@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: anatole-api
+    runtime: python
+    rootDir: apps/api
+    buildCommand: pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: MARKET_DATA_PROVIDER
+        value: yahoo
+      - key: CORS_ORIGINS
+        sync: false

@@ -1,0 +1,165 @@
+import asyncio
+import math
+import random
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import httpx
+
+from app.core.config import settings
+from app.schemas.stocks import Candle, FocusSnapshot, Quote, StockProfile, Technicals
+from app.services.indicators import calculate_technicals
+
+
+class DemoProvider:
+    def normalize_ticker(self, ticker: str) -> str:
+        value = ticker.strip().upper()
+        return value if "." in value else f"{value}.TO"
+
+    def _seed(self, ticker: str) -> int:
+        return sum((index + 1) * ord(char) for index, char in enumerate(ticker))
+
+    async def history(self, ticker: str, range_: str, interval: str) -> list[Candle]:
+        symbol = self.normalize_ticker(ticker)
+        randomizer = random.Random(self._seed(symbol))
+        count = {"1mo": 30, "3mo": 90, "6mo": 130, "1y": 260, "2y": 520, "5y": 900}.get(range_, 260)
+        start = datetime.now(UTC) - timedelta(days=count * 1.5)
+        price = 45 + (self._seed(symbol) % 120)
+        output: list[Candle] = []
+        current = start
+        while len(output) < count:
+            current += timedelta(days=1)
+            if current.weekday() >= 5:
+                continue
+            drift = 0.00035 + 0.0018 * math.sin(len(output) / 31)
+            shock = randomizer.gauss(0, 0.012)
+            open_price = price * (1 + randomizer.gauss(0, 0.003))
+            close = max(1, price * (1 + drift + shock))
+            high = max(open_price, close) * (1 + abs(randomizer.gauss(0.006, 0.004)))
+            low = min(open_price, close) * (1 - abs(randomizer.gauss(0.006, 0.004)))
+            volume = int(700_000 + abs(randomizer.gauss(0, 450_000)))
+            output.append(Candle(time=int(current.timestamp()), open=round(open_price, 4), high=round(high, 4), low=round(low, 4), close=round(close, 4), volume=volume))
+            price = close
+        return output
+
+    async def quote(self, ticker: str) -> Quote:
+        history = await self.history(ticker, "1mo", "1d")
+        last, previous = history[-1], history[-2]
+        change = last.close - previous.close
+        return Quote(
+            ticker=self.normalize_ticker(ticker), symbol=self.normalize_ticker(ticker).split(".")[0], name=f"{self.normalize_ticker(ticker).split('.')[0]} — démonstration", exchange="TSX", currency="CAD",
+            price=last.close, previous_close=previous.close, change=round(change, 4), change_percent=round(change / previous.close * 100, 4), day_high=last.high, day_low=last.low,
+            volume=last.volume, timestamp=datetime.now(UTC), source="demo-fallback", delayed=True,
+        )
+
+    async def profile(self, ticker: str) -> StockProfile:
+        symbol = self.normalize_ticker(ticker)
+        return StockProfile(ticker=symbol, name=f"{symbol.split('.')[0]} — profil de démonstration", exchange="TSX", currency="CAD", sector="Marché canadien", industry="Titre coté", description="Données de secours utilisées lorsque la source publique n’est pas disponible. La structure API reste identique à celle de production.")
+
+
+class YahooProvider:
+    base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
+
+    def normalize_ticker(self, ticker: str) -> str:
+        value = ticker.strip().upper()
+        return value if "." in value else f"{value}.TO"
+
+    async def _chart(self, ticker: str, range_: str, interval: str) -> dict[str, Any]:
+        symbol = self.normalize_ticker(ticker)
+        headers = {"User-Agent": "Mozilla/5.0 Anatole/0.1", "Accept": "application/json"}
+        async with httpx.AsyncClient(timeout=settings.yahoo_timeout_seconds, headers=headers) as client:
+            response = await client.get(f"{self.base_url}/{symbol}", params={"range": range_, "interval": interval, "events": "div,splits"})
+            response.raise_for_status()
+            payload = response.json()
+        result = payload.get("chart", {}).get("result") or []
+        if not result:
+            raise RuntimeError("Yahoo chart payload is empty")
+        return result[0]
+
+    async def history(self, ticker: str, range_: str, interval: str) -> list[Candle]:
+        result = await self._chart(ticker, range_, interval)
+        timestamps = result.get("timestamp") or []
+        quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+        output: list[Candle] = []
+        for index, timestamp in enumerate(timestamps):
+            try:
+                values = [quote.get(field, [None])[index] for field in ("open", "high", "low", "close")]
+                if any(value is None for value in values):
+                    continue
+                output.append(Candle(time=int(timestamp), open=float(values[0]), high=float(values[1]), low=float(values[2]), close=float(values[3]), volume=int((quote.get("volume") or [0])[index] or 0)))
+            except (IndexError, TypeError, ValueError):
+                continue
+        if len(output) < 2:
+            raise RuntimeError("Yahoo history contains insufficient candles")
+        return output
+
+    async def quote(self, ticker: str) -> Quote:
+        result = await self._chart(ticker, "1d", "1m")
+        meta = result.get("meta") or {}
+        candles = await self.history(ticker, "5d", "5m")
+        last = candles[-1]
+        previous_close = float(meta.get("chartPreviousClose") or meta.get("previousClose") or candles[-2].close)
+        price = float(meta.get("regularMarketPrice") or last.close)
+        change = price - previous_close
+        symbol = self.normalize_ticker(ticker)
+        return Quote(
+            ticker=symbol,
+            symbol=symbol.split(".")[0],
+            name=str(meta.get("longName") or meta.get("shortName") or symbol.split(".")[0]),
+            exchange=str(meta.get("exchangeName") or "TSX"),
+            currency=str(meta.get("currency") or "CAD"),
+            price=price,
+            previous_close=previous_close,
+            change=change,
+            change_percent=(change / previous_close * 100) if previous_close else 0,
+            day_high=float(meta.get("regularMarketDayHigh") or last.high),
+            day_low=float(meta.get("regularMarketDayLow") or last.low),
+            volume=int(meta.get("regularMarketVolume") or last.volume),
+            timestamp=datetime.fromtimestamp(int(meta.get("regularMarketTime") or last.time), UTC),
+            source="yahoo-public",
+            delayed=True,
+        )
+
+    async def profile(self, ticker: str) -> StockProfile:
+        quote = await self.quote(ticker)
+        return StockProfile(ticker=quote.ticker, name=quote.name, exchange=quote.exchange, currency=quote.currency, sector="Marché canadien", industry=None, description="Profil de base provenant du flux de marché public. Les fondamentaux détaillés seront branchés lors du prochain jalon.")
+
+
+class MarketDataService:
+    def __init__(self) -> None:
+        self.demo = DemoProvider()
+        self.yahoo = YahooProvider()
+
+    def normalize_ticker(self, ticker: str) -> str:
+        return self.yahoo.normalize_ticker(ticker)
+
+    async def _with_fallback(self, primary, fallback):
+        if settings.market_data_provider.lower() == "demo":
+            return await fallback()
+        try:
+            return await primary()
+        except Exception:
+            return await fallback()
+
+    async def get_quote(self, ticker: str) -> Quote:
+        return await self._with_fallback(lambda: self.yahoo.quote(ticker), lambda: self.demo.quote(ticker))
+
+    async def get_history(self, ticker: str, range_: str = "1y", interval: str = "1d") -> list[Candle]:
+        return await self._with_fallback(lambda: self.yahoo.history(ticker, range_, interval), lambda: self.demo.history(ticker, range_, interval))
+
+    async def get_profile(self, ticker: str) -> StockProfile:
+        return await self._with_fallback(lambda: self.yahoo.profile(ticker), lambda: self.demo.profile(ticker))
+
+    def calculate_technicals(self, candles: list[Candle]) -> Technicals:
+        return calculate_technicals(candles)
+
+    async def get_focus_snapshot(self, ticker: str, range_: str = "1y", interval: str = "1d") -> FocusSnapshot:
+        quote, history, profile = await asyncio.gather(
+            self.get_quote(ticker),
+            self.get_history(ticker, range_, interval),
+            self.get_profile(ticker),
+        )
+        return FocusSnapshot(quote=quote, history=history, technicals=self.calculate_technicals(history), profile=profile, generated_at=datetime.now(UTC))
+
+
+market_data_service = MarketDataService()
