@@ -14,7 +14,11 @@ from app.services.indicators import calculate_technicals
 class DemoProvider:
     def normalize_ticker(self, ticker: str) -> str:
         value = ticker.strip().upper()
-        if value.endswith(".TO"):
+        if not value:
+            raise ValueError("Ticker cannot be empty")
+        if value.startswith("^") or value.endswith(("=F", "=X")):
+            return value
+        if value.endswith((".TO", ".V", ".CN", ".NE")):
             return value
         # Yahoo represents TSX share classes and units with a hyphen.
         return f"{value.replace('.', '-')}.TO"
@@ -65,7 +69,11 @@ class YahooProvider:
 
     def normalize_ticker(self, ticker: str) -> str:
         value = ticker.strip().upper()
-        if value.endswith(".TO"):
+        if not value:
+            raise ValueError("Ticker cannot be empty")
+        if value.startswith("^") or value.endswith(("=F", "=X")):
+            return value
+        if value.endswith((".TO", ".V", ".CN", ".NE")):
             return value
         # Yahoo represents TSX share classes and units with a hyphen.
         return f"{value.replace('.', '-')}.TO"
@@ -210,6 +218,22 @@ class MarketDataService:
 
     async def get_profile(self, ticker: str) -> StockProfile:
         return await self._with_fallback(lambda: self.yahoo.profile(ticker), lambda: self.demo.profile(ticker))
+
+    async def get_history_many(
+        self,
+        tickers: list[str],
+        range_: str = "3mo",
+        interval: str = "1d",
+        concurrency: int = 10,
+    ) -> dict[str, list[Candle]]:
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+
+        async def fetch(ticker: str) -> tuple[str, list[Candle]]:
+            async with semaphore:
+                return ticker, await self.get_history(ticker, range_, interval)
+
+        results = await asyncio.gather(*(fetch(ticker) for ticker in tickers))
+        return {ticker: candles for ticker, candles in results}
 
     def calculate_technicals(self, candles: list[Candle]) -> Technicals:
         return calculate_technicals(candles)

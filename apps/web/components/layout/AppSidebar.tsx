@@ -35,10 +35,10 @@ const groups: Array<{ label: string; items: NavItem[] }> = [
     label: "Marchés",
     items: [
       { href: "/cockpit", label: "Cockpit", icon: LayoutDashboard, available: true, mobile: true },
-      { href: "/roadmap#screener", label: "Screener", icon: TableProperties, available: false },
-      { href: "/roadmap#actualites", label: "Actualités", icon: Newspaper, available: false },
-      { href: "/roadmap#calendrier", label: "Calendrier", icon: CalendarDays, available: false },
-      { href: "/roadmap#etf", label: "ETF", icon: CircleDollarSign, available: false },
+      { href: "/screener", label: "Screener", icon: TableProperties, available: true, mobile: true },
+      { href: "/actualites", label: "Actualités", icon: Newspaper, available: true },
+      { href: "/calendrier", label: "Calendrier", icon: CalendarDays, available: true },
+      { href: "/etf", label: "ETF", icon: CircleDollarSign, available: true },
       { href: "/roadmap#ipo", label: "IPO & insiders", icon: Database, available: false },
     ],
   },
@@ -47,7 +47,7 @@ const groups: Array<{ label: string; items: NavItem[] }> = [
     items: [
       { href: "/focus/RY", label: "Focus", icon: BarChart3, available: true, mobile: true },
       { href: "/roadmap#comparateur", label: "Comparateur", icon: GitCompareArrows, available: false },
-      { href: "/roadmap#psychologie", label: "Psychologie", icon: Activity, available: false },
+      { href: "/psychologie", label: "Psychologie", icon: Activity, available: true },
       { href: "/roadmap#terminal", label: "Terminal Pro", icon: Gauge, available: false },
     ],
   },
@@ -130,7 +130,7 @@ export function AppSidebar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </nav>
 
       <div className="sidebar-footer">
-        <Link href="/roadmap">Migration v0.4</Link>
+        <Link href="/roadmap">Migration v0.5</Link>
         <span>Next.js + FastAPI</span>
       </div>
     </aside>

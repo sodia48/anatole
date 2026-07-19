@@ -8,6 +8,11 @@ import { ApiStatus } from "@/components/status/ApiStatus";
 const titles: Array<[string, string]> = [
   ["/cockpit", "Cockpit TSX 60"],
   ["/focus", "Focus"],
+  ["/screener", "Screener TSX 60"],
+  ["/actualites", "Actualités officielles"],
+  ["/calendrier", "Calendrier économique"],
+  ["/etf", "ETF"],
+  ["/psychologie", "Psychologie du marché"],
   ["/watchlist", "Watchlist"],
   ["/preferences", "Préférences"],
   ["/roadmap", "Migration Anatole"],

@@ -139,3 +139,121 @@ export type SymbolSearchResponse = {
   items: SymbolSearchItem[];
   count: number;
 };
+
+export type ScreenerRow = {
+  ticker: string;
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change_percent: number;
+  volume: number;
+  average_volume_20d: number;
+  relative_volume: number;
+  momentum_20d: number;
+  rsi_14: number | null;
+  sma_20: number | null;
+  sma_50: number | null;
+  trend: string;
+  score: number;
+  signal: string;
+  source: string;
+  delayed: boolean;
+};
+
+export type ScreenerSnapshot = {
+  universe: string;
+  items: ScreenerRow[];
+  sectors: string[];
+  generated_at: string;
+  refresh_after_seconds: number;
+  live_items: number;
+  fallback_items: number;
+};
+
+export type FeedStatus = {
+  source: string;
+  status: string;
+  detail: string | null;
+};
+
+export type NewsItem = {
+  id: string;
+  title: string;
+  summary: string;
+  url: string;
+  source: string;
+  category: string;
+  published_at: string;
+  sentiment: string;
+  sentiment_score: number;
+};
+
+export type NewsSnapshot = {
+  items: NewsItem[];
+  source_statuses: FeedStatus[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type EconomicEvent = {
+  id: string;
+  title: string;
+  country: string;
+  currency: string;
+  category: string;
+  importance: string;
+  starts_at: string;
+  source: string;
+  url: string | null;
+  description: string | null;
+};
+
+export type CalendarSnapshot = {
+  events: EconomicEvent[];
+  source_statuses: FeedStatus[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type EtfDirectoryItem = {
+  ticker: string;
+  symbol: string;
+  name: string;
+  provider: string;
+  category: string;
+  exposure: string;
+  currency: string;
+  price: number;
+  change_percent: number;
+  volume: number;
+  source: string;
+  delayed: boolean;
+};
+
+export type EtfDirectorySnapshot = {
+  items: EtfDirectoryItem[];
+  categories: string[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type PsychologyComponent = {
+  key: string;
+  label: string;
+  score: number;
+  description: string;
+};
+
+export type PsychologySnapshot = {
+  score: number;
+  label: string;
+  change_20d: number;
+  change_50d: number;
+  volatility_20d: number;
+  advance_ratio: number;
+  components: PsychologyComponent[];
+  generated_at: string;
+  refresh_after_seconds: number;
+  source: string;
+};

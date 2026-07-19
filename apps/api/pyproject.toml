@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anatole-api"
-version = "0.4.1"
+version = "0.5.0"
 description = "API FastAPI de la plateforme Anatole"
 requires-python = ">=3.11"
 dependencies = [

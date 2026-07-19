@@ -5,19 +5,19 @@ const phases = [
   {
     title: "Socle plateforme",
     version: "v0.4",
-    status: "active",
-    items: ["Navigation complète desktop et mobile", "Recherche universelle Ctrl K", "Préférences persistantes", "État global de l’API", "Cadences live centralisées"],
+    status: "done",
+    items: ["Navigation desktop et mobile", "Recherche universelle Ctrl K", "Préférences persistantes", "État global de l’API", "Pont Next.js vers FastAPI"],
   },
   {
     title: "Marchés",
     version: "v0.5",
-    status: "next",
-    items: ["Screener TSX 60 et Composite", "Actualités", "Calendrier économique", "ETF", "IPO", "Insiders", "Psychologie du marché"],
+    status: "active",
+    items: ["Screener TSX 60", "Actualités officielles", "Calendrier économique", "Répertoire ETF", "Psychologie du marché", "Prochaine sous-étape : Composite, IPO et insiders"],
   },
   {
     title: "Analyse professionnelle",
     version: "v0.6",
-    status: "planned",
+    status: "next",
     items: ["Focus Chart Studio", "Outils de dessin persistants", "Comparateur", "Backtesting", "Corrélations", "Terminal Pro"],
   },
   {
@@ -34,14 +34,14 @@ const phases = [
   },
 ];
 
-const featureIds = ["screener", "actualites", "calendrier", "etf", "ipo", "comparateur", "psychologie", "terminal", "portefeuille", "alertes", "assistant", "qualite"];
+const featureIds = ["composite", "ipo", "insiders", "comparateur", "terminal", "portefeuille", "alertes", "assistant", "qualite"];
 
 export default function RoadmapPage() {
   return (
     <div className="roadmap-page">
       <header className="panel roadmap-header">
-        <div><span className="eyebrow">PARITÉ BÊTA STREAMLIT</span><h1>Migration Anatole</h1><p>La nouvelle plateforme progresse par blocs testables, sans fragiliser Cockpit, Focus ou Watchlist.</p></div>
-        <div className="roadmap-progress"><strong>3</strong><span>fonctions actives</span><small>Cockpit · Focus · Watchlist</small></div>
+        <div><span className="eyebrow">PARITÉ BÊTA STREAMLIT</span><h1>Migration Anatole</h1><p>La nouvelle plateforme progresse par blocs testables, sans fragiliser les sections déjà en production.</p></div>
+        <div className="roadmap-progress"><strong>8</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · Psychologie</small></div>
       </header>
 
       <section className="roadmap-summary">
@@ -51,11 +51,11 @@ export default function RoadmapPage() {
       </section>
 
       <section className="roadmap-timeline">
-        {phases.map((phase, index) => (
+        {phases.map((phase) => (
           <article className={`panel roadmap-phase roadmap-${phase.status}`} key={phase.version}>
-            <div className="roadmap-phase-marker">{phase.status === "active" ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}</div>
+            <div className="roadmap-phase-marker">{phase.status === "done" || phase.status === "active" ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}</div>
             <div className="roadmap-phase-copy">
-              <div className="roadmap-phase-title"><span>{phase.version}</span><h2>{phase.title}</h2>{phase.status === "active" ? <em>En cours</em> : phase.status === "next" ? <em>Prochaine</em> : <em>Planifiée</em>}</div>
+              <div className="roadmap-phase-title"><span>{phase.version}</span><h2>{phase.title}</h2><em>{phase.status === "done" ? "Terminé" : phase.status === "active" ? "En cours" : phase.status === "next" ? "Prochaine" : "Planifiée"}</em></div>
               <div className="roadmap-items">{phase.items.map((item) => <span key={item}>{item}</span>)}</div>
             </div>
           </article>
@@ -63,10 +63,8 @@ export default function RoadmapPage() {
       </section>
 
       <section className="panel feature-index">
-        <div><span className="eyebrow">REGISTRE</span><h2>Sections de la bêta à migrer</h2><p>Les liens « Bientôt » de la navigation arrivent ici jusqu’à leur activation.</p></div>
-        <div className="feature-anchor-grid">
-          {featureIds.map((id) => <span id={id} key={id}>{id.replace(/-/g, " ")}</span>)}
-        </div>
+        <div><span className="eyebrow">PROCHAINES MIGRATIONS</span><h2>Fonctions restantes de la bêta</h2><p>Les fonctions ci-dessous seront activées progressivement après validation des sections Marchés.</p></div>
+        <div className="feature-anchor-grid">{featureIds.map((id) => <span id={id} key={id}>{id.replace(/-/g, " ")}</span>)}</div>
         <Link href="/cockpit" className="primary-button">Retour au Cockpit</Link>
       </section>
     </div>
