@@ -7,8 +7,8 @@ import { BarChart3, Bell, BookOpen, LayoutDashboard, Search, Star } from "lucide
 const items = [
   { href: "/cockpit", label: "Cockpit", icon: LayoutDashboard },
   { href: "/focus/RY", label: "Focus", icon: BarChart3 },
+  { href: "/watchlist", label: "Watchlist", icon: Star },
   { href: "/focus/SHOP", label: "Screener bientôt", icon: Search },
-  { href: "/focus/ENB", label: "Liste bientôt", icon: Star },
 ];
 
 export function AppSidebar() {

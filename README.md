@@ -1,24 +1,24 @@
-# Anatole Platform v0.2 — Cockpit TSX 60
+# Anatole Platform v0.3
 
-Monorepo de migration d’Anatole vers Next.js + FastAPI.
+Migration Next.js + FastAPI d’Anatole.
 
-## Fonctionnel
+## Sections disponibles
 
-- `/cockpit` : carte du S&P/TSX 60, largeur de marché, secteurs et principaux mouvements.
-- Actualisation automatique toutes les 15 secondes, sans bouton Live.
-- Chaque tuile ouvre `/focus/{ticker}`.
-- `/focus/RY` et autres pages Focus avec WebSocket.
-- FastAPI sur Render et Next.js sur Vercel.
+- `/cockpit` — Cockpit TSX 60 avec heatmap et mise à jour automatique.
+- `/focus/RY` — Focus d’un titre avec graphique et cotation WebSocket.
+- `/watchlist` — liste personnalisée, sauvegardée localement et actualisée toutes les 20 secondes.
 
-## API ajoutée
+## Architecture
 
-- `GET /api/v1/market/cockpit?universe=tsx60`
+- Frontend : Next.js / React / TypeScript
+- Backend : FastAPI / Python
+- Graphiques : Lightweight Charts
+- Déploiement : Vercel + Render
 
-## Déploiement
+## Développement local
 
-Téléverser les fichiers du patch à la racine du dépôt GitHub. Le commit déclenche automatiquement :
+Consulter `.env.example`, puis lancer l’API et le frontend dans deux terminaux.
 
-- un redéploiement de l’API Render via `render.yaml`;
-- un redéploiement du frontend Vercel connecté à `apps/web`.
+## Données
 
-Les variables existantes restent inchangées.
+Les flux publics peuvent être différés. Le fournisseur de repli préserve le fonctionnement de l’interface lorsque la source principale est indisponible.

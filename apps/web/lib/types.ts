@@ -102,3 +102,18 @@ export type CockpitSnapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
+
+export type WatchlistSummary = {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  average_change_percent: number;
+};
+
+export type WatchlistSnapshot = {
+  tickers: string[];
+  items: Quote[];
+  summary: WatchlistSummary;
+  generated_at: string;
+  refresh_after_seconds: number;
+};

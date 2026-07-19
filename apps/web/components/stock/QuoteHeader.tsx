@@ -1,4 +1,5 @@
 import type { Quote } from "@/lib/types";
+import { WatchlistButton } from "@/components/watchlist/WatchlistButton";
 
 const number = new Intl.NumberFormat("fr-CA", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 const compact = new Intl.NumberFormat("fr-CA", { notation: "compact", maximumFractionDigits: 1 });
@@ -20,10 +21,13 @@ export function QuoteHeader({ quote, liveState }: { quote: Quote; liveState: "co
           </span>
         </div>
       </div>
-      <div className="quote-meta">
-        <span className={`live-pill ${liveState}`}>{liveState === "live" ? "LIVE" : liveState === "connecting" ? "CONNEXION" : "REPLI"}</span>
-        <span>Volume {compact.format(quote.volume)}</span>
-        <span>{quote.delayed ? "Donnée potentiellement différée" : "Flux disponible"}</span>
+      <div className="quote-actions">
+        <WatchlistButton ticker={quote.ticker} />
+        <div className="quote-meta">
+          <span className={`live-pill ${liveState}`}>{liveState === "live" ? "LIVE" : liveState === "connecting" ? "CONNEXION" : "REPLI"}</span>
+          <span>Volume {compact.format(quote.volume)}</span>
+          <span>{quote.delayed ? "Donnée potentiellement différée" : "Flux disponible"}</span>
+        </div>
       </div>
     </header>
   );
