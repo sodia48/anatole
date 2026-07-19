@@ -117,3 +117,25 @@ export type WatchlistSnapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
+
+
+export type HealthStatus = {
+  status: string;
+  service: string;
+  timestamp: string;
+};
+
+export type SymbolSearchItem = {
+  symbol: string;
+  ticker: string;
+  name: string;
+  sector: string;
+  exchange: string;
+  universe: string;
+};
+
+export type SymbolSearchResponse = {
+  query: string;
+  items: SymbolSearchItem[];
+  count: number;
+};

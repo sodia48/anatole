@@ -1,4 +1,4 @@
-import type { CockpitSnapshot, FocusSnapshot, WatchlistSnapshot } from "./types";
+import type { CockpitSnapshot, FocusSnapshot, HealthStatus, SymbolSearchResponse, WatchlistSnapshot } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -42,4 +42,18 @@ export async function getWatchlistSnapshot(tickers: string[], signal?: AbortSign
     throw new Error(`Watchlist API error: ${response.status}`);
   }
   return response.json() as Promise<WatchlistSnapshot>;
+}
+
+
+export async function getHealthStatus(signal?: AbortSignal): Promise<HealthStatus> {
+  const response = await fetch(`${API_URL}/health`, { cache: "no-store", signal });
+  if (!response.ok) throw new Error(`Health API error: ${response.status}`);
+  return response.json() as Promise<HealthStatus>;
+}
+
+export async function searchSymbols(query: string, signal?: AbortSignal): Promise<SymbolSearchResponse> {
+  const params = new URLSearchParams({ q: query, limit: "8" });
+  const response = await fetch(`${API_URL}/api/v1/search/symbols?${params.toString()}`, { cache: "no-store", signal });
+  if (!response.ok) throw new Error(`Search API error: ${response.status}`);
+  return response.json() as Promise<SymbolSearchResponse>;
 }

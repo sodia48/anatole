@@ -1,4 +1,4 @@
-# Anatole Platform v0.3
+# Anatole Platform v0.4
 
 Migration Next.js + FastAPI d’Anatole.
 
@@ -6,7 +6,22 @@ Migration Next.js + FastAPI d’Anatole.
 
 - `/cockpit` — Cockpit TSX 60 avec heatmap et mise à jour automatique.
 - `/focus/RY` — Focus d’un titre avec graphique et cotation WebSocket.
-- `/watchlist` — liste personnalisée, sauvegardée localement et actualisée toutes les 20 secondes.
+- `/watchlist` — liste personnalisée, sauvegardée localement et actualisée automatiquement.
+- `/preferences` — thème, densité, décimales et période par défaut.
+- `/roadmap` — registre de migration des fonctionnalités de la bêta Streamlit.
+
+## Nouveau dans v0.4
+
+- navigation complète desktop et mobile ;
+- regroupement Marchés, Analyse, Mon espace et Intelligence ;
+- recherche universelle avec `Ctrl + K` ;
+- recherche de symboles TSX 60 par nom, secteur ou ticker ;
+- ouverture directe de n’importe quel symbole dans Focus ;
+- état global de l’API ;
+- thème sombre par défaut et thème bleu optionnel ;
+- densité confortable ou compacte ;
+- préférences persistantes dans le navigateur ;
+- cadences de rafraîchissement centralisées.
 
 ## Architecture
 

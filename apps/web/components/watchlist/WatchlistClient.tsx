@@ -6,6 +6,7 @@ import { getWatchlistSnapshot } from "@/lib/api";
 import type { WatchlistSnapshot } from "@/lib/types";
 import { normalizeWatchlistSymbol, readWatchlist, writeWatchlist } from "@/lib/watchlist";
 import { WatchlistTable } from "./WatchlistTable";
+import { REFRESH_INTERVALS } from "@/lib/refresh";
 
 export function WatchlistClient() {
   const [tickers, setTickers] = useState<string[]>([]);
@@ -43,7 +44,7 @@ export function WatchlistClient() {
     if (!hydrated || tickers.length === 0) return;
     const controller = new AbortController();
     void load(tickers, controller.signal);
-    const interval = window.setInterval(() => void load(tickers), 20_000);
+    const interval = window.setInterval(() => void load(tickers), REFRESH_INTERVALS.watchlist);
     return () => {
       controller.abort();
       window.clearInterval(interval);

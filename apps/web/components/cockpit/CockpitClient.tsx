@@ -5,6 +5,7 @@ import { MarketHeatmap } from "./MarketHeatmap";
 import { MoversList } from "./MoversList";
 import { getCockpitSnapshot } from "@/lib/api";
 import type { CockpitSnapshot } from "@/lib/types";
+import { REFRESH_INTERVALS } from "@/lib/refresh";
 
 export function CockpitClient() {
   const [snapshot, setSnapshot] = useState<CockpitSnapshot | null>(null);
@@ -29,7 +30,7 @@ export function CockpitClient() {
   useEffect(() => {
     const controller = new AbortController();
     void load(controller.signal);
-    const interval = window.setInterval(() => void load(), 15_000);
+    const interval = window.setInterval(() => void load(), REFRESH_INTERVALS.cockpitTsx60);
     return () => {
       controller.abort();
       window.clearInterval(interval);
