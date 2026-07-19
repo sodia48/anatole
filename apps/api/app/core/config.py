@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_env: str = "development"
     cors_origins: str = "http://localhost:3000"
+    cors_origin_regex: str = r"^https://anatole(?:-[a-z0-9-]+)*\.vercel\.app$"
     market_data_provider: str = "yahoo"
     yahoo_timeout_seconds: float = 8.0
 
