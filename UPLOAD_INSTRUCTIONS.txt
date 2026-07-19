@@ -1,0 +1,9 @@
+1) GitHub: supprimer package-lock.json à la racine.
+2) Upload files: téléverser le CONTENU de ce dossier décompressé (pas le dossier lui-même).
+3) Vérifier avant le commit que GitHub affiche 3 fichiers modifiés/ajoutés:
+   - package.json
+   - pnpm-workspace.yaml
+   - apps/web/package.json
+4) Commit message: Apply Vercel pnpm fix v0.1.2
+5) Vercel: ne pas cliquer Redeploy sur l'ancien déploiement 597a673.
+   Attendre le nouveau déploiement lié au nouveau commit, ou Deployments > Create Deployment depuis main.

@@ -1,0 +1,14 @@
+{
+  "name": "anatole-platform",
+  "private": true,
+  "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "build:web": "pnpm --dir apps/web build",
+    "lint:web": "pnpm --dir apps/web lint",
+    "typecheck:web": "pnpm --dir apps/web typecheck"
+  }
+}
