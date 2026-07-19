@@ -1,4 +1,4 @@
-import type { FocusSnapshot } from "./types";
+import type { CockpitSnapshot, FocusSnapshot } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -17,4 +17,16 @@ export async function getFocusSnapshot(ticker: string): Promise<FocusSnapshot> {
 export function quoteWebSocketUrl(ticker: string): string {
   const base = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
   return `${base}/ws/v1/quotes/${encodeURIComponent(ticker)}`;
+}
+
+
+export async function getCockpitSnapshot(signal?: AbortSignal): Promise<CockpitSnapshot> {
+  const response = await fetch(`${API_URL}/api/v1/market/cockpit?universe=tsx60`, {
+    cache: "no-store",
+    signal,
+  });
+  if (!response.ok) {
+    throw new Error(`Cockpit API error: ${response.status}`);
+  }
+  return response.json() as Promise<CockpitSnapshot>;
 }

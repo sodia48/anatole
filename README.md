@@ -1,60 +1,24 @@
-# Anatole Platform — Focus vertical slice
+# Anatole Platform v0.2 — Cockpit TSX 60
 
-Première tranche de migration de Streamlit vers Next.js + FastAPI.
+Monorepo de migration d’Anatole vers Next.js + FastAPI.
 
-## Ce qui est inclus
+## Fonctionnel
 
-- Frontend Next.js App Router en TypeScript.
-- Backend FastAPI structuré avec `APIRouter`.
-- Page `/focus/[ticker]`.
-- Endpoints santé, cotation, historique, indicateurs, profil et vue Focus agrégée.
-- WebSocket de cotation par titre.
-- Fournisseur Yahoo Finance public avec repli automatique vers des données de démonstration cohérentes.
-- Graphique chandeliers + volume avec Lightweight Charts.
-- Gestion propre des pannes de source.
+- `/cockpit` : carte du S&P/TSX 60, largeur de marché, secteurs et principaux mouvements.
+- Actualisation automatique toutes les 15 secondes, sans bouton Live.
+- Chaque tuile ouvre `/focus/{ticker}`.
+- `/focus/RY` et autres pages Focus avec WebSocket.
+- FastAPI sur Render et Next.js sur Vercel.
 
-## Démarrage local
+## API ajoutée
 
-### API
-
-```bash
-cd apps/api
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -e ".[dev]"
-uvicorn app.main:app --reload --port 8000
-```
-
-### Web
-
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-
-Puis ouvrir :
-
-- http://localhost:3000/focus/RY
-- http://localhost:8000/docs
-- http://localhost:8000/health
+- `GET /api/v1/market/cockpit?universe=tsx60`
 
 ## Déploiement
 
-### Vercel — frontend
+Téléverser les fichiers du patch à la racine du dépôt GitHub. Le commit déclenche automatiquement :
 
-- Root directory : `apps/web`
-- Variable : `NEXT_PUBLIC_API_URL`
-- Variable : `NEXT_PUBLIC_WS_URL`
+- un redéploiement de l’API Render via `render.yaml`;
+- un redéploiement du frontend Vercel connecté à `apps/web`.
 
-### Render — API
-
-- Root directory : `apps/api`
-- Build command : `pip install -e .`
-- Start command : `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- Variable : `CORS_ORIGINS=https://votre-frontend.vercel.app`
-
-## Étape suivante
-
-Brancher progressivement les fonctions Python pures d’Anatole dans `apps/api/app/services` et remplacer les données de secours par le fournisseur de marché retenu.
+Les variables existantes restent inchangées.

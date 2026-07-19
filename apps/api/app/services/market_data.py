@@ -14,7 +14,10 @@ from app.services.indicators import calculate_technicals
 class DemoProvider:
     def normalize_ticker(self, ticker: str) -> str:
         value = ticker.strip().upper()
-        return value if "." in value else f"{value}.TO"
+        if value.endswith(".TO"):
+            return value
+        # Yahoo represents TSX share classes and units with a hyphen.
+        return f"{value.replace('.', '-')}.TO"
 
     def _seed(self, ticker: str) -> int:
         return sum((index + 1) * ord(char) for index, char in enumerate(ticker))
@@ -62,7 +65,10 @@ class YahooProvider:
 
     def normalize_ticker(self, ticker: str) -> str:
         value = ticker.strip().upper()
-        return value if "." in value else f"{value}.TO"
+        if value.endswith(".TO"):
+            return value
+        # Yahoo represents TSX share classes and units with a hyphen.
+        return f"{value.replace('.', '-')}.TO"
 
     async def _chart(self, ticker: str, range_: str, interval: str) -> dict[str, Any]:
         symbol = self.normalize_ticker(ticker)
@@ -75,6 +81,76 @@ class YahooProvider:
         if not result:
             raise RuntimeError("Yahoo chart payload is empty")
         return result[0]
+
+    def _quote_from_result(self, ticker: str, result: dict[str, Any]) -> Quote:
+        meta = result.get("meta") or {}
+        timestamps = result.get("timestamp") or []
+        raw_quote = ((result.get("indicators") or {}).get("quote") or [{}])[0]
+        valid: list[tuple[int, float, float, float, int]] = []
+        for index, timestamp in enumerate(timestamps):
+            try:
+                close = (raw_quote.get("close") or [None])[index]
+                high = (raw_quote.get("high") or [None])[index]
+                low = (raw_quote.get("low") or [None])[index]
+                volume = int(((raw_quote.get("volume") or [0])[index]) or 0)
+                if close is None or high is None or low is None:
+                    continue
+                valid.append((int(timestamp), float(close), float(high), float(low), volume))
+            except (IndexError, TypeError, ValueError):
+                continue
+        if not valid:
+            raise RuntimeError("Yahoo quote payload is empty")
+        last = valid[-1]
+        previous_close = float(meta.get("chartPreviousClose") or meta.get("previousClose") or (valid[-2][1] if len(valid) > 1 else last[1]))
+        price = float(meta.get("regularMarketPrice") or last[1])
+        change = price - previous_close
+        symbol = self.normalize_ticker(ticker)
+        return Quote(
+            ticker=symbol,
+            symbol=symbol.removesuffix(".TO"),
+            name=str(meta.get("longName") or meta.get("shortName") or symbol.removesuffix(".TO")),
+            exchange=str(meta.get("exchangeName") or "TSX"),
+            currency=str(meta.get("currency") or "CAD"),
+            price=price,
+            previous_close=previous_close,
+            change=change,
+            change_percent=(change / previous_close * 100) if previous_close else 0,
+            day_high=float(meta.get("regularMarketDayHigh") or last[2]),
+            day_low=float(meta.get("regularMarketDayLow") or last[3]),
+            volume=int(meta.get("regularMarketVolume") or last[4]),
+            timestamp=datetime.fromtimestamp(int(meta.get("regularMarketTime") or last[0]), UTC),
+            source="yahoo-public",
+            delayed=True,
+        )
+
+    async def quotes_many(self, tickers: list[str]) -> list[Quote]:
+        headers = {"User-Agent": "Mozilla/5.0 Anatole/0.2", "Accept": "application/json"}
+        semaphore = asyncio.Semaphore(12)
+        timeout = httpx.Timeout(min(settings.yahoo_timeout_seconds, 6.0))
+        async with httpx.AsyncClient(timeout=timeout, headers=headers) as client:
+            async def fetch_one(ticker: str) -> Quote:
+                symbol = self.normalize_ticker(ticker)
+                async with semaphore:
+                    response = await client.get(
+                        f"{self.base_url}/{symbol}",
+                        params={"range": "5d", "interval": "5m", "events": "div,splits"},
+                    )
+                    response.raise_for_status()
+                    payload = response.json()
+                    results = payload.get("chart", {}).get("result") or []
+                    if not results:
+                        raise RuntimeError("Yahoo chart payload is empty")
+                    return self._quote_from_result(ticker, results[0])
+
+            results = await asyncio.gather(*(fetch_one(ticker) for ticker in tickers), return_exceptions=True)
+
+        output: list[Quote] = []
+        for ticker, result in zip(tickers, results, strict=True):
+            if isinstance(result, Quote):
+                output.append(result)
+            else:
+                output.append(await DemoProvider().quote(ticker))
+        return output
 
     async def history(self, ticker: str, range_: str, interval: str) -> list[Candle]:
         result = await self._chart(ticker, range_, interval)
@@ -94,31 +170,8 @@ class YahooProvider:
         return output
 
     async def quote(self, ticker: str) -> Quote:
-        result = await self._chart(ticker, "1d", "1m")
-        meta = result.get("meta") or {}
-        candles = await self.history(ticker, "5d", "5m")
-        last = candles[-1]
-        previous_close = float(meta.get("chartPreviousClose") or meta.get("previousClose") or candles[-2].close)
-        price = float(meta.get("regularMarketPrice") or last.close)
-        change = price - previous_close
-        symbol = self.normalize_ticker(ticker)
-        return Quote(
-            ticker=symbol,
-            symbol=symbol.split(".")[0],
-            name=str(meta.get("longName") or meta.get("shortName") or symbol.split(".")[0]),
-            exchange=str(meta.get("exchangeName") or "TSX"),
-            currency=str(meta.get("currency") or "CAD"),
-            price=price,
-            previous_close=previous_close,
-            change=change,
-            change_percent=(change / previous_close * 100) if previous_close else 0,
-            day_high=float(meta.get("regularMarketDayHigh") or last.high),
-            day_low=float(meta.get("regularMarketDayLow") or last.low),
-            volume=int(meta.get("regularMarketVolume") or last.volume),
-            timestamp=datetime.fromtimestamp(int(meta.get("regularMarketTime") or last.time), UTC),
-            source="yahoo-public",
-            delayed=True,
-        )
+        result = await self._chart(ticker, "5d", "5m")
+        return self._quote_from_result(ticker, result)
 
     async def profile(self, ticker: str) -> StockProfile:
         quote = await self.quote(ticker)
@@ -143,6 +196,14 @@ class MarketDataService:
 
     async def get_quote(self, ticker: str) -> Quote:
         return await self._with_fallback(lambda: self.yahoo.quote(ticker), lambda: self.demo.quote(ticker))
+
+    async def get_quotes(self, tickers: list[str]) -> list[Quote]:
+        if settings.market_data_provider.lower() == "demo":
+            return list(await asyncio.gather(*(self.demo.quote(ticker) for ticker in tickers)))
+        try:
+            return await self.yahoo.quotes_many(tickers)
+        except Exception:
+            return list(await asyncio.gather(*(self.demo.quote(ticker) for ticker in tickers)))
 
     async def get_history(self, ticker: str, range_: str = "1y", interval: str = "1d") -> list[Candle]:
         return await self._with_fallback(lambda: self.yahoo.history(ticker, range_, interval), lambda: self.demo.history(ticker, range_, interval))

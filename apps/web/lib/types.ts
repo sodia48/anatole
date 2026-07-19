@@ -56,3 +56,49 @@ export type FocusSnapshot = {
   profile: StockProfile;
   generated_at: string;
 };
+
+
+export type MarketTile = {
+  ticker: string;
+  symbol: string;
+  name: string;
+  sector: string;
+  weight: number;
+  price: number;
+  change: number;
+  change_percent: number;
+  volume: number;
+  timestamp: string;
+  source: string;
+  delayed: boolean;
+};
+
+export type SectorSnapshot = {
+  sector: string;
+  weight: number;
+  change_percent: number;
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+};
+
+export type MarketBreadth = {
+  advancers: number;
+  decliners: number;
+  unchanged: number;
+  advance_ratio: number;
+};
+
+export type CockpitSnapshot = {
+  universe: string;
+  universe_as_of: string;
+  universe_source: string;
+  weighted_change_percent: number;
+  breadth: MarketBreadth;
+  sectors: SectorSnapshot[];
+  constituents: MarketTile[];
+  top_gainers: MarketTile[];
+  top_losers: MarketTile[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
