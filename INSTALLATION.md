@@ -1,51 +1,45 @@
-# Focus Fondamental V1 — TSX 60
+# Résultats financiers V2 — approfondissement
 
-Cette livraison ajoute les quatre sections suivantes dans Focus :
-
-- Graphique
-- Fondamentaux
-- Résultats
-- Analystes
-
-## Fichiers à ajouter
-
-- `apps/api/app/schemas/fundamentals.py`
-- `apps/api/app/services/fundamentals.py`
-- `apps/api/app/api/routes/fundamentals.py`
-- `apps/api/tests/test_fundamentals.py`
-- `apps/web/components/stock/FocusFundamentals.tsx`
+Cette mise à jour enrichit uniquement l'onglet **Résultats** déjà fonctionnel.
+Elle ne modifie ni le routeur principal, ni FocusClient, ni la heatmap.
 
 ## Fichiers à remplacer
 
-- `apps/api/app/api/router.py`
-- `apps/web/components/stock/FocusClient.tsx`
+- `apps/api/app/schemas/fundamentals.py`
+- `apps/api/app/services/fundamentals.py`
+- `apps/web/components/stock/FocusFundamentals.tsx`
 
-## Données
+## Fichier de test à ajouter
 
-La V1 utilise le service public `quoteSummary` de Yahoo Finance avec cookie et
-crumb. Aucune clé API ni variable d'environnement supplémentaire n'est requise.
+- `apps/api/tests/test_fundamentals_results_v2.py`
 
-Règles :
+## Nouvelles vues dans Résultats
 
-- aucune donnée fictive;
-- champ absent = `N/D`;
-- réponse partielle conservée;
-- cache backend de 30 minutes;
-- panne de la source affichée proprement, sans casser Focus.
+- Vue d'ensemble
+- Trimestriel
+- Annuel
+- Estimations
+- BPA & calendrier
+
+## Nouvelles données
+
+- jusqu'à 12 trimestres et 5 exercices;
+- revenus, coûts, bénéfice brut, résultat opérationnel, BAIIA et bénéfice net;
+- BPA de base et dilué;
+- flux opérationnel, immobilisations, flux disponible, dividendes et rachats;
+- trésorerie, dette, dette nette, actifs, passifs et capitaux propres;
+- marges brute, opérationnelle, nette et de flux disponible;
+- croissance sur un an des revenus, du résultat, du BPA et du flux disponible;
+- agrégats TTM;
+- CAGR sur trois ans;
+- conversion du bénéfice en flux;
+- dette nette / BAIIA;
+- estimations de BPA et de revenus avec fourchettes et nombre d'analystes.
 
 ## Déploiement
 
 1. Commit sur `main`.
-2. Render : `anatole-api` → Clear build cache & deploy.
-3. Vercel : redéploiement sans l'ancien cache.
-4. Vérifier :
-   - `/api/v1/stocks/RY/fundamentals`
-   - Focus → Fondamentaux
-   - Focus → Résultats
-   - Focus → Analystes
+2. Render → `anatole-api` → Clear build cache & deploy.
+3. Vercel → redéployer sans l'ancien cache.
 
-## Note
-
-Yahoo Finance est une source publique non contractuelle. Les informations
-fondamentales et le consensus peuvent être incomplets pour certains titres TSX.
-Anatole affiche alors `N/D` au lieu d'inventer une valeur.
+Aucun changement à `apps/api/app/api/router.py`.

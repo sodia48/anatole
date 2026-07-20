@@ -47,20 +47,91 @@ class FundamentalMetrics(BaseModel):
     earnings_growth: float | None = None
 
 
-class AnnualFinancial(BaseModel):
+class FinancialPeriod(BaseModel):
     period_end: datetime
+    period_type: Literal["annual", "quarterly"]
+    currency: str | None = None
+
+    total_revenue: float | None = None
+    cost_of_revenue: float | None = None
+    gross_profit: float | None = None
+    research_development: float | None = None
+    selling_general_administrative: float | None = None
+    total_operating_expenses: float | None = None
+    operating_income: float | None = None
+    ebit: float | None = None
+    depreciation_amortization: float | None = None
+    ebitda: float | None = None
+    interest_expense: float | None = None
+    income_before_tax: float | None = None
+    income_tax_expense: float | None = None
+    net_income: float | None = None
+    basic_eps: float | None = None
+    diluted_eps: float | None = None
+    diluted_average_shares: float | None = None
+
+    operating_cash_flow: float | None = None
+    capital_expenditure: float | None = None
+    free_cash_flow: float | None = None
+    dividends_paid: float | None = None
+    share_repurchases: float | None = None
+
+    total_cash: float | None = None
+    total_debt: float | None = None
+    net_debt: float | None = None
+    current_assets: float | None = None
+    current_liabilities: float | None = None
+    total_assets: float | None = None
+    total_liabilities: float | None = None
+    stockholder_equity: float | None = None
+
+    gross_margin: float | None = None
+    operating_margin: float | None = None
+    net_margin: float | None = None
+    free_cash_flow_margin: float | None = None
+
+    revenue_growth_yoy: float | None = None
+    operating_income_growth_yoy: float | None = None
+    net_income_growth_yoy: float | None = None
+    eps_growth_yoy: float | None = None
+    free_cash_flow_growth_yoy: float | None = None
+
+
+class TTMSummary(BaseModel):
+    period_end: datetime | None = None
     currency: str | None = None
     total_revenue: float | None = None
     gross_profit: float | None = None
     operating_income: float | None = None
+    ebitda: float | None = None
     net_income: float | None = None
+    diluted_eps: float | None = None
     operating_cash_flow: float | None = None
     capital_expenditure: float | None = None
     free_cash_flow: float | None = None
+    dividends_paid: float | None = None
+    share_repurchases: float | None = None
     total_cash: float | None = None
     total_debt: float | None = None
-    total_assets: float | None = None
-    stockholder_equity: float | None = None
+    net_debt: float | None = None
+    gross_margin: float | None = None
+    operating_margin: float | None = None
+    net_margin: float | None = None
+    free_cash_flow_margin: float | None = None
+
+
+class FinancialHighlights(BaseModel):
+    latest_period_end: datetime | None = None
+    revenue_growth_yoy: float | None = None
+    operating_income_growth_yoy: float | None = None
+    net_income_growth_yoy: float | None = None
+    eps_growth_yoy: float | None = None
+    free_cash_flow_growth_yoy: float | None = None
+    three_year_revenue_cagr: float | None = None
+    three_year_net_income_cagr: float | None = None
+    three_year_free_cash_flow_cagr: float | None = None
+    cash_conversion_percent: float | None = None
+    net_debt_to_ebitda: float | None = None
 
 
 class EarningsQuarter(BaseModel):
@@ -68,6 +139,23 @@ class EarningsQuarter(BaseModel):
     actual: float | None = None
     estimate: float | None = None
     surprise_percent: float | None = None
+
+
+class EarningsEstimate(BaseModel):
+    period: str
+    end_date: str | None = None
+    eps_average: float | None = None
+    eps_low: float | None = None
+    eps_high: float | None = None
+    eps_year_ago: float | None = None
+    eps_growth: float | None = None
+    eps_analyst_count: int | None = None
+    revenue_average: float | None = None
+    revenue_low: float | None = None
+    revenue_high: float | None = None
+    revenue_year_ago: float | None = None
+    revenue_growth: float | None = None
+    revenue_analyst_count: int | None = None
 
 
 class AnalystConsensus(BaseModel):
@@ -104,8 +192,12 @@ class FundamentalSnapshot(BaseModel):
     status: Literal["available", "partial", "unavailable"]
     message: str | None = None
     metrics: FundamentalMetrics
-    annual_financials: list[AnnualFinancial] = Field(default_factory=list)
+    annual_financials: list[FinancialPeriod] = Field(default_factory=list)
+    quarterly_financials: list[FinancialPeriod] = Field(default_factory=list)
+    ttm: TTMSummary
+    highlights: FinancialHighlights
     earnings_history: list[EarningsQuarter] = Field(default_factory=list)
+    earnings_estimates: list[EarningsEstimate] = Field(default_factory=list)
     analysts: AnalystConsensus
     events: CorporateEvents
     source: str
