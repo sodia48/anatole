@@ -39,6 +39,7 @@ type LiveState = "connecting" | "live" | "offline";
 
 type PeriodKey =
   | "live"
+  | "1w"
   | "ytd"
   | "3mo"
   | "6mo"
@@ -61,6 +62,13 @@ const PERIODS: PeriodDefinition[] = [
     range: "1d",
     interval: "1m",
     refreshMs: 15_000,
+  },
+  {
+    key: "1w",
+    label: "1S",
+    range: "5d",
+    interval: "5m",
+    refreshMs: 60_000,
   },
   {
     key: "ytd",
@@ -101,6 +109,20 @@ const PERIODS: PeriodDefinition[] = [
 ];
 
 const MARKET_TIME_ZONE = "America/Toronto";
+
+function isIntradayPeriod(
+  period: PeriodDefinition,
+): boolean {
+  return [
+    "1m",
+    "2m",
+    "5m",
+    "15m",
+    "30m",
+    "60m",
+    "90m",
+  ].includes(period.interval);
+}
 
 function unixSeconds(value: Candle["time"]): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -381,7 +403,7 @@ function ChartPanel({
       },
       timeScale: {
         borderColor: "#24465f",
-        timeVisible: period.key === "live",
+        timeVisible: isIntradayPeriod(period),
         secondsVisible: false,
       },
       localization: {
@@ -476,14 +498,14 @@ function ChartPanel({
     }
 
     chartRefs.chart.timeScale().applyOptions({
-      timeVisible: period.key === "live",
+      timeVisible: isIntradayPeriod(period),
       secondsVisible: false,
       rightOffset: period.key === "live" ? 6 : 2,
       barSpacing: period.key === "live" ? 7 : 5,
       minBarSpacing: period.key === "10y" ? 0.04 : 0.08,
     });
 
-    const intraday = period.key === "live";
+    const intraday = isIntradayPeriod(period);
 
     const candleData: CandlestickData<UTCTimestamp>[] =
       displayCandles.map((item) => ({
@@ -620,6 +642,15 @@ function ChartPanel({
             }}
           >
             ● actualisation 15 s
+          </span>
+        ) : period.key === "1w" ? (
+          <span
+            style={{
+              color: "#65b8f5",
+              fontWeight: 750,
+            }}
+          >
+            5 séances · bougies 5 min · actualisation 60 s
           </span>
         ) : null}
 
