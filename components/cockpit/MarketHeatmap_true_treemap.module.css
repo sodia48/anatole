@@ -1,0 +1,346 @@
+.panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+.heading {
+  min-height: 43px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.heading h2 {
+  margin: 3px 0 0;
+  font-size: clamp(21px, 2vw, 29px);
+}
+
+.controls {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 9px;
+}
+
+.controls label {
+  display: grid;
+  gap: 3px;
+}
+
+.controls label > span {
+  color: #7e9bb1;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.controls select,
+.controls button {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(5, 18, 29, 0.95);
+  color: var(--text);
+  font-size: 11px;
+}
+
+.controls select {
+  min-width: 178px;
+  padding: 0 30px 0 10px;
+}
+
+.controls button {
+  padding: 0 11px;
+  cursor: pointer;
+}
+
+.controls select:focus-visible,
+.controls button:focus-visible {
+  border-color: rgba(86, 152, 255, 0.85);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(45, 118, 255, 0.14);
+}
+
+.hint {
+  align-self: center;
+  color: #77a6c6;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/*
+ * Un seul canvas fixe : aucun secteur ne peut créer
+ * une nouvelle rangée ou agrandir la page.
+ */
+.canvas {
+  position: relative;
+  width: 100%;
+  height: clamp(500px, 63vh, 690px);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid rgba(64, 104, 130, 0.7);
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(44, 50, 58, 0.96),
+      rgba(29, 38, 47, 0.98)
+    );
+  contain: layout paint;
+}
+
+.group {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  height: var(--h);
+  overflow: hidden;
+  border: 1px solid rgba(221, 231, 237, 0.78);
+  background: rgba(49, 56, 64, 0.72);
+  box-sizing: border-box;
+}
+
+.groupHeader {
+  position: absolute;
+  z-index: 4;
+  inset: 0 0 auto 0;
+  width: 100%;
+  height: var(--header-height);
+  min-height: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 2px 6px;
+  border: 0;
+  border-bottom: 1px solid rgba(220, 231, 237, 0.65);
+  background: rgba(54, 65, 74, 0.86);
+  color: white;
+  text-align: left;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.groupHeader:hover {
+  background: rgba(68, 83, 94, 0.96);
+}
+
+.groupHeader:focus-visible {
+  outline: 2px solid rgba(94, 166, 255, 0.95);
+  outline-offset: -2px;
+}
+
+.groupHeader span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(8px, 0.78vw, 12px);
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupHeader strong {
+  flex: 0 0 auto;
+  color: #d8eefc;
+  font-size: clamp(7px, 0.66vw, 10px);
+}
+
+.tile {
+  position: absolute;
+  z-index: 2;
+  left: var(--x);
+  top: var(--y);
+  width: var(--w);
+  height: var(--h);
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-content: center;
+  justify-items: start;
+  align-content: start;
+  gap: 2px;
+  overflow: hidden;
+  padding: 5px;
+  border: 1px solid rgba(235, 242, 246, 0.78);
+  background: var(--tile-background);
+  color: white;
+  text-align: left;
+  box-sizing: border-box;
+  isolation: isolate;
+  transition:
+    filter 120ms ease,
+    transform 120ms ease;
+}
+
+.tile::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.04),
+      transparent 58%
+    );
+}
+
+.tile:hover,
+.tile:focus-visible {
+  z-index: 5;
+  transform: scale(1.012);
+  filter: brightness(1.08) saturate(1.06);
+  outline: 1px solid white;
+  outline-offset: -1px;
+}
+
+.symbol {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: clamp(8px, 0.9vw, 15px);
+  font-weight: 850;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile strong {
+  font-size: clamp(7px, 0.78vw, 12px);
+  line-height: 1;
+}
+
+.tile small {
+  color: rgba(244, 249, 252, 0.82);
+  font-size: clamp(6px, 0.58vw, 9px);
+  line-height: 1;
+}
+
+.delayed {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  padding: 1px 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 5px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.medium {
+  justify-items: start;
+  align-content: start;
+}
+
+.large {
+  place-content: center;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+}
+
+.large .symbol {
+  font-size: clamp(13px, 1.35vw, 22px);
+}
+
+.large strong {
+  font-size: clamp(10px, 1vw, 16px);
+}
+
+.small {
+  padding: 3px;
+}
+
+.small small,
+.small .delayed {
+  display: none;
+}
+
+.tiny {
+  place-content: start;
+  justify-items: start;
+  padding: 2px;
+}
+
+.tiny .symbol {
+  font-size: clamp(6px, 0.55vw, 9px);
+}
+
+.tiny strong,
+.tiny small,
+.tiny .delayed {
+  display: none;
+}
+
+.empty {
+  min-height: 250px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+@media (max-width: 1100px) {
+  .canvas {
+    height: clamp(480px, 60vh, 630px);
+  }
+
+  .controls label > span {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .panel {
+    padding: 10px;
+  }
+
+  .heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .controls,
+  .controls label,
+  .controls select {
+    width: 100%;
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .canvas {
+    height: 500px;
+  }
+
+  .groupHeader strong {
+    display: none;
+  }
+
+  .tile {
+    padding: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .canvas {
+    height: 440px;
+  }
+
+  .heading h2 {
+    font-size: 21px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+}
