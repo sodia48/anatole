@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ChangeEvent,
   type CSSProperties,
   type KeyboardEvent,
   useMemo,
@@ -53,10 +54,9 @@ type LayoutItem<T> = {
 type Mode = "sector" | "flat" | "direction";
 
 const VIEW_WIDTH = 1200;
-const VIEW_HEIGHT = 690;
+const VIEW_HEIGHT = 680;
 const OUTER_GAP = 5;
-const SECTOR_HEADER_HEIGHT = 25;
-const SECTOR_INSET = 4;
+const SECTOR_INSET = 3;
 const MIN_TILE_WEIGHT = 0.18;
 const UNKNOWN_SECTOR = "Autres";
 
@@ -64,6 +64,77 @@ const MODE_LABELS: Record<Mode, string> = {
   sector: "Par secteur",
   flat: "Sans regroupement",
   direction: "Gagnants / perdants",
+};
+
+const SECTOR_LABELS: Record<
+  string,
+  { full: string; medium: string; short: string }
+> = {
+  Financials: {
+    full: "Services financiers",
+    medium: "Finances",
+    short: "FIN",
+  },
+  Energy: {
+    full: "Énergie",
+    medium: "Énergie",
+    short: "ÉNER",
+  },
+  Materials: {
+    full: "Matériaux",
+    medium: "Matériaux",
+    short: "MAT",
+  },
+  "Information Technology": {
+    full: "Technologies",
+    medium: "Technologies",
+    short: "TECH",
+  },
+  Industrials: {
+    full: "Industries",
+    medium: "Industries",
+    short: "IND",
+  },
+  "Consumer Staples": {
+    full: "Consommation de base",
+    medium: "Conso. de base",
+    short: "BASE",
+  },
+  "Consumer Discretionary": {
+    full: "Consommation discrétionnaire",
+    medium: "Conso. discrétionnaire",
+    short: "DISC",
+  },
+  Utilities: {
+    full: "Services publics",
+    medium: "Services publics",
+    short: "UTIL",
+  },
+  Communication: {
+    full: "Communications",
+    medium: "Communications",
+    short: "COM",
+  },
+  "Communication Services": {
+    full: "Communications",
+    medium: "Communications",
+    short: "COM",
+  },
+  "Real Estate": {
+    full: "Immobilier",
+    medium: "Immobilier",
+    short: "IMMO",
+  },
+  Healthcare: {
+    full: "Santé",
+    medium: "Santé",
+    short: "SANTÉ",
+  },
+  "Health Care": {
+    full: "Santé",
+    medium: "Santé",
+    short: "SANTÉ",
+  },
 };
 
 function asText(value: unknown, fallback = ""): string {
@@ -212,11 +283,6 @@ function clamp(
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-/**
- * Treemap binaire sans dépendance :
- * toutes les coordonnées sont calculées dans le même repère SVG.
- * Aucun bloc ne peut donc se transformer en liste verticale.
- */
 function binaryTreemap<T>(
   items: T[],
   getWeight: (item: T) => number,
@@ -306,31 +372,32 @@ function binaryTreemap<T>(
 }
 
 function marketColor(changePercent: number): string {
-  const intensity = clamp(Math.abs(changePercent) / 4.5, 0.08, 1);
+  const normalized = clamp(changePercent / 5, -1, 1);
+  const magnitude = Math.abs(normalized);
 
-  if (changePercent > 0.005) {
-    const lightness = 27 + intensity * 12;
-    return `hsl(165 69% ${lightness}%)`;
+  if (Math.abs(changePercent) < 0.08) {
+    return "hsl(210 27% 37%)";
   }
 
-  if (changePercent < -0.005) {
-    const lightness = 29 + intensity * 11;
-    return `hsl(346 48% ${lightness}%)`;
+  if (normalized > 0) {
+    const saturation = 50 + magnitude * 32;
+    const lightness = 25 + magnitude * 15;
+    return `hsl(163 ${saturation}% ${lightness}%)`;
   }
 
-  return "hsl(213 25% 38%)";
+  const saturation = 34 + magnitude * 38;
+  const lightness = 27 + magnitude * 13;
+  return `hsl(346 ${saturation}% ${lightness}%)`;
 }
 
-function sectorColor(changePercent: number): string {
-  if (changePercent > 0.005) {
-    return "rgba(12, 111, 91, 0.95)";
+function headerColor(changePercent: number): string {
+  if (Math.abs(changePercent) < 0.08) {
+    return "rgba(34, 66, 85, 0.96)";
   }
 
-  if (changePercent < -0.005) {
-    return "rgba(108, 56, 75, 0.95)";
-  }
-
-  return "rgba(52, 83, 105, 0.95)";
+  return changePercent > 0
+    ? "rgba(9, 96, 77, 0.96)"
+    : "rgba(94, 47, 65, 0.96)";
 }
 
 function formatChange(value: number): string {
@@ -346,47 +413,61 @@ function formatPrice(value: number): string {
   });
 }
 
+function formatWeight(value: number): string {
+  return `${value.toFixed(2)}%`;
+}
+
 function tileTextSize(rect: Rect): {
   symbol: number;
   change: number;
+  company: number;
   showChange: boolean;
   showPrice: boolean;
+  showCompany: boolean;
 } {
   const minSide = Math.min(rect.width, rect.height);
   const area = rect.width * rect.height;
 
-  if (minSide < 31 || area < 1_650) {
+  if (minSide < 28 || area < 1_400) {
     return {
-      symbol: 9,
+      symbol: 8,
       change: 0,
+      company: 0,
       showChange: false,
       showPrice: false,
+      showCompany: false,
     };
   }
 
-  if (minSide < 52 || area < 4_300) {
+  if (minSide < 48 || area < 3_900) {
     return {
-      symbol: 11,
-      change: 9,
+      symbol: 10,
+      change: 8,
+      company: 0,
       showChange: true,
       showPrice: false,
+      showCompany: false,
     };
   }
 
-  if (minSide > 115 && area > 19_000) {
+  if (minSide > 120 && area > 22_000) {
     return {
-      symbol: 18,
+      symbol: 19,
       change: 14,
+      company: 9,
       showChange: true,
       showPrice: true,
+      showCompany: true,
     };
   }
 
   return {
     symbol: 13,
     change: 11,
+    company: 0,
     showChange: true,
-    showPrice: area > 8_000,
+    showPrice: area > 8_500,
+    showCompany: false,
   };
 }
 
@@ -399,6 +480,31 @@ function insetRect(rect: Rect, amount: number): Rect {
   };
 }
 
+function sectorLabel(
+  sector: string,
+  width: number,
+): string {
+  const translated = SECTOR_LABELS[sector];
+
+  if (!translated) {
+    if (width > 170) {
+      return sector;
+    }
+
+    return sector.slice(0, width > 95 ? 15 : 6);
+  }
+
+  if (width > 210) {
+    return translated.full;
+  }
+
+  if (width > 115) {
+    return translated.medium;
+  }
+
+  return translated.short;
+}
+
 export function MarketHeatmap({
   tiles,
 }: {
@@ -408,6 +514,9 @@ export function MarketHeatmap({
   const [mode, setMode] = useState<Mode>("sector");
   const [expandedGroup, setExpandedGroup] =
     useState<string | null>(null);
+  const [hoveredTile, setHoveredTile] = useState<Tile | null>(
+    null,
+  );
 
   const normalizedTiles = useMemo(
     () =>
@@ -481,27 +590,32 @@ export function MarketHeatmap({
 
   const sectionStyle: CSSProperties = {
     display: "grid",
-    gap: 10,
-    padding: 14,
+    gap: 9,
+    padding: 13,
     overflow: "hidden",
   };
 
   const canvasStyle: CSSProperties = {
     width: "100%",
-    height: "clamp(500px, 62vh, 690px)",
+    height: "clamp(500px, 61vh, 670px)",
     display: "block",
     overflow: "hidden",
-    border: "1px solid rgba(92, 126, 148, 0.66)",
+    border: "1px solid rgba(45, 83, 105, 0.88)",
     borderRadius: 10,
     background:
-      "linear-gradient(145deg, rgba(54, 58, 64, 0.98), rgba(28, 38, 47, 0.99))",
+      "linear-gradient(145deg, rgba(30, 43, 53, 0.98), rgba(17, 28, 37, 0.99))",
   };
+
+  const activeSector =
+    hoveredTile &&
+    (SECTOR_LABELS[hoveredTile.sector]?.full ??
+      hoveredTile.sector);
 
   return (
     <section className="panel" style={sectionStyle}>
       <header
         style={{
-          minHeight: 42,
+          minHeight: 44,
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
@@ -530,12 +644,38 @@ export function MarketHeatmap({
             flexWrap: "wrap",
           }}
         >
+          <div
+            aria-label="Échelle des variations"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              color: "#7f9db2",
+              fontSize: 9,
+            }}
+          >
+            <span>-5%</span>
+            <span
+              style={{
+                width: 94,
+                height: 6,
+                borderRadius: 999,
+                background:
+                  "linear-gradient(90deg, hsl(346 72% 39%), hsl(210 27% 37%), hsl(163 82% 40%))",
+                boxShadow:
+                  "inset 0 0 0 1px rgba(255,255,255,.12)",
+              }}
+            />
+            <span>+5%</span>
+          </div>
+
           <select
             aria-label="Regroupement de la carte"
             value={mode}
-            onChange={(event) => {
+            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
               setMode(event.target.value as Mode);
               setExpandedGroup(null);
+              setHoveredTile(null);
             }}
             style={{
               height: 34,
@@ -587,18 +727,51 @@ export function MarketHeatmap({
         </div>
       </header>
 
+      <div
+        style={{
+          minHeight: 24,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "3px 8px",
+          border: "1px solid rgba(42, 82, 105, 0.55)",
+          borderRadius: 7,
+          background: "rgba(7, 24, 35, 0.72)",
+          color: hoveredTile ? "#ddecf5" : "#728fa3",
+          fontSize: 10,
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {hoveredTile ? (
+          <>
+            <strong>{hoveredTile.name}</strong>
+            <span>{hoveredTile.symbol}</span>
+            <span>{activeSector}</span>
+            <span>{formatPrice(hoveredTile.price)}</span>
+            <span>{formatChange(hoveredTile.changePercent)}</span>
+            <span>Poids : {formatWeight(hoveredTile.weight)}</span>
+            {hoveredTile.delayed ? <span>Données différées</span> : null}
+          </>
+        ) : (
+          "Survole un titre pour afficher ses détails."
+        )}
+      </div>
+
       <svg
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
         preserveAspectRatio="none"
         role="img"
         aria-label="Carte sectorielle du S&P TSX 60"
         style={canvasStyle}
+        onMouseLeave={() => setHoveredTile(null)}
       >
         {sectorLayout.map(({ item: group, rect }) => {
-          const sectorRect = insetRect(rect, 1.5);
+          const sectorRect = insetRect(rect, 2.2);
           const headerHeight = Math.min(
-            SECTOR_HEADER_HEIGHT,
-            Math.max(18, sectorRect.height * 0.12),
+            24,
+            Math.max(17, sectorRect.height * 0.11),
           );
 
           const stocksRect: Rect = {
@@ -632,9 +805,10 @@ export function MarketHeatmap({
                 y={sectorRect.y}
                 width={sectorRect.width}
                 height={sectorRect.height}
-                fill="rgba(50, 58, 65, 0.82)"
-                stroke="rgba(232, 238, 242, 0.82)"
-                strokeWidth={1.7}
+                rx={2}
+                fill="rgba(16, 31, 41, 0.96)"
+                stroke="rgba(24, 57, 76, 0.98)"
+                strokeWidth={2.4}
               />
 
               <g
@@ -663,33 +837,34 @@ export function MarketHeatmap({
                 style={{ cursor: "pointer" }}
               >
                 <rect
-                  x={sectorRect.x}
-                  y={sectorRect.y}
-                  width={sectorRect.width}
-                  height={headerHeight}
-                  fill={sectorColor(group.changePercent)}
-                  stroke="rgba(232, 238, 242, 0.72)"
-                  strokeWidth={1}
+                  x={sectorRect.x + 1}
+                  y={sectorRect.y + 1}
+                  width={Math.max(sectorRect.width - 2, 1)}
+                  height={Math.max(headerHeight - 1, 1)}
+                  rx={1.5}
+                  fill={headerColor(group.changePercent)}
+                  stroke="none"
                 />
+
                 <text
                   x={sectorRect.x + 7}
                   y={
                     sectorRect.y +
                     headerHeight / 2 +
-                    4
+                    3.5
                   }
                   fill="#ffffff"
                   fontSize={Math.min(
-                    12,
-                    Math.max(8, sectorRect.width / 22),
+                    11,
+                    Math.max(7.5, sectorRect.width / 23),
                   )}
-                  fontWeight={700}
+                  fontWeight={750}
                   pointerEvents="none"
                 >
-                  {group.label}
+                  {sectorLabel(group.label, sectorRect.width)}
                 </text>
 
-                {sectorRect.width > 125 ? (
+                {sectorRect.width > 105 ? (
                   <text
                     x={
                       sectorRect.x +
@@ -699,17 +874,15 @@ export function MarketHeatmap({
                     y={
                       sectorRect.y +
                       headerHeight / 2 +
-                      4
+                      3.5
                     }
                     fill="#ffffff"
-                    fontSize={9}
+                    fontSize={8}
                     fontWeight={800}
                     textAnchor="end"
                     pointerEvents="none"
                   >
-                    {formatChange(
-                      group.changePercent,
-                    )}
+                    {formatChange(group.changePercent)}
                   </text>
                 ) : null}
               </g>
@@ -718,11 +891,13 @@ export function MarketHeatmap({
                 ({ item: tile, rect: rawTileRect }) => {
                   const tileRect = insetRect(
                     rawTileRect,
-                    1.4,
+                    1.35,
                   );
                   const textSize = tileTextSize(tileRect);
-                  const textX = tileRect.x + 6;
-                  const textY = tileRect.y + textSize.symbol + 5;
+                  const textX = tileRect.x + 5;
+                  const textY = tileRect.y + textSize.symbol + 4;
+                  const isHovered =
+                    hoveredTile?.ticker === tile.ticker;
 
                   return (
                     <g
@@ -733,6 +908,9 @@ export function MarketHeatmap({
                       onKeyDown={(event) =>
                         handleTileKey(event, tile)
                       }
+                      onMouseEnter={() => setHoveredTile(tile)}
+                      onFocus={() => setHoveredTile(tile)}
+                      onBlur={() => setHoveredTile(null)}
                       style={{ cursor: "pointer" }}
                     >
                       <title>
@@ -740,7 +918,7 @@ export function MarketHeatmap({
                           tile.price,
                         )} · ${formatChange(
                           tile.changePercent,
-                        )}`}
+                        )} · poids ${formatWeight(tile.weight)}`}
                       </title>
 
                       <rect
@@ -748,12 +926,16 @@ export function MarketHeatmap({
                         y={tileRect.y}
                         width={tileRect.width}
                         height={tileRect.height}
-                        rx={1}
+                        rx={1.5}
                         fill={marketColor(
                           tile.changePercent,
                         )}
-                        stroke="rgba(238, 242, 245, 0.88)"
-                        strokeWidth={1.4}
+                        stroke={
+                          isHovered
+                            ? "rgba(255,255,255,0.95)"
+                            : "rgba(8, 26, 37, 0.95)"
+                        }
+                        strokeWidth={isHovered ? 2 : 1.15}
                       />
 
                       <text
@@ -773,7 +955,7 @@ export function MarketHeatmap({
                           y={
                             textY +
                             textSize.change +
-                            3
+                            2
                           }
                           fill="#ffffff"
                           fontSize={textSize.change}
@@ -792,13 +974,31 @@ export function MarketHeatmap({
                           y={
                             textY +
                             textSize.change +
-                            16
+                            14
                           }
-                          fill="rgba(245, 249, 252, 0.82)"
-                          fontSize={8}
+                          fill="rgba(245, 249, 252, 0.77)"
+                          fontSize={7.5}
                           pointerEvents="none"
                         >
                           {formatPrice(tile.price)}
+                        </text>
+                      ) : null}
+
+                      {textSize.showCompany ? (
+                        <text
+                          x={textX}
+                          y={
+                            textY +
+                            textSize.change +
+                            26
+                          }
+                          fill="rgba(245, 249, 252, 0.64)"
+                          fontSize={textSize.company}
+                          pointerEvents="none"
+                        >
+                          {tile.name.length > 24
+                            ? `${tile.name.slice(0, 24)}…`
+                            : tile.name}
                         </text>
                       ) : null}
                     </g>
