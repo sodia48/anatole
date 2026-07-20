@@ -100,6 +100,98 @@ const PERIODS: PeriodDefinition[] = [
   },
 ];
 
+const MARKET_TIME_ZONE = "America/Toronto";
+
+function unixSeconds(value: Candle["time"]): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.floor(
+      value > 10_000_000_000 ? value / 1000 : value,
+    );
+  }
+
+  const parsed = Date.parse(String(value));
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return Math.floor(parsed / 1000);
+}
+
+/**
+ * Lightweight Charts traite les timestamps intrajournaliers en UTC.
+ * On crée donc un timestamp d'affichage dont les composantes UTC
+ * correspondent à l'heure officielle de Toronto. Cela corrige le
+ * décalage de +4 h l'été et de +5 h l'hiver, avec gestion automatique
+ * de l'heure avancée.
+ */
+function torontoChartTimestamp(
+  value: Candle["time"],
+): UTCTimestamp {
+  const seconds = unixSeconds(value);
+
+  if (seconds === null) {
+    return 0 as UTCTimestamp;
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: MARKET_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(seconds * 1000));
+
+  const values: Record<string, number> = {};
+
+  for (const part of parts) {
+    if (part.type !== "literal") {
+      values[part.type] = Number.parseInt(part.value, 10);
+    }
+  }
+
+  return Math.floor(
+    Date.UTC(
+      values.year,
+      values.month - 1,
+      values.day,
+      values.hour,
+      values.minute,
+      values.second,
+    ) / 1000,
+  ) as UTCTimestamp;
+}
+
+function chartTimestamp(
+  value: Candle["time"],
+  intraday: boolean,
+): UTCTimestamp {
+  if (intraday) {
+    return torontoChartTimestamp(value);
+  }
+
+  return (unixSeconds(value) ?? 0) as UTCTimestamp;
+}
+
+function withoutFutureLiveCandles(
+  candles: Candle[],
+  live: boolean,
+): Candle[] {
+  if (!live) {
+    return candles;
+  }
+
+  const latestAllowed = Math.floor(Date.now() / 1000) + 120;
+
+  return candles.filter((candle) => {
+    const seconds = unixSeconds(candle.time);
+    return seconds !== null && seconds <= latestAllowed;
+  });
+}
+
 type ChartRefs = {
   chart: IChartApi;
   candles: ISeriesApi<"Candlestick">;
@@ -126,6 +218,7 @@ function focusApiUrl(
 function movingAverage(
   candles: Candle[],
   period: number,
+  intraday: boolean,
 ): LineData<UTCTimestamp>[] {
   if (candles.length < period) {
     return [];
@@ -143,7 +236,10 @@ function movingAverage(
 
     if (index >= period - 1) {
       output.push({
-        time: candles[index].time as UTCTimestamp,
+        time: chartTimestamp(
+          candles[index].time,
+          intraday,
+        ),
         value: rollingTotal / period,
       });
     }
@@ -234,9 +330,18 @@ function ChartPanel({
   const priceLines = useRef<IPriceLine[]>([]);
   const previousPeriod = useRef<PeriodKey | null>(null);
 
+  const displayCandles = useMemo(
+    () =>
+      withoutFutureLiveCandles(
+        candles,
+        period.key === "live",
+      ),
+    [candles, period.key],
+  );
+
   const performance = useMemo(
-    () => periodPerformance(candles),
-    [candles],
+    () => periodPerformance(displayCandles),
+    [displayCandles],
   );
 
   useEffect(() => {
@@ -366,7 +471,7 @@ function ChartPanel({
   useEffect(() => {
     const chartRefs = refs.current;
 
-    if (!chartRefs || candles.length === 0) {
+    if (!chartRefs || displayCandles.length === 0) {
       return;
     }
 
@@ -378,9 +483,11 @@ function ChartPanel({
       minBarSpacing: period.key === "10y" ? 0.04 : 0.08,
     });
 
+    const intraday = period.key === "live";
+
     const candleData: CandlestickData<UTCTimestamp>[] =
-      candles.map((item) => ({
-        time: item.time as UTCTimestamp,
+      displayCandles.map((item) => ({
+        time: chartTimestamp(item.time, intraday),
         open: item.open,
         high: item.high,
         low: item.low,
@@ -388,8 +495,8 @@ function ChartPanel({
       }));
 
     const volumeData: HistogramData<UTCTimestamp>[] =
-      candles.map((item) => ({
-        time: item.time as UTCTimestamp,
+      displayCandles.map((item) => ({
+        time: chartTimestamp(item.time, intraday),
         value: item.volume,
         color:
           item.close >= item.open
@@ -399,9 +506,15 @@ function ChartPanel({
 
     chartRefs.candles.setData(candleData);
     chartRefs.volume.setData(volumeData);
-    chartRefs.sma20.setData(movingAverage(candles, 20));
-    chartRefs.sma50.setData(movingAverage(candles, 50));
-    chartRefs.sma200.setData(movingAverage(candles, 200));
+    chartRefs.sma20.setData(
+      movingAverage(displayCandles, 20, intraday),
+    );
+    chartRefs.sma50.setData(
+      movingAverage(displayCandles, 50, intraday),
+    );
+    chartRefs.sma200.setData(
+      movingAverage(displayCandles, 200, intraday),
+    );
 
     for (const line of priceLines.current) {
       chartRefs.candles.removePriceLine(line);
@@ -443,7 +556,7 @@ function ChartPanel({
     } else if (period.key === "live") {
       chartRefs.chart.timeScale().scrollToRealTime();
     }
-  }, [candles, period.key, technicals]);
+  }, [displayCandles, period.key, technicals]);
 
   return (
     <section className="panel chart-panel">
@@ -496,7 +609,7 @@ function ChartPanel({
         </strong>
 
         <span>
-          {candles.length.toLocaleString("fr-CA")} bougies
+          {displayCandles.length.toLocaleString("fr-CA")} bougies
         </span>
 
         {period.key === "live" ? (
@@ -532,7 +645,7 @@ function ChartPanel({
           }}
         />
 
-        {loading && candles.length === 0 ? (
+        {loading && displayCandles.length === 0 ? (
           <div
             style={{
               position: "absolute",
