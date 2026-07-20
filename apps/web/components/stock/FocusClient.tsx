@@ -24,6 +24,7 @@ import {
   useState,
 } from "react";
 
+import { FocusFundamentals, type FundamentalView } from "./FocusFundamentals";
 import { KeyLevels } from "./KeyLevels";
 import { QuoteHeader } from "./QuoteHeader";
 import { TechnicalSummary } from "./TechnicalSummary";
@@ -36,6 +37,17 @@ import type {
 } from "@/lib/types";
 
 type LiveState = "connecting" | "live" | "offline";
+type FocusSection = "chart" | FundamentalView;
+
+const FOCUS_SECTIONS: Array<{
+  key: FocusSection;
+  label: string;
+}> = [
+  { key: "chart", label: "Graphique" },
+  { key: "fundamentals", label: "Fondamentaux" },
+  { key: "financials", label: "Résultats" },
+  { key: "analysts", label: "Analystes" },
+];
 
 type PeriodKey =
   | "live"
@@ -736,6 +748,8 @@ export function FocusClient({
   );
   const [liveState, setLiveState] =
     useState<LiveState>("connecting");
+  const [activeSection, setActiveSection] =
+    useState<FocusSection>("chart");
 
   const [periodKey, setPeriodKey] =
     useState<PeriodKey>("1y");
@@ -905,114 +919,171 @@ export function FocusClient({
         liveState={liveState}
       />
 
-      <div
+      <nav
+        aria-label="Sections de Focus"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 5,
-          flexWrap: "wrap",
-          margin: "0 0 12px",
-          padding: 4,
           width: "fit-content",
           maxWidth: "100%",
+          margin: "0 0 12px",
+          padding: 4,
+          overflowX: "auto",
           border: "1px solid rgba(39,78,102,.8)",
           borderRadius: 11,
           background: "rgba(4,18,29,.82)",
-          overflowX: "auto",
         }}
-        role="group"
-        aria-label="Période du graphique Focus"
       >
-        {PERIODS.map((candidate) => {
-          const active = candidate.key === periodKey;
+        {FOCUS_SECTIONS.map((section) => {
+          const active = activeSection === section.key;
 
           return (
             <button
               type="button"
-              key={candidate.key}
+              key={section.key}
               aria-pressed={active}
-              onClick={() =>
-                setPeriodKey(candidate.key)
-              }
-              style={chartButtonStyle(active)}
+              onClick={() => setActiveSection(section.key)}
+              style={{
+                minWidth: 105,
+                height: 35,
+                padding: "0 13px",
+                border: active
+                  ? "1px solid rgba(54,163,241,.72)"
+                  : "1px solid transparent",
+                borderRadius: 8,
+                background: active
+                  ? "rgba(27,105,159,.82)"
+                  : "transparent",
+                color: active ? "#ffffff" : "#86a4b8",
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
             >
-              {candidate.key === "live" ? (
-                <span
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 999,
-                    background: "#16c79a",
-                    boxShadow:
-                      "0 0 9px rgba(22,199,154,.86)",
-                  }}
-                />
-              ) : null}
-
-              {candidate.label}
+              {section.label}
             </button>
           );
         })}
-      </div>
+      </nav>
 
-      <div className="focus-grid">
-        <ChartPanel
-          candles={periodSnapshot.history}
-          technicals={periodSnapshot.technicals}
-          period={period}
-          loading={loading}
-          refreshing={refreshing}
-          error={error}
-          delayed={Boolean(
-            periodSnapshot.quote.delayed,
-          )}
+      {activeSection === "chart" ? (
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+              flexWrap: "wrap",
+              margin: "0 0 12px",
+              padding: 4,
+              width: "fit-content",
+              maxWidth: "100%",
+              border: "1px solid rgba(39,78,102,.8)",
+              borderRadius: 11,
+              background: "rgba(4,18,29,.82)",
+              overflowX: "auto",
+            }}
+            role="group"
+            aria-label="Période du graphique Focus"
+          >
+            {PERIODS.map((candidate) => {
+              const active = candidate.key === periodKey;
+
+              return (
+                <button
+                  type="button"
+                  key={candidate.key}
+                  aria-pressed={active}
+                  onClick={() =>
+                    setPeriodKey(candidate.key)
+                  }
+                  style={chartButtonStyle(active)}
+                >
+                  {candidate.key === "live" ? (
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: 999,
+                        background: "#16c79a",
+                        boxShadow:
+                          "0 0 9px rgba(22,199,154,.86)",
+                      }}
+                    />
+                  ) : null}
+
+                  {candidate.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="focus-grid">
+            <ChartPanel
+              candles={periodSnapshot.history}
+              technicals={periodSnapshot.technicals}
+              period={period}
+              loading={loading}
+              refreshing={refreshing}
+              error={error}
+              delayed={Boolean(
+                periodSnapshot.quote.delayed,
+              )}
+            />
+
+            <aside className="right-column">
+              <section className="panel info-card profile-card">
+                <div className="section-title-row">
+                  <h2>
+                    {periodSnapshot.profile.name}
+                  </h2>
+                  <span className="eyebrow">
+                    {periodSnapshot.profile.exchange}
+                  </span>
+                </div>
+
+                <p>
+                  {periodSnapshot.profile.description ??
+                    "Profil détaillé disponible lors du branchement des données Anatole."}
+                </p>
+
+                <div className="profile-tags">
+                  <span>
+                    {periodSnapshot.profile.sector ??
+                      "Marché canadien"}
+                  </span>
+                  <span>
+                    {periodSnapshot.profile.industry ??
+                      "Titre coté"}
+                  </span>
+                </div>
+              </section>
+
+              <TechnicalSummary
+                technicals={periodSnapshot.technicals}
+              />
+
+              <KeyLevels
+                technicals={periodSnapshot.technicals}
+              />
+            </aside>
+          </div>
+
+          <footer className="status-footer">
+            Période {period.label} · Généré à{" "}
+            {formatGeneratedAt(
+              periodSnapshot.generated_at,
+            )}{" "}
+            · Source {quote.source}
+          </footer>
+        </>
+      ) : (
+        <FocusFundamentals
+          ticker={initialSnapshot.quote.ticker}
+          view={activeSection}
         />
-
-        <aside className="right-column">
-          <section className="panel info-card profile-card">
-            <div className="section-title-row">
-              <h2>
-                {periodSnapshot.profile.name}
-              </h2>
-              <span className="eyebrow">
-                {periodSnapshot.profile.exchange}
-              </span>
-            </div>
-
-            <p>
-              {periodSnapshot.profile.description ??
-                "Profil détaillé disponible lors du branchement des données Anatole."}
-            </p>
-
-            <div className="profile-tags">
-              <span>
-                {periodSnapshot.profile.sector ??
-                  "Marché canadien"}
-              </span>
-              <span>
-                {periodSnapshot.profile.industry ??
-                  "Titre coté"}
-              </span>
-            </div>
-          </section>
-
-          <TechnicalSummary
-            technicals={periodSnapshot.technicals}
-          />
-
-          <KeyLevels
-            technicals={periodSnapshot.technicals}
-          />
-        </aside>
-      </div>
-
-      <footer className="status-footer">
-        Période {period.label} · Généré à{" "}
-        {formatGeneratedAt(
-          periodSnapshot.generated_at,
-        )}{" "}
-        · Source {quote.source}
-      </footer>
+      )}
     </div>
   );
 }
