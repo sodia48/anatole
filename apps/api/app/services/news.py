@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import html
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -39,6 +40,15 @@ STATCAN_CATEGORIES = (
     "Commerce international",
     "Énergie",
 )
+
+
+def _statcan_proxy_url(resource: str) -> str | None:
+    """Return the whitelisted Vercel relay URL when configured on Render."""
+    base = os.getenv("STATCAN_PROXY_URL", "").strip()
+    if not base:
+        return None
+    separator = "&" if "?" in base else "?"
+    return f"{base}{separator}{urlencode({'resource': resource})}"
 
 CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "Comptes économiques": (
@@ -583,11 +593,36 @@ class NewsService:
         self,
         client: httpx.AsyncClient,
     ) -> tuple[list[NewsItem], list[FeedStatus]]:
-        entries, error = await self._download(
-            client,
-            source_label=f"{STATCAN_SOURCE} — Tous les sujets",
-            url=STATCAN_URL,
-        )
+        source_label = f"{STATCAN_SOURCE} — Tous les sujets"
+        proxy_url = _statcan_proxy_url("news")
+        channel = "direct"
+
+        if proxy_url:
+            channel = "proxy"
+            entries, error = await self._download(
+                client,
+                source_label=source_label,
+                url=proxy_url,
+            )
+            if error:
+                logger.warning(
+                    "news_statcan_proxy_failed url=%r detail=%r fallback=direct",
+                    proxy_url,
+                    error,
+                )
+                channel = "direct"
+                entries, error = await self._download(
+                    client,
+                    source_label=source_label,
+                    url=STATCAN_URL,
+                )
+        else:
+            entries, error = await self._download(
+                client,
+                source_label=source_label,
+                url=STATCAN_URL,
+            )
+
         if error:
             return [], [
                 FeedStatus(
@@ -626,7 +661,10 @@ class NewsService:
                     FeedStatus(
                         source=f"{STATCAN_SOURCE} — {category}",
                         status="ok",
-                        detail=f"{len(category_items)} éléments",
+                        detail=(
+                            f"{len(category_items)} éléments"
+                            + (" — relayés par Vercel" if channel == "proxy" else "")
+                        ),
                     )
                 )
             else:
