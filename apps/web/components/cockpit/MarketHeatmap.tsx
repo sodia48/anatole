@@ -51,13 +51,18 @@ type LayoutItem<T> = {
   rect: Rect;
 };
 
+type AreaItem<T> = {
+  item: T;
+  area: number;
+};
+
 type Mode = "sector" | "flat" | "direction";
 
-const VIEW_WIDTH = 1200;
-const VIEW_HEIGHT = 680;
+const VIEW_WIDTH = 1440;
+const VIEW_HEIGHT = 660;
 const OUTER_GAP = 5;
 const SECTOR_INSET = 3;
-const MIN_TILE_WEIGHT = 0.18;
+const MIN_TILE_WEIGHT = 0.16;
 const UNKNOWN_SECTOR = "Autres";
 
 const MODE_LABELS: Record<Mode, string> = {
@@ -283,7 +288,124 @@ function clamp(
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-function binaryTreemap<T>(
+function rowWorst<T>(
+  row: AreaItem<T>[],
+  side: number,
+): number {
+  if (row.length === 0 || side <= 0) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  const areas = row.map((entry) => entry.area);
+  const sum = areas.reduce((total, area) => total + area, 0);
+  const maximum = Math.max(...areas);
+  const minimum = Math.min(...areas);
+  const sideSquared = side * side;
+  const sumSquared = sum * sum;
+
+  return Math.max(
+    (sideSquared * maximum) / sumSquared,
+    sumSquared / (sideSquared * minimum),
+  );
+}
+
+function layoutRow<T>(
+  row: AreaItem<T>[],
+  rect: Rect,
+): {
+  layouts: LayoutItem<T>[];
+  remaining: Rect;
+} {
+  const rowArea = row.reduce(
+    (total, entry) => total + entry.area,
+    0,
+  );
+
+  if (rect.width >= rect.height) {
+    const rowHeight = clamp(
+      rowArea / Math.max(rect.width, 1),
+      0,
+      rect.height,
+    );
+    let x = rect.x;
+
+    const layouts = row.map((entry, index) => {
+      const width =
+        index === row.length - 1
+          ? rect.x + rect.width - x
+          : entry.area / Math.max(rowHeight, 0.0001);
+
+      const itemRect = {
+        x,
+        y: rect.y,
+        width: Math.max(width, 0),
+        height: Math.max(rowHeight, 0),
+      };
+
+      x += width;
+
+      return {
+        item: entry.item,
+        rect: itemRect,
+      };
+    });
+
+    return {
+      layouts,
+      remaining: {
+        x: rect.x,
+        y: rect.y + rowHeight,
+        width: rect.width,
+        height: Math.max(rect.height - rowHeight, 0),
+      },
+    };
+  }
+
+  const rowWidth = clamp(
+    rowArea / Math.max(rect.height, 1),
+    0,
+    rect.width,
+  );
+  let y = rect.y;
+
+  const layouts = row.map((entry, index) => {
+    const height =
+      index === row.length - 1
+        ? rect.y + rect.height - y
+        : entry.area / Math.max(rowWidth, 0.0001);
+
+    const itemRect = {
+      x: rect.x,
+      y,
+      width: Math.max(rowWidth, 0),
+      height: Math.max(height, 0),
+    };
+
+    y += height;
+
+    return {
+      item: entry.item,
+      rect: itemRect,
+    };
+  });
+
+  return {
+    layouts,
+    remaining: {
+      x: rect.x + rowWidth,
+      y: rect.y,
+      width: Math.max(rect.width - rowWidth, 0),
+      height: rect.height,
+    },
+  };
+}
+
+/**
+ * Treemap "squarified" :
+ * réduit les rectangles trop longs ou trop étroits et garde une
+ * présentation stable et professionnelle sur les écrans larges.
+ */
+function squarifiedTreemap<T>(
   items: T[],
   getWeight: (item: T) => number,
   rect: Rect,
@@ -292,83 +414,57 @@ function binaryTreemap<T>(
     return [];
   }
 
-  if (items.length === 1) {
-    return [{ item: items[0], rect }];
-  }
-
-  const sorted = [...items].sort(
-    (left, right) => getWeight(right) - getWeight(left),
-  );
-
-  const weights = sorted.map((item) =>
-    Math.max(getWeight(item), 0.0001),
-  );
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  const target = total / 2;
-
-  let running = 0;
-  let splitIndex = 1;
-
-  for (let index = 0; index < sorted.length - 1; index += 1) {
-    const before = running;
-    running += weights[index];
-    splitIndex = index + 1;
-
-    if (running >= target) {
-      if (
-        index > 0 &&
-        Math.abs(target - before) < Math.abs(target - running)
-      ) {
-        splitIndex = index;
-      }
-      break;
-    }
-  }
-
-  const first = sorted.slice(0, splitIndex);
-  const second = sorted.slice(splitIndex);
-
-  const firstWeight = first.reduce(
-    (sum, item) => sum + Math.max(getWeight(item), 0.0001),
+  const totalWeight = items.reduce(
+    (total, item) =>
+      total + Math.max(getWeight(item), 0.0001),
     0,
   );
-  const ratio = clamp(firstWeight / total, 0.06, 0.94);
+  const scale =
+    (rect.width * rect.height) /
+    Math.max(totalWeight, 0.0001);
 
-  if (rect.width >= rect.height) {
-    const firstWidth = rect.width * ratio;
+  const remainingItems: AreaItem<T>[] = [...items]
+    .sort(
+      (left, right) =>
+        getWeight(right) - getWeight(left),
+    )
+    .map((item) => ({
+      item,
+      area: Math.max(getWeight(item), 0.0001) * scale,
+    }));
 
-    return [
-      ...binaryTreemap(first, getWeight, {
-        x: rect.x,
-        y: rect.y,
-        width: firstWidth,
-        height: rect.height,
-      }),
-      ...binaryTreemap(second, getWeight, {
-        x: rect.x + firstWidth,
-        y: rect.y,
-        width: rect.width - firstWidth,
-        height: rect.height,
-      }),
-    ];
+  const output: LayoutItem<T>[] = [];
+  let currentRect = { ...rect };
+  let row: AreaItem<T>[] = [];
+
+  while (remainingItems.length > 0) {
+    const next = remainingItems[0];
+    const side = Math.max(
+      Math.min(currentRect.width, currentRect.height),
+      0.0001,
+    );
+
+    if (
+      row.length === 0 ||
+      rowWorst([...row, next], side) <= rowWorst(row, side)
+    ) {
+      row.push(next);
+      remainingItems.shift();
+      continue;
+    }
+
+    const laidOut = layoutRow(row, currentRect);
+    output.push(...laidOut.layouts);
+    currentRect = laidOut.remaining;
+    row = [];
   }
 
-  const firstHeight = rect.height * ratio;
+  if (row.length > 0) {
+    const laidOut = layoutRow(row, currentRect);
+    output.push(...laidOut.layouts);
+  }
 
-  return [
-    ...binaryTreemap(first, getWeight, {
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: firstHeight,
-    }),
-    ...binaryTreemap(second, getWeight, {
-      x: rect.x,
-      y: rect.y + firstHeight,
-      width: rect.width,
-      height: rect.height - firstHeight,
-    }),
-  ];
+  return output;
 }
 
 function marketColor(changePercent: number): string {
@@ -376,28 +472,18 @@ function marketColor(changePercent: number): string {
   const magnitude = Math.abs(normalized);
 
   if (Math.abs(changePercent) < 0.08) {
-    return "hsl(210 27% 37%)";
+    return "hsl(210 26% 36%)";
   }
 
   if (normalized > 0) {
-    const saturation = 50 + magnitude * 32;
-    const lightness = 25 + magnitude * 15;
+    const saturation = 48 + magnitude * 34;
+    const lightness = 24 + magnitude * 15;
     return `hsl(163 ${saturation}% ${lightness}%)`;
   }
 
-  const saturation = 34 + magnitude * 38;
-  const lightness = 27 + magnitude * 13;
+  const saturation = 35 + magnitude * 38;
+  const lightness = 27 + magnitude * 12;
   return `hsl(346 ${saturation}% ${lightness}%)`;
-}
-
-function headerColor(changePercent: number): string {
-  if (Math.abs(changePercent) < 0.08) {
-    return "rgba(34, 66, 85, 0.96)";
-  }
-
-  return changePercent > 0
-    ? "rgba(9, 96, 77, 0.96)"
-    : "rgba(94, 47, 65, 0.96)";
 }
 
 function formatChange(value: number): string {
@@ -417,60 +503,6 @@ function formatWeight(value: number): string {
   return `${value.toFixed(2)}%`;
 }
 
-function tileTextSize(rect: Rect): {
-  symbol: number;
-  change: number;
-  company: number;
-  showChange: boolean;
-  showPrice: boolean;
-  showCompany: boolean;
-} {
-  const minSide = Math.min(rect.width, rect.height);
-  const area = rect.width * rect.height;
-
-  if (minSide < 28 || area < 1_400) {
-    return {
-      symbol: 8,
-      change: 0,
-      company: 0,
-      showChange: false,
-      showPrice: false,
-      showCompany: false,
-    };
-  }
-
-  if (minSide < 48 || area < 3_900) {
-    return {
-      symbol: 10,
-      change: 8,
-      company: 0,
-      showChange: true,
-      showPrice: false,
-      showCompany: false,
-    };
-  }
-
-  if (minSide > 120 && area > 22_000) {
-    return {
-      symbol: 19,
-      change: 14,
-      company: 9,
-      showChange: true,
-      showPrice: true,
-      showCompany: true,
-    };
-  }
-
-  return {
-    symbol: 13,
-    change: 11,
-    company: 0,
-    showChange: true,
-    showPrice: area > 8_500,
-    showCompany: false,
-  };
-}
-
 function insetRect(rect: Rect, amount: number): Rect {
   return {
     x: rect.x + amount,
@@ -487,22 +519,66 @@ function sectorLabel(
   const translated = SECTOR_LABELS[sector];
 
   if (!translated) {
-    if (width > 170) {
+    if (width > 180) {
       return sector;
     }
 
-    return sector.slice(0, width > 95 ? 15 : 6);
+    return sector.slice(0, width > 100 ? 15 : 6);
   }
 
-  if (width > 210) {
+  if (width > 230) {
     return translated.full;
   }
 
-  if (width > 115) {
+  if (width > 125) {
     return translated.medium;
   }
 
   return translated.short;
+}
+
+function tilePresentation(rect: Rect): {
+  symbolSize: number;
+  changeSize: number;
+  showChange: boolean;
+  centered: boolean;
+} {
+  const minSide = Math.min(rect.width, rect.height);
+  const area = rect.width * rect.height;
+
+  if (minSide < 26 || area < 1_250) {
+    return {
+      symbolSize: 8,
+      changeSize: 0,
+      showChange: false,
+      centered: true,
+    };
+  }
+
+  if (minSide < 46 || area < 3_700) {
+    return {
+      symbolSize: 10,
+      changeSize: 8,
+      showChange: true,
+      centered: false,
+    };
+  }
+
+  if (minSide > 105 && area > 15_000) {
+    return {
+      symbolSize: 20,
+      changeSize: 14,
+      showChange: true,
+      centered: true,
+    };
+  }
+
+  return {
+    symbolSize: 13,
+    changeSize: 10,
+    showChange: true,
+    centered: false,
+  };
 }
 
 export function MarketHeatmap({
@@ -514,9 +590,8 @@ export function MarketHeatmap({
   const [mode, setMode] = useState<Mode>("sector");
   const [expandedGroup, setExpandedGroup] =
     useState<string | null>(null);
-  const [hoveredTile, setHoveredTile] = useState<Tile | null>(
-    null,
-  );
+  const [hoveredTile, setHoveredTile] =
+    useState<Tile | null>(null);
 
   const normalizedTiles = useMemo(
     () =>
@@ -543,7 +618,7 @@ export function MarketHeatmap({
 
   const sectorLayout = useMemo(
     () =>
-      binaryTreemap(
+      squarifiedTreemap(
         visibleGroups,
         (group) => Math.max(group.weight, 0.0001),
         {
@@ -595,17 +670,6 @@ export function MarketHeatmap({
     overflow: "hidden",
   };
 
-  const canvasStyle: CSSProperties = {
-    width: "100%",
-    height: "clamp(500px, 61vh, 670px)",
-    display: "block",
-    overflow: "hidden",
-    border: "1px solid rgba(45, 83, 105, 0.88)",
-    borderRadius: 10,
-    background:
-      "linear-gradient(145deg, rgba(30, 43, 53, 0.98), rgba(17, 28, 37, 0.99))",
-  };
-
   const activeSector =
     hoveredTile &&
     (SECTOR_LABELS[hoveredTile.sector]?.full ??
@@ -624,7 +688,9 @@ export function MarketHeatmap({
         }}
       >
         <div>
-          <span className="eyebrow">CARTE DU MARCHÉ</span>
+          <span className="eyebrow">
+            CARTE DU MARCHÉ
+          </span>
           <h2
             style={{
               margin: "3px 0 0",
@@ -640,7 +706,7 @@ export function MarketHeatmap({
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-end",
-            gap: 9,
+            gap: 10,
             flexWrap: "wrap",
           }}
         >
@@ -657,11 +723,11 @@ export function MarketHeatmap({
             <span>-5%</span>
             <span
               style={{
-                width: 94,
+                width: 98,
                 height: 6,
                 borderRadius: 999,
                 background:
-                  "linear-gradient(90deg, hsl(346 72% 39%), hsl(210 27% 37%), hsl(163 82% 40%))",
+                  "linear-gradient(90deg, hsl(346 72% 39%), hsl(210 26% 36%), hsl(163 82% 39%))",
                 boxShadow:
                   "inset 0 0 0 1px rgba(255,255,255,.12)",
               }}
@@ -672,7 +738,9 @@ export function MarketHeatmap({
           <select
             aria-label="Regroupement de la carte"
             value={mode}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+            onChange={(
+              event: ChangeEvent<HTMLSelectElement>,
+            ) => {
               setMode(event.target.value as Mode);
               setExpandedGroup(null);
               setHoveredTile(null);
@@ -729,11 +797,11 @@ export function MarketHeatmap({
 
       <div
         style={{
-          minHeight: 24,
+          minHeight: 25,
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          padding: "3px 8px",
+          gap: 9,
+          padding: "4px 9px",
           border: "1px solid rgba(42, 82, 105, 0.55)",
           borderRadius: 7,
           background: "rgba(7, 24, 35, 0.72)",
@@ -746,269 +814,381 @@ export function MarketHeatmap({
       >
         {hoveredTile ? (
           <>
-            <strong>{hoveredTile.name}</strong>
-            <span>{hoveredTile.symbol}</span>
+            <strong>{hoveredTile.symbol}</strong>
             <span>{activeSector}</span>
-            <span>{formatPrice(hoveredTile.price)}</span>
             <span>{formatChange(hoveredTile.changePercent)}</span>
+            <span>{formatPrice(hoveredTile.price)}</span>
             <span>Poids : {formatWeight(hoveredTile.weight)}</span>
-            {hoveredTile.delayed ? <span>Données différées</span> : null}
+            {hoveredTile.delayed ? (
+              <span>Données différées</span>
+            ) : null}
           </>
         ) : (
-          "Survole un titre pour afficher ses détails."
+          "Survole un titre pour afficher ses données."
         )}
       </div>
 
-      <svg
-        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label="Carte sectorielle du S&P TSX 60"
-        style={canvasStyle}
-        onMouseLeave={() => setHoveredTile(null)}
+      <div
+        style={{
+          width: "100%",
+          overflowX: "auto",
+          overflowY: "hidden",
+          border: "1px solid rgba(45, 83, 105, 0.88)",
+          borderRadius: 11,
+          background:
+            "linear-gradient(145deg, rgba(19, 34, 44, 0.99), rgba(7, 20, 29, 0.99))",
+        }}
       >
-        {sectorLayout.map(({ item: group, rect }) => {
-          const sectorRect = insetRect(rect, 2.2);
-          const headerHeight = Math.min(
-            24,
-            Math.max(17, sectorRect.height * 0.11),
-          );
-
-          const stocksRect: Rect = {
-            x: sectorRect.x + SECTOR_INSET,
-            y:
-              sectorRect.y +
-              headerHeight +
-              SECTOR_INSET,
-            width: Math.max(
-              sectorRect.width - SECTOR_INSET * 2,
-              1,
-            ),
-            height: Math.max(
-              sectorRect.height -
-                headerHeight -
-                SECTOR_INSET * 2,
-              1,
-            ),
-          };
-
-          const stockLayout = binaryTreemap(
-            group.tiles,
-            effectiveWeight,
-            stocksRect,
-          );
-
-          return (
-            <g key={group.key}>
-              <rect
-                x={sectorRect.x}
-                y={sectorRect.y}
-                width={sectorRect.width}
-                height={sectorRect.height}
-                rx={2}
-                fill="rgba(16, 31, 41, 0.96)"
-                stroke="rgba(24, 57, 76, 0.98)"
-                strokeWidth={2.4}
+        <svg
+          viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Carte sectorielle du S&P TSX 60"
+          onMouseLeave={() => setHoveredTile(null)}
+          style={{
+            width: "100%",
+            minWidth: 920,
+            height: "auto",
+            aspectRatio: `${VIEW_WIDTH} / ${VIEW_HEIGHT}`,
+            display: "block",
+          }}
+        >
+          <defs>
+            <linearGradient
+              id="tile-sheen"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop
+                offset="0%"
+                stopColor="#ffffff"
+                stopOpacity="0.055"
               />
+              <stop
+                offset="42%"
+                stopColor="#ffffff"
+                stopOpacity="0.012"
+              />
+              <stop
+                offset="100%"
+                stopColor="#000000"
+                stopOpacity="0.07"
+              />
+            </linearGradient>
+          </defs>
 
-              <g
-                role="button"
-                tabIndex={0}
-                onClick={() =>
-                  setExpandedGroup((current) =>
-                    current === group.key
-                      ? null
-                      : group.key,
-                  )
-                }
-                onKeyDown={(event) => {
-                  if (
-                    event.key === "Enter" ||
-                    event.key === " "
-                  ) {
-                    event.preventDefault();
+          {sectorLayout.map(({ item: group, rect }) => {
+            const sectorRect = insetRect(rect, 2.6);
+            const headerHeight = Math.min(
+              27,
+              Math.max(19, sectorRect.height * 0.105),
+            );
+            const accentColor = marketColor(
+              group.changePercent,
+            );
+
+            const stocksRect: Rect = {
+              x: sectorRect.x + SECTOR_INSET,
+              y:
+                sectorRect.y +
+                headerHeight +
+                SECTOR_INSET,
+              width: Math.max(
+                sectorRect.width - SECTOR_INSET * 2,
+                1,
+              ),
+              height: Math.max(
+                sectorRect.height -
+                  headerHeight -
+                  SECTOR_INSET * 2,
+                1,
+              ),
+            };
+
+            const stockLayout = squarifiedTreemap(
+              group.tiles,
+              effectiveWeight,
+              stocksRect,
+            );
+
+            const showSectorChange =
+              sectorRect.width > 112;
+            const changePillWidth =
+              sectorRect.width > 170 ? 58 : 48;
+
+            return (
+              <g key={group.key}>
+                <rect
+                  x={sectorRect.x}
+                  y={sectorRect.y}
+                  width={sectorRect.width}
+                  height={sectorRect.height}
+                  rx={4}
+                  fill="rgba(6, 22, 32, 0.98)"
+                  stroke="rgba(23, 58, 79, 0.98)"
+                  strokeWidth={1.8}
+                />
+
+                <g
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
                     setExpandedGroup((current) =>
                       current === group.key
                         ? null
                         : group.key,
-                    );
+                    )
                   }
-                }}
-                style={{ cursor: "pointer" }}
-              >
-                <rect
-                  x={sectorRect.x + 1}
-                  y={sectorRect.y + 1}
-                  width={Math.max(sectorRect.width - 2, 1)}
-                  height={Math.max(headerHeight - 1, 1)}
-                  rx={1.5}
-                  fill={headerColor(group.changePercent)}
-                  stroke="none"
-                />
-
-                <text
-                  x={sectorRect.x + 7}
-                  y={
-                    sectorRect.y +
-                    headerHeight / 2 +
-                    3.5
-                  }
-                  fill="#ffffff"
-                  fontSize={Math.min(
-                    11,
-                    Math.max(7.5, sectorRect.width / 23),
-                  )}
-                  fontWeight={750}
-                  pointerEvents="none"
-                >
-                  {sectorLabel(group.label, sectorRect.width)}
-                </text>
-
-                {sectorRect.width > 105 ? (
-                  <text
-                    x={
-                      sectorRect.x +
-                      sectorRect.width -
-                      7
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" ||
+                      event.key === " "
+                    ) {
+                      event.preventDefault();
+                      setExpandedGroup((current) =>
+                        current === group.key
+                          ? null
+                          : group.key,
+                      );
                     }
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={sectorRect.x + 1}
+                    y={sectorRect.y + 1}
+                    width={Math.max(
+                      sectorRect.width - 2,
+                      1,
+                    )}
+                    height={Math.max(headerHeight - 1, 1)}
+                    rx={3}
+                    fill="rgba(10, 34, 48, 0.98)"
+                    stroke="none"
+                  />
+
+                  <rect
+                    x={sectorRect.x + 1}
+                    y={sectorRect.y + 1}
+                    width={4}
+                    height={Math.max(headerHeight - 1, 1)}
+                    rx={2}
+                    fill={accentColor}
+                    stroke="none"
+                  />
+
+                  <text
+                    x={sectorRect.x + 10}
                     y={
                       sectorRect.y +
                       headerHeight / 2 +
-                      3.5
+                      4
                     }
-                    fill="#ffffff"
-                    fontSize={8}
-                    fontWeight={800}
-                    textAnchor="end"
+                    fill="#eaf6fd"
+                    fontSize={Math.min(
+                      11.5,
+                      Math.max(
+                        7.5,
+                        sectorRect.width / 24,
+                      ),
+                    )}
+                    fontWeight={760}
                     pointerEvents="none"
                   >
-                    {formatChange(group.changePercent)}
+                    {sectorLabel(
+                      group.label,
+                      sectorRect.width,
+                    )}
                   </text>
-                ) : null}
-              </g>
 
-              {stockLayout.map(
-                ({ item: tile, rect: rawTileRect }) => {
-                  const tileRect = insetRect(
-                    rawTileRect,
-                    1.35,
-                  );
-                  const textSize = tileTextSize(tileRect);
-                  const textX = tileRect.x + 5;
-                  const textY = tileRect.y + textSize.symbol + 4;
-                  const isHovered =
-                    hoveredTile?.ticker === tile.ticker;
-
-                  return (
-                    <g
-                      key={tile.ticker}
-                      role="link"
-                      tabIndex={0}
-                      onClick={() => openTicker(tile)}
-                      onKeyDown={(event) =>
-                        handleTileKey(event, tile)
-                      }
-                      onMouseEnter={() => setHoveredTile(tile)}
-                      onFocus={() => setHoveredTile(tile)}
-                      onBlur={() => setHoveredTile(null)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <title>
-                        {`${tile.name} · ${group.label} · ${formatPrice(
-                          tile.price,
-                        )} · ${formatChange(
-                          tile.changePercent,
-                        )} · poids ${formatWeight(tile.weight)}`}
-                      </title>
-
+                  {showSectorChange ? (
+                    <>
                       <rect
-                        x={tileRect.x}
-                        y={tileRect.y}
-                        width={tileRect.width}
-                        height={tileRect.height}
-                        rx={1.5}
-                        fill={marketColor(
-                          tile.changePercent,
-                        )}
-                        stroke={
-                          isHovered
-                            ? "rgba(255,255,255,0.95)"
-                            : "rgba(8, 26, 37, 0.95)"
+                        x={
+                          sectorRect.x +
+                          sectorRect.width -
+                          changePillWidth -
+                          6
                         }
-                        strokeWidth={isHovered ? 2 : 1.15}
+                        y={sectorRect.y + 4}
+                        width={changePillWidth}
+                        height={Math.max(
+                          headerHeight - 8,
+                          12,
+                        )}
+                        rx={8}
+                        fill={accentColor}
+                        opacity={0.96}
+                        stroke="rgba(255,255,255,.08)"
+                        strokeWidth={0.7}
                       />
-
                       <text
-                        x={textX}
-                        y={textY}
+                        x={
+                          sectorRect.x +
+                          sectorRect.width -
+                          changePillWidth / 2 -
+                          6
+                        }
+                        y={
+                          sectorRect.y +
+                          headerHeight / 2 +
+                          3
+                        }
                         fill="#ffffff"
-                        fontSize={textSize.symbol}
+                        fontSize={8.5}
                         fontWeight={850}
+                        textAnchor="middle"
                         pointerEvents="none"
                       >
-                        {tile.symbol}
+                        {formatChange(
+                          group.changePercent,
+                        )}
                       </text>
+                    </>
+                  ) : null}
+                </g>
 
-                      {textSize.showChange ? (
-                        <text
-                          x={textX}
-                          y={
-                            textY +
-                            textSize.change +
-                            2
-                          }
-                          fill="#ffffff"
-                          fontSize={textSize.change}
-                          fontWeight={700}
-                          pointerEvents="none"
-                        >
-                          {formatChange(
+                {stockLayout.map(
+                  ({ item: tile, rect: rawTileRect }) => {
+                    const tileRect = insetRect(
+                      rawTileRect,
+                      1.7,
+                    );
+                    const presentation =
+                      tilePresentation(tileRect);
+                    const isHovered =
+                      hoveredTile?.ticker === tile.ticker;
+
+                    const textX = presentation.centered
+                      ? tileRect.x + tileRect.width / 2
+                      : tileRect.x + 7;
+                    const textAnchor = presentation.centered
+                      ? "middle"
+                      : "start";
+                    const symbolY = presentation.centered
+                      ? tileRect.y +
+                        tileRect.height / 2 -
+                        (presentation.showChange ? 2 : -3)
+                      : tileRect.y +
+                        presentation.symbolSize +
+                        6;
+
+                    return (
+                      <g
+                        key={tile.ticker}
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => openTicker(tile)}
+                        onKeyDown={(event) =>
+                          handleTileKey(event, tile)
+                        }
+                        onMouseEnter={() =>
+                          setHoveredTile(tile)
+                        }
+                        onFocus={() => setHoveredTile(tile)}
+                        onBlur={() => setHoveredTile(null)}
+                        style={{ cursor: "pointer" }}
+                        aria-label={`${tile.symbol}, ${tile.name}, ${formatChange(
+                          tile.changePercent,
+                        )}`}
+                      >
+                        <title>
+                          {`${tile.symbol} · ${tile.name} · ${formatPrice(
+                            tile.price,
+                          )} · ${formatChange(
+                            tile.changePercent,
+                          )}`}
+                        </title>
+
+                        <rect
+                          x={tileRect.x}
+                          y={tileRect.y}
+                          width={tileRect.width}
+                          height={tileRect.height}
+                          rx={2.5}
+                          fill={marketColor(
                             tile.changePercent,
                           )}
-                        </text>
-                      ) : null}
+                          stroke={
+                            isHovered
+                              ? "rgba(255,255,255,0.96)"
+                              : "rgba(3, 18, 27, 0.98)"
+                          }
+                          strokeWidth={
+                            isHovered ? 2.2 : 1.2
+                          }
+                        />
 
-                      {textSize.showPrice ? (
+                        <rect
+                          x={tileRect.x}
+                          y={tileRect.y}
+                          width={tileRect.width}
+                          height={tileRect.height}
+                          rx={2.5}
+                          fill="url(#tile-sheen)"
+                          pointerEvents="none"
+                        />
+
                         <text
                           x={textX}
-                          y={
-                            textY +
-                            textSize.change +
-                            14
+                          y={symbolY}
+                          fill="#ffffff"
+                          fontSize={
+                            presentation.symbolSize
                           }
-                          fill="rgba(245, 249, 252, 0.77)"
-                          fontSize={7.5}
+                          fontWeight={880}
+                          textAnchor={textAnchor}
+                          dominantBaseline={
+                            presentation.centered
+                              ? "middle"
+                              : "auto"
+                          }
                           pointerEvents="none"
                         >
-                          {formatPrice(tile.price)}
+                          {tile.symbol}
                         </text>
-                      ) : null}
 
-                      {textSize.showCompany ? (
-                        <text
-                          x={textX}
-                          y={
-                            textY +
-                            textSize.change +
-                            26
-                          }
-                          fill="rgba(245, 249, 252, 0.64)"
-                          fontSize={textSize.company}
-                          pointerEvents="none"
-                        >
-                          {tile.name.length > 24
-                            ? `${tile.name.slice(0, 24)}…`
-                            : tile.name}
-                        </text>
-                      ) : null}
-                    </g>
-                  );
-                },
-              )}
-            </g>
-          );
-        })}
-      </svg>
+                        {presentation.showChange ? (
+                          <text
+                            x={textX}
+                            y={
+                              presentation.centered
+                                ? symbolY +
+                                  presentation.changeSize +
+                                  8
+                                : symbolY +
+                                  presentation.changeSize +
+                                  3
+                            }
+                            fill="rgba(255,255,255,.92)"
+                            fontSize={
+                              presentation.changeSize
+                            }
+                            fontWeight={720}
+                            textAnchor={textAnchor}
+                            dominantBaseline={
+                              presentation.centered
+                                ? "middle"
+                                : "auto"
+                            }
+                            pointerEvents="none"
+                          >
+                            {formatChange(
+                              tile.changePercent,
+                            )}
+                          </text>
+                        ) : null}
+                      </g>
+                    );
+                  },
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
     </section>
   );
 }
