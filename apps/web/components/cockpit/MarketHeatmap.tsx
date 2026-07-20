@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   type ChangeEvent,
   type CSSProperties,
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -13,20 +12,18 @@ import styles from "./MarketHeatmap.module.css";
 
 type GroupingMode = "sector" | "flat" | "direction";
 
-type HeatmapTile = {
+type RawTile = {
   ticker?: unknown;
   symbol?: unknown;
   name?: unknown;
   sector?: unknown;
   weight?: unknown;
   price?: unknown;
-  change?: unknown;
   change_percent?: unknown;
-  volume?: unknown;
   delayed?: unknown;
 };
 
-type NormalizedTile = {
+type Tile = {
   ticker: string;
   symbol: string;
   name: string;
@@ -34,22 +31,42 @@ type NormalizedTile = {
   weight: number;
   price: number;
   changePercent: number;
-  volume: number;
   delayed: boolean;
 };
 
-type TileGroup = {
+type Group = {
   key: string;
   label: string;
-  tiles: NormalizedTile[];
+  tiles: Tile[];
   weight: number;
   changePercent: number;
-  advancers: number;
-  decliners: number;
+};
+
+type Rect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type LayoutItem<T> = {
+  item: T;
+  rect: Rect;
+};
+
+type PositionedGroup = {
+  group: Group;
+  rect: Rect;
+  headerHeight: number;
+  tiles: LayoutItem<Tile>[];
 };
 
 type CSSVariables = CSSProperties &
   Record<`--${string}`, string | number>;
+
+const CANVAS_WIDTH = 1000;
+const CANVAS_HEIGHT = 620;
+const UNKNOWN_SECTOR = "Autres";
 
 const MODE_LABELS: Record<GroupingMode, string> = {
   sector: "Par secteur",
@@ -57,13 +74,13 @@ const MODE_LABELS: Record<GroupingMode, string> = {
   direction: "Gagnants / perdants",
 };
 
-const UNKNOWN_SECTOR = "Autres";
-
-function text(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+function asText(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim()
+    ? value.trim()
+    : fallback;
 }
 
-function number(value: unknown, fallback = 0): number {
+function asNumber(value: unknown, fallback = 0): number {
   const parsed =
     typeof value === "number"
       ? value
@@ -74,40 +91,47 @@ function number(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeTile(raw: unknown): NormalizedTile | null {
+function normalizeTile(raw: unknown): Tile | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
 
-  const tile = raw as HeatmapTile;
-  const ticker = text(tile.ticker, text(tile.symbol)).toUpperCase();
+  const source = raw as RawTile;
+  const ticker = asText(
+    source.ticker,
+    asText(source.symbol),
+  ).toUpperCase();
 
   if (!ticker) {
     return null;
   }
 
-  const symbol = text(tile.symbol, ticker.replace(/\.TO$/i, "")).toUpperCase();
+  const symbol = asText(
+    source.symbol,
+    ticker.replace(/\.TO$/i, ""),
+  ).toUpperCase();
 
   return {
     ticker,
     symbol,
-    name: text(tile.name, symbol),
-    sector: text(tile.sector, UNKNOWN_SECTOR),
-    weight: Math.max(number(tile.weight, 0), 0),
-    price: Math.max(number(tile.price, 0), 0),
-    changePercent: number(tile.change_percent, 0),
-    volume: Math.max(number(tile.volume, 0), 0),
-    delayed: Boolean(tile.delayed),
+    name: asText(source.name, symbol),
+    sector: asText(source.sector, UNKNOWN_SECTOR),
+    weight: Math.max(asNumber(source.weight), 0),
+    price: Math.max(asNumber(source.price), 0),
+    changePercent: asNumber(source.change_percent),
+    delayed: Boolean(source.delayed),
   };
 }
 
-function tileWeight(tile: NormalizedTile): number {
-  // Un poids minimal garde les petites capitalisations visibles.
-  return Math.max(tile.weight, 0.35);
+function effectiveWeight(tile: Tile): number {
+  return Math.max(tile.weight, 0.18);
 }
 
-function weightedChange(tiles: NormalizedTile[]): number {
-  const totalWeight = tiles.reduce((total, tile) => total + tileWeight(tile), 0);
+function weightedChange(tiles: Tile[]): number {
+  const totalWeight = tiles.reduce(
+    (total, tile) => total + effectiveWeight(tile),
+    0,
+  );
 
   if (totalWeight <= 0) {
     return 0;
@@ -115,70 +139,68 @@ function weightedChange(tiles: NormalizedTile[]): number {
 
   return (
     tiles.reduce(
-      (total, tile) => total + tile.changePercent * tileWeight(tile),
+      (total, tile) =>
+        total + tile.changePercent * effectiveWeight(tile),
       0,
     ) / totalWeight
   );
 }
 
-function buildGroup(
+function createGroup(
   key: string,
   label: string,
-  tiles: NormalizedTile[],
-): TileGroup {
-  const sorted = [...tiles].sort(
-    (left, right) => tileWeight(right) - tileWeight(left),
+  tiles: Tile[],
+): Group {
+  const sortedTiles = [...tiles].sort(
+    (left, right) =>
+      effectiveWeight(right) - effectiveWeight(left),
   );
 
   return {
     key,
     label,
-    tiles: sorted,
-    weight: sorted.reduce((total, tile) => total + tileWeight(tile), 0),
-    changePercent: weightedChange(sorted),
-    advancers: sorted.filter((tile) => tile.changePercent > 0.005).length,
-    decliners: sorted.filter((tile) => tile.changePercent < -0.005).length,
+    tiles: sortedTiles,
+    weight: sortedTiles.reduce(
+      (total, tile) => total + effectiveWeight(tile),
+      0,
+    ),
+    changePercent: weightedChange(sortedTiles),
   };
 }
 
-function groupTiles(
-  tiles: NormalizedTile[],
+function buildGroups(
+  tiles: Tile[],
   mode: GroupingMode,
-): TileGroup[] {
+): Group[] {
   if (mode === "flat") {
-    return [buildGroup("market", "Marché complet", tiles)];
+    return [createGroup("market", "Marché complet", tiles)];
   }
 
   if (mode === "direction") {
-    const definitions = [
-      {
-        key: "gainers",
-        label: "Hausses",
-        tiles: tiles.filter((tile) => tile.changePercent > 0.005),
-      },
-      {
-        key: "unchanged",
-        label: "Inchangées",
-        tiles: tiles.filter(
+    return [
+      createGroup(
+        "gainers",
+        "Hausses",
+        tiles.filter((tile) => tile.changePercent > 0.005),
+      ),
+      createGroup(
+        "unchanged",
+        "Inchangées",
+        tiles.filter(
           (tile) =>
-            tile.changePercent >= -0.005 && tile.changePercent <= 0.005,
+            tile.changePercent >= -0.005 &&
+            tile.changePercent <= 0.005,
         ),
-      },
-      {
-        key: "losers",
-        label: "Baisses",
-        tiles: tiles.filter((tile) => tile.changePercent < -0.005),
-      },
-    ];
-
-    return definitions
-      .filter((definition) => definition.tiles.length > 0)
-      .map((definition) =>
-        buildGroup(definition.key, definition.label, definition.tiles),
-      );
+      ),
+      createGroup(
+        "losers",
+        "Baisses",
+        tiles.filter((tile) => tile.changePercent < -0.005),
+      ),
+    ].filter((group) => group.tiles.length > 0);
   }
 
-  const sectors = new Map<string, NormalizedTile[]>();
+  const sectors = new Map<string, Tile[]>();
 
   for (const tile of tiles) {
     const current = sectors.get(tile.sector) ?? [];
@@ -187,74 +209,235 @@ function groupTiles(
   }
 
   return [...sectors.entries()]
-    .map(([sector, sectorTiles]) => buildGroup(sector, sector, sectorTiles))
+    .map(([sector, sectorTiles]) =>
+      createGroup(sector, sector, sectorTiles),
+    )
     .sort((left, right) => right.weight - left.weight);
 }
 
-function clamp(value: number, minimum: number, maximum: number): number {
+function clamp(
+  value: number,
+  minimum: number,
+  maximum: number,
+): number {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-function groupColumnSpan(
-  group: TileGroup,
-  largestWeight: number,
-  expanded: boolean,
-): number {
-  if (expanded) {
-    return 12;
+/**
+ * Treemap binaire :
+ * - divise récursivement la surface selon le poids;
+ * - alterne automatiquement horizontal / vertical selon le rectangle;
+ * - garantit que chaque titre demeure dans le canvas.
+ */
+function binaryTreemap<T>(
+  items: T[],
+  getWeight: (item: T) => number,
+  rect: Rect,
+): LayoutItem<T>[] {
+  if (items.length === 0) {
+    return [];
   }
 
-  if (largestWeight <= 0) {
-    return 6;
+  if (items.length === 1) {
+    return [{ item: items[0], rect }];
   }
 
-  const ratio = group.weight / largestWeight;
-  return clamp(Math.round(4 + ratio * 8), 4, 12);
+  const sorted = [...items].sort(
+    (left, right) => getWeight(right) - getWeight(left),
+  );
+
+  const totalWeight = sorted.reduce(
+    (total, item) => total + Math.max(getWeight(item), 0.0001),
+    0,
+  );
+
+  const targetWeight = totalWeight / 2;
+  let cumulativeWeight = 0;
+  let splitIndex = 1;
+
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    cumulativeWeight += Math.max(
+      getWeight(sorted[index]),
+      0.0001,
+    );
+    splitIndex = index + 1;
+
+    if (cumulativeWeight >= targetWeight) {
+      const previousDifference = Math.abs(
+        targetWeight -
+          (cumulativeWeight -
+            Math.max(getWeight(sorted[index]), 0.0001)),
+      );
+      const currentDifference = Math.abs(
+        targetWeight - cumulativeWeight,
+      );
+
+      if (previousDifference < currentDifference && index > 0) {
+        splitIndex = index;
+      }
+
+      break;
+    }
+  }
+
+  const firstItems = sorted.slice(0, splitIndex);
+  const secondItems = sorted.slice(splitIndex);
+
+  const firstWeight = firstItems.reduce(
+    (total, item) => total + Math.max(getWeight(item), 0.0001),
+    0,
+  );
+  const ratio = clamp(firstWeight / totalWeight, 0.08, 0.92);
+
+  if (rect.width >= rect.height) {
+    const firstWidth = rect.width * ratio;
+
+    return [
+      ...binaryTreemap(firstItems, getWeight, {
+        x: rect.x,
+        y: rect.y,
+        width: firstWidth,
+        height: rect.height,
+      }),
+      ...binaryTreemap(secondItems, getWeight, {
+        x: rect.x + firstWidth,
+        y: rect.y,
+        width: rect.width - firstWidth,
+        height: rect.height,
+      }),
+    ];
+  }
+
+  const firstHeight = rect.height * ratio;
+
+  return [
+    ...binaryTreemap(firstItems, getWeight, {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: firstHeight,
+    }),
+    ...binaryTreemap(secondItems, getWeight, {
+      x: rect.x,
+      y: rect.y + firstHeight,
+      width: rect.width,
+      height: rect.height - firstHeight,
+    }),
+  ];
 }
 
-function tileColumnSpan(tile: NormalizedTile, largestWeight: number): number {
-  if (largestWeight <= 0) {
-    return 2;
-  }
+function buildTreemap(
+  groups: Group[],
+): PositionedGroup[] {
+  const outerPadding = 5;
+  const sectorLayouts = binaryTreemap(
+    groups,
+    (group) => Math.max(group.weight, 0.0001),
+    {
+      x: outerPadding,
+      y: outerPadding,
+      width: CANVAS_WIDTH - outerPadding * 2,
+      height: CANVAS_HEIGHT - outerPadding * 2,
+    },
+  );
 
-  const ratio = tileWeight(tile) / largestWeight;
-  return clamp(Math.round(2 + ratio * 4), 2, 6);
+  return sectorLayouts.map(({ item: group, rect }) => {
+    const groupPadding = 4;
+    const headerHeight = clamp(
+      rect.height * 0.095,
+      20,
+      31,
+    );
+
+    const innerRect: Rect = {
+      x: rect.x + groupPadding,
+      y: rect.y + headerHeight + groupPadding,
+      width: Math.max(rect.width - groupPadding * 2, 1),
+      height: Math.max(
+        rect.height - headerHeight - groupPadding * 2,
+        1,
+      ),
+    };
+
+    return {
+      group,
+      rect,
+      headerHeight,
+      tiles: binaryTreemap(
+        group.tiles,
+        effectiveWeight,
+        innerRect,
+      ),
+    };
+  });
 }
 
-function tileMobileColumnSpan(tile: NormalizedTile, largestWeight: number): number {
-  if (largestWeight <= 0) {
-    return 2;
-  }
-
-  const ratio = tileWeight(tile) / largestWeight;
-  return clamp(Math.round(1 + ratio * 3), 1, 4);
+function toPercentX(value: number): string {
+  return `${(value / CANVAS_WIDTH) * 100}%`;
 }
 
-function tileRowSpan(tile: NormalizedTile, largestWeight: number): number {
-  if (largestWeight <= 0) {
-    return 1;
-  }
+function toPercentY(value: number): string {
+  return `${(value / CANVAS_HEIGHT) * 100}%`;
+}
 
-  const ratio = tileWeight(tile) / largestWeight;
-  return clamp(Math.round(1 + ratio * 2), 1, 3);
+function rectStyle(rect: Rect): CSSVariables {
+  return {
+    "--x": toPercentX(rect.x),
+    "--y": toPercentY(rect.y),
+    "--w": toPercentX(rect.width),
+    "--h": toPercentY(rect.height),
+  };
 }
 
 function tileBackground(changePercent: number): string {
-  const strength = clamp(Math.abs(changePercent) / 5, 0.16, 1);
+  const strength = clamp(
+    Math.abs(changePercent) / 5,
+    0.13,
+    1,
+  );
 
   if (changePercent > 0.005) {
-    return `linear-gradient(145deg, rgba(10, 140, 103, ${
-      0.4 + strength * 0.48
-    }), rgba(7, 82, 66, ${0.76 + strength * 0.2}))`;
+    return `linear-gradient(145deg, rgba(9, 150, 108, ${
+      0.42 + strength * 0.46
+    }), rgba(7, 87, 70, ${0.78 + strength * 0.18}))`;
   }
 
   if (changePercent < -0.005) {
-    return `linear-gradient(145deg, rgba(194, 38, 69, ${
-      0.42 + strength * 0.48
-    }), rgba(105, 38, 51, ${0.76 + strength * 0.2}))`;
+    return `linear-gradient(145deg, rgba(201, 42, 73, ${
+      0.42 + strength * 0.46
+    }), rgba(111, 42, 57, ${0.78 + strength * 0.18}))`;
   }
 
-  return "linear-gradient(145deg, rgba(57, 79, 96, .88), rgba(29, 48, 63, .96))";
+  return "linear-gradient(145deg, rgba(65, 92, 117, .92), rgba(38, 57, 78, .98))";
+}
+
+function tileSizeClass(rect: Rect): string {
+  const area = rect.width * rect.height;
+
+  if (
+    rect.width < 48 ||
+    rect.height < 32 ||
+    area < 2100
+  ) {
+    return styles.tiny;
+  }
+
+  if (
+    rect.width < 92 ||
+    rect.height < 52 ||
+    area < 6000
+  ) {
+    return styles.small;
+  }
+
+  if (
+    rect.width > 190 &&
+    rect.height > 110
+  ) {
+    return styles.large;
+  }
+
+  return styles.medium;
 }
 
 function formatChange(value: number): string {
@@ -270,99 +453,93 @@ function formatPrice(value: number): string {
   });
 }
 
-function formatWeight(value: number): string {
-  return `${value.toFixed(1)}% du panier`;
-}
-
-function stockPath(tile: NormalizedTile): string {
+function focusPath(tile: Tile): string {
   return `/focus/${encodeURIComponent(tile.symbol)}`;
 }
 
-export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
-  const [mode, setMode] = useState<GroupingMode>("sector");
-  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+export function MarketHeatmap({
+  tiles,
+}: {
+  tiles: readonly unknown[];
+}) {
+  const [mode, setMode] =
+    useState<GroupingMode>("sector");
+  const [expandedGroup, setExpandedGroup] =
+    useState<string | null>(null);
 
   const normalizedTiles = useMemo(
     () =>
       tiles
         .map(normalizeTile)
-        .filter((tile): tile is NormalizedTile => tile !== null),
+        .filter((tile): tile is Tile => tile !== null),
     [tiles],
   );
 
   const groups = useMemo(
-    () => groupTiles(normalizedTiles, mode),
+    () => buildGroups(normalizedTiles, mode),
     [mode, normalizedTiles],
   );
-
-  useEffect(() => {
-    setExpandedGroup(null);
-  }, [mode]);
 
   const visibleGroups = useMemo(() => {
     if (!expandedGroup) {
       return groups;
     }
 
-    return groups.filter((group) => group.key === expandedGroup);
+    return groups.filter(
+      (group) => group.key === expandedGroup,
+    );
   }, [expandedGroup, groups]);
 
-  const largestGroupWeight = Math.max(
-    ...visibleGroups.map((group) => group.weight),
-    0,
+  const layout = useMemo(
+    () => buildTreemap(visibleGroups),
+    [visibleGroups],
   );
 
   if (normalizedTiles.length === 0) {
     return (
       <section className={`panel ${styles.panel}`}>
-        <div className={styles.heading}>
-          <div>
-            <span className="eyebrow">CARTE DU MARCHÉ</span>
-            <h2>S&amp;P/TSX 60</h2>
-          </div>
-        </div>
-        <p className={styles.empty}>Aucun titre n’est disponible pour la carte.</p>
+        <p className={styles.empty}>
+          Aucun titre disponible pour la carte.
+        </p>
       </section>
     );
   }
 
   return (
     <section className={`panel ${styles.panel}`}>
-      <div className={styles.heading}>
+      <header className={styles.heading}>
         <div>
           <span className="eyebrow">CARTE DU MARCHÉ</span>
           <h2>S&amp;P/TSX 60</h2>
-          <p>
-            Les blocs sont dimensionnés selon le poids du titre. La couleur
-            représente la variation de séance.
-          </p>
         </div>
 
         <div className={styles.controls}>
-          <label className={styles.selectLabel}>
+          <label>
             <span>Regroupement</span>
             <select
               aria-label="Regroupement de la carte"
               value={mode}
-              onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-                setMode(event.target.value as GroupingMode)
-              }
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+                setMode(event.target.value as GroupingMode);
+                setExpandedGroup(null);
+              }}
             >
-              {Object.entries(MODE_LABELS).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
+              {Object.entries(MODE_LABELS).map(
+                ([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
+                ),
+              )}
             </select>
           </label>
 
           {expandedGroup ? (
             <button
               type="button"
-              className={styles.resetButton}
               onClick={() => setExpandedGroup(null)}
             >
-              Afficher tous les groupes
+              Voir tout le TSX 60
             </button>
           ) : (
             <span className={styles.hint}>
@@ -370,104 +547,95 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
             </span>
           )}
         </div>
-      </div>
+      </header>
 
-      <div className={styles.groups}>
-        {visibleGroups.map((group) => {
-          const groupStyle: CSSVariables = {
-            "--group-span": groupColumnSpan(
-              group,
-              largestGroupWeight,
-              Boolean(expandedGroup),
-            ),
-          };
-
-          const largestTileWeight = Math.max(
-            ...group.tiles.map(tileWeight),
-            0,
-          );
-
-          return (
-            <article
+      <div className={styles.canvas}>
+        {layout.map(
+          ({
+            group,
+            rect,
+            headerHeight,
+            tiles: groupTiles,
+          }) => (
+            <div
               className={styles.group}
+              style={rectStyle(rect)}
               key={group.key}
-              style={groupStyle}
             >
               <button
                 type="button"
                 className={styles.groupHeader}
+                style={
+                  {
+                    "--header-height": toPercentY(
+                      headerHeight,
+                    ),
+                  } as CSSVariables
+                }
                 onClick={() =>
                   setExpandedGroup((current) =>
-                    current === group.key ? null : group.key,
+                    current === group.key
+                      ? null
+                      : group.key,
                   )
                 }
-                aria-pressed={expandedGroup === group.key}
+                title={`Agrandir ${group.label}`}
               >
-                <span>
-                  <strong>{group.label}</strong>
-                  <small>
-                    {group.tiles.length} titre
-                    {group.tiles.length > 1 ? "s" : ""} ·{" "}
-                    {formatWeight(group.weight)}
-                  </small>
-                </span>
-
-                <span
-                  className={
-                    group.changePercent >= 0
-                      ? styles.groupPositive
-                      : styles.groupNegative
-                  }
-                >
-                  <strong>{formatChange(group.changePercent)}</strong>
-                  <small>
-                    {group.advancers}↑ · {group.decliners}↓
-                  </small>
-                </span>
+                <span>{group.label}</span>
+                <strong>
+                  {formatChange(group.changePercent)}
+                </strong>
               </button>
 
-              <div className={styles.tiles}>
-                {group.tiles.map((tile) => {
-                  const tileStyle: CSSVariables = {
-                    "--tile-column-span": tileColumnSpan(
-                      tile,
-                      largestTileWeight,
-                    ),
-                    "--tile-mobile-column-span": tileMobileColumnSpan(
-                      tile,
-                      largestTileWeight,
-                    ),
-                    "--tile-row-span": tileRowSpan(
-                      tile,
-                      largestTileWeight,
-                    ),
-                    "--tile-background": tileBackground(tile.changePercent),
+              {groupTiles.map(
+                ({ item: tile, rect: tileRect }) => {
+                  const style: CSSVariables = {
+                    ...rectStyle(tileRect),
+                    "--tile-background":
+                      tileBackground(
+                        tile.changePercent,
+                      ),
                   };
 
                   return (
                     <Link
-                      href={stockPath(tile)}
-                      className={styles.tile}
-                      style={tileStyle}
-                      key={tile.ticker}
-                      title={`${tile.name} · ${tile.sector} · ${formatChange(
+                      href={focusPath(tile)}
+                      className={`${styles.tile} ${tileSizeClass(
+                        tileRect,
+                      )}`}
+                      style={style}
+                      title={`${tile.name} · ${group.label} · ${formatPrice(
+                        tile.price,
+                      )} · ${formatChange(
                         tile.changePercent,
                       )}`}
+                      key={tile.ticker}
                     >
-                      <span className={styles.tileSymbol}>{tile.symbol}</span>
-                      <strong>{formatChange(tile.changePercent)}</strong>
-                      <small>{formatPrice(tile.price)}</small>
-                      <span className={styles.tileName}>{tile.name}</span>
+                      <span className={styles.symbol}>
+                        {tile.symbol}
+                      </span>
+                      <strong>
+                        {formatChange(
+                          tile.changePercent,
+                        )}
+                      </strong>
+                      <small>
+                        {formatPrice(tile.price)}
+                      </small>
                       {tile.delayed ? (
-                        <span className={styles.delayed}>Différé</span>
+                        <span
+                          className={styles.delayed}
+                        >
+                          Différé
+                        </span>
                       ) : null}
                     </Link>
                   );
-                })}
-              </div>
-            </article>
-          );
-        })}
+                },
+              )}
+            </div>
+          ),
+        )}
       </div>
     </section>
   );
