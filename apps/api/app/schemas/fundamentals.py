@@ -51,6 +51,7 @@ class FinancialSource(BaseModel):
     source_type: Literal[
         "sec_edgar_xbrl",
         "issuer_official_normalized",
+        "issuer_official_document",
         "yahoo_public",
     ]
     source_name: str
@@ -74,6 +75,9 @@ class OfficialCoverage(BaseModel):
     official_fields: int = 0
     sec_cik: str | None = None
     source_types: list[str] = Field(default_factory=list)
+    documents_found: int = 0
+    documents_parsed: int = 0
+    discovery_url: str | None = None
     message: str | None = None
 
 
@@ -87,6 +91,7 @@ class CompositeCoverageItem(BaseModel):
     automatic_source: Literal[
         "sec_edgar_xbrl",
         "issuer_official_normalized",
+        "issuer_official_document",
         "yahoo_public",
     ]
     status: Literal["official", "fallback"]
@@ -153,6 +158,40 @@ class FinancialPeriod(BaseModel):
     eps_growth_yoy: float | None = None
     free_cash_flow_growth_yoy: float | None = None
     source: FinancialSource | None = None
+
+
+class IssuerDocumentCandidate(BaseModel):
+    url: str
+    title: str
+    document_format: Literal["pdf", "xlsx", "xls", "html"]
+    document_type: Literal[
+        "annual",
+        "quarterly",
+        "financial_statements",
+        "supplementary",
+        "unknown",
+    ]
+    score: float
+    origin_url: str
+    content_type: str | None = None
+    published_at: datetime | None = None
+
+
+class IssuerDocumentDiagnostics(BaseModel):
+    ticker: str
+    website: str | None = None
+    status: Literal[
+        "available",
+        "partial",
+        "unavailable",
+    ]
+    documents: list[IssuerDocumentCandidate] = Field(
+        default_factory=list
+    )
+    parsed_periods: int = 0
+    parsed_fields: int = 0
+    error: str | None = None
+    generated_at: datetime
 
 
 class TTMSummary(BaseModel):
@@ -245,6 +284,8 @@ class FundamentalSnapshot(BaseModel):
     name: str
     exchange: str | None = None
     currency: str | None = None
+    financial_currency: str | None = None
+    website: str | None = None
     sector: str | None = None
     industry: str | None = None
     status: Literal["available", "partial", "unavailable"]

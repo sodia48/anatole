@@ -56,6 +56,7 @@ type FinancialSource = {
   source_type:
     | "sec_edgar_xbrl"
     | "issuer_official_normalized"
+    | "issuer_official_document"
     | "yahoo_public";
   source_name: string;
   source_url: string | null;
@@ -77,6 +78,9 @@ type OfficialCoverage = {
   official_fields: number;
   sec_cik: string | null;
   source_types: string[];
+  documents_found: number;
+  documents_parsed: number;
+  discovery_url: string | null;
   message: string | null;
 };
 
@@ -216,6 +220,8 @@ type Snapshot = {
   name: string;
   exchange: string | null;
   currency: string | null;
+  financial_currency: string | null;
+  website: string | null;
   sector: string | null;
   industry: string | null;
   status: "available" | "partial" | "unavailable";
@@ -433,7 +439,10 @@ function Fundamentals({
   snapshot: Snapshot;
 }) {
   const m = snapshot.metrics;
-  const currency = snapshot.currency ?? "CAD";
+  const currency =
+    snapshot.financial_currency ??
+    snapshot.currency ??
+    "CAD";
 
   return (
     <div
@@ -532,7 +541,11 @@ function SourceBadge({
         fontWeight: 800,
       }}
     >
-      OFFICIEL
+      {source.source_type === "issuer_official_document"
+        ? "OFFICIEL · ÉMETTEUR"
+        : source.source_type === "sec_edgar_xbrl"
+          ? "OFFICIEL · EDGAR"
+          : "OFFICIEL"}
     </span>
   );
 
@@ -1000,6 +1013,18 @@ function Financials({
             label="Champs officiels"
             value={String(
               snapshot.official_coverage.official_fields
+            )}
+          />
+          <Metric
+            label="Documents trouvés"
+            value={String(
+              snapshot.official_coverage.documents_found
+            )}
+          />
+          <Metric
+            label="Documents analysés"
+            value={String(
+              snapshot.official_coverage.documents_parsed
             )}
           />
         </div>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +13,10 @@ from app.schemas.fundamentals import (
     FinancialSource,
     FundamentalSnapshot,
     OfficialCoverage,
+)
+from app.services.issuer_documents import (
+    IssuerFinancialsResult,
+    issuer_financial_documents_service,
 )
 from app.services.sec_edgar import (
     SECEdgarResult,
@@ -394,37 +399,88 @@ class OfficialFinancialsService:
         local_annual, local_quarterly = (
             self.local.get(ticker)
         )
+
         sec_result: SECEdgarResult | None = None
-        sec_error: str | None = None
+        issuer_result: IssuerFinancialsResult | None = None
+        errors: list[str] = []
 
-        try:
-            sec_result = await (
-                sec_edgar_financials_provider
-                .get_financials(ticker)
-            )
-        except Exception as exc:  # noqa: BLE001
-            sec_error = (
-                f"SEC EDGAR unavailable: "
-                f"{type(exc).__name__}"
-            )
+        async def sec_task() -> None:
+            nonlocal sec_result
+            try:
+                sec_result = await (
+                    sec_edgar_financials_provider
+                    .get_financials(ticker)
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors.append(
+                    "SEC EDGAR: "
+                    f"{type(exc).__name__}"
+                )
 
-        official_annual = list(local_annual)
-        official_quarterly = list(local_quarterly)
+        async def issuer_task() -> None:
+            nonlocal issuer_result
+            try:
+                issuer_result = await (
+                    issuer_financial_documents_service
+                    .get_financials(
+                        ticker,
+                        snapshot.website,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors.append(
+                    "Site investisseurs: "
+                    f"{type(exc).__name__}"
+                )
+
+        # The two official-source families are independent and can be
+        # queried in parallel. Local normalized data requires no network.
+        await asyncio.gather(
+            sec_task(),
+            issuer_task(),
+        )
+
+        # Priority inside the same reporting period:
+        # SEC structured facts -> issuer document -> normalized local data.
+        # Each later source only overwrites fields it actually provides.
+        official_annual: list[FinancialPeriod] = []
+        official_quarterly: list[FinancialPeriod] = []
         source_types: set[str] = set()
         sec_cik: str | None = None
 
-        if local_annual or local_quarterly:
-            source_types.add(
-                "issuer_official_normalized"
-            )
-
         if sec_result is not None:
             sec_cik = sec_result.cik
-            official_annual.extend(sec_result.annual)
+            official_annual.extend(
+                sec_result.annual
+            )
             official_quarterly.extend(
                 sec_result.quarterly
             )
             source_types.add("sec_edgar_xbrl")
+
+        if issuer_result is not None:
+            official_annual.extend(
+                issuer_result.annual
+            )
+            official_quarterly.extend(
+                issuer_result.quarterly
+            )
+            if (
+                issuer_result.annual
+                or issuer_result.quarterly
+            ):
+                source_types.add(
+                    "issuer_official_document"
+                )
+
+        if local_annual or local_quarterly:
+            official_annual.extend(local_annual)
+            official_quarterly.extend(
+                local_quarterly
+            )
+            source_types.add(
+                "issuer_official_normalized"
+            )
 
         annual = merge_periods(
             snapshot.annual_financials,
@@ -450,19 +506,42 @@ class OfficialFinancialsService:
             if getattr(period, field) is not None
         )
 
+        reporting_currency = next(
+            (
+                period.currency
+                for period in official_periods
+                if period.currency
+            ),
+            snapshot.financial_currency
+            or snapshot.currency,
+        )
+
+        documents_found = (
+            len(issuer_result.documents)
+            if issuer_result is not None
+            else 0
+        )
+        documents_parsed = (
+            issuer_result.parsed_documents
+            if issuer_result is not None
+            else 0
+        )
+        discovery_url = (
+            issuer_result.website
+            if issuer_result is not None
+            else snapshot.website
+        )
+
         if official_periods:
             status = (
                 "official"
-                if len(official_periods)
-                >= max(
-                    1,
-                    len(annual) + len(quarterly) - 1,
-                )
+                if official_fields >= 45
                 else "mixed"
             )
             message = (
-                "Les périodes officielles remplacent "
-                "automatiquement les valeurs secondaires."
+                "Les valeurs officielles EDGAR ou publiées sur le "
+                "site investisseurs remplacent automatiquement les "
+                "valeurs secondaires, champ par champ."
             )
         else:
             status = (
@@ -471,18 +550,29 @@ class OfficialFinancialsService:
                 else "unavailable"
             )
             message = (
-                "Aucun dépôt XBRL officiel structuré "
-                "n'a été trouvé automatiquement pour ce "
-                "ticker. Les données secondaires restent "
-                "visibles en attendant l'ingestion du "
-                "document officiel."
+                "Aucune extraction officielle suffisamment fiable "
+                "n'a encore été obtenue. Anatole conserve les données "
+                "secondaires disponibles et n'invente aucun champ."
             )
-            if sec_error:
-                message += f" {sec_error}."
+
+            if (
+                issuer_result is not None
+                and issuer_result.error
+            ):
+                message += (
+                    f" Site investisseurs: "
+                    f"{issuer_result.error}"
+                )
+
+        if errors:
+            message += " " + " · ".join(errors)
 
         data = snapshot.model_dump()
         data["annual_financials"] = annual
         data["quarterly_financials"] = quarterly
+        data["financial_currency"] = (
+            reporting_currency
+        )
         data["official_coverage"] = OfficialCoverage(
             is_tsx_composite=is_composite,
             status=status,
@@ -500,11 +590,14 @@ class OfficialFinancialsService:
             official_fields=official_fields,
             sec_cik=sec_cik,
             source_types=sorted(source_types),
+            documents_found=documents_found,
+            documents_parsed=documents_parsed,
+            discovery_url=discovery_url,
             message=message,
         )
         data["source"] = (
-            "Official filings + Yahoo Finance public "
-            "quoteSummary"
+            "Official issuer documents / SEC EDGAR + "
+            "Yahoo Finance public quoteSummary"
             if official_periods
             else snapshot.source
         )

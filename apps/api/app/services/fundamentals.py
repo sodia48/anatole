@@ -944,6 +944,13 @@ class FundamentalsService:
             ),
             exchange=str(price.get("exchangeName") or "") or None,
             currency=currency,
+            financial_currency=str(
+                financial.get("financialCurrency")
+                or currency
+                or ""
+            )
+            or None,
+            website=str(profile.get("website") or "") or None,
             sector=str(profile.get("sector") or "") or None,
             industry=str(profile.get("industry") or "") or None,
             status=status,
@@ -1026,7 +1033,8 @@ class FundamentalsService:
             )
             snapshot.ttm = self._ttm(
                 snapshot.quarterly_financials,
-                snapshot.currency,
+                snapshot.financial_currency
+                or snapshot.currency,
             )
             snapshot.highlights = self._highlights(
                 snapshot.annual_financials,

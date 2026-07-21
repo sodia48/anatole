@@ -1,72 +1,93 @@
-# Official Financials Engine V1 — S&P/TSX Composite
+# Issuer Financial Documents Engine V1 — TSX Composite
 
-## Ce que cette livraison fait
+Cette livraison remplace le registre vide par un moteur qui travaille
+réellement avec les sites officiels des sociétés.
 
-Le moteur s'applique à tout ticker TSX, sans code Python propre à une société.
+## Hiérarchie des sources
 
-Hiérarchie :
+1. SEC EDGAR XBRL lorsque disponible;
+2. PDF, XLSX ou page financière publiée sur le site officiel de l’émetteur;
+3. registre officiel normalisé local;
+4. Yahoo uniquement pour les champs encore absents.
 
-1. dépôt officiel normalisé de l'émetteur;
-2. SEC EDGAR CompanyFacts XBRL pour les sociétés interinscrites;
-3. Yahoo public uniquement comme repli pour les champs encore absents.
+Le moteur :
 
-Les valeurs officielles remplacent les valeurs secondaires champ par champ.
-Une valeur officielle absente ne détruit pas une valeur secondaire disponible.
-
-## Univers
-
-`tsx_composite_universe.py` récupère le registre opérationnel des sociétés
-depuis le fichier de positions XIC publié par BlackRock. Les espèces et dérivés
-sont exclus.
+- utilise le site officiel fourni dans le profil de l’entreprise;
+- inspecte les chemins investisseurs habituels;
+- lit `robots.txt`;
+- exploite les XML sitemaps;
+- ne suit que les pages du domaine officiel;
+- accepte les documents CDN seulement lorsqu’ils sont liés depuis une page
+  officielle;
+- préfère les états financiers aux présentations et transcriptions;
+- analyse les PDF avec pypdf;
+- analyse les classeurs XLSX avec openpyxl;
+- détecte CAD/USD, milliers/millions, périodes et principaux postes;
+- refuse une extraction trop pauvre au lieu d’inventer des chiffres;
+- conserve la source et le lien officiel sur chaque période.
 
 ## Fichiers à remplacer
 
+- `apps/api/pyproject.toml`
 - `apps/api/app/schemas/fundamentals.py`
 - `apps/api/app/services/fundamentals.py`
+- `apps/api/app/services/official_financials.py`
 - `apps/api/app/api/routes/fundamentals.py`
 - `apps/web/components/stock/FocusFundamentals.tsx`
 
 ## Fichiers à ajouter
 
-- `apps/api/app/services/tsx_composite_universe.py`
-- `apps/api/app/services/sec_edgar.py`
-- `apps/api/app/services/official_financials.py`
-- `apps/api/app/data/official_financials/registry.json`
-- `apps/api/app/data/official_financials/README.md`
-- `apps/api/tests/test_sec_edgar_financials.py`
-- `apps/api/tests/test_official_financials_merge.py`
+- `apps/api/app/services/issuer_documents.py`
+- `apps/api/app/services/issuer_document_parser.py`
+- `apps/api/app/data/official_financials/issuer_sites.json`
+- `apps/api/app/data/official_financials/ISSUER_SITES.md`
+- `apps/api/tests/test_issuer_document_parser.py`
+- `apps/api/tests/test_issuer_document_xlsx.py`
+- `apps/api/tests/test_issuer_document_discovery.py`
 
-## Important
+## Ne pas remplacer
 
-Ne remplace pas `apps/api/app/api/router.py`.
-La route `fundamentals.router` est déjà enregistrée dans le routeur principal.
+Ne touche pas à :
 
-## Variable Render recommandée
-
-Ajouter sur `anatole-api` :
-
-`SEC_USER_AGENT=Anatole souleyman@example.com`
-
-La SEC demande un User-Agent déclarant l'application et un moyen de contact.
-Remplace l'adresse d'exemple par une adresse que tu contrôles.
-
-## Endpoints
-
-- `/api/v1/stocks/RY/fundamentals`
-- `/api/v1/stocks/official-financials/coverage`
+- `apps/api/app/api/router.py`
+- `apps/web/components/stock/FocusClient.tsx`
 
 ## Déploiement
 
 1. Commit sur `main`.
-2. Render → `anatole-api` → Clear build cache & deploy.
-3. Vercel → redéployer sans l'ancien cache.
-4. Recharge Anatole avec `Ctrl + Shift + R`.
+2. Render → `anatole-api`.
+3. `Clear build cache & deploy`.
+4. Vercel → redéploiement sans ancien cache.
+5. Recharge Anatole avec `Ctrl + Shift + R`.
 
-## Limite honnête de V1
+Le nouveau `pyproject.toml` installe :
 
-Les sociétés interinscrites avec XBRL SEC sont enrichies automatiquement.
-Pour les sociétés TSX uniquement, le moteur est universel mais leurs dépôts
-SEDAR+/IR doivent être normalisés dans `registry.json`. SEDAR+ offre la
-recherche publique de documents, mais pas une API REST publique documentée
-équivalente à CompanyFacts. Le registre évite tout traitement spécial en code
-et permet d'étendre progressivement la couverture à l'ensemble du Composite.
+- `pypdf>=5.7,<7.0`
+- `openpyxl>=3.1,<4.0`
+
+## Vérification
+
+Teste d’abord le diagnostic :
+
+```text
+/api/v1/stocks/VNP/official-documents?refresh=true
+```
+
+Puis :
+
+```text
+/api/v1/stocks/VNP/fundamentals
+```
+
+Dans le diagnostic, vérifie :
+
+- `documents` non vide;
+- `parsed_periods` supérieur à zéro;
+- `parsed_fields` supérieur à zéro;
+- les URL appartiennent au site officiel ou à un actif lié depuis celui-ci.
+
+## Limite volontaire
+
+Le moteur ne fait pas d’OCR. Un PDF uniquement composé d’images restera
+non analysable. Cette décision évite les valeurs incertaines. Les PDF avec
+une couche texte et les XLSX sont pris en charge.

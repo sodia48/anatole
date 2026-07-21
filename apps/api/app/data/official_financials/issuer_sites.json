@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "description": "Optional official-site overrides. The engine normally uses the website published in the issuer profile and discovers investor pages automatically. Add an override only when the corporate homepage does not expose the investor-relations section.",
+  "issuers": {}
+}
