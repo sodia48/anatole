@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "description": "Normalized issuer-official filings for TSX companies without usable SEC XBRL. Add issuers by ticker; no company-specific Python code is required.",
+  "issuers": {}
+}

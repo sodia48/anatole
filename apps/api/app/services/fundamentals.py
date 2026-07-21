@@ -21,6 +21,9 @@ from app.schemas.fundamentals import (
     TTMSummary,
 )
 from app.services.market_data import market_data_service
+from app.services.official_financials import (
+    official_financials_service,
+)
 
 
 MODULES = (
@@ -1017,6 +1020,19 @@ class FundamentalsService:
                         f"indisponible ({type(exc).__name__})."
                     ),
                 )
+
+            snapshot = await official_financials_service.enrich(
+                snapshot
+            )
+            snapshot.ttm = self._ttm(
+                snapshot.quarterly_financials,
+                snapshot.currency,
+            )
+            snapshot.highlights = self._highlights(
+                snapshot.annual_financials,
+                snapshot.quarterly_financials,
+                snapshot.ttm,
+            )
 
             self._cache[symbol] = (monotonic(), snapshot)
             return snapshot

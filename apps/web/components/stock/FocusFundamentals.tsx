@@ -52,6 +52,34 @@ type Metrics = {
   earnings_growth: number | null;
 };
 
+type FinancialSource = {
+  source_type:
+    | "sec_edgar_xbrl"
+    | "issuer_official_normalized"
+    | "yahoo_public";
+  source_name: string;
+  source_url: string | null;
+  filed_at: string | null;
+  form: string | null;
+  confidence: "official" | "secondary";
+};
+
+type OfficialCoverage = {
+  is_tsx_composite: boolean;
+  status:
+    | "official"
+    | "mixed"
+    | "fallback"
+    | "unavailable";
+  official_periods: number;
+  annual_official_periods: number;
+  quarterly_official_periods: number;
+  official_fields: number;
+  sec_cik: string | null;
+  source_types: string[];
+  message: string | null;
+};
+
 type FinancialPeriod = {
   period_end: string;
   period_type: "annual" | "quarterly";
@@ -95,6 +123,7 @@ type FinancialPeriod = {
   net_income_growth_yoy: number | null;
   eps_growth_yoy: number | null;
   free_cash_flow_growth_yoy: number | null;
+  source: FinancialSource | null;
 };
 
 type TTMSummary = {
@@ -200,6 +229,7 @@ type Snapshot = {
   earnings_estimates: EarningsEstimate[];
   analysts: Analysts;
   events: Events;
+  official_coverage: OfficialCoverage;
   source: string;
   generated_at: string;
   refresh_after_seconds: number;
@@ -461,6 +491,65 @@ function Fundamentals({
   );
 }
 
+function SourceBadge({
+  source,
+}: {
+  source: FinancialSource | null;
+}) {
+  if (!source) {
+    return (
+      <span
+        title="Source secondaire"
+        style={{
+          display: "inline-flex",
+          marginTop: 5,
+          padding: "2px 6px",
+          borderRadius: 999,
+          background: "rgba(94,120,137,.17)",
+          color: "#7f9db1",
+          fontSize: 8,
+          fontWeight: 750,
+        }}
+      >
+        SECONDAIRE
+      </span>
+    );
+  }
+
+  const content = (
+    <span
+      title={`${source.source_name}${
+        source.form ? ` · ${source.form}` : ""
+      }`}
+      style={{
+        display: "inline-flex",
+        marginTop: 5,
+        padding: "2px 6px",
+        borderRadius: 999,
+        background: "rgba(22,199,154,.14)",
+        color: "#27d9aa",
+        fontSize: 8,
+        fontWeight: 800,
+      }}
+    >
+      OFFICIEL
+    </span>
+  );
+
+  return source.source_url ? (
+    <a
+      href={source.source_url}
+      target="_blank"
+      rel="noreferrer"
+      style={{ textDecoration: "none" }}
+    >
+      {content}
+    </a>
+  ) : (
+    content
+  );
+}
+
 function MiniTrend({
   title,
   rows,
@@ -660,7 +749,8 @@ function FinancialTable({
                     whiteSpace: "nowrap",
                   }}
                 >
-                  {periodLabel(row.period_end)}
+                  <div>{periodLabel(row.period_end)}</div>
+                  <SourceBadge source={row.source} />
                 </td>
 
                 {view === "income" ? (
@@ -852,6 +942,68 @@ function Financials({
           );
         })}
       </nav>
+
+      <section
+        style={{
+          ...panelStyle,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 14,
+          flexWrap: "wrap",
+          padding: 14,
+        }}
+      >
+        <div>
+          <span className="eyebrow">
+            SOURCES DES ÉTATS FINANCIERS
+          </span>
+          <div
+            style={{
+              marginTop: 5,
+              color: "#dcecf6",
+              fontWeight: 760,
+            }}
+          >
+            {snapshot.official_coverage.status === "official"
+              ? "Couverture officielle"
+              : snapshot.official_coverage.status === "mixed"
+                ? "Couverture officielle partielle"
+                : "Source secondaire en attente du dépôt officiel"}
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              maxWidth: 850,
+              color: "#819db0",
+              fontSize: 10,
+            }}
+          >
+            {snapshot.official_coverage.message}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          <Metric
+            label="Périodes officielles"
+            value={String(
+              snapshot.official_coverage.official_periods
+            )}
+          />
+          <Metric
+            label="Champs officiels"
+            value={String(
+              snapshot.official_coverage.official_fields
+            )}
+          />
+        </div>
+      </section>
 
       {subview === "overview" ? (
         <>

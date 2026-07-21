@@ -47,6 +47,63 @@ class FundamentalMetrics(BaseModel):
     earnings_growth: float | None = None
 
 
+class FinancialSource(BaseModel):
+    source_type: Literal[
+        "sec_edgar_xbrl",
+        "issuer_official_normalized",
+        "yahoo_public",
+    ]
+    source_name: str
+    source_url: str | None = None
+    filed_at: datetime | None = None
+    form: str | None = None
+    confidence: Literal["official", "secondary"] = "official"
+
+
+class OfficialCoverage(BaseModel):
+    is_tsx_composite: bool = False
+    status: Literal[
+        "official",
+        "mixed",
+        "fallback",
+        "unavailable",
+    ] = "fallback"
+    official_periods: int = 0
+    annual_official_periods: int = 0
+    quarterly_official_periods: int = 0
+    official_fields: int = 0
+    sec_cik: str | None = None
+    source_types: list[str] = Field(default_factory=list)
+    message: str | None = None
+
+
+class CompositeCoverageItem(BaseModel):
+    ticker: str
+    name: str
+    sector: str | None = None
+    weight: float | None = None
+    sec_cik: str | None = None
+    has_local_official_data: bool = False
+    automatic_source: Literal[
+        "sec_edgar_xbrl",
+        "issuer_official_normalized",
+        "yahoo_public",
+    ]
+    status: Literal["official", "fallback"]
+
+
+class CompositeCoverageSnapshot(BaseModel):
+    universe: str = "S&P/TSX Composite"
+    constituent_count: int
+    official_automatic_count: int
+    fallback_count: int
+    generated_at: datetime
+    source: str
+    constituents: list[CompositeCoverageItem] = Field(
+        default_factory=list
+    )
+
+
 class FinancialPeriod(BaseModel):
     period_end: datetime
     period_type: Literal["annual", "quarterly"]
@@ -95,6 +152,7 @@ class FinancialPeriod(BaseModel):
     net_income_growth_yoy: float | None = None
     eps_growth_yoy: float | None = None
     free_cash_flow_growth_yoy: float | None = None
+    source: FinancialSource | None = None
 
 
 class TTMSummary(BaseModel):
@@ -200,6 +258,9 @@ class FundamentalSnapshot(BaseModel):
     earnings_estimates: list[EarningsEstimate] = Field(default_factory=list)
     analysts: AnalystConsensus
     events: CorporateEvents
+    official_coverage: OfficialCoverage = Field(
+        default_factory=OfficialCoverage
+    )
     source: str
     generated_at: datetime
     refresh_after_seconds: int = 1800
