@@ -1,42 +1,43 @@
-# Yahoo Structured Financial Statements V1
+# Répertoire ETF sectoriel Anatole V1
 
-Cette mise à jour restaure dans FastAPI le pipeline de la bêta Streamlit :
-`income_stmt`, `balance_sheet`, `cashflow` et leurs versions trimestrielles.
-
-## Priorité
-
-1. Dépôt officiel
-2. États financiers Yahoo/yfinance structurés
-3. Ancien quoteSummary
-4. Calcul exact
-5. N/D
-
-## Remplacer
-
-- apps/api/pyproject.toml
-- apps/api/app/schemas/fundamentals.py
-- apps/api/app/services/fundamentals.py
-- apps/api/app/services/official_financials.py
-- apps/api/app/api/routes/fundamentals.py
-- apps/web/components/stock/FocusFundamentals.tsx
+Cette livraison fait passer la section de **30 à 172 ETF** et les
+regroupe par secteur/exposition.
 
 ## Ajouter
 
-- apps/api/app/services/yahoo_statements.py
-- apps/api/tests/test_yahoo_statements.py
-- apps/api/tests/test_yahoo_statements_priority.py
+- `apps/api/app/data/etf_catalog.py`
+- `apps/web/app/etf/page.module.css`
+- `apps/api/tests/test_etf_catalog.py`
 
-Ne touche pas à `apps/api/app/api/router.py` ni à `FocusClient.tsx`.
+## Remplacer
+
+- `apps/api/app/services/etf.py`
+- `apps/web/app/etf/page.tsx`
+
+## Comportement
+
+- regroupement par secteur;
+- filtre rapide par secteur;
+- filtre par fournisseur;
+- recherche par ticker, nom, exposition ou région;
+- sections ouvrables et refermables;
+- grille 3 / 2 / 1 colonnes selon l'écran;
+- chargement prioritaire des ETF les plus consultés;
+- mise à jour asynchrone du reste des cotations;
+- rejet des valeurs de démonstration;
+- affichage `N/D` lorsqu'une cotation publique réelle n'est pas disponible.
 
 ## Déploiement
 
-1. Commit sur main.
-2. Render → anatole-api → Clear build cache & deploy.
-3. Tester `/api/v1/stocks/RY/structured-statements?refresh=true`.
-4. Tester `/api/v1/stocks/RY/fundamentals`.
-5. Vercel → redeploy sans cache.
-6. Ctrl + Shift + R.
+1. Ajoute/remplace les fichiers dans GitHub sur `main`.
+2. Render → `anatole-api` → **Clear build cache & deploy**.
+3. Vérifie `/api/v1/discovery/etfs`.
+4. Vercel → redéploie le frontend sans cache.
+5. Recharge Anatole avec `Ctrl + Shift + R`.
 
-Résultat attendu : `annual_periods > 0` et `populated_fields > 0`.
-Les lignes portent `YAHOO · STRUCTURÉ`; les valeurs dérivées portent
-`CALCULÉ · n`.
+Aucune nouvelle variable d'environnement n'est nécessaire.
+
+## Vérification attendue
+
+L'endpoint doit retourner au moins 100 éléments. La page `/etf` doit afficher
+les groupes sectoriels ainsi que le compteur total.

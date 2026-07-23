@@ -1,0 +1,173 @@
+﻿ticker,name,provider,category,exposure,region
+XIC,iShares Core S&P/TSX Capped Composite Index ETF,iShares,Marché canadien,Marché canadien large,Canada — marché large
+XIU,iShares S&P/TSX 60 Index ETF,iShares,Marché canadien,Grandes capitalisations canadiennes,Canada — grandes capitalisations
+VCN,Vanguard FTSE Canada All Cap Index ETF,Vanguard,Marché canadien,Marché canadien toutes capitalisations,Canada — marché large
+ZCN,BMO S&P/TSX Capped Composite Index ETF,BMO,Marché canadien,Marché canadien large,Canada — marché large
+HXT,Global X S&P/TSX 60 Index Corporate Class ETF,Global X,Marché canadien,S&P/TSX 60,Canada — grandes capitalisations
+HXCN,Global X S&P/TSX Capped Composite Index Corporate Class ETF,Global X,Marché canadien,S&P/TSX Composite,Canada — marché large
+QCN,Mackenzie Canadian Equity Index ETF,Mackenzie,Marché canadien,Actions canadiennes diversifiées,Canada — marché large
+XMD,iShares S&P/TSX Completion Index ETF,iShares,Marché canadien,Titres hors TSX 60,Canada — moyennes capitalisations
+XCS,iShares S&P/TSX SmallCap Index ETF,iShares,Marché canadien,Petites capitalisations canadiennes,Canada — petites capitalisations
+XCV,iShares Canadian Value Index ETF,iShares,Marché canadien,Facteur valeur canadien,Canada — facteur valeur
+XCG,iShares Canadian Growth Index ETF,iShares,Marché canadien,Facteur croissance canadien,Canada — facteur croissance
+XMV,iShares MSCI Min Vol Canada Index ETF,iShares,Marché canadien,Faible volatilité canadienne,Canada — faible volatilité
+ZLB,BMO Low Volatility Canadian Equity ETF,BMO,Marché canadien,Faible volatilité canadienne,Canada — faible volatilité
+XFN,iShares S&P/TSX Capped Financials Index ETF,iShares,Finance et dividendes,Services financiers canadiens,Canada — finance
+ZEB,BMO Equal Weight Banks Index ETF,BMO,Finance et dividendes,Banques canadiennes équipondérées,Canada — banques
+ZWB,BMO Covered Call Canadian Banks ETF,BMO,Finance et dividendes,Banques canadiennes avec options d'achat couvertes,Canada — banques et revenu
+HCAL,Hamilton Canadian Bank Mean Reversion Index ETF,Hamilton,Finance et dividendes,Banques canadiennes,Canada — banques
+HFIN,Hamilton Enhanced Canadian Financials ETF,Hamilton,Finance et dividendes,Services financiers canadiens,Canada — finance
+XDV,iShares Canadian Select Dividend Index ETF,iShares,Finance et dividendes,Dividendes canadiens sélectionnés,Canada — dividendes
+XEI,iShares S&P/TSX Composite High Dividend Index ETF,iShares,Finance et dividendes,Dividendes élevés du TSX,Canada — dividendes
+XDIV,iShares Core MSCI Canadian Quality Dividend Index ETF,iShares,Finance et dividendes,Dividendes canadiens de qualité,Canada — dividendes qualité
+VDY,Vanguard FTSE Canadian High Dividend Yield Index ETF,Vanguard,Finance et dividendes,Rendement élevé canadien,Canada — dividendes
+ZDV,BMO Canadian Dividend ETF,BMO,Finance et dividendes,Actions canadiennes à dividendes,Canada — dividendes
+CDZ,iShares S&P/TSX Canadian Dividend Aristocrats Index ETF,iShares,Finance et dividendes,Aristocrates du dividende canadien,Canada — dividendes
+FIE,iShares Canadian Financial Monthly Income ETF,iShares,Finance et dividendes,Revenu mensuel financier,Canada — finance et revenu
+PDC,Invesco Canadian Dividend Index ETF,Invesco,Finance et dividendes,Dividendes canadiens,Canada — dividendes
+XEG,iShares S&P/TSX Capped Energy Index ETF,iShares,Énergie et ressources,Producteurs d'énergie canadiens,Canada — énergie
+ZEO,BMO Equal Weight Oil & Gas Index ETF,BMO,Énergie et ressources,Pétrole et gaz équipondérés,Canada — énergie
+HXE,Global X S&P/TSX Capped Energy Index Corporate Class ETF,Global X,Énergie et ressources,Énergie canadienne,Canada — énergie
+NXF,CI Energy Giants Covered Call ETF,CI Global Asset Management,Énergie et ressources,Producteurs d'énergie avec options couvertes,Canada — énergie et revenu
+HEE,Global X Enhanced Income Energy ETF,Global X,Énergie et ressources,Énergie canadienne à revenu amélioré,Canada — énergie et revenu
+XCLN,iShares Global Clean Energy Index ETF,iShares,Énergie et ressources,Énergie propre mondiale,Monde — énergie propre
+ZCLN,BMO Clean Energy Index ETF,BMO,Énergie et ressources,Énergie propre mondiale,Monde — énergie propre
+HCLN,Harvest Clean Energy ETF,Harvest,Énergie et ressources,Entreprises mondiales d'énergie propre,Monde — énergie propre
+XETM,iShares S&P/TSX Energy Transition Materials Index ETF,iShares,Énergie et ressources,Matériaux de transition énergétique,Canada — transition énergétique
+COW,iShares Global Agriculture Index ETF,iShares,Énergie et ressources,Agriculture mondiale,Monde — ressources agricoles
+HURA,Global X Uranium Index ETF,Global X,Énergie et ressources,Producteurs d'uranium,Monde — uranium
+URNM,Sprott Uranium Miners ETF,Sprott,Énergie et ressources,Minières d'uranium,Monde — uranium
+XMA,iShares S&P/TSX Capped Materials Index ETF,iShares,Matériaux et métaux,Matériaux canadiens,Canada — matériaux
+XBM,iShares S&P/TSX Global Base Metals Index ETF,iShares,Matériaux et métaux,Producteurs de métaux de base,Monde — métaux de base
+XGD,iShares S&P/TSX Global Gold Index ETF,iShares,Matériaux et métaux,Minières aurifères,Monde — or
+ZGD,BMO Equal Weight Global Gold Index ETF,BMO,Matériaux et métaux,Minières aurifères équipondérées,Monde — or
+COPP,Global X Copper Producers Index ETF,Global X,Matériaux et métaux,Producteurs de cuivre,Monde — cuivre
+CGL,iShares Gold Bullion ETF,iShares,Matériaux et métaux,Lingots d'or,Or physique
+CGL.C,iShares Gold Bullion ETF — CAD Hedged,iShares,Matériaux et métaux,Lingots d'or couverts en CAD,Or physique — couvert
+SVR,iShares Silver Bullion ETF,iShares,Matériaux et métaux,Lingots d'argent,Argent physique
+KILO,Purpose Gold Bullion Fund,Purpose,Matériaux et métaux,Lingots d'or,Or physique
+HUG,Global X Gold ETF,Global X,Matériaux et métaux,Contrats sur l'or,Or
+HUZ,Global X Silver ETF,Global X,Matériaux et métaux,Contrats sur l'argent,Argent
+XIT,iShares S&P/TSX Capped Information Technology Index ETF,iShares,Technologie et innovation,Technologie canadienne,Canada — technologie
+TEC,TD Global Technology Leaders Index ETF,TD,Technologie et innovation,Leaders technologiques mondiaux,Monde — technologie
+QQC,Invesco NASDAQ 100 Index ETF,Invesco,Technologie et innovation,NASDAQ-100,États-Unis — technologie
+QQC.F,Invesco NASDAQ 100 Index ETF — CAD Hedged,Invesco,Technologie et innovation,NASDAQ-100 couvert en CAD,États-Unis — technologie couverte
+HXQ,Global X NASDAQ-100 Index Corporate Class ETF,Global X,Technologie et innovation,NASDAQ-100,États-Unis — technologie
+ZQQ,BMO NASDAQ 100 Equity Hedged to CAD Index ETF,BMO,Technologie et innovation,NASDAQ-100 couvert en CAD,États-Unis — technologie couverte
+XQQ,iShares NASDAQ 100 Index ETF — CAD Hedged,iShares,Technologie et innovation,NASDAQ-100 couvert en CAD,États-Unis — technologie couverte
+XCHP,iShares Semiconductor Index ETF,iShares,Technologie et innovation,Semi-conducteurs,Monde — semi-conducteurs
+XHAK,iShares Cybersecurity and Tech Index ETF,iShares,Technologie et innovation,Cybersécurité,Monde — cybersécurité
+XEXP,iShares Exponential Technologies Index ETF,iShares,Technologie et innovation,Technologies exponentielles,Monde — innovation
+XDRV,iShares Global Electric and Autonomous Vehicles Index ETF,iShares,Technologie et innovation,Véhicules électriques et autonomes,Monde — mobilité
+CYBR,Evolve Cyber Security Index Fund,Evolve,Technologie et innovation,Cybersécurité mondiale,Monde — cybersécurité
+EDGE,Evolve Innovation Index Fund,Evolve,Technologie et innovation,Entreprises innovantes,Monde — innovation
+RBOT,Global X Robotics & AI Index ETF,Global X,Technologie et innovation,Robotique et intelligence artificielle,Monde — robotique et IA
+XRE,iShares S&P/TSX Capped REIT Index ETF,iShares,"Immobilier, infrastructures et services publics",FPI canadiennes,Canada — immobilier
+ZRE,BMO Equal Weight REITs Index ETF,BMO,"Immobilier, infrastructures et services publics",FPI canadiennes équipondérées,Canada — immobilier
+VRE,Vanguard FTSE Canadian Capped REIT Index ETF,Vanguard,"Immobilier, infrastructures et services publics",FPI canadiennes,Canada — immobilier
+RIT,CI Canadian REIT ETF,CI Global Asset Management,"Immobilier, infrastructures et services publics",FPI canadiennes,Canada — immobilier
+XUT,iShares S&P/TSX Capped Utilities Index ETF,iShares,"Immobilier, infrastructures et services publics",Services publics canadiens,Canada — services publics
+ZUT,BMO Equal Weight Utilities Index ETF,BMO,"Immobilier, infrastructures et services publics",Services publics équipondérés,Canada — services publics
+ZWU,BMO Covered Call Utilities ETF,BMO,"Immobilier, infrastructures et services publics",Services publics avec options couvertes,Canada — services publics et revenu
+HUTL,Harvest Equal Weight Global Utilities Income ETF,Harvest,"Immobilier, infrastructures et services publics",Services publics mondiaux à revenu,Monde — services publics
+CIF,iShares Global Infrastructure Index ETF,iShares,"Immobilier, infrastructures et services publics",Infrastructures mondiales,Monde — infrastructures
+ZGI,BMO Global Infrastructure Index ETF,BMO,"Immobilier, infrastructures et services publics",Infrastructures mondiales,Monde — infrastructures
+XGI,iShares S&P Global Industrials Index ETF,iShares,"Immobilier, infrastructures et services publics",Industries mondiales,Monde — industries
+CWW,iShares Global Water Index ETF,iShares,"Immobilier, infrastructures et services publics",Entreprises mondiales de l'eau,Monde — eau
+UTIL,Hamilton Utilities Yield Maximizer ETF,Hamilton,"Immobilier, infrastructures et services publics",Services publics et revenu d'options,Canada / États-Unis — services publics
+XST,iShares S&P/TSX Capped Consumer Staples Index ETF,iShares,Consommation et santé,Consommation de base canadienne,Canada — consommation défensive
+XCD,iShares S&P Global Consumer Discretionary Index ETF,iShares,Consommation et santé,Consommation discrétionnaire mondiale,Monde — consommation discrétionnaire
+XHC,iShares Global Healthcare Index ETF,iShares,Consommation et santé,Santé mondiale,Monde — santé
+XDNA,iShares Genomics Immunology and Healthcare Index ETF,iShares,Consommation et santé,"Génomique, immunologie et santé",Monde — santé innovante
+LIFE,Evolve Global Healthcare Enhanced Yield Fund,Evolve,Consommation et santé,Santé mondiale avec revenu amélioré,Monde — santé et revenu
+HHL,Harvest Healthcare Leaders Income ETF,Harvest,Consommation et santé,Leaders mondiaux de la santé,Monde — santé et revenu
+HLTH,Global X Health Care Covered Call ETF,Global X,Consommation et santé,Santé avec options couvertes,Monde — santé et revenu
+FOOD,Global X Agri-Tech & Food Innovation Index ETF,Global X,Consommation et santé,Technologies agricoles et alimentation,Monde — alimentation
+TRVL,Harvest Travel & Leisure Index ETF,Harvest,Consommation et santé,Voyage et loisirs,Monde — consommation discrétionnaire
+CARS,Evolve Automobile Innovation Index Fund,Evolve,Consommation et santé,Innovation automobile,Monde — automobile
+VFV,Vanguard S&P 500 Index ETF,Vanguard,Marché américain,S&P 500,États-Unis — grandes capitalisations
+VSP,Vanguard S&P 500 Index ETF — CAD Hedged,Vanguard,Marché américain,S&P 500 couvert en CAD,États-Unis — grandes capitalisations couvertes
+XUS,iShares Core S&P 500 Index ETF,iShares,Marché américain,S&P 500,États-Unis — grandes capitalisations
+XSP,iShares Core S&P 500 Index ETF — CAD Hedged,iShares,Marché américain,S&P 500 couvert en CAD,États-Unis — grandes capitalisations couvertes
+ZSP,BMO S&P 500 Index ETF,BMO,Marché américain,S&P 500,États-Unis — grandes capitalisations
+ZUE,BMO S&P 500 Hedged to CAD Index ETF,BMO,Marché américain,S&P 500 couvert en CAD,États-Unis — grandes capitalisations couvertes
+HXS,Global X S&P 500 Index Corporate Class ETF,Global X,Marché américain,S&P 500,États-Unis — grandes capitalisations
+HSH,Global X S&P 500 CAD Hedged Index Corporate Class ETF,Global X,Marché américain,S&P 500 couvert en CAD,États-Unis — grandes capitalisations couvertes
+XUU,iShares Core S&P U.S. Total Market Index ETF,iShares,Marché américain,Marché américain total,États-Unis — marché total
+VUN,Vanguard U.S. Total Market Index ETF,Vanguard,Marché américain,Marché américain total,États-Unis — marché total
+ZUQ,BMO MSCI USA High Quality Index ETF,BMO,Marché américain,Facteur qualité américain,États-Unis — qualité
+XMU,iShares MSCI Min Vol USA Index ETF,iShares,Marché américain,Faible volatilité américaine,États-Unis — faible volatilité
+XQLT,iShares MSCI USA Quality Factor Index ETF,iShares,Marché américain,Facteur qualité américain,États-Unis — qualité
+XMTM,iShares MSCI USA Momentum Factor Index ETF,iShares,Marché américain,Facteur momentum américain,États-Unis — momentum
+XSU,iShares U.S. Small Cap Index ETF — CAD Hedged,iShares,Marché américain,Petites capitalisations américaines,États-Unis — petites capitalisations
+XEF,iShares Core MSCI EAFE IMI Index ETF,iShares,International et émergents,Marchés développés hors Amérique du Nord,EAFE — marchés développés
+VIU,Vanguard FTSE Developed All Cap ex North America Index ETF,Vanguard,International et émergents,Marchés développés hors Amérique du Nord,Marchés développés
+ZEA,BMO MSCI EAFE Index ETF,BMO,International et émergents,Marchés développés EAFE,EAFE — marchés développés
+XEC,iShares Core MSCI Emerging Markets IMI Index ETF,iShares,International et émergents,Marchés émergents toutes capitalisations,Marchés émergents
+VEE,Vanguard FTSE Emerging Markets All Cap Index ETF,Vanguard,International et émergents,Marchés émergents toutes capitalisations,Marchés émergents
+ZEM,BMO MSCI Emerging Markets Index ETF,BMO,International et émergents,Marchés émergents,Marchés émergents
+XEM,iShares MSCI Emerging Markets Index ETF,iShares,International et émergents,Marchés émergents,Marchés émergents
+XAW,iShares Core MSCI All Country World ex Canada Index ETF,iShares,International et émergents,Monde hors Canada,Monde hors Canada
+VXC,Vanguard FTSE Global All Cap ex Canada Index ETF,Vanguard,International et émergents,Monde hors Canada,Monde hors Canada
+XWD,iShares MSCI World Index ETF,iShares,International et émergents,Marchés développés mondiaux,Monde développé
+XIN,iShares MSCI EAFE Index ETF — CAD Hedged,iShares,International et émergents,EAFE couvert en CAD,EAFE — couvert
+XEU,iShares MSCI Europe IMI Index ETF,iShares,International et émergents,Actions européennes,Europe
+XCH,iShares China Index ETF,iShares,International et émergents,Actions chinoises,Chine
+CJP,iShares Japan Fundamental Index ETF,iShares,International et émergents,Actions japonaises,Japon
+XID,iShares India Index ETF,iShares,International et émergents,Actions indiennes,Inde
+XEQT,iShares Core Equity ETF Portfolio,iShares,Portefeuilles tout-en-un,Portefeuille 100 % actions,Monde — tout-en-un actions
+XGRO,iShares Core Growth ETF Portfolio,iShares,Portefeuilles tout-en-un,Portefeuille croissance,Monde — tout-en-un croissance
+XBAL,iShares Core Balanced ETF Portfolio,iShares,Portefeuilles tout-en-un,Portefeuille équilibré,Monde — tout-en-un équilibré
+XCNS,iShares Core Conservative Balanced ETF Portfolio,iShares,Portefeuilles tout-en-un,Portefeuille prudent,Monde — tout-en-un prudent
+XINC,iShares Core Income Balanced ETF Portfolio,iShares,Portefeuilles tout-en-un,Portefeuille de revenu,Monde — tout-en-un revenu
+VEQT,Vanguard All-Equity ETF Portfolio,Vanguard,Portefeuilles tout-en-un,Portefeuille 100 % actions,Monde — tout-en-un actions
+VGRO,Vanguard Growth ETF Portfolio,Vanguard,Portefeuilles tout-en-un,Portefeuille croissance,Monde — tout-en-un croissance
+VBAL,Vanguard Balanced ETF Portfolio,Vanguard,Portefeuilles tout-en-un,Portefeuille équilibré,Monde — tout-en-un équilibré
+VCNS,Vanguard Conservative ETF Portfolio,Vanguard,Portefeuilles tout-en-un,Portefeuille prudent,Monde — tout-en-un prudent
+VRIF,Vanguard Retirement Income ETF Portfolio,Vanguard,Portefeuilles tout-en-un,Portefeuille de revenu de retraite,Monde — tout-en-un revenu
+ZEQT,BMO All-Equity ETF,BMO,Portefeuilles tout-en-un,Portefeuille 100 % actions,Monde — tout-en-un actions
+ZGRO,BMO Growth ETF,BMO,Portefeuilles tout-en-un,Portefeuille croissance,Monde — tout-en-un croissance
+ZBAL,BMO Balanced ETF,BMO,Portefeuilles tout-en-un,Portefeuille équilibré,Monde — tout-en-un équilibré
+ZCON,BMO Conservative ETF,BMO,Portefeuilles tout-en-un,Portefeuille prudent,Monde — tout-en-un prudent
+XBB,iShares Core Canadian Universe Bond Index ETF,iShares,Obligations et liquidités,Univers obligataire canadien,Canada — obligations
+VAB,Vanguard Canadian Aggregate Bond Index ETF,Vanguard,Obligations et liquidités,Obligations canadiennes agrégées,Canada — obligations
+ZAG,BMO Aggregate Bond Index ETF,BMO,Obligations et liquidités,Obligations canadiennes agrégées,Canada — obligations
+XQB,iShares High Quality Canadian Bond Index ETF,iShares,Obligations et liquidités,Obligations canadiennes de qualité,Canada — obligations
+XSB,iShares Core Canadian Short Term Bond Index ETF,iShares,Obligations et liquidités,Obligations canadiennes court terme,Canada — obligations court terme
+VSB,Vanguard Canadian Short-Term Bond Index ETF,Vanguard,Obligations et liquidités,Obligations canadiennes court terme,Canada — obligations court terme
+ZSB,BMO Short Corporate Bond Index ETF,BMO,Obligations et liquidités,Obligations de sociétés court terme,Canada — crédit court terme
+XGB,iShares Core Canadian Government Bond Index ETF,iShares,Obligations et liquidités,Obligations gouvernementales canadiennes,Canada — gouvernement
+ZGB,BMO Government Bond Index ETF,BMO,Obligations et liquidités,Obligations gouvernementales canadiennes,Canada — gouvernement
+XCB,iShares Core Canadian Corporate Bond Index ETF,iShares,Obligations et liquidités,Obligations de sociétés canadiennes,Canada — crédit
+ZCB,BMO Corporate Bond Index ETF,BMO,Obligations et liquidités,Obligations de sociétés canadiennes,Canada — crédit
+XHY,iShares U.S. High Yield Bond Index ETF — CAD Hedged,iShares,Obligations et liquidités,Obligations américaines à rendement élevé,États-Unis — haut rendement couvert
+ZHY,BMO High Yield U.S. Corporate Bond Hedged to CAD Index ETF,BMO,Obligations et liquidités,Crédit américain à rendement élevé,États-Unis — haut rendement couvert
+XFR,iShares Floating Rate Index ETF,iShares,Obligations et liquidités,Obligations à taux variable,Canada — taux variable
+ZFL,BMO Long Federal Bond Index ETF,BMO,Obligations et liquidités,Obligations fédérales long terme,Canada — gouvernement long terme
+ZFM,BMO Mid Federal Bond Index ETF,BMO,Obligations et liquidités,Obligations fédérales moyen terme,Canada — gouvernement moyen terme
+ZFS,BMO Short Federal Bond Index ETF,BMO,Obligations et liquidités,Obligations fédérales court terme,Canada — gouvernement court terme
+HBB,Global X Canadian Select Universe Bond Index Corporate Class ETF,Global X,Obligations et liquidités,Univers obligataire canadien,Canada — obligations
+CMR,iShares Premium Money Market ETF,iShares,Obligations et liquidités,Marché monétaire canadien,Canada — liquidités
+CASH,Global X High Interest Savings ETF,Global X,Obligations et liquidités,Comptes d'épargne à intérêt élevé,Canada — liquidités
+PSA,Purpose High Interest Savings Fund,Purpose,Obligations et liquidités,Comptes d'épargne à intérêt élevé,Canada — liquidités
+CSAV,CI High Interest Savings ETF,CI Global Asset Management,Obligations et liquidités,Comptes d'épargne à intérêt élevé,Canada — liquidités
+HISA,Evolve High Interest Savings Account Fund,Evolve,Obligations et liquidités,Comptes d'épargne à intérêt élevé,Canada — liquidités
+CBIL,Global X 0-3 Month T-Bill ETF,Global X,Obligations et liquidités,Bons du Trésor canadiens 0-3 mois,Canada — bons du Trésor
+ZMMK,BMO Money Market Fund ETF Series,BMO,Obligations et liquidités,Marché monétaire canadien,Canada — liquidités
+MNY,Purpose Cash Management Fund,Purpose,Obligations et liquidités,Gestion de trésorerie,Canada — liquidités
+ZWC,BMO Canadian High Dividend Covered Call ETF,BMO,Revenu amélioré et options,Actions canadiennes à dividendes avec options couvertes,Canada — revenu amélioré
+ZWG,BMO Global High Dividend Covered Call ETF,BMO,Revenu amélioré et options,Actions mondiales à dividendes avec options couvertes,Monde — revenu amélioré
+ZWH,BMO U.S. High Dividend Covered Call ETF,BMO,Revenu amélioré et options,Actions américaines à dividendes avec options couvertes,États-Unis — revenu amélioré
+ZWE,BMO Europe High Dividend Covered Call ETF,BMO,Revenu amélioré et options,Actions européennes à dividendes avec options couvertes,Europe — revenu amélioré
+ZWP,BMO Europe High Dividend Covered Call Hedged to CAD ETF,BMO,Revenu amélioré et options,Actions européennes à dividendes couvertes en CAD,Europe — revenu amélioré couvert
+HYLD,Hamilton Enhanced U.S. Covered Call ETF,Hamilton,Revenu amélioré et options,FNB américains avec options couvertes,États-Unis — revenu amélioré
+HDIV,Hamilton Enhanced Multi-Sector Covered Call ETF,Hamilton,Revenu amélioré et options,Portefeuille multi-secteurs avec options couvertes,Canada — revenu amélioré
+BANK,Evolve Canadian Banks and Lifecos Enhanced Yield Index Fund,Evolve,Revenu amélioré et options,Banques et assureurs-vie canadiens,Canada — finance et revenu
+HMAX,Hamilton Canadian Financials Yield Maximizer ETF,Hamilton,Revenu amélioré et options,Services financiers canadiens et options,Canada — finance et revenu
+UMAX,Hamilton Utilities Yield Maximizer ETF,Hamilton,Revenu amélioré et options,Services publics nord-américains et options,Amérique du Nord — services publics et revenu
+HUC,Global X Crude Oil ETF,Global X,Actifs numériques et matières premières,Pétrole brut,Pétrole
+HUN,Global X Natural Gas ETF,Global X,Actifs numériques et matières premières,Gaz naturel,Gaz naturel
+BTCC.B,Purpose Bitcoin ETF,Purpose,Actifs numériques et matières premières,Bitcoin détenu directement,Actifs numériques — bitcoin
+BTCX.B,CI Galaxy Bitcoin ETF,CI Global Asset Management,Actifs numériques et matières premières,Bitcoin détenu directement,Actifs numériques — bitcoin
+ETHH.B,Purpose Ether ETF,Purpose,Actifs numériques et matières premières,Ether détenu directement,Actifs numériques — ether
+ETHX.B,CI Galaxy Ethereum ETF,CI Global Asset Management,Actifs numériques et matières premières,Ether détenu directement,Actifs numériques — ether

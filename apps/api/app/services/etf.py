@@ -1,83 +1,255 @@
+from __future__ import annotations
+
 import asyncio
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
+from typing import Any, Iterable
 
-from app.schemas.discovery import EtfDirectoryItem, EtfDirectorySnapshot
+try:
+    from app.schemas.discovery import (
+        EtfDirectoryItem,
+        EtfDirectorySnapshot,
+    )
+except ImportError:
+    # Compatibilité avec une éventuelle séparation future des schémas.
+    from app.schemas.etf import (  # type: ignore[no-redef]
+        EtfDirectoryItem,
+        EtfDirectorySnapshot,
+    )
+
+from app.data.etf_catalog import (
+    ETF_CATALOG,
+    PRIORITY_ETF_TICKERS,
+    EtfCatalogEntry,
+)
 from app.services.market_data import market_data_service
 
 
-@dataclass(frozen=True)
-class EtfMeta:
-    symbol: str
-    name: str
-    provider: str
-    category: str
-    exposure: str
+QUOTE_REFRESH_SECONDS = 300
+CLIENT_REFRESH_SECONDS = 60
+QUOTE_BATCH_SIZE = 24
+COLD_START_TIMEOUT_SECONDS = 12
 
 
-ETF_DIRECTORY = (
-    EtfMeta("XIC", "iShares Core S&P/TSX Capped Composite Index ETF", "iShares", "Canada — marché large", "Actions canadiennes diversifiées"),
-    EtfMeta("XIU", "iShares S&P/TSX 60 Index ETF", "iShares", "Canada — grandes capitalisations", "S&P/TSX 60"),
-    EtfMeta("VCN", "Vanguard FTSE Canada All Cap Index ETF", "Vanguard", "Canada — marché large", "Actions canadiennes toutes capitalisations"),
-    EtfMeta("ZCN", "BMO S&P/TSX Capped Composite Index ETF", "BMO", "Canada — marché large", "S&P/TSX Capped Composite"),
-    EtfMeta("XDV", "iShares Canadian Select Dividend Index ETF", "iShares", "Dividendes", "Actions canadiennes à dividendes"),
-    EtfMeta("VDY", "Vanguard FTSE Canadian High Dividend Yield Index ETF", "Vanguard", "Dividendes", "Rendement élevé canadien"),
-    EtfMeta("ZDV", "BMO Canadian Dividend ETF", "BMO", "Dividendes", "Actions canadiennes à dividendes"),
-    EtfMeta("XEG", "iShares S&P/TSX Capped Energy Index ETF", "iShares", "Secteur — énergie", "Producteurs et infrastructures énergétiques"),
-    EtfMeta("XFN", "iShares S&P/TSX Capped Financials Index ETF", "iShares", "Secteur — financières", "Banques, assurances et services financiers"),
-    EtfMeta("XMA", "iShares S&P/TSX Capped Materials Index ETF", "iShares", "Secteur — matériaux", "Métaux, mines et matériaux"),
-    EtfMeta("XIT", "iShares S&P/TSX Capped Information Technology Index ETF", "iShares", "Secteur — technologie", "Technologie canadienne"),
-    EtfMeta("XRE", "iShares S&P/TSX Capped REIT Index ETF", "iShares", "Secteur — immobilier", "Fiducies immobilières canadiennes"),
-    EtfMeta("XUT", "iShares S&P/TSX Capped Utilities Index ETF", "iShares", "Secteur — services publics", "Services publics canadiens"),
-    EtfMeta("XST", "iShares S&P/TSX Capped Consumer Staples Index ETF", "iShares", "Secteur — consommation de base", "Consommation de base canadienne"),
-    EtfMeta("XBB", "iShares Core Canadian Universe Bond Index ETF", "iShares", "Obligations", "Obligations canadiennes de qualité"),
-    EtfMeta("VAB", "Vanguard Canadian Aggregate Bond Index ETF", "Vanguard", "Obligations", "Marché obligataire canadien agrégé"),
-    EtfMeta("ZAG", "BMO Aggregate Bond Index ETF", "BMO", "Obligations", "Obligations canadiennes agrégées"),
-    EtfMeta("CASH", "Global X High Interest Savings ETF", "Global X", "Liquidités", "Dépôts à intérêt élevé"),
-    EtfMeta("CBIL", "Global X 0-3 Month T-Bill ETF", "Global X", "Liquidités", "Bons du Trésor du Canada à court terme"),
-    EtfMeta("XEQT", "iShares Core Equity ETF Portfolio", "iShares", "Portefeuille tout-en-un", "Portefeuille mondial 100 % actions"),
-    EtfMeta("VEQT", "Vanguard All-Equity ETF Portfolio", "Vanguard", "Portefeuille tout-en-un", "Portefeuille mondial 100 % actions"),
-    EtfMeta("XGRO", "iShares Core Growth ETF Portfolio", "iShares", "Portefeuille tout-en-un", "Portefeuille croissance mondial"),
-    EtfMeta("VGRO", "Vanguard Growth ETF Portfolio", "Vanguard", "Portefeuille tout-en-un", "Portefeuille croissance mondial"),
-    EtfMeta("XBAL", "iShares Core Balanced ETF Portfolio", "iShares", "Portefeuille tout-en-un", "Portefeuille équilibré mondial"),
-    EtfMeta("VBAL", "Vanguard Balanced ETF Portfolio", "Vanguard", "Portefeuille tout-en-un", "Portefeuille équilibré mondial"),
-    EtfMeta("XUS", "iShares Core S&P 500 Index ETF", "iShares", "États-Unis", "S&P 500 en dollars canadiens"),
-    EtfMeta("VFV", "Vanguard S&P 500 Index ETF", "Vanguard", "États-Unis", "S&P 500 en dollars canadiens"),
-    EtfMeta("ZSP", "BMO S&P 500 Index ETF", "BMO", "États-Unis", "S&P 500 en dollars canadiens"),
-    EtfMeta("XQQ", "iShares NASDAQ 100 Index ETF (CAD-Hedged)", "iShares", "États-Unis — technologie", "NASDAQ-100 couvert en CAD"),
-    EtfMeta("TEC", "TD Global Technology Leaders Index ETF", "TD", "Technologie mondiale", "Leaders technologiques mondiaux"),
-)
+def _model_fields(model: type[Any]) -> set[str]:
+    fields = getattr(model, "model_fields", None)
+    if isinstance(fields, dict):
+        return set(fields)
+    legacy_fields = getattr(model, "__fields__", None)
+    if isinstance(legacy_fields, dict):
+        return set(legacy_fields)
+    return set()
 
 
-class EtfService:
-    cache_ttl_seconds = 45.0
+def _compatible_payload(
+    model: type[Any],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    fields = _model_fields(model)
+    if not fields:
+        return payload
+    return {key: value for key, value in payload.items() if key in fields}
+
+
+def _chunks(
+    values: list[str],
+    size: int,
+) -> Iterable[list[str]]:
+    for index in range(0, len(values), size):
+        yield values[index : index + size]
+
+
+class EtfDirectoryService:
+    """Répertoire ETF sectoriel avec cotations asynchrones mises en cache.
+
+    Le catalogue est retourné immédiatement. Les cotations des ETF les plus
+    consultés sont chargées lors du premier appel, puis le reste du répertoire
+    est rafraîchi en arrière-plan par lots afin d'éviter qu'une centaine
+    d'appels Yahoo bloque la page.
+    """
 
     def __init__(self) -> None:
-        self._cached: EtfDirectorySnapshot | None = None
-        self._cached_at = 0.0
-        self._lock = asyncio.Lock()
+        self._quote_cache: dict[str, Any] = {}
+        self._last_full_refresh = 0.0
+        self._refresh_task: asyncio.Task[None] | None = None
+        self._cold_start_lock = asyncio.Lock()
 
-    async def get_directory(self) -> EtfDirectorySnapshot:
-        now = monotonic()
-        if self._cached is not None and now - self._cached_at < self.cache_ttl_seconds:
-            return self._cached
-        async with self._lock:
-            now = monotonic()
-            if self._cached is not None and now - self._cached_at < self.cache_ttl_seconds:
-                return self._cached
-            quotes = await market_data_service.get_quotes([item.symbol for item in ETF_DIRECTORY])
-            quote_by_symbol = {quote.symbol.replace("-", "."): quote for quote in quotes}
-            items: list[EtfDirectoryItem] = []
-            for meta in ETF_DIRECTORY:
-                quote = quote_by_symbol.get(meta.symbol)
-                if quote is None:
-                    continue
-                items.append(EtfDirectoryItem(ticker=quote.ticker, symbol=meta.symbol, name=meta.name, provider=meta.provider, category=meta.category, exposure=meta.exposure, currency=quote.currency, price=round(quote.price, 4), change_percent=round(quote.change_percent, 4), volume=quote.volume, source=quote.source, delayed=quote.delayed))
-            snapshot = EtfDirectorySnapshot(items=items, categories=sorted({item.category for item in items}), generated_at=datetime.now(UTC), refresh_after_seconds=45)
-            self._cached = snapshot
-            self._cached_at = monotonic()
-            return snapshot
+    async def _refresh_batch(self, tickers: list[str]) -> None:
+        if not tickers:
+            return
+
+        try:
+            quotes = await asyncio.wait_for(
+                market_data_service.get_quotes(tickers),
+                timeout=18,
+            )
+        except (TimeoutError, Exception):
+            return
+
+        for requested_ticker, quote in zip(
+            tickers,
+            quotes,
+            strict=False,
+        ):
+            # Le service de marché possède un repli de démonstration pour
+            # maintenir certaines pages. Le répertoire ETF l'ignore afin de ne
+            # jamais présenter une valeur synthétique comme un cours réel.
+            if str(getattr(quote, "source", "")).lower() == "demo-fallback":
+                continue
+            self._quote_cache[requested_ticker] = quote
+
+    async def _refresh_quotes(
+        self,
+        tickers: list[str],
+    ) -> None:
+        for batch in _chunks(tickers, QUOTE_BATCH_SIZE):
+            await self._refresh_batch(batch)
+
+    async def _refresh_all(self) -> None:
+        try:
+            await self._refresh_quotes(
+                [entry["ticker"] for entry in ETF_CATALOG]
+            )
+            self._last_full_refresh = monotonic()
+        finally:
+            self._refresh_task = None
+
+    def _ensure_background_refresh(self) -> None:
+        stale = (
+            monotonic() - self._last_full_refresh
+            >= QUOTE_REFRESH_SECONDS
+        )
+        if not stale:
+            return
+        if self._refresh_task is not None and not self._refresh_task.done():
+            return
+        self._refresh_task = asyncio.create_task(self._refresh_all())
+
+    async def _prime_cold_start(self) -> None:
+        if self._quote_cache:
+            return
+
+        async with self._cold_start_lock:
+            if self._quote_cache:
+                return
+            try:
+                await asyncio.wait_for(
+                    self._refresh_quotes(list(PRIORITY_ETF_TICKERS)),
+                    timeout=COLD_START_TIMEOUT_SECONDS,
+                )
+            except TimeoutError:
+                # Le catalogue reste disponible; le rafraîchissement complet
+                # continue ensuite en arrière-plan.
+                pass
+
+    @staticmethod
+    def _make_item(
+        entry: EtfCatalogEntry,
+        quote: Any | None,
+    ) -> Any:
+        available = quote is not None
+        price = float(getattr(quote, "price", 0.0) or 0.0)
+        change_percent = float(
+            getattr(quote, "change_percent", 0.0) or 0.0
+        )
+        change = float(getattr(quote, "change", 0.0) or 0.0)
+        volume = int(getattr(quote, "volume", 0) or 0)
+
+        payload: dict[str, Any] = {
+            # Noms utilisés par la version actuelle.
+            "ticker": entry["ticker"],
+            "name": entry["name"],
+            "provider": entry["provider"],
+            "category": entry["category"],
+            "exposure": entry["exposure"],
+            "region": entry["region"],
+            "price": price if available else 0.0,
+            "change_percent": change_percent if available else 0.0,
+            "volume": volume if available else 0,
+            # Alias conservés pour les évolutions de schéma.
+            "symbol": entry["ticker"],
+            "issuer": entry["provider"],
+            "sector": entry["category"],
+            "description": entry["exposure"],
+            "change": change if available else 0.0,
+            "currency": str(
+                getattr(quote, "currency", "CAD") or "CAD"
+            ),
+            "source": (
+                str(getattr(quote, "source", "yahoo-public"))
+                if available
+                else "unavailable"
+            ),
+            "delayed": bool(
+                getattr(quote, "delayed", True)
+            ),
+            "timestamp": (
+                getattr(quote, "timestamp", None)
+                if available
+                else None
+            ),
+        }
+        return EtfDirectoryItem(
+            **_compatible_payload(EtfDirectoryItem, payload)
+        )
+
+    def _make_snapshot(self) -> Any:
+        items = [
+            self._make_item(
+                entry,
+                self._quote_cache.get(entry["ticker"]),
+            )
+            for entry in ETF_CATALOG
+        ]
+        now = datetime.now(UTC)
+        payload: dict[str, Any] = {
+            "items": items,
+            "etfs": items,
+            "total": len(items),
+            "generated_at": now,
+            "refresh_after_seconds": CLIENT_REFRESH_SECONDS,
+            "source": (
+                "Répertoire éditorial Anatole + cotations publiques"
+            ),
+        }
+        return EtfDirectorySnapshot(
+            **_compatible_payload(EtfDirectorySnapshot, payload)
+        )
+
+    async def snapshot(self) -> Any:
+        await self._prime_cold_start()
+        self._ensure_background_refresh()
+        return self._make_snapshot()
+
+    # Façade de compatibilité avec les noms utilisés dans les jalons précédents.
+    async def get_snapshot(self) -> Any:
+        return await self.snapshot()
+
+    async def directory(self) -> Any:
+        return await self.snapshot()
+
+    async def get_directory(self) -> Any:
+        return await self.snapshot()
+
+    async def build(self) -> Any:
+        return await self.snapshot()
 
 
-etf_service = EtfService()
+etf_service = EtfDirectoryService()
+etf_directory_service = etf_service
+
+
+async def get_etf_directory() -> Any:
+    return await etf_service.snapshot()
+
+
+async def build_etf_directory() -> Any:
+    return await etf_service.snapshot()
+
+
+async def build_etf_snapshot() -> Any:
+    return await etf_service.snapshot()
+
+
+async def etf_directory() -> Any:
+    return await etf_service.snapshot()
