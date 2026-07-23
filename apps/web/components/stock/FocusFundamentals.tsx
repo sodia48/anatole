@@ -1568,10 +1568,9 @@ export function FocusFundamentals({
       )}
 
       <footer className="status-footer">
-        Source principale : {snapshot.source} · Mise à jour :{" "}
-        {generated ?? "N/D"} · Les valeurs calculées sont dérivées
-        uniquement à partir des données disponibles · Les champs
-        impossibles à déterminer sont affichés N/D.
+        Source : {snapshot.source} · Mise à jour : {generated ?? "N/D"} ·
+        Certaines valeurs peuvent être calculées à partir des données
+        disponibles · Les champs indéterminables sont affichés N/D.
       </footer>
     </div>
   );
