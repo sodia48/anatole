@@ -52,6 +52,7 @@ class FinancialSource(BaseModel):
         "sec_edgar_xbrl",
         "issuer_official_normalized",
         "issuer_official_document",
+        "yahoo_structured",
         "yahoo_public",
     ]
     source_name: str
@@ -77,6 +78,12 @@ class OfficialCoverage(BaseModel):
     source_types: list[str] = Field(default_factory=list)
     documents_found: int = 0
     documents_parsed: int = 0
+    structured_periods: int = 0
+    annual_structured_periods: int = 0
+    quarterly_structured_periods: int = 0
+    structured_fields: int = 0
+    calculated_fields: int = 0
+    yahoo_statements_error: str | None = None
     discovery_url: str | None = None
     message: str | None = None
 
@@ -92,6 +99,7 @@ class CompositeCoverageItem(BaseModel):
         "sec_edgar_xbrl",
         "issuer_official_normalized",
         "issuer_official_document",
+        "yahoo_structured",
         "yahoo_public",
     ]
     status: Literal["official", "fallback"]
@@ -157,6 +165,7 @@ class FinancialPeriod(BaseModel):
     net_income_growth_yoy: float | None = None
     eps_growth_yoy: float | None = None
     free_cash_flow_growth_yoy: float | None = None
+    calculated_fields: list[str] = Field(default_factory=list)
     source: FinancialSource | None = None
 
 
@@ -175,6 +184,19 @@ class IssuerDocumentCandidate(BaseModel):
     origin_url: str
     content_type: str | None = None
     published_at: datetime | None = None
+
+
+class YahooStatementsDiagnostics(BaseModel):
+    ticker: str
+    normalized_symbol: str
+    status: Literal["available", "partial", "unavailable"]
+    annual_periods: int = 0
+    quarterly_periods: int = 0
+    populated_fields: int = 0
+    calculated_fields: int = 0
+    currency: str | None = None
+    error: str | None = None
+    generated_at: datetime
 
 
 class IssuerDocumentDiagnostics(BaseModel):

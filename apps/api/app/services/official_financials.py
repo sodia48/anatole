@@ -26,6 +26,10 @@ from app.services.tsx_composite_universe import (
     CompositeConstituent,
     tsx_composite_universe_service,
 )
+from app.services.yahoo_statements import (
+    YahooStatementsResult,
+    yahoo_statements_service,
+)
 
 
 DATA_DIRECTORY = (
@@ -118,6 +122,79 @@ def _growth(
     )
 
 
+def _mark_calculated(
+    data: dict[str, Any],
+    field: str,
+    value: float | None,
+) -> None:
+    if value is None or data.get(field) is not None:
+        return
+    data[field] = value
+    calculated = set(data.get("calculated_fields") or [])
+    calculated.add(field)
+    data["calculated_fields"] = sorted(calculated)
+
+
+def _derive_exact_fields(data: dict[str, Any]) -> dict[str, Any]:
+    _mark_calculated(
+        data,
+        "gross_profit",
+        data["total_revenue"] - data["cost_of_revenue"]
+        if data.get("total_revenue") is not None
+        and data.get("cost_of_revenue") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "free_cash_flow",
+        data["operating_cash_flow"] + data["capital_expenditure"]
+        if data.get("operating_cash_flow") is not None
+        and data.get("capital_expenditure") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "ebitda",
+        data["ebit"] + abs(data["depreciation_amortization"])
+        if data.get("ebit") is not None
+        and data.get("depreciation_amortization") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "net_debt",
+        data["total_debt"] - data["total_cash"]
+        if data.get("total_debt") is not None
+        and data.get("total_cash") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "stockholder_equity",
+        data["total_assets"] - data["total_liabilities"]
+        if data.get("total_assets") is not None
+        and data.get("total_liabilities") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "total_liabilities",
+        data["total_assets"] - data["stockholder_equity"]
+        if data.get("total_assets") is not None
+        and data.get("stockholder_equity") is not None
+        else None,
+    )
+    _mark_calculated(
+        data,
+        "total_assets",
+        data["total_liabilities"] + data["stockholder_equity"]
+        if data.get("total_liabilities") is not None
+        and data.get("stockholder_equity") is not None
+        else None,
+    )
+    return data
+
+
 def _recompute(
     periods: list[FinancialPeriod],
 ) -> list[FinancialPeriod]:
@@ -128,67 +205,47 @@ def _recompute(
     )
     gap = (
         4
-        if rows
-        and rows[0].period_type == "quarterly"
+        if rows and rows[0].period_type == "quarterly"
         else 1
     )
-
     output: list[FinancialPeriod] = []
 
     for index, period in enumerate(rows):
-        data = period.model_dump()
-        revenue = period.total_revenue
+        data = _derive_exact_fields(period.model_dump())
+        revenue = data.get("total_revenue")
         data["gross_margin"] = _safe_div(
-            period.gross_profit,
-            revenue,
-            100,
+            data.get("gross_profit"), revenue, 100
         )
         data["operating_margin"] = _safe_div(
-            period.operating_income,
-            revenue,
-            100,
+            data.get("operating_income"), revenue, 100
         )
         data["net_margin"] = _safe_div(
-            period.net_income,
-            revenue,
-            100,
+            data.get("net_income"), revenue, 100
         )
         data["free_cash_flow_margin"] = _safe_div(
-            period.free_cash_flow,
-            revenue,
-            100,
+            data.get("free_cash_flow"), revenue, 100
         )
 
         prior_index = index + gap
         if prior_index < len(rows):
             prior = rows[prior_index]
             data["revenue_growth_yoy"] = _growth(
-                period.total_revenue,
-                prior.total_revenue,
+                data.get("total_revenue"), prior.total_revenue
             )
-            data[
-                "operating_income_growth_yoy"
-            ] = _growth(
-                period.operating_income,
-                prior.operating_income,
+            data["operating_income_growth_yoy"] = _growth(
+                data.get("operating_income"), prior.operating_income
             )
             data["net_income_growth_yoy"] = _growth(
-                period.net_income,
-                prior.net_income,
+                data.get("net_income"), prior.net_income
             )
             data["eps_growth_yoy"] = _growth(
-                period.diluted_eps,
-                prior.diluted_eps,
+                data.get("diluted_eps"), prior.diluted_eps
             )
-            data[
-                "free_cash_flow_growth_yoy"
-            ] = _growth(
-                period.free_cash_flow,
-                prior.free_cash_flow,
+            data["free_cash_flow_growth_yoy"] = _growth(
+                data.get("free_cash_flow"), prior.free_cash_flow
             )
 
         output.append(FinancialPeriod(**data))
-
     return output
 
 
@@ -210,19 +267,24 @@ def _same_period(
 
 def _merge_period(
     fallback: FinancialPeriod,
-    official: FinancialPeriod,
+    stronger: FinancialPeriod,
 ) -> FinancialPeriod:
     data = fallback.model_dump()
+    calculated = set(fallback.calculated_fields)
 
     for field in VALUE_FIELDS:
-        value = getattr(official, field)
+        value = getattr(stronger, field)
         if value is not None:
             data[field] = value
+            calculated.discard(field)
 
-    if official.currency:
-        data["currency"] = official.currency
-    if official.source is not None:
-        data["source"] = official.source
+    calculated.update(stronger.calculated_fields)
+    data["calculated_fields"] = sorted(calculated)
+
+    if stronger.currency:
+        data["currency"] = stronger.currency
+    if stronger.source is not None:
+        data["source"] = stronger.source
 
     return FinancialPeriod(**data)
 
@@ -390,107 +452,101 @@ class OfficialFinancialsService:
     ) -> FundamentalSnapshot:
         ticker = snapshot.symbol
         constituent = await (
-            tsx_composite_universe_service.find(
-                ticker
-            )
+            tsx_composite_universe_service.find(ticker)
         )
         is_composite = constituent is not None
-
-        local_annual, local_quarterly = (
-            self.local.get(ticker)
-        )
+        local_annual, local_quarterly = self.local.get(ticker)
 
         sec_result: SECEdgarResult | None = None
         issuer_result: IssuerFinancialsResult | None = None
+        yahoo_result: YahooStatementsResult | None = None
         errors: list[str] = []
 
         async def sec_task() -> None:
             nonlocal sec_result
             try:
                 sec_result = await (
-                    sec_edgar_financials_provider
-                    .get_financials(ticker)
+                    sec_edgar_financials_provider.get_financials(ticker)
                 )
             except Exception as exc:  # noqa: BLE001
-                errors.append(
-                    "SEC EDGAR: "
-                    f"{type(exc).__name__}"
-                )
+                errors.append(f"SEC EDGAR: {type(exc).__name__}")
 
         async def issuer_task() -> None:
             nonlocal issuer_result
             try:
                 issuer_result = await (
-                    issuer_financial_documents_service
-                    .get_financials(
-                        ticker,
-                        snapshot.website,
+                    issuer_financial_documents_service.get_financials(
+                        ticker, snapshot.website
                     )
                 )
             except Exception as exc:  # noqa: BLE001
                 errors.append(
-                    "Site investisseurs: "
-                    f"{type(exc).__name__}"
+                    f"Site investisseurs: {type(exc).__name__}"
                 )
 
-        # The two official-source families are independent and can be
-        # queried in parallel. Local normalized data requires no network.
-        await asyncio.gather(
-            sec_task(),
-            issuer_task(),
+        async def yahoo_task() -> None:
+            nonlocal yahoo_result
+            try:
+                yahoo_result = await (
+                    yahoo_statements_service.get_financials(
+                        ticker,
+                        snapshot.financial_currency
+                        or snapshot.currency,
+                    )
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors.append(
+                    f"Yahoo structuré: {type(exc).__name__}"
+                )
+
+        await asyncio.gather(sec_task(), issuer_task(), yahoo_task())
+
+        yahoo_annual = yahoo_result.annual if yahoo_result else []
+        yahoo_quarterly = (
+            yahoo_result.quarterly if yahoo_result else []
         )
 
-        # Priority inside the same reporting period:
-        # SEC structured facts -> issuer document -> normalized local data.
-        # Each later source only overwrites fields it actually provides.
+        # quoteSummary -> Yahoo statements
+        annual = merge_periods(
+            snapshot.annual_financials,
+            yahoo_annual,
+            limit=5,
+        )
+        quarterly = merge_periods(
+            snapshot.quarterly_financials,
+            yahoo_quarterly,
+            limit=12,
+        )
+
+        # Yahoo statements -> official filings
         official_annual: list[FinancialPeriod] = []
         official_quarterly: list[FinancialPeriod] = []
         source_types: set[str] = set()
         sec_cik: str | None = None
 
+        if yahoo_annual or yahoo_quarterly:
+            source_types.add("yahoo_structured")
+
         if sec_result is not None:
             sec_cik = sec_result.cik
-            official_annual.extend(
-                sec_result.annual
-            )
-            official_quarterly.extend(
-                sec_result.quarterly
-            )
+            official_annual.extend(sec_result.annual)
+            official_quarterly.extend(sec_result.quarterly)
             source_types.add("sec_edgar_xbrl")
 
         if issuer_result is not None:
-            official_annual.extend(
-                issuer_result.annual
-            )
-            official_quarterly.extend(
-                issuer_result.quarterly
-            )
-            if (
-                issuer_result.annual
-                or issuer_result.quarterly
-            ):
-                source_types.add(
-                    "issuer_official_document"
-                )
+            official_annual.extend(issuer_result.annual)
+            official_quarterly.extend(issuer_result.quarterly)
+            if issuer_result.annual or issuer_result.quarterly:
+                source_types.add("issuer_official_document")
 
         if local_annual or local_quarterly:
             official_annual.extend(local_annual)
-            official_quarterly.extend(
-                local_quarterly
-            )
-            source_types.add(
-                "issuer_official_normalized"
-            )
+            official_quarterly.extend(local_quarterly)
+            source_types.add("issuer_official_normalized")
 
-        annual = merge_periods(
-            snapshot.annual_financials,
-            official_annual,
-            limit=5,
-        )
+        annual = merge_periods(annual, official_annual, limit=5)
         quarterly = merge_periods(
-            snapshot.quarterly_financials,
-            official_quarterly,
-            limit=12,
+            quarterly, official_quarterly, limit=12
         )
 
         official_periods = [
@@ -499,11 +555,28 @@ class OfficialFinancialsService:
             if period.source is not None
             and period.source.confidence == "official"
         ]
+        structured_periods = [
+            period
+            for period in annual + quarterly
+            if period.source is not None
+            and period.source.source_type == "yahoo_structured"
+        ]
+
         official_fields = sum(
             1
             for period in official_periods
             for field in VALUE_FIELDS
             if getattr(period, field) is not None
+        )
+        structured_fields = sum(
+            1
+            for period in structured_periods
+            for field in VALUE_FIELDS
+            if getattr(period, field) is not None
+        )
+        calculated_fields = sum(
+            len(period.calculated_fields)
+            for period in annual + quarterly
         )
 
         reporting_currency = next(
@@ -512,19 +585,21 @@ class OfficialFinancialsService:
                 for period in official_periods
                 if period.currency
             ),
-            snapshot.financial_currency
-            or snapshot.currency,
+            None,
+        ) or next(
+            (
+                period.currency
+                for period in structured_periods
+                if period.currency
+            ),
+            snapshot.financial_currency or snapshot.currency,
         )
 
         documents_found = (
-            len(issuer_result.documents)
-            if issuer_result is not None
-            else 0
+            len(issuer_result.documents) if issuer_result else 0
         )
         documents_parsed = (
-            issuer_result.parsed_documents
-            if issuer_result is not None
-            else 0
+            issuer_result.parsed_documents if issuer_result else 0
         )
         discovery_url = (
             issuer_result.website
@@ -533,15 +608,18 @@ class OfficialFinancialsService:
         )
 
         if official_periods:
-            status = (
-                "official"
-                if official_fields >= 45
-                else "mixed"
-            )
+            status = "official" if official_fields >= 45 else "mixed"
             message = (
-                "Les valeurs officielles EDGAR ou publiées sur le "
-                "site investisseurs remplacent automatiquement les "
-                "valeurs secondaires, champ par champ."
+                "Les dépôts officiels ont priorité. Les champs "
+                "officiels absents sont complétés par les états "
+                "financiers structurés de Yahoo."
+            )
+        elif structured_periods:
+            status = "fallback"
+            message = (
+                "Les états financiers structurés utilisés dans la "
+                "bêta ont été restaurés. Les calculs exacts complètent "
+                "uniquement les champs mathématiquement déterminables."
             )
         else:
             status = (
@@ -550,35 +628,28 @@ class OfficialFinancialsService:
                 else "unavailable"
             )
             message = (
-                "Aucune extraction officielle suffisamment fiable "
-                "n'a encore été obtenue. Anatole conserve les données "
-                "secondaires disponibles et n'invente aucun champ."
+                "Aucun état financier structuré ou officiel n'a été "
+                "récupéré. Anatole conserve les données disponibles "
+                "sans inventer de valeurs."
             )
 
-            if (
-                issuer_result is not None
-                and issuer_result.error
-            ):
-                message += (
-                    f" Site investisseurs: "
-                    f"{issuer_result.error}"
-                )
-
+        if (
+            issuer_result is not None
+            and issuer_result.error
+            and not official_periods
+        ):
+            message += f" Site investisseurs: {issuer_result.error}"
         if errors:
             message += " " + " · ".join(errors)
 
         data = snapshot.model_dump()
         data["annual_financials"] = annual
         data["quarterly_financials"] = quarterly
-        data["financial_currency"] = (
-            reporting_currency
-        )
+        data["financial_currency"] = reporting_currency
         data["official_coverage"] = OfficialCoverage(
             is_tsx_composite=is_composite,
             status=status,
-            official_periods=len(
-                official_periods
-            ),
+            official_periods=len(official_periods),
             annual_official_periods=sum(
                 period.period_type == "annual"
                 for period in official_periods
@@ -592,16 +663,38 @@ class OfficialFinancialsService:
             source_types=sorted(source_types),
             documents_found=documents_found,
             documents_parsed=documents_parsed,
+            structured_periods=len(structured_periods),
+            annual_structured_periods=sum(
+                period.period_type == "annual"
+                for period in structured_periods
+            ),
+            quarterly_structured_periods=sum(
+                period.period_type == "quarterly"
+                for period in structured_periods
+            ),
+            structured_fields=structured_fields,
+            calculated_fields=calculated_fields,
+            yahoo_statements_error=(
+                yahoo_result.error if yahoo_result else None
+            ),
             discovery_url=discovery_url,
             message=message,
         )
+        data["status"] = (
+            "available"
+            if official_fields + structured_fields >= 25
+            else "partial"
+            if official_periods or structured_periods
+            else snapshot.status
+        )
         data["source"] = (
-            "Official issuer documents / SEC EDGAR + "
-            "Yahoo Finance public quoteSummary"
+            "Official filings + Yahoo Finance structured "
+            "statements + quoteSummary"
             if official_periods
+            else "Yahoo Finance structured statements + quoteSummary"
+            if structured_periods
             else snapshot.source
         )
-
         return FundamentalSnapshot(**data)
 
     async def coverage(
@@ -636,7 +729,7 @@ class OfficialFinancialsService:
                 automatic_source = "sec_edgar_xbrl"
                 status = "official"
             else:
-                automatic_source = "yahoo_public"
+                automatic_source = "yahoo_structured"
                 status = "fallback"
 
             items.append(

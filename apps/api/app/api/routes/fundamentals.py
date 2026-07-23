@@ -4,6 +4,7 @@ from app.schemas.fundamentals import (
     CompositeCoverageSnapshot,
     FundamentalSnapshot,
     IssuerDocumentDiagnostics,
+    YahooStatementsDiagnostics,
 )
 from app.services.fundamentals import fundamentals_service
 from app.services.issuer_documents import (
@@ -11,6 +12,9 @@ from app.services.issuer_documents import (
 )
 from app.services.official_financials import (
     official_financials_service,
+)
+from app.services.yahoo_statements import (
+    yahoo_statements_service,
 )
 
 
@@ -65,6 +69,29 @@ async def official_documents(
             website,
             force_refresh=refresh,
         )
+    )
+
+
+@router.get(
+    "/{ticker}/structured-statements",
+    response_model=YahooStatementsDiagnostics,
+    summary=(
+        "Yahoo structured annual and quarterly "
+        "financial statements"
+    ),
+)
+async def structured_statements(
+    ticker: str,
+    refresh: bool = Query(
+        default=False,
+        description=(
+            "Ignore the thirty-minute structured-statements cache."
+        ),
+    ),
+) -> YahooStatementsDiagnostics:
+    return await yahoo_statements_service.diagnostics(
+        ticker,
+        force_refresh=refresh,
     )
 
 

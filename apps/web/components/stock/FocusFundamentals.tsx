@@ -57,6 +57,7 @@ type FinancialSource = {
     | "sec_edgar_xbrl"
     | "issuer_official_normalized"
     | "issuer_official_document"
+    | "yahoo_structured"
     | "yahoo_public";
   source_name: string;
   source_url: string | null;
@@ -80,6 +81,12 @@ type OfficialCoverage = {
   source_types: string[];
   documents_found: number;
   documents_parsed: number;
+  structured_periods: number;
+  annual_structured_periods: number;
+  quarterly_structured_periods: number;
+  structured_fields: number;
+  calculated_fields: number;
+  yahoo_statements_error: string | null;
   discovery_url: string | null;
   message: string | null;
 };
@@ -127,6 +134,7 @@ type FinancialPeriod = {
   net_income_growth_yoy: number | null;
   eps_growth_yoy: number | null;
   free_cash_flow_growth_yoy: number | null;
+  calculated_fields: string[];
   source: FinancialSource | null;
 };
 
@@ -502,28 +510,56 @@ function Fundamentals({
 
 function SourceBadge({
   source,
+  calculatedFields = [],
 }: {
   source: FinancialSource | null;
+  calculatedFields?: string[];
 }) {
+  const calculated = calculatedFields.length ? (
+    <span
+      title={`Champs calculés exactement : ${calculatedFields.join(", ")}`}
+      style={{
+        display: "inline-flex",
+        marginTop: 5,
+        marginLeft: source ? 5 : 0,
+        padding: "2px 6px",
+        borderRadius: 999,
+        background: "rgba(181,126,255,.14)",
+        color: "#c7a0ff",
+        fontSize: 8,
+        fontWeight: 800,
+      }}
+    >
+      CALCULÉ · {calculatedFields.length}
+    </span>
+  ) : null;
+
   if (!source) {
     return (
-      <span
-        title="Source secondaire"
-        style={{
-          display: "inline-flex",
-          marginTop: 5,
-          padding: "2px 6px",
-          borderRadius: 999,
-          background: "rgba(94,120,137,.17)",
-          color: "#7f9db1",
-          fontSize: 8,
-          fontWeight: 750,
-        }}
-      >
-        SECONDAIRE
-      </span>
+      <>
+        <span
+          title="Source secondaire non structurée"
+          style={{
+            display: "inline-flex",
+            marginTop: 5,
+            padding: "2px 6px",
+            borderRadius: 999,
+            background: "rgba(94,120,137,.17)",
+            color: "#7f9db1",
+            fontSize: 8,
+            fontWeight: 750,
+          }}
+        >
+          SECONDAIRE
+        </span>
+        {calculated}
+      </>
     );
   }
+
+  const official = source.confidence === "official";
+  const yahooStructured =
+    source.source_type === "yahoo_structured";
 
   const content = (
     <span
@@ -535,8 +571,16 @@ function SourceBadge({
         marginTop: 5,
         padding: "2px 6px",
         borderRadius: 999,
-        background: "rgba(22,199,154,.14)",
-        color: "#27d9aa",
+        background: official
+          ? "rgba(22,199,154,.14)"
+          : yahooStructured
+            ? "rgba(48,157,231,.16)"
+            : "rgba(94,120,137,.17)",
+        color: official
+          ? "#27d9aa"
+          : yahooStructured
+            ? "#63bdf6"
+            : "#7f9db1",
         fontSize: 8,
         fontWeight: 800,
       }}
@@ -545,11 +589,16 @@ function SourceBadge({
         ? "OFFICIEL · ÉMETTEUR"
         : source.source_type === "sec_edgar_xbrl"
           ? "OFFICIEL · EDGAR"
-          : "OFFICIEL"}
+          : source.source_type ===
+              "issuer_official_normalized"
+            ? "OFFICIEL"
+            : source.source_type === "yahoo_structured"
+              ? "YAHOO · STRUCTURÉ"
+              : "SECONDAIRE"}
     </span>
   );
 
-  return source.source_url ? (
+  const badge = source.source_url ? (
     <a
       href={source.source_url}
       target="_blank"
@@ -560,6 +609,13 @@ function SourceBadge({
     </a>
   ) : (
     content
+  );
+
+  return (
+    <>
+      {badge}
+      {calculated}
+    </>
   );
 }
 
@@ -763,7 +819,10 @@ function FinancialTable({
                   }}
                 >
                   <div>{periodLabel(row.period_end)}</div>
-                  <SourceBadge source={row.source} />
+                  <SourceBadge
+                    source={row.source}
+                    calculatedFields={row.calculated_fields}
+                  />
                 </td>
 
                 {view === "income" ? (
@@ -881,7 +940,10 @@ function Financials({
   const [statementView, setStatementView] =
     useState<StatementView>("income");
 
-  const currency = snapshot.currency ?? "CAD";
+  const currency =
+    snapshot.financial_currency ??
+    snapshot.currency ??
+    "CAD";
   const t = snapshot.ttm;
   const h = snapshot.highlights;
   const annual = snapshot.annual_financials;
@@ -982,7 +1044,9 @@ function Financials({
               ? "Couverture officielle"
               : snapshot.official_coverage.status === "mixed"
                 ? "Couverture officielle partielle"
-                : "Source secondaire en attente du dépôt officiel"}
+                : snapshot.official_coverage.structured_periods > 0
+                  ? "États financiers structurés restaurés"
+                  : "Source secondaire en attente de données structurées"}
           </div>
           <div
             style={{
@@ -1025,6 +1089,24 @@ function Financials({
             label="Documents analysés"
             value={String(
               snapshot.official_coverage.documents_parsed
+            )}
+          />
+          <Metric
+            label="Périodes Yahoo structurées"
+            value={String(
+              snapshot.official_coverage.structured_periods
+            )}
+          />
+          <Metric
+            label="Champs structurés"
+            value={String(
+              snapshot.official_coverage.structured_fields
+            )}
+          />
+          <Metric
+            label="Champs calculés"
+            value={String(
+              snapshot.official_coverage.calculated_fields
             )}
           />
         </div>
