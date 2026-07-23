@@ -1,46 +1,47 @@
-# ETF Sector Directory V1.1 — Correctif 0 ETF
+# ETF Live Treemap V2
 
-## Cause corrigée
+Cette version transforme la section ETF en véritable carte de marché,
+sur le même modèle que la carte des actions.
 
-Le modèle FastAPI actuel `EtfDirectorySnapshot` exige le champ
-`categories`. La première version construisait `items`, mais omettait ce
-champ obligatoire. Pydantic rejetait donc la réponse et l'endpoint renvoyait
-une erreur.
+## Résultat
 
-Le service attendait aussi les cotations publiques au premier chargement.
-Cette attente pouvait dépasser le délai du proxy Vercel.
+- regroupement sectoriel par défaut;
+- blocs rectangulaires proportionnels à la liquidité;
+- couleurs vertes, rouges ou neutres selon la variation de séance;
+- prix et variations mis à jour automatiquement;
+- actualisation frontend toutes les 15 secondes;
+- rafraîchissement backend continu avec cache;
+- 100 ETF les plus liquides affichés par défaut;
+- option pour afficher les 172 ETF;
+- regroupement alternatif par fournisseur ou direction;
+- clic sur un ETF vers `/focus/{ticker}`;
+- une panne de cotation ne vide jamais le catalogue.
 
-## Nouveau fonctionnement
+## Ajouter
 
-- les 172 ETF sont retournés immédiatement;
-- `categories` est toujours fourni;
-- les cotations sont chargées en arrière-plan;
-- une panne Yahoo ne peut plus vider le catalogue;
-- les prix indisponibles apparaissent N/D dans la nouvelle page;
-- 13 groupes sectoriels sont disponibles.
-
-## Ajouter / remplacer
-
+- `apps/web/components/etf/EtfHeatmap.tsx`
 - `apps/api/app/data/__init__.py`
+- `apps/api/tests/test_etf_live_treemap.py`
+
+## Remplacer
+
 - `apps/api/app/data/etf_catalog.py`
 - `apps/api/app/services/etf.py`
-- `apps/api/tests/test_etf_catalog.py`
-- `apps/api/tests/test_etf_service_snapshot.py`
 - `apps/web/app/etf/page.tsx`
 - `apps/web/app/etf/page.module.css`
 
-## Ordre de déploiement
+## Déploiement
 
-1. GitHub : ajoute/remplace tous les fichiers du ZIP.
-2. Render : `anatole-api` → **Clear build cache & deploy**.
-3. Ouvre :
+1. Ajoute ou remplace tous les fichiers du ZIP dans GitHub.
+2. Render → `anatole-api` → `Clear build cache & deploy`.
+3. Vérifie :
    `https://anatole-api.onrender.com/api/v1/discovery/etfs`
-4. La réponse doit contenir :
-   - `items` avec 172 entrées;
-   - `categories` avec 13 groupes.
-5. Vercel : redéploie le frontend sans cache.
+4. La réponse doit contenir 172 éléments et `refresh_after_seconds: 15`.
+5. Vercel → redéploie Anatole sans ancien cache.
 6. Recharge `/etf` avec `Ctrl + Shift + R`.
 
-Le nouveau frontend affiche le titre « ETF canadiens par secteur ». Si
-« ETF canadiens suivis » reste visible, Vercel sert encore l'ancien
-déploiement.
+## Important
+
+Le badge LIVE indique une actualisation automatique de l'application.
+Les données du fournisseur public peuvent rester différées; cette mention
+reste visible dans l'interface.
