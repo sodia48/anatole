@@ -508,117 +508,6 @@ function Fundamentals({
   );
 }
 
-function SourceBadge({
-  source,
-  calculatedFields = [],
-}: {
-  source: FinancialSource | null;
-  calculatedFields?: string[];
-}) {
-  const calculated = calculatedFields.length ? (
-    <span
-      title={`Champs calculés exactement : ${calculatedFields.join(", ")}`}
-      style={{
-        display: "inline-flex",
-        marginTop: 5,
-        marginLeft: source ? 5 : 0,
-        padding: "2px 6px",
-        borderRadius: 999,
-        background: "rgba(181,126,255,.14)",
-        color: "#c7a0ff",
-        fontSize: 8,
-        fontWeight: 800,
-      }}
-    >
-      CALCULÉ · {calculatedFields.length}
-    </span>
-  ) : null;
-
-  if (!source) {
-    return (
-      <>
-        <span
-          title="Source secondaire non structurée"
-          style={{
-            display: "inline-flex",
-            marginTop: 5,
-            padding: "2px 6px",
-            borderRadius: 999,
-            background: "rgba(94,120,137,.17)",
-            color: "#7f9db1",
-            fontSize: 8,
-            fontWeight: 750,
-          }}
-        >
-          SECONDAIRE
-        </span>
-        {calculated}
-      </>
-    );
-  }
-
-  const official = source.confidence === "official";
-  const yahooStructured =
-    source.source_type === "yahoo_structured";
-
-  const content = (
-    <span
-      title={`${source.source_name}${
-        source.form ? ` · ${source.form}` : ""
-      }`}
-      style={{
-        display: "inline-flex",
-        marginTop: 5,
-        padding: "2px 6px",
-        borderRadius: 999,
-        background: official
-          ? "rgba(22,199,154,.14)"
-          : yahooStructured
-            ? "rgba(48,157,231,.16)"
-            : "rgba(94,120,137,.17)",
-        color: official
-          ? "#27d9aa"
-          : yahooStructured
-            ? "#63bdf6"
-            : "#7f9db1",
-        fontSize: 8,
-        fontWeight: 800,
-      }}
-    >
-      {source.source_type === "issuer_official_document"
-        ? "OFFICIEL · ÉMETTEUR"
-        : source.source_type === "sec_edgar_xbrl"
-          ? "OFFICIEL · EDGAR"
-          : source.source_type ===
-              "issuer_official_normalized"
-            ? "OFFICIEL"
-            : source.source_type === "yahoo_structured"
-              ? "YAHOO · STRUCTURÉ"
-              : "SECONDAIRE"}
-    </span>
-  );
-
-  const badge = source.source_url ? (
-    <a
-      href={source.source_url}
-      target="_blank"
-      rel="noreferrer"
-      style={{ textDecoration: "none" }}
-    >
-      {content}
-    </a>
-  ) : (
-    content
-  );
-
-  return (
-    <>
-      {badge}
-      {calculated}
-    </>
-  );
-}
-
 function MiniTrend({
   title,
   rows,
@@ -819,10 +708,6 @@ function FinancialTable({
                   }}
                 >
                   <div>{periodLabel(row.period_end)}</div>
-                  <SourceBadge
-                    source={row.source}
-                    calculatedFields={row.calculated_fields}
-                  />
                 </td>
 
                 {view === "income" ? (
@@ -1017,100 +902,6 @@ function Financials({
           );
         })}
       </nav>
-
-      <section
-        style={{
-          ...panelStyle,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 14,
-          flexWrap: "wrap",
-          padding: 14,
-        }}
-      >
-        <div>
-          <span className="eyebrow">
-            SOURCES DES ÉTATS FINANCIERS
-          </span>
-          <div
-            style={{
-              marginTop: 5,
-              color: "#dcecf6",
-              fontWeight: 760,
-            }}
-          >
-            {snapshot.official_coverage.status === "official"
-              ? "Couverture officielle"
-              : snapshot.official_coverage.status === "mixed"
-                ? "Couverture officielle partielle"
-                : snapshot.official_coverage.structured_periods > 0
-                  ? "États financiers structurés restaurés"
-                  : "Source secondaire en attente de données structurées"}
-          </div>
-          <div
-            style={{
-              marginTop: 4,
-              maxWidth: 850,
-              color: "#819db0",
-              fontSize: 10,
-            }}
-          >
-            {snapshot.official_coverage.message}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-          }}
-        >
-          <Metric
-            label="Périodes officielles"
-            value={String(
-              snapshot.official_coverage.official_periods
-            )}
-          />
-          <Metric
-            label="Champs officiels"
-            value={String(
-              snapshot.official_coverage.official_fields
-            )}
-          />
-          <Metric
-            label="Documents trouvés"
-            value={String(
-              snapshot.official_coverage.documents_found
-            )}
-          />
-          <Metric
-            label="Documents analysés"
-            value={String(
-              snapshot.official_coverage.documents_parsed
-            )}
-          />
-          <Metric
-            label="Périodes Yahoo structurées"
-            value={String(
-              snapshot.official_coverage.structured_periods
-            )}
-          />
-          <Metric
-            label="Champs structurés"
-            value={String(
-              snapshot.official_coverage.structured_fields
-            )}
-          />
-          <Metric
-            label="Champs calculés"
-            value={String(
-              snapshot.official_coverage.calculated_fields
-            )}
-          />
-        </div>
-      </section>
 
       {subview === "overview" ? (
         <>
@@ -1777,8 +1568,10 @@ export function FocusFundamentals({
       )}
 
       <footer className="status-footer">
-        Source : {snapshot.source} · Mise à jour : {generated ?? "N/D"} ·
-        Les champs non publiés sont affichés N/D.
+        Source principale : {snapshot.source} · Mise à jour :{" "}
+        {generated ?? "N/D"} · Les valeurs calculées sont dérivées
+        uniquement à partir des données disponibles · Les champs
+        impossibles à déterminer sont affichés N/D.
       </footer>
     </div>
   );
