@@ -549,7 +549,7 @@ export function EtfHeatmap({
     item: EtfHeatmapItem,
   ): void {
     router.push(
-      `/focus/${encodeURIComponent(
+      `/etf/${encodeURIComponent(
         item.ticker,
       )}`,
     );
