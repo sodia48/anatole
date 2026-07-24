@@ -250,7 +250,6 @@
 @media (max-width: 1180px) {
   .heading {
     align-items: flex-start;
-    flex-direction: row;
   }
 
   .controls {
@@ -260,128 +259,189 @@
 
 @media (max-width: 860px) {
   .panel {
+    width: 100%;
+    max-width: 100%;
     padding: 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .heading,
-  .groups {
-    min-width: 760px;
+    overflow: hidden;
   }
 
   .heading {
-    align-items: flex-start;
-    flex-direction: row;
-    gap: 14px;
-    margin-bottom: 12px;
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 10px;
+    margin-bottom: 11px;
+  }
+
+  .heading h2 {
+    font-size: clamp(24px, 7vw, 32px);
   }
 
   .heading p {
-    max-width: 520px;
-    font-size: 11px;
+    max-width: 360px;
+    margin-top: 5px;
+    font-size: 9px;
+    line-height: 1.35;
   }
 
   .controls {
+    min-width: 145px;
+    align-items: flex-end;
+    flex-direction: column;
     flex-wrap: nowrap;
-  }
-
-  .groups {
-    display: grid;
-    grid-template-columns: repeat(12, minmax(0, 1fr));
-    grid-auto-flow: dense;
     gap: 6px;
   }
 
-  .group {
-    margin: 0;
-    border-radius: 11px;
-  }
-
-  .groupHeader {
-    min-height: 48px;
-    padding: 8px 9px;
-    gap: 8px;
-  }
-
-  .groupHeader strong {
-    font-size: 11px;
-  }
-
-  .groupHeader small {
-    font-size: 8px;
-  }
-
-  .tiles {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    grid-auto-rows: 52px;
-    gap: 3px;
-    padding: 4px;
-  }
-
-  .tile {
-    grid-column: span var(--tile-column-span);
-    grid-row: span var(--tile-row-span);
-    min-height: 52px;
-    gap: 2px;
-    padding: 6px;
-    border-radius: 7px;
-  }
-
-  .tileSymbol {
-    font-size: clamp(11px, 2.5vw, 16px);
-  }
-
-  .tile strong {
-    font-size: clamp(9px, 2.1vw, 12px);
-  }
-
-  .tile small,
-  .tileName {
-    font-size: 7px;
-  }
-
-  .delayed {
-    right: 3px;
-    bottom: 2px;
-    font-size: 6px;
-  }
-}
-
-@media (max-width: 560px) {
-  .heading,
-  .groups {
-    min-width: 720px;
-  }
-
-  .controls,
   .selectLabel {
-    width: auto;
+    width: 100%;
+    min-width: 0;
   }
 
-  .selectLabel {
-    min-width: 155px;
+  .selectLabel > span {
+    display: none;
   }
 
   .selectLabel select,
   .resetButton {
-    width: auto;
+    width: 100%;
+    min-width: 0;
+    height: 38px;
+    padding-right: 30px;
+    font-size: 11px;
   }
 
   .hint {
-    max-width: 180px;
+    max-width: 145px;
+    overflow: hidden;
+    font-size: 8px;
+    line-height: 1.25;
+    text-align: right;
+    text-overflow: ellipsis;
     white-space: normal;
   }
 
-  .groupHeader {
-    align-items: center;
+  .groups {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    grid-auto-flow: dense;
+    align-items: start;
+    gap: 5px;
   }
 
-  .tileName {
-    display: block;
+  .group {
+    grid-column: span var(--group-mobile-span);
+    min-width: 0;
+    margin: 0;
+    border-radius: 10px;
+  }
+
+  .groupHeader {
+    min-height: 39px;
+    gap: 5px;
+    padding: 6px 7px;
+  }
+
+  .groupHeader > span {
+    gap: 1px;
+  }
+
+  .groupHeader > span:last-child {
+    max-width: 50%;
+  }
+
+  .groupHeader strong {
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.05;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .groupHeader small {
+    display: none;
+  }
+
+  .tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-rows: 38px;
+    gap: 2px;
+    padding: 3px;
+  }
+
+  .tile {
+    grid-column: span var(--tile-mobile-column-span);
+    grid-row: span 1;
+    min-width: 0;
+    min-height: 38px;
+    gap: 1px;
+    padding: 4px 3px;
+    border-radius: 5px;
+  }
+
+  .tile:hover,
+  .tile:focus-visible {
+    transform: none;
+  }
+
+  .tileSymbol {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: clamp(8px, 2.45vw, 12px);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tile strong {
+    font-size: clamp(7px, 2.05vw, 10px);
+    line-height: 1;
+  }
+
+  .tile small,
+  .tileName,
+  .delayed {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .heading {
+    grid-template-columns: minmax(0, 1fr) 135px;
+  }
+
+  .heading p {
+    display: none;
+  }
+
+  .controls {
+    min-width: 135px;
+  }
+
+  .hint {
+    max-width: 135px;
+  }
+
+  .groups {
+    gap: 4px;
+  }
+
+  .groupHeader {
+    min-height: 36px;
+    padding: 5px 6px;
+  }
+
+  .groupHeader strong {
+    font-size: 8px;
+  }
+
+  .tiles {
+    grid-auto-rows: 35px;
+  }
+
+  .tile {
+    min-height: 35px;
   }
 }
 

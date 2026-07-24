@@ -1,45 +1,45 @@
-# Anatole — parité mobile / ordinateur v1
+# Anatole mobile responsive v2
 
-Cette livraison conserve sur téléphone la même architecture visuelle que
-sur ordinateur. Elle ne remplace plus les sections par des versions mobiles
-simplifiées.
+Cette version corrige directement les deux problèmes visibles sur iPhone :
+
+1. le tiroir latéral n'est plus décalé ni coupé;
+2. le cockpit ne force plus des sections de 720 à 1 010 pixels dans un
+   écran d'environ 390 pixels.
 
 ## Fichiers à remplacer
 
 - `apps/web/components/layout/AppSidebar.tsx`
-- `apps/web/components/cockpit/MarketHeatmap.module.css`
-- `apps/web/components/ipo-insiders/IpoInsiders.module.css`
-- `apps/web/components/etf/EtfHeatmap.tsx`
-
-## Fichier à ajouter
-
 - `apps/web/components/layout/MobileDesktopParity.tsx`
+- `apps/web/components/cockpit/MarketHeatmap.tsx`
+- `apps/web/components/cockpit/MarketHeatmap.module.css`
+- `apps/web/components/etf/EtfHeatmap.tsx`
+- `apps/web/components/ipo-insiders/IpoInsiders.module.css`
 
-Deux copies synchronisées sont aussi fournies sous `components/layout/`
-parce que ce dépôt a déjà contenu les deux arborescences.
+Les copies sous `components/layout/` sont également incluses pour garder
+synchronisées les deux arborescences déjà présentes dans le dépôt.
 
-## Ce qui change
+## Résultat attendu sur téléphone
 
-- Le téléphone utilise le menu complet de l’ordinateur dans un tiroir.
-- Toutes les sections disponibles restent accessibles.
-- Le menu inférieur mobile simplifié disparaît.
-- Les cartes KPI restent sur une ligne horizontale.
-- Les tableaux conservent toutes leurs colonnes.
-- Focus conserve le graphique et la colonne d’analyse de bureau.
-- La heatmap TSX 60 conserve son regroupement sectoriel de bureau.
-- La carte ETF conserve son ratio et ne se déforme plus.
-- IPO et Initiés conservent leurs grilles, filtres et tableaux complets.
-- Les zones trop larges défilent localement, sans transformer toute la page
-  en immense canvas horizontal.
-- Aucun contenu n’est masqué pour mobile.
+- logo Anatole en haut du tiroir;
+- barre de recherche sous le logo;
+- navigation verticale complète, sans noms tronqués;
+- bouton de fermeture dans le tiroir;
+- quatre KPI affichés en grille 2 × 2;
+- heatmap TSX 60 entièrement contenue dans la largeur du téléphone;
+- tous les secteurs affichés dans une grille compacte;
+- meilleures variations, baisses et contribution sectorielle empilées;
+- Focus en une colonne avec le graphique pleine largeur;
+- ETF redimensionné dans la largeur disponible;
+- IPO et Initiés en cartes mobiles lisibles;
+- seuls les tableaux détaillés utilisent un défilement horizontal local.
 
 ## Déploiement
 
-1. Téléverser les fichiers en respectant exactement les chemins.
+1. Remplacer les fichiers dans GitHub.
 2. Commit et push sur la branche de production.
 3. Vercel → Redeploy.
 4. Désactiver `Use existing Build Cache`.
-5. Tester avec Chrome mobile et Safari iPhone.
-6. Recharger avec un rafraîchissement complet.
+5. Sur iPhone, fermer l'ancien onglet ou vider les données du site.
+6. Ouvrir de nouveau `https://anatole-mu.vercel.app/cockpit`.
 
-Aucun changement Render/FastAPI n’est requis.
+Aucun redéploiement Render n'est requis.

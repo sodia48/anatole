@@ -209,7 +209,7 @@ export function AppSidebar({
     document.body.style.overflow =
       "hidden";
 
-    const onKeyDown = (
+    const closeOnEscape = (
       event: KeyboardEvent,
     ) => {
       if (event.key === "Escape") {
@@ -219,7 +219,7 @@ export function AppSidebar({
 
     window.addEventListener(
       "keydown",
-      onKeyDown,
+      closeOnEscape,
     );
 
     return () => {
@@ -227,7 +227,7 @@ export function AppSidebar({
         previousOverflow;
       window.removeEventListener(
         "keydown",
-        onKeyDown,
+        closeOnEscape,
       );
     };
   }, [mobileOpen]);
@@ -243,23 +243,19 @@ export function AppSidebar({
 
       <button
         type="button"
-        className="mobile-menu-toggle"
-        aria-label={
+        className={`mobile-menu-toggle ${
           mobileOpen
-            ? "Fermer le menu Anatole"
-            : "Ouvrir le menu Anatole"
-        }
+            ? "is-drawer-open"
+            : ""
+        }`}
+        aria-label="Ouvrir le menu Anatole"
         aria-controls="anatole-sidebar"
         aria-expanded={mobileOpen}
         onClick={() =>
-          setMobileOpen((current) => !current)
+          setMobileOpen(true)
         }
       >
-        {mobileOpen ? (
-          <X size={21} />
-        ) : (
-          <Menu size={21} />
-        )}
+        <Menu size={22} />
       </button>
 
       <button
@@ -279,14 +275,40 @@ export function AppSidebar({
             ? "is-mobile-open"
             : ""
         }`}
+        aria-hidden={!mobileOpen}
       >
+        <div className="mobile-sidebar-header">
+          <Link
+            href="/cockpit"
+            className="brand"
+            aria-label="Anatole"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+          >
+            <span className="brand-mark">
+              A
+            </span>
+            <span>anatole</span>
+            <small>beta</small>
+          </Link>
+
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            aria-label="Fermer le menu Anatole"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+          >
+            <X size={22} />
+          </button>
+        </div>
+
         <Link
           href="/cockpit"
-          className="brand"
+          className="brand desktop-sidebar-brand"
           aria-label="Anatole"
-          onClick={() =>
-            setMobileOpen(false)
-          }
         >
           <span className="brand-mark">
             A

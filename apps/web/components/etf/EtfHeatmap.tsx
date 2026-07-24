@@ -588,16 +588,13 @@ export function EtfHeatmap({
     display: "grid",
     gap: 10,
     padding: 14,
-    overflowX: "auto",
-    overflowY: "hidden",
-    overscrollBehaviorX: "contain",
-    WebkitOverflowScrolling: "touch",
+    overflow: "hidden",
   };
 
   const canvasStyle: CSSProperties = {
     width: "100%",
-    minWidth: 980,
-    height: "clamp(560px, 57.5vw, 720px)",
+    minWidth: 0,
+    height: "clamp(440px, 105vw, 720px)",
     display: "block",
     overflow: "hidden",
     border:

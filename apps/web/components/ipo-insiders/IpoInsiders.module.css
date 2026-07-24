@@ -695,71 +695,20 @@
 }
 
 @media (max-width: 1120px) {
-  .page {
-    overflow-x: hidden;
-  }
-
-  .hero {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-  }
-
-  .heroMetrics {
-    flex: 0 0 auto;
-  }
-
-  .metricGrid,
-  .filters,
-  .ipoGrid,
-  .sourceGrid,
-  .insiderControls,
-  .flowPanel {
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
-  }
-
   .metricGrid {
-    grid-template-columns: repeat(5, minmax(155px, 1fr));
-  }
-
-  .filters {
-    grid-template-columns:
-      minmax(330px, 1fr)
-      210px
-      210px;
-    min-width: 780px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .ipoGrid {
-    grid-template-columns: repeat(3, minmax(280px, 1fr));
-    min-width: 870px;
-  }
-
-  .sourceGrid {
-    grid-template-columns: repeat(3, minmax(225px, 1fr));
-    min-width: 720px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .insiderControls {
-    grid-template-columns:
-      minmax(430px, 1fr)
-      190px
-      170px
-      190px;
-    min-width: 1010px;
-  }
-
-  .flowPanel {
-    grid-template-columns: repeat(4, minmax(175px, 1fr));
-    min-width: 720px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tickerForm {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
 }
 
@@ -767,11 +716,14 @@
   .page {
     gap: 12px;
     padding: 12px 10px 30px;
+    overflow-x: hidden;
   }
 
   .hero {
+    min-height: 145px;
+    display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    min-height: 140px;
+    align-items: center;
     gap: 14px;
     padding: 18px;
   }
@@ -792,43 +744,27 @@
     font-size: 29px;
   }
 
-  .mainTabs {
+  .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .panelHeader,
-  .sourcesPanel > header {
-    align-items: flex-end;
-    flex-direction: row;
+  .filters,
+  .insiderControls {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .panelHeader p {
-    text-align: right;
-  }
-}
-
-@media (max-width: 580px) {
-  .hero {
-    grid-template-columns: minmax(0, 1fr) 104px;
-  }
-
-  .heroMetrics {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 9px;
-  }
-
-  .heroMetrics > div {
-    justify-items: end;
-  }
-
-  .mainTabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
+  .search,
   .tickerForm {
-    align-items: end;
-    flex-direction: row;
+    grid-column: auto;
+  }
+
+  .ipoGrid,
+  .sourceGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .flowPanel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .panelHeader,
@@ -839,5 +775,34 @@
 
   .panelHeader p {
     text-align: left;
+  }
+
+  .tradeTable {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 560px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .heroMetrics {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .heroMetrics > div {
+    justify-items: start;
+  }
+
+  .mainTabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tickerForm {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

@@ -1,19 +1,20 @@
 "use client";
 
 const MOBILE_DESKTOP_PARITY_CSS = String.raw`
-/*
- * Anatole mobile parity layer
- * Keeps the same information architecture and visual hierarchy as desktop.
- * Mobile uses compact dimensions and local horizontal rails instead of
- * replacing sections with simplified mobile-only versions.
- */
-
 .mobile-menu-toggle,
-.mobile-sidebar-backdrop {
+.mobile-sidebar-backdrop,
+.mobile-sidebar-header,
+.mobile-drawer-close {
   display: none;
 }
 
 @media (max-width: 900px) {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
   html,
   body {
     width: 100%;
@@ -27,81 +28,268 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
 
   .app-shell {
     display: block !important;
+    width: 100% !important;
     min-height: 100dvh !important;
   }
 
   .app-main {
     width: 100% !important;
     min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
     padding:
-      calc(66px + env(safe-area-inset-top, 0px))
-      12px
+      calc(68px + env(safe-area-inset-top, 0px))
+      10px
       calc(24px + env(safe-area-inset-bottom, 0px))
       !important;
+    overflow-x: hidden !important;
   }
 
-  /* Full desktop navigation in a mobile drawer. */
+  /*
+   * Complete desktop navigation, reorganized as a proper mobile drawer.
+   * Explicit grid/flex resets prevent the inherited desktop placement seen
+   * in the previous version.
+   */
   .sidebar {
     position: fixed !important;
     inset: 0 auto 0 0 !important;
     z-index: 1001 !important;
-    width: min(88vw, 310px) !important;
+    width: min(calc(100vw - 46px), 326px) !important;
+    min-width: 0 !important;
+    max-width: 326px !important;
     height: 100dvh !important;
+    margin: 0 !important;
     padding:
-      calc(18px + env(safe-area-inset-top, 0px))
-      14px
-      calc(18px + env(safe-area-inset-bottom, 0px))
+      env(safe-area-inset-top, 0px)
+      12px
+      calc(16px + env(safe-area-inset-bottom, 0px))
       !important;
+    display: flex !important;
+    grid-template-columns: none !important;
+    grid-template-rows: none !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 0 !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
-    border-right: 1px solid var(--border) !important;
-    border-radius: 0 20px 20px 0 !important;
-    background: rgba(5, 13, 21, 0.985) !important;
-    box-shadow: 26px 0 70px rgba(0, 0, 0, 0.42) !important;
-    transform: translateX(-106%);
-    transition: transform 180ms ease;
     overscroll-behavior: contain;
+    border: 0 !important;
+    border-right: 1px solid var(--border) !important;
+    border-radius: 0 22px 22px 0 !important;
+    background: rgba(4, 13, 21, 0.99) !important;
+    box-shadow: 24px 0 72px rgba(0, 0, 0, 0.52) !important;
+    transform: translate3d(-106%, 0, 0);
+    transition: transform 180ms ease;
   }
 
   .sidebar.is-mobile-open {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
+  }
+
+  .sidebar > *,
+  .sidebar nav,
+  .sidebar div,
+  .sidebar a,
+  .sidebar button {
+    grid-column: auto !important;
+    grid-row: auto !important;
+    transform: none;
+  }
+
+  .mobile-sidebar-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    width: 100%;
+    min-height: 68px;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 0 8px;
+    background:
+      linear-gradient(
+        180deg,
+        rgba(4, 13, 21, 1) 72%,
+        rgba(4, 13, 21, 0)
+      );
+  }
+
+  .sidebar .desktop-sidebar-brand {
+    display: none !important;
   }
 
   .sidebar .brand {
+    position: static !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     display: flex !important;
-    padding: 0 8px 18px !important;
+    flex: 1 1 auto !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 9px !important;
+    color: var(--text) !important;
+    text-decoration: none !important;
   }
 
-  .sidebar .brand > span,
-  .sidebar .brand > small,
-  .sidebar .nav-item > span,
-  .sidebar .nav-group-label,
-  .sidebar .sidebar-footer {
-    display: initial !important;
+  .sidebar .brand-mark {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    display: grid !important;
+    place-items: center !important;
+    border-radius: 12px !important;
+    font-size: 24px !important;
+    line-height: 1 !important;
+  }
+
+  .sidebar .brand > span:not(.brand-mark) {
+    display: inline !important;
+    min-width: 0;
+    font-size: 25px !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+  }
+
+  .sidebar .brand > small {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    min-height: 23px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 9px !important;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .mobile-drawer-close {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: grid !important;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(9, 29, 43, 0.94);
+    color: var(--text);
+    cursor: pointer;
   }
 
   .sidebar .sidebar-search {
-    display: flex !important;
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 43px !important;
+    margin: 5px 0 13px !important;
+    padding: 0 11px !important;
+    display: grid !important;
+    grid-template-columns: 20px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    border-radius: 11px !important;
+    text-align: left !important;
+  }
+
+  .sidebar .sidebar-search > span,
+  .sidebar .sidebar-search > kbd {
+    display: inline !important;
+  }
+
+  .sidebar .sidebar-search > kbd {
+    justify-self: end;
   }
 
   .sidebar .desktop-nav,
   .sidebar .sidebar-nav {
-    display: grid !important;
+    position: static !important;
     width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 0 8px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-content: start !important;
+    gap: 15px !important;
+    overflow: visible !important;
+  }
+
+  .sidebar .nav-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 4px !important;
+  }
+
+  .sidebar .nav-group-label {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 2px 8px 5px !important;
+    font-size: 9px !important;
+    letter-spacing: 0.14em !important;
   }
 
   .sidebar .nav-item {
-    justify-content: flex-start !important;
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
     min-height: 43px !important;
-    padding: 10px 11px !important;
+    margin: 0 !important;
+    padding: 9px 10px !important;
+    display: grid !important;
+    grid-template-columns: 22px minmax(0, 1fr) auto !important;
+    align-items: center !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    border-radius: 10px !important;
+    text-align: left !important;
+    white-space: normal !important;
   }
 
   .sidebar .nav-item > svg {
-    flex: 0 0 auto;
+    width: 18px !important;
+    min-width: 18px !important;
+    justify-self: center;
+  }
+
+  .sidebar .nav-item > span {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    font-size: 13px !important;
+    line-height: 1.25 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .sidebar .nav-item > em {
+    display: inline !important;
+    justify-self: end;
+    font-size: 7px !important;
+    white-space: nowrap !important;
   }
 
   .sidebar .mobile-nav {
     display: none !important;
+  }
+
+  .sidebar .sidebar-footer {
+    width: 100% !important;
+    margin: auto 0 0 !important;
+    padding: 14px 8px 4px !important;
+    display: grid !important;
+    gap: 5px !important;
   }
 
   .mobile-menu-toggle {
@@ -115,16 +303,16 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     place-items: center;
     border: 1px solid var(--border);
     border-radius: 13px;
-    background: rgba(7, 22, 34, 0.96);
+    background: rgba(7, 22, 34, 0.97);
     color: var(--text);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
     backdrop-filter: blur(18px);
     cursor: pointer;
   }
 
-  .mobile-menu-toggle:focus-visible {
-    outline: 2px solid rgba(86, 152, 255, 0.9);
-    outline-offset: 2px;
+  .mobile-menu-toggle.is-drawer-open {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .mobile-sidebar-backdrop {
@@ -132,8 +320,12 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     inset: 0;
     z-index: 1000;
     display: block;
+    width: 100vw;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
     border: 0;
-    background: rgba(0, 6, 11, 0.66);
+    background: rgba(0, 6, 11, 0.7);
     backdrop-filter: blur(3px);
     cursor: pointer;
   }
@@ -142,9 +334,9 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     display: none !important;
   }
 
-  /* Same panel language as desktop. */
   .panel {
-    border-radius: 17px !important;
+    max-width: 100% !important;
+    border-radius: 16px !important;
   }
 
   .cockpit-page,
@@ -157,105 +349,150 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
   .preferences-page,
   .roadmap-page {
     width: 100% !important;
-    max-width: none !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     gap: 12px !important;
+    overflow-x: hidden !important;
   }
 
-  /* Desktop-style headers remain horizontal. */
   .cockpit-header,
   .quote-header {
+    width: 100% !important;
+    min-width: 0 !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) auto !important;
     align-items: center !important;
-    gap: 14px !important;
-    padding: 16px !important;
+    gap: 10px !important;
+    padding: 15px !important;
   }
 
   .cockpit-header h1,
   .quote-header h1 {
-    font-size: clamp(28px, 8vw, 43px) !important;
+    margin-top: 7px !important;
+    font-size: clamp(27px, 8vw, 39px) !important;
+  }
+
+  .cockpit-header p,
+  .quote-header p {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
   }
 
   .cockpit-market-score,
   .quote-meta {
+    min-width: 82px;
     justify-content: flex-end !important;
     text-align: right !important;
+  }
+
+  .cockpit-market-score strong {
+    font-size: clamp(23px, 7vw, 32px) !important;
+  }
+
+  .cockpit-market-score small {
+    max-width: 105px;
+    font-size: 8px !important;
+    line-height: 1.35 !important;
   }
 
   .price-line {
     flex-wrap: wrap;
   }
 
-  /* KPI rows stay rows, as on desktop. */
+  /*
+   * True mobile KPI grid: all four values are visible and no card is cut.
+   */
   .cockpit-kpis,
   [class*="metricGrid"] {
+    width: 100% !important;
+    min-width: 0 !important;
     display: grid !important;
-    grid-template-columns: none !important;
-    grid-auto-flow: column !important;
-    grid-auto-columns: minmax(155px, 1fr) !important;
-    gap: 10px !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    padding-bottom: 4px;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-flow: row !important;
+    grid-auto-columns: auto !important;
+    gap: 9px !important;
+    overflow: visible !important;
+    padding: 0 !important;
   }
 
-  .cockpit-kpis > *,
+  .cockpit-kpi,
   [class*="metricGrid"] > * {
-    scroll-snap-align: start;
+    min-width: 0 !important;
+    min-height: 92px !important;
+    padding: 13px !important;
+  }
+
+  .cockpit-kpi strong {
+    font-size: 27px !important;
   }
 
   /*
-   * Complex desktop sections preserve their desktop columns inside a local
-   * horizontal rail. Nothing is removed and the whole page does not become
-   * one giant horizontal canvas.
+   * Cockpit lower modules stack cleanly instead of remaining a 956px rail.
    */
-  .focus-grid {
-    grid-template-columns: minmax(720px, 1fr) 330px !important;
-    min-width: 1066px !important;
+  .cockpit-lower-grid,
+  .cockpit-movers-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 11px !important;
+    overflow: visible !important;
   }
 
-  .focus-page:has(.focus-grid) {
-    overflow-x: auto !important;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
+  .sector-list,
+  .movers-list {
+    min-width: 0 !important;
+  }
+
+  /*
+   * Focus keeps every desktop module, but the analytics column moves below
+   * the chart. The chart itself uses the phone width.
+   */
+  .focus-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
   }
 
   .chart-toolbar {
-    align-items: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
     flex-direction: row !important;
-    min-width: 720px;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .chart-toolbar::-webkit-scrollbar {
+    display: none;
   }
 
   .chart-canvas {
     width: 100% !important;
-    min-width: 720px !important;
-    min-height: 500px !important;
-    height: min(72vh, 760px) !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 390px !important;
+    height: clamp(420px, 112vw, 560px) !important;
+    overflow: hidden !important;
   }
 
   .right-column {
-    grid-template-columns: 1fr !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 11px !important;
   }
 
-  .cockpit-lower-grid {
-    grid-template-columns: minmax(620px, 1fr) 320px !important;
-    min-width: 956px !important;
-  }
-
-  .cockpit-page:has(.cockpit-lower-grid) {
-    overflow-x: auto !important;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .cockpit-movers-grid {
-    grid-template-columns: repeat(2, minmax(300px, 1fr)) !important;
-  }
-
-  /* Tables retain every desktop column. */
+  /*
+   * Tables keep all data through local horizontal scrolling only.
+   */
   .table-wrap,
   .trade-table,
   [class*="tradeTable"],
@@ -263,8 +500,10 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
   [class*="tableContainer"],
   [class*="financialTable"],
   [class*="statementTable"] {
-    max-width: 100%;
+    width: 100% !important;
+    max-width: 100% !important;
     overflow-x: auto !important;
+    overflow-y: hidden !important;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
   }
@@ -273,52 +512,45 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     min-width: max-content;
   }
 
-  /* CSS-module pages: preserve desktop grids in scrollable rails. */
+  /*
+   * IPO/insider sections remain visually identical, with responsive grids.
+   */
   [class*="sectionPanel"],
   [class*="sourcesPanel"] {
-    overflow-x: auto !important;
-    overscroll-behavior-x: contain;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
   }
 
   [class*="ipoGrid"] {
-    grid-template-columns: repeat(3, minmax(280px, 1fr)) !important;
-    min-width: 870px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   [class*="sourceGrid"] {
-    grid-template-columns: repeat(3, minmax(225px, 1fr)) !important;
-    min-width: 720px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   [class*="flowPanel"] {
-    grid-template-columns: repeat(4, minmax(175px, 1fr)) !important;
-    min-width: 720px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
-  [class*="filters"] {
-    grid-template-columns:
-      minmax(330px, 1fr)
-      210px
-      210px
-      !important;
-    min-width: 780px !important;
-  }
-
+  [class*="filters"],
   [class*="insiderControls"] {
-    grid-template-columns:
-      minmax(430px, 1fr)
-      190px
-      170px
-      190px
-      !important;
-    min-width: 1010px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   [class*="mainTabs"] {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
-  /* Filters and period tabs remain compact horizontal toolbars. */
   .period-tabs,
   .range-tabs,
   .filters-row,
@@ -326,8 +558,10 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
   [class*="periodTabs"],
   [class*="rangeTabs"],
   [class*="toolbar"] {
+    width: 100%;
     max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     flex-wrap: nowrap !important;
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
@@ -345,52 +579,52 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
 
   input,
   select,
-  textarea,
-  button {
-    font-size: max(16px, 1em);
-  }
-
-  input,
-  select,
   textarea {
+    max-width: 100%;
     min-height: 42px;
+    font-size: 16px;
   }
 
-  /* Avoid accidental disappearance caused by legacy mobile CSS. */
   .desktop-only,
   [data-desktop-only="true"] {
     display: revert !important;
   }
 
-  /* Touch behavior: scroll, no involuntary chart zoom. */
   svg,
   canvas {
-    touch-action: pan-x pan-y;
+    max-width: 100%;
+    touch-action: pan-y;
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 520px) {
   .app-main {
-    padding-right: 9px !important;
-    padding-left: 9px !important;
+    padding-right: 8px !important;
+    padding-left: 8px !important;
   }
 
   .cockpit-header,
   .quote-header {
-    gap: 10px !important;
-    padding: 14px !important;
+    padding: 13px !important;
   }
 
-  .cockpit-market-score strong {
-    font-size: 25px !important;
+  .cockpit-header p {
+    display: none;
   }
 
-  .panel {
-    border-radius: 15px !important;
+  [class*="hero"] {
+    align-items: flex-start !important;
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
-  [class*="hero"] h1 {
-    font-size: clamp(27px, 9vw, 38px) !important;
+  [class*="heroMetrics"] {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+
+  [class*="heroMetrics"] > div {
+    justify-items: start !important;
   }
 }
 
@@ -404,7 +638,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
 export function MobileDesktopParity() {
   return (
     <style
-      data-anatole-mobile-desktop-parity
+      data-anatole-mobile-responsive-v2
       dangerouslySetInnerHTML={{
         __html: MOBILE_DESKTOP_PARITY_CSS,
       }}
