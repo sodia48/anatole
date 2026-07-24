@@ -1,0 +1,12 @@
+diff --git a/components/layout/AppSidebar.tsx b/components/layout/AppSidebar.tsx
+--- a/components/layout/AppSidebar.tsx
++++ b/components/layout/AppSidebar.tsx
+@@
+-      { href: "/roadmap#ipo", label: "IPO & insiders", icon: Database, available: false },
++      { href: "/ipo-insiders", label: "IPO & insiders", icon: Database, available: true },
+diff --git a/apps/web/components/layout/AppSidebar.tsx b/apps/web/components/layout/AppSidebar.tsx
+--- a/apps/web/components/layout/AppSidebar.tsx
++++ b/apps/web/components/layout/AppSidebar.tsx
+@@
+-      { href: "/roadmap#ipo", label: "IPO & insiders", icon: Database, available: false },
++      { href: "/ipo-insiders", label: "IPO & insiders", icon: Database, available: true },
