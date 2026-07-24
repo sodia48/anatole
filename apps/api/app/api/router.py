@@ -5,6 +5,7 @@ from app.api.routes import (
     etf_holdings,
     fundamentals,
     health,
+    ipo_insiders,
     market,
     search,
     stocks,
@@ -52,6 +53,12 @@ api_router.include_router(
     etf_holdings.router,
     prefix="/api/v1/discovery/etfs",
     tags=["ETF holdings"],
+)
+
+api_router.include_router(
+    ipo_insiders.router,
+    prefix="/api/v1/discovery",
+    tags=["IPO & insiders"],
 )
 
 api_router.include_router(

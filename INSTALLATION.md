@@ -1,61 +1,96 @@
-# ETF Holdings, Drivers & Performance V4
+# Anatole v0.5 — IPO & Initiés
 
-Cette version conserve les positions motrices de la V3 et ajoute un
-graphique de progression dans chaque fiche ETF.
+## Routes frontend
 
-## Périodes disponibles
+- `/ipo-insiders`
+- `/ipo`
+- `/insiders`
 
-- 5J : cinq dernières séances, données intrajournalières de 30 minutes;
-- 1M : un mois;
-- YTD : depuis le début de l’année;
-- 6M : six mois;
-- 1A : un an;
-- 5A : cinq ans;
-- 10A : dix ans.
+La page principale contient deux onglets : IPO et Initiés.
 
-## Informations affichées
+## Sources
 
-- performance de la période;
-- cours au début de la période;
-- dernier cours;
-- sommet;
-- creux;
-- graphique interactif avec curseur et infobulle;
-- heures affichées dans le fuseau de Toronto;
-- actualisation automatique selon la période.
+### IPO
 
-## Ajouter
+- TMX : nouvelles inscriptions TSX et TSXV.
+- SEC EDGAR : dépôts S-1 et F-1 récents.
 
-- `apps/api/app/schemas/etf_history.py`
-- `apps/api/app/services/etf_history.py`
-- `apps/api/tests/test_etf_history.py`
-- `apps/web/components/etf/EtfPerformanceChart.tsx`
+Les ETF, CDR et fonds sont classifiés séparément. Le filtre par
+défaut conserve uniquement les sociétés.
 
-## Remplacer
+### Initiés
 
-- `apps/api/app/api/routes/etf_holdings.py`
-- `apps/web/lib/etf-holdings-api.ts`
-- `apps/web/app/etf/[ticker]/page.tsx`
-- `apps/web/app/etf/[ticker]/page.module.css`
+- Canada : normalisation automatisée d’une source publique secondaire,
+  avec lien de vérification vers le registre officiel SEDI.
+- États-Unis : formulaires 4 et 4/A de la SEC, lus dans leur XML officiel.
 
-Tous les fichiers de la V3 sont également inclus dans le ZIP.
+SEDI ne propose pas d’API publique documentée adaptée à une collecte
+automatisée simple. Anatole ne présente donc jamais la source canadienne
+secondaire comme une déclaration officielle.
+
+## Fichiers à ajouter
+
+Backend :
+
+- `apps/api/app/schemas/ipo_insiders.py`
+- `apps/api/app/services/ipo.py`
+- `apps/api/app/services/insiders.py`
+- `apps/api/app/api/routes/ipo_insiders.py`
+- `apps/api/tests/test_ipo_service.py`
+- `apps/api/tests/test_insiders_service.py`
+
+Frontend :
+
+- `apps/web/lib/ipo-insiders-api.ts`
+- `apps/web/components/ipo-insiders/IpoInsidersClient.tsx`
+- `apps/web/components/ipo-insiders/IpoInsiders.module.css`
+- `apps/web/app/ipo-insiders/page.tsx`
+- `apps/web/app/ipo/page.tsx`
+- `apps/web/app/insiders/page.tsx`
+
+## Fichier à remplacer
+
+- `apps/api/app/api/router.py`
+
+## Activation du bouton du menu
+
+Le bouton `IPO & insiders` doit pointer vers :
+
+```text
+/ipo-insiders
+```
+
+Retirer son indicateur `BIENTÔT` ou sa propriété équivalente :
+`disabled`, `comingSoon`, `soon`, etc.
+
+Les routes `/ipo` et `/insiders` restent disponibles pour les anciens liens.
 
 ## Déploiement
 
-1. Ajoute ou remplace tous les fichiers du ZIP dans GitHub.
-2. Render → `anatole-api` → `Clear build cache & deploy`.
-3. Vérifie :
-   `/api/v1/discovery/etfs/XIU/history?range=1y`
-4. La réponse doit contenir `points`, `change_percent`,
-   `period_high` et `period_low`.
-5. Vérifie aussi les autres périodes :
-   - `range=5d`
-   - `range=1mo`
-   - `range=ytd`
-   - `range=6mo`
-   - `range=5y`
-   - `range=10y`
-6. Vercel → redéploie sans ancien cache.
-7. Recharge une fiche comme `/etf/XIU` avec `Ctrl + Shift + R`.
+1. Ajouter/remplacer les fichiers dans GitHub.
+2. Render → `anatole-api` → **Clear build cache & deploy**.
+3. Tester :
+   - `/api/v1/discovery/ipo`
+   - `/api/v1/discovery/insiders?market=canada`
+   - `/api/v1/discovery/insiders?market=us`
+   - `/api/v1/discovery/insiders?market=us&ticker=AAPL`
+4. Vercel → redéployer sans ancien cache.
+5. Recharger `/ipo-insiders` avec `Ctrl + Shift + R`.
 
-Aucune nouvelle variable d’environnement n’est nécessaire.
+## Variable SEC facultative
+
+Aucune nouvelle variable n’est obligatoire. Pour mieux identifier
+Anatole auprès de la SEC :
+
+```text
+SEC_USER_AGENT=Anatole/0.5 votre-email@example.com
+```
+
+## Garde-fous
+
+- aucune transaction inventée;
+- aucune fausse date ou valeur;
+- `N/D` lorsque le champ n’est pas publié;
+- attributions et exercices exclus du flux net achats–ventes;
+- doublons supprimés;
+- dernière réponse valide conservée lorsqu’une source tombe en panne.
