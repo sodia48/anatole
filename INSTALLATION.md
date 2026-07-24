@@ -1,96 +1,45 @@
-# Anatole v0.5 — IPO & Initiés
+# Anatole — parité mobile / ordinateur v1
 
-## Routes frontend
+Cette livraison conserve sur téléphone la même architecture visuelle que
+sur ordinateur. Elle ne remplace plus les sections par des versions mobiles
+simplifiées.
 
-- `/ipo-insiders`
-- `/ipo`
-- `/insiders`
+## Fichiers à remplacer
 
-La page principale contient deux onglets : IPO et Initiés.
-
-## Sources
-
-### IPO
-
-- TMX : nouvelles inscriptions TSX et TSXV.
-- SEC EDGAR : dépôts S-1 et F-1 récents.
-
-Les ETF, CDR et fonds sont classifiés séparément. Le filtre par
-défaut conserve uniquement les sociétés.
-
-### Initiés
-
-- Canada : normalisation automatisée d’une source publique secondaire,
-  avec lien de vérification vers le registre officiel SEDI.
-- États-Unis : formulaires 4 et 4/A de la SEC, lus dans leur XML officiel.
-
-SEDI ne propose pas d’API publique documentée adaptée à une collecte
-automatisée simple. Anatole ne présente donc jamais la source canadienne
-secondaire comme une déclaration officielle.
-
-## Fichiers à ajouter
-
-Backend :
-
-- `apps/api/app/schemas/ipo_insiders.py`
-- `apps/api/app/services/ipo.py`
-- `apps/api/app/services/insiders.py`
-- `apps/api/app/api/routes/ipo_insiders.py`
-- `apps/api/tests/test_ipo_service.py`
-- `apps/api/tests/test_insiders_service.py`
-
-Frontend :
-
-- `apps/web/lib/ipo-insiders-api.ts`
-- `apps/web/components/ipo-insiders/IpoInsidersClient.tsx`
+- `apps/web/components/layout/AppSidebar.tsx`
+- `apps/web/components/cockpit/MarketHeatmap.module.css`
 - `apps/web/components/ipo-insiders/IpoInsiders.module.css`
-- `apps/web/app/ipo-insiders/page.tsx`
-- `apps/web/app/ipo/page.tsx`
-- `apps/web/app/insiders/page.tsx`
+- `apps/web/components/etf/EtfHeatmap.tsx`
 
-## Fichier à remplacer
+## Fichier à ajouter
 
-- `apps/api/app/api/router.py`
+- `apps/web/components/layout/MobileDesktopParity.tsx`
 
-## Activation du bouton du menu
+Deux copies synchronisées sont aussi fournies sous `components/layout/`
+parce que ce dépôt a déjà contenu les deux arborescences.
 
-Le bouton `IPO & insiders` doit pointer vers :
+## Ce qui change
 
-```text
-/ipo-insiders
-```
-
-Retirer son indicateur `BIENTÔT` ou sa propriété équivalente :
-`disabled`, `comingSoon`, `soon`, etc.
-
-Les routes `/ipo` et `/insiders` restent disponibles pour les anciens liens.
+- Le téléphone utilise le menu complet de l’ordinateur dans un tiroir.
+- Toutes les sections disponibles restent accessibles.
+- Le menu inférieur mobile simplifié disparaît.
+- Les cartes KPI restent sur une ligne horizontale.
+- Les tableaux conservent toutes leurs colonnes.
+- Focus conserve le graphique et la colonne d’analyse de bureau.
+- La heatmap TSX 60 conserve son regroupement sectoriel de bureau.
+- La carte ETF conserve son ratio et ne se déforme plus.
+- IPO et Initiés conservent leurs grilles, filtres et tableaux complets.
+- Les zones trop larges défilent localement, sans transformer toute la page
+  en immense canvas horizontal.
+- Aucun contenu n’est masqué pour mobile.
 
 ## Déploiement
 
-1. Ajouter/remplacer les fichiers dans GitHub.
-2. Render → `anatole-api` → **Clear build cache & deploy**.
-3. Tester :
-   - `/api/v1/discovery/ipo`
-   - `/api/v1/discovery/insiders?market=canada`
-   - `/api/v1/discovery/insiders?market=us`
-   - `/api/v1/discovery/insiders?market=us&ticker=AAPL`
-4. Vercel → redéployer sans ancien cache.
-5. Recharger `/ipo-insiders` avec `Ctrl + Shift + R`.
+1. Téléverser les fichiers en respectant exactement les chemins.
+2. Commit et push sur la branche de production.
+3. Vercel → Redeploy.
+4. Désactiver `Use existing Build Cache`.
+5. Tester avec Chrome mobile et Safari iPhone.
+6. Recharger avec un rafraîchissement complet.
 
-## Variable SEC facultative
-
-Aucune nouvelle variable n’est obligatoire. Pour mieux identifier
-Anatole auprès de la SEC :
-
-```text
-SEC_USER_AGENT=Anatole/0.5 votre-email@example.com
-```
-
-## Garde-fous
-
-- aucune transaction inventée;
-- aucune fausse date ou valeur;
-- `N/D` lorsque le champ n’est pas publié;
-- attributions et exercices exclus du flux net achats–ventes;
-- doublons supprimés;
-- dernière réponse valide conservée lorsqu’une source tombe en panne.
+Aucun changement Render/FastAPI n’est requis.

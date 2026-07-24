@@ -549,7 +549,7 @@ export function EtfHeatmap({
     item: EtfHeatmapItem,
   ): void {
     router.push(
-      `/etf/${encodeURIComponent(
+      `/focus/${encodeURIComponent(
         item.ticker,
       )}`,
     );
@@ -588,12 +588,16 @@ export function EtfHeatmap({
     display: "grid",
     gap: 10,
     padding: 14,
-    overflow: "hidden",
+    overflowX: "auto",
+    overflowY: "hidden",
+    overscrollBehaviorX: "contain",
+    WebkitOverflowScrolling: "touch",
   };
 
   const canvasStyle: CSSProperties = {
     width: "100%",
-    height: "clamp(520px, 67vh, 720px)",
+    minWidth: 980,
+    height: "clamp(560px, 57.5vw, 720px)",
     display: "block",
     overflow: "hidden",
     border:
@@ -760,7 +764,7 @@ export function EtfHeatmap({
 
       <svg
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Carte sectorielle des ETF canadiens"
         style={canvasStyle}
