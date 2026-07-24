@@ -39,7 +39,7 @@ const groups: Array<{ label: string; items: NavItem[] }> = [
       { href: "/actualites", label: "Actualités", icon: Newspaper, available: true },
       { href: "/calendrier", label: "Calendrier", icon: CalendarDays, available: true },
       { href: "/etf", label: "ETF", icon: CircleDollarSign, available: true },
-      { href: "/roadmap#ipo", label: "IPO & insiders", icon: Database, available: false },
+      { href: "/ipo-insiders", label: "IPO & insiders", icon: Database, available: true, mobile: true },
     ],
   },
   {
