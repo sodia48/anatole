@@ -1,3 +1,45 @@
+
+export type EtfHistoryRange =
+  | "5d"
+  | "1mo"
+  | "ytd"
+  | "6mo"
+  | "1y"
+  | "5y"
+  | "10y";
+
+export type EtfHistoryPoint = {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+export type EtfHistorySnapshot = {
+  ticker: string;
+  normalized_symbol: string;
+  range: EtfHistoryRange;
+  range_label: string;
+  currency: string;
+  interval: string;
+  points: EtfHistoryPoint[];
+  first_close: number | null;
+  last_close: number | null;
+  change: number | null;
+  change_percent: number | null;
+  period_high: number | null;
+  period_low: number | null;
+  status: "available" | "unavailable";
+  message: string | null;
+  delayed: boolean;
+  source_name: string;
+  source_url: string | null;
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
 export type EtfHoldingDriver = {
   rank: number;
   symbol: string;
@@ -98,4 +140,44 @@ export async function getEtfHoldings(
   }
 
   return (await response.json()) as EtfHoldingsSnapshot;
+}
+
+
+export async function getEtfHistory(
+  ticker: string,
+  range: EtfHistoryRange,
+  signal?: AbortSignal,
+): Promise<EtfHistorySnapshot> {
+  const url = new URL(
+    `${apiBaseUrl()}/api/v1/discovery/etfs/${encodeURIComponent(
+      ticker,
+    )}/history`,
+  );
+  url.searchParams.set("range", range);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      Accept: "application/json",
+    },
+    cache: "no-store",
+    signal,
+  });
+
+  if (!response.ok) {
+    let detail = `Erreur API ${response.status}`;
+
+    try {
+      const body = (await response.json()) as {
+        detail?: string;
+      };
+      detail = body.detail ?? detail;
+    } catch {
+      // Keep the status-based message.
+    }
+
+    throw new Error(detail);
+  }
+
+  return (await response.json()) as EtfHistorySnapshot;
 }

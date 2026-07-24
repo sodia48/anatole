@@ -16,6 +16,7 @@ import {
   type EtfHoldingsSnapshot,
   getEtfHoldings,
 } from "../../../lib/etf-holdings-api";
+import { EtfPerformanceChart } from "../../../components/etf/EtfPerformanceChart";
 
 import styles from "./page.module.css";
 
@@ -313,6 +314,11 @@ export default function EtfHoldingsPage() {
           chargées restent affichées.
         </div>
       ) : null}
+
+      <EtfPerformanceChart
+        ticker={snapshot.ticker}
+        currency={snapshot.currency}
+      />
 
       <section
         className={styles.metrics}

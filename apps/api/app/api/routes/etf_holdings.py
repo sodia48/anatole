@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
+from app.schemas.etf_history import (
+    EtfHistoryRange,
+    EtfHistorySnapshot,
+)
 from app.schemas.etf_holdings import (
     EtfHoldingsSnapshot,
+)
+from app.services.etf_history import (
+    etf_history_service,
 )
 from app.services.etf_holdings import (
     DEFAULT_HOLDING_LIMIT,
@@ -40,5 +47,32 @@ async def etf_holdings(
     return await etf_holdings_service.snapshot(
         ticker,
         limit=limit,
+        force_refresh=refresh,
+    )
+
+
+@router.get(
+    "/{ticker}/history",
+    response_model=EtfHistorySnapshot,
+    summary=(
+        "Progression historique d'un ETF pour une période sélectionnée"
+    ),
+)
+async def etf_history(
+    ticker: str,
+    range: EtfHistoryRange = Query(  # noqa: A002
+        default="1y",
+        description=(
+            "Période : 5d, 1mo, ytd, 6mo, 1y, 5y ou 10y."
+        ),
+    ),
+    refresh: bool = Query(
+        default=False,
+        description="Ignore le cache de l'historique.",
+    ),
+) -> EtfHistorySnapshot:
+    return await etf_history_service.snapshot(
+        ticker,
+        range,
         force_refresh=refresh,
     )
