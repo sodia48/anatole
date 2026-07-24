@@ -13,6 +13,7 @@ import {
   type InsiderSnapshot,
   type InsiderTransactionType,
   type IpoInstrumentType,
+  type IpoItem,
   type IpoSnapshot,
   getInsiderSnapshot,
   getIpoSnapshot,
@@ -128,6 +129,65 @@ function formatMoney(
         ? 2
         : 0,
   }).format(value);
+}
+
+function formatIpoPrice(
+  item: IpoItem,
+): string {
+  const currency =
+    item.offer_currency ||
+    (item.country === "Canada"
+      ? "CAD"
+      : "USD");
+
+  const format = (value: number): string =>
+    new Intl.NumberFormat("fr-CA", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+
+  if (
+    item.offer_price_status === "range" &&
+    item.offer_price_low !== null &&
+    item.offer_price_high !== null
+  ) {
+    return `${format(item.offer_price_low)} – ${format(
+      item.offer_price_high,
+    )}`;
+  }
+
+  if (
+    item.offer_price !== null &&
+    (item.offer_price_status === "final" ||
+      item.offer_price_status === "reference")
+  ) {
+    const prefix =
+      item.offer_price_status === "reference"
+        ? "≈ "
+        : "";
+    return `${prefix}${format(item.offer_price)}`;
+  }
+
+  return "Non publié";
+}
+
+function ipoPriceCaption(item: IpoItem): string {
+  if (item.offer_price_status === "range") {
+    return "Fourchette indicative";
+  }
+
+  if (item.offer_price_status === "reference") {
+    return "Prix de référence";
+  }
+
+  if (item.offer_price_status === "final") {
+    return "Prix IPO final";
+  }
+
+  return "Prix IPO";
 }
 
 function sourceClass(
@@ -766,6 +826,31 @@ export function IpoInsidersClient({
 
                       <div
                         className={
+                          item.offer_price_status ===
+                          "not_published"
+                            ? `${styles.priceBlock} ${styles.priceUnavailable}`
+                            : styles.priceBlock
+                        }
+                      >
+                        <span>
+                          {ipoPriceCaption(item)}
+                        </span>
+                        <strong>
+                          {formatIpoPrice(item)}
+                        </strong>
+                        <small>
+                          {item.offer_price_status ===
+                          "not_published"
+                            ? "Le prospectus ne publie pas encore de prix."
+                            : item.offer_price_status ===
+                                "range"
+                              ? "Le prix final peut encore changer."
+                              : "Prix extrait du document officiel."}
+                        </small>
+                      </div>
+
+                      <div
+                        className={
                           styles.confidence
                         }
                       >
@@ -815,6 +900,7 @@ export function IpoInsidersClient({
 
                         <a
                           href={
+                            item.price_source_url ??
                             item.source_url
                           }
                           target="_blank"

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 
 IpoInstrumentType = Literal["company", "etf", "cdr", "fund", "other"]
+IpoPriceStatus = Literal["final", "range", "reference", "not_published"]
 
 
 class IpoItem(BaseModel):
@@ -29,6 +30,13 @@ class IpoItem(BaseModel):
     official: bool = True
     confidence_score: int = Field(ge=0, le=100)
     focus_available: bool = False
+    offer_price: float | None = None
+    offer_price_low: float | None = None
+    offer_price_high: float | None = None
+    offer_currency: str = ""
+    offer_price_status: IpoPriceStatus = "not_published"
+    offer_price_label: str = "Prix non publié"
+    price_source_url: str | None = None
 
 
 class IpoSourceStatus(BaseModel):

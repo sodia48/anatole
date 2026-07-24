@@ -258,7 +258,7 @@
 }
 
 .ipoCard {
-  min-height: 285px;
+  min-height: 335px;
   display: grid;
   align-content: start;
   gap: 14px;
@@ -343,6 +343,47 @@
 .eventLine strong {
   color: #eaf5fa;
   font-size: 11px;
+}
+
+.priceBlock {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  padding: 12px 13px;
+  border: 1px solid rgba(32, 213, 166, 0.28);
+  border-radius: 11px;
+  background: rgba(32, 213, 166, 0.07);
+}
+
+.priceBlock span {
+  color: #83b3cd;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.priceBlock strong {
+  color: #31dfb0;
+  font-size: 16px;
+  line-height: 1;
+  text-align: right;
+}
+
+.priceBlock small {
+  grid-column: 1 / -1;
+  color: #6f9eb9;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.priceUnavailable {
+  border-color: rgba(111, 158, 185, 0.18);
+  background: rgba(111, 158, 185, 0.05);
+}
+
+.priceUnavailable strong {
+  color: #7c9cad;
 }
 
 .confidence {

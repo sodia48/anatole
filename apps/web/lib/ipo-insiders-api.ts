@@ -28,6 +28,17 @@ export type IpoItem = {
   official: boolean;
   confidence_score: number;
   focus_available: boolean;
+  offer_price: number | null;
+  offer_price_low: number | null;
+  offer_price_high: number | null;
+  offer_currency: string;
+  offer_price_status:
+    | "final"
+    | "range"
+    | "reference"
+    | "not_published";
+  offer_price_label: string;
+  price_source_url: string | null;
 };
 
 export type IpoSnapshot = {
