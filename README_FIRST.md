@@ -1,47 +1,30 @@
-# Anatole — Emergency Fix v4.2.1
+# Anatole — Search Fix v4.2.2
 
-Ce correctif restaure le shell Anatole et conserve la nouvelle heatmap ETF.
+Ce correctif rend le bouton **Recherche** réellement fonctionnel sur mobile et ordinateur.
 
-## Cause visible sur la capture
+## Ce qui est corrigé
 
-La barre mobile brute (`☰ Anatole Cockpit 🔍`) et l'en-tête du tiroir apparaissent sur ordinateur uniquement lorsque la couche `apps/web/app/mobile.css` n'est plus chargée correctement, a été écrasée, ou reste servie depuis un cache incohérent.
+- le bouton loupe ouvre maintenant une vraie fenêtre de recherche;
+- le bouton « Rechercher » dans la barre latérale ouvre la même fenêtre;
+- `Ctrl + K` et `⌘ + K` ouvrent la recherche;
+- saisie d’un symbole comme `RY`, `SHOP` ou `MDA` → ouverture directe de la page Focus;
+- recherche des sections : Cockpit, Screener, Actualités, Calendrier, ETF, IPO & insiders, Psychologie, Watchlist et Préférences;
+- navigation clavier avec ↑, ↓ et Entrée;
+- fermeture avec Échap, le bouton X ou un clic à l’extérieur.
 
-La heatmap ETF n'est pas la cause directe de cet écran.
+## Fichiers à remplacer
 
-## Remplacement exact
-
-Copier le contenu du dossier `apps/` à la racine du dépôt et remplacer les fichiers existants :
-
-- `apps/web/app/layout.tsx`
-- `apps/web/app/providers.tsx`
-- `apps/web/app/mobile.css`
 - `apps/web/components/layout/AppSidebar.tsx`
-- `apps/web/components/layout/AppSidebarGuard.module.css` (nouveau)
-- `apps/web/components/etf/EtfHeatmap.tsx`
-- `apps/web/components/etf/EtfHeatmap.module.css`
+- `apps/web/components/layout/AppSidebarGuard.module.css`
 
-Ne renommer aucun fichier et ne déplacer aucun `.module.css` dans `apps/web/app`.
-
-## Vérification avant déploiement
-
-Dans `apps/web/app/layout.tsx`, l'ordre doit rester :
-
-```ts
-import "./globals.css";
-import "./mobile.css";
-```
-
-Dans `EtfHeatmap.tsx`, l'import doit rester :
-
-```ts
-import styles from "./EtfHeatmap.module.css";
-```
+Les autres fichiers du ZIP sont repris de la version d’urgence v4.2.1 afin de permettre une installation complète si nécessaire.
 
 ## Déploiement
 
-1. Commit et push.
-2. Vercel → Redeploy.
-3. Désactiver `Use existing Build Cache`.
-4. Après le déploiement, faire un rechargement forcé du navigateur.
+1. Copier le dossier `apps/` à la racine du dépôt.
+2. Commit et push.
+3. Vercel → Redeploy.
+4. Désactiver `Use existing Build Cache`.
+5. Rechargement forcé du navigateur.
 
-Aucun changement Render ou FastAPI.
+Aucun changement Render ou FastAPI n’est requis.

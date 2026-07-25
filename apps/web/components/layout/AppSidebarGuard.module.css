@@ -1,12 +1,237 @@
 /*
  * Structural safety net for AppSidebar.
- * It prevents mobile-only controls from leaking into desktop even if the
- * global mobile stylesheet is temporarily missing or stale in a deployment.
+ * Mobile-only controls remain hidden on desktop even if global CSS is stale.
  */
 .mobileAppbar,
 .mobileBackdrop,
 .mobileDrawerHeading {
   display: none;
+}
+
+.searchBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: grid;
+  place-items: start center;
+  padding: clamp(72px, 12vh, 130px) 20px 24px;
+  overflow-y: auto;
+  background: rgba(0, 5, 10, .76);
+  backdrop-filter: blur(12px) saturate(1.08);
+  -webkit-backdrop-filter: blur(12px) saturate(1.08);
+}
+
+.searchDialog {
+  width: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(64, 111, 140, .72);
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      circle at 95% 0%,
+      rgba(34, 111, 166, .21),
+      transparent 42%
+    ),
+    linear-gradient(
+      150deg,
+      rgba(9, 27, 40, .995),
+      rgba(4, 15, 24, .995)
+    );
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, .58),
+    inset 0 1px 0 rgba(255, 255, 255, .04);
+}
+
+.searchHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 20px 14px;
+}
+
+.searchHeader > div {
+  min-width: 0;
+}
+
+.searchHeader span {
+  color: #5f91ae;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.searchHeader h2 {
+  margin: 6px 0 0;
+  color: #edf7fd;
+  font-size: clamp(21px, 4vw, 28px);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+}
+
+.searchClose {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(62, 108, 135, .72);
+  border-radius: 12px;
+  background: rgba(10, 32, 46, .94);
+  color: #dfeef7;
+  cursor: pointer;
+}
+
+.searchField {
+  min-height: 54px;
+  margin: 0 20px 12px;
+  padding: 0 14px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(61, 111, 140, .82);
+  border-radius: 15px;
+  background: rgba(3, 15, 24, .88);
+  color: #7da2b8;
+  box-shadow: 0 0 0 3px rgba(45, 118, 255, .06);
+}
+
+.searchField:focus-within {
+  border-color: rgba(69, 151, 255, .94);
+  box-shadow: 0 0 0 3px rgba(45, 118, 255, .14);
+}
+
+.searchField input {
+  width: 100%;
+  min-width: 0;
+  height: 50px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #eef8ff;
+  font: inherit;
+  font-size: 15px;
+}
+
+.searchField input::placeholder {
+  color: #577b91;
+}
+
+.searchField input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.searchField kbd {
+  padding: 4px 7px;
+  border: 1px solid rgba(67, 110, 135, .58);
+  border-radius: 7px;
+  color: #6f93a9;
+  font-size: 9px;
+  font-family: inherit;
+}
+
+.searchResults {
+  max-height: min(440px, 54vh);
+  margin: 0 10px;
+  padding: 0 10px;
+  display: grid;
+  gap: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.searchResult {
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  background: transparent;
+  color: #dcebf4;
+  cursor: pointer;
+  text-align: left;
+}
+
+.searchResult:hover,
+.searchResultActive {
+  border-color: rgba(62, 125, 163, .54);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(31, 103, 149, .28),
+      rgba(11, 42, 61, .86)
+    );
+}
+
+.searchResultIcon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(61, 112, 141, .55);
+  border-radius: 11px;
+  background: rgba(8, 30, 44, .88);
+  color: #8cc5ef;
+}
+
+.searchResult > span:nth-child(2) {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.searchResult strong {
+  overflow: hidden;
+  color: #edf7fd;
+  font-size: 13px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResult small {
+  overflow: hidden;
+  color: #6e94aa;
+  font-size: 9px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchResultArrow {
+  color: #4b758d;
+  font-size: 18px;
+}
+
+.searchResultActive .searchResultArrow {
+  color: #49a7ff;
+}
+
+.searchEmpty {
+  margin: 10px 0;
+  padding: 24px 16px;
+  border: 1px dashed rgba(61, 108, 135, .48);
+  border-radius: 14px;
+  color: #7898aa;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.searchHelp {
+  margin: 12px 20px 0;
+  padding: 12px 0 16px;
+  border-top: 1px solid rgba(48, 88, 112, .44);
+  color: #53788d;
+  font-size: 9px;
+  text-align: center;
 }
 
 @media (max-width: 820px) {
@@ -24,5 +249,49 @@
 
   .mobileDrawerHeading {
     display: flex;
+  }
+
+  .searchBackdrop {
+    align-items: start;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 78px)
+      10px
+      calc(env(safe-area-inset-bottom, 0px) + 14px);
+  }
+
+  .searchDialog {
+    width: 100%;
+    border-radius: 19px;
+  }
+
+  .searchHeader {
+    padding: 17px 15px 12px;
+  }
+
+  .searchHeader h2 {
+    max-width: 270px;
+    font-size: clamp(20px, 6vw, 26px);
+  }
+
+  .searchField {
+    margin: 0 12px 10px;
+  }
+
+  .searchResults {
+    max-height: min(470px, 55dvh);
+    margin-inline: 6px;
+    padding-inline: 6px;
+  }
+
+  .searchHelp {
+    margin-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .searchBackdrop,
+  .searchDialog,
+  .searchResult {
+    scroll-behavior: auto;
   }
 }

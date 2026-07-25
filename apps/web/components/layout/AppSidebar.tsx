@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-
-import guardStyles from "./AppSidebarGuard.module.css";
 import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -31,11 +34,21 @@ import {
   X,
 } from "lucide-react";
 
+import guardStyles from "./AppSidebarGuard.module.css";
+
 type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   available: boolean;
+};
+
+type SearchResult = {
+  key: string;
+  href: string;
+  label: string;
+  description: string;
+  icon: typeof LayoutDashboard;
 };
 
 const groups: Array<{
@@ -160,6 +173,19 @@ const groups: Array<{
   },
 ];
 
+const searchablePages: SearchResult[] =
+  groups.flatMap((group) =>
+    group.items
+      .filter((item) => item.available)
+      .map((item) => ({
+        key: `page:${item.href}`,
+        href: item.href,
+        label: item.label,
+        description: group.label,
+        icon: item.icon,
+      })),
+  );
+
 function isActive(
   pathname: string,
   item: NavItem,
@@ -212,17 +238,25 @@ function mobileSectionFromPath(
   return firstSegment || "cockpit";
 }
 
-function openSearchFallback(): void {
-  window.dispatchEvent(
-    new CustomEvent("anatole:open-search"),
-  );
+function normalizeSearch(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
 
-  const candidate =
-    document.querySelector<HTMLInputElement>(
-      'input[placeholder*="Rechercher"], input[type="search"]',
-    );
+function tickerFromQuery(value: string): string | null {
+  const ticker = value
+    .trim()
+    .toUpperCase()
+    .replace(/\.TO$/i, "");
 
-  candidate?.focus();
+  if (!/^[A-Z0-9.-]{1,12}$/.test(ticker)) {
+    return null;
+  }
+
+  return ticker;
 }
 
 export function AppSidebar({
@@ -231,8 +265,17 @@ export function AppSidebar({
   onOpenSearch?: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchInputRef =
+    useRef<HTMLInputElement | null>(null);
   const [drawerOpen, setDrawerOpen] =
     useState(false);
+  const [searchOpen, setSearchOpen] =
+    useState(false);
+  const [searchQuery, setSearchQuery] =
+    useState("");
+  const [activeResult, setActiveResult] =
+    useState(0);
 
   const mobileSection = useMemo(
     () => mobileSectionFromPath(pathname),
@@ -242,8 +285,7 @@ export function AppSidebar({
   const activeLabel = useMemo(() => {
     for (const group of groups) {
       const active = group.items.find(
-        (item) =>
-          isActive(pathname, item),
+        (item) => isActive(pathname, item),
       );
 
       if (active) {
@@ -254,8 +296,40 @@ export function AppSidebar({
     return "Anatole";
   }, [pathname]);
 
+  const searchResults = useMemo(() => {
+    const normalizedQuery =
+      normalizeSearch(searchQuery);
+
+    const pages = normalizedQuery
+      ? searchablePages.filter((item) =>
+          normalizeSearch(
+            `${item.label} ${item.description}`,
+          ).includes(normalizedQuery),
+        )
+      : searchablePages;
+
+    const ticker = tickerFromQuery(searchQuery);
+    const directResult: SearchResult[] = ticker
+      ? [
+          {
+            key: `ticker:${ticker}`,
+            href: `/focus/${encodeURIComponent(
+              ticker,
+            )}`,
+            label: `Analyser ${ticker}`,
+            description: "Ouvrir la fiche Focus",
+            icon: BarChart3,
+          },
+        ]
+      : [];
+
+    return [...directResult, ...pages].slice(0, 12);
+  }, [searchQuery]);
+
   useEffect(() => {
     setDrawerOpen(false);
+    setSearchOpen(false);
+    setSearchQuery("");
   }, [pathname]);
 
   useEffect(() => {
@@ -266,8 +340,8 @@ export function AppSidebar({
 
     return () => {
       if (
-        document.body.dataset
-          .anatolePath === pathname
+        document.body.dataset.anatolePath ===
+        pathname
       ) {
         delete document.body.dataset
           .anatoleSection;
@@ -278,9 +352,12 @@ export function AppSidebar({
   }, [mobileSection, pathname]);
 
   useEffect(() => {
+    const overlayOpen =
+      drawerOpen || searchOpen;
+
     document.body.classList.toggle(
       "anatole-drawer-open",
-      drawerOpen,
+      overlayOpen,
     );
 
     return () => {
@@ -288,7 +365,7 @@ export function AppSidebar({
         "anatole-drawer-open",
       );
     };
-  }, [drawerOpen]);
+  }, [drawerOpen, searchOpen]);
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -315,18 +392,108 @@ export function AppSidebar({
       );
   }, [drawerOpen]);
 
-  function openSearch(): void {
-    setDrawerOpen(false);
+  useEffect(() => {
+    const openWithShortcut = (
+      event: KeyboardEvent,
+    ) => {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "k"
+      ) {
+        event.preventDefault();
+        setDrawerOpen(false);
+        setSearchOpen(true);
+      }
+    };
 
-    if (onOpenSearch) {
-      onOpenSearch();
+    window.addEventListener(
+      "keydown",
+      openWithShortcut,
+    );
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        openWithShortcut,
+      );
+  }, []);
+
+  useEffect(() => {
+    if (!searchOpen) {
       return;
     }
 
-    window.setTimeout(
-      openSearchFallback,
-      50,
+    const frame = window.requestAnimationFrame(
+      () => {
+        searchInputRef.current?.focus();
+      },
     );
+
+    return () =>
+      window.cancelAnimationFrame(frame);
+  }, [searchOpen]);
+
+  useEffect(() => {
+    setActiveResult(0);
+  }, [searchQuery]);
+
+  function openSearch(): void {
+    setDrawerOpen(false);
+    setSearchOpen(true);
+    onOpenSearch?.();
+  }
+
+  function closeSearch(): void {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setActiveResult(0);
+  }
+
+  function chooseResult(
+    result: SearchResult,
+  ): void {
+    closeSearch();
+    router.push(result.href);
+  }
+
+  function handleSearchKeyDown(
+    event: ReactKeyboardEvent<HTMLInputElement>,
+  ): void {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSearch();
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveResult((current) =>
+        searchResults.length
+          ? (current + 1) % searchResults.length
+          : 0,
+      );
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveResult((current) =>
+        searchResults.length
+          ? (current - 1 + searchResults.length) %
+            searchResults.length
+          : 0,
+      );
+      return;
+    }
+
+    if (event.key === "Enter") {
+      const result = searchResults[activeResult];
+
+      if (result) {
+        event.preventDefault();
+        chooseResult(result);
+      }
+    }
   }
 
   return (
@@ -340,9 +507,7 @@ export function AppSidebar({
           aria-label="Ouvrir le menu Anatole"
           aria-controls="anatole-sidebar"
           aria-expanded={drawerOpen}
-          onClick={() =>
-            setDrawerOpen(true)
-          }
+          onClick={() => setDrawerOpen(true)}
         >
           <Menu size={21} />
         </button>
@@ -365,6 +530,8 @@ export function AppSidebar({
           type="button"
           className="mobile-appbar-button"
           aria-label="Rechercher dans Anatole"
+          aria-haspopup="dialog"
+          aria-expanded={searchOpen}
           onClick={openSearch}
         >
           <Search size={20} />
@@ -376,17 +543,134 @@ export function AppSidebar({
         className={`mobile-sidebar-backdrop ${guardStyles.mobileBackdrop}`}
         aria-label="Fermer le menu"
         hidden={!drawerOpen}
-        onClick={() =>
-          setDrawerOpen(false)
-        }
+        onClick={() => setDrawerOpen(false)}
       />
+
+      {searchOpen ? (
+        <div
+          className={guardStyles.searchBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeSearch();
+            }
+          }}
+        >
+          <section
+            className={guardStyles.searchDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="anatole-search-title"
+          >
+            <div className={guardStyles.searchHeader}>
+              <div>
+                <span>RECHERCHE ANATOLE</span>
+                <h2 id="anatole-search-title">
+                  Trouver une section ou un titre
+                </h2>
+              </div>
+              <button
+                type="button"
+                className={guardStyles.searchClose}
+                aria-label="Fermer la recherche"
+                onClick={closeSearch}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <label
+              className={guardStyles.searchField}
+            >
+              <Search size={20} />
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                placeholder="Ex. RY, SHOP, ETF, Psychologie…"
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) =>
+                  setSearchQuery(event.target.value)
+                }
+                onKeyDown={handleSearchKeyDown}
+              />
+              <kbd>Esc</kbd>
+            </label>
+
+            <div
+              className={guardStyles.searchResults}
+              role="listbox"
+              aria-label="Résultats de recherche"
+            >
+              {searchResults.length ? (
+                searchResults.map((result, index) => {
+                  const Icon = result.icon;
+                  const active =
+                    index === activeResult;
+
+                  return (
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      className={`${guardStyles.searchResult} ${
+                        active
+                          ? guardStyles.searchResultActive
+                          : ""
+                      }`}
+                      key={result.key}
+                      onMouseEnter={() =>
+                        setActiveResult(index)
+                      }
+                      onClick={() =>
+                        chooseResult(result)
+                      }
+                    >
+                      <span
+                        className={
+                          guardStyles.searchResultIcon
+                        }
+                      >
+                        <Icon size={19} />
+                      </span>
+                      <span>
+                        <strong>{result.label}</strong>
+                        <small>
+                          {result.description}
+                        </small>
+                      </span>
+                      <span
+                        className={
+                          guardStyles.searchResultArrow
+                        }
+                        aria-hidden="true"
+                      >
+                        →
+                      </span>
+                    </button>
+                  );
+                })
+              ) : (
+                <p className={guardStyles.searchEmpty}>
+                  Aucun résultat. Saisis un symbole TSX,
+                  par exemple RY ou SHOP.
+                </p>
+              )}
+            </div>
+
+            <p className={guardStyles.searchHelp}>
+              ↑↓ pour naviguer · Entrée pour ouvrir ·
+              Ctrl/⌘ K pour rechercher
+            </p>
+          </section>
+        </div>
+      ) : null}
 
       <aside
         id="anatole-sidebar"
         className={`sidebar ${
-          drawerOpen
-            ? "is-mobile-open"
-            : ""
+          drawerOpen ? "is-mobile-open" : ""
         }`}
       >
         <div
@@ -395,18 +679,12 @@ export function AppSidebar({
           <Link
             href="/cockpit"
             className="mobile-drawer-brand"
-            onClick={() =>
-              setDrawerOpen(false)
-            }
+            onClick={() => setDrawerOpen(false)}
           >
-            <span className="brand-mark">
-              A
-            </span>
+            <span className="brand-mark">A</span>
             <span>
               <strong>anatole</strong>
-              <small>
-                Intelligence de marché
-              </small>
+              <small>Intelligence de marché</small>
             </span>
           </Link>
 
@@ -414,9 +692,7 @@ export function AppSidebar({
             type="button"
             className="mobile-drawer-close"
             aria-label="Fermer le menu Anatole"
-            onClick={() =>
-              setDrawerOpen(false)
-            }
+            onClick={() => setDrawerOpen(false)}
           >
             <X size={21} />
           </button>
@@ -427,9 +703,7 @@ export function AppSidebar({
           className="brand desktop-brand"
           aria-label="Anatole"
         >
-          <span className="brand-mark">
-            A
-          </span>
+          <span className="brand-mark">A</span>
           <span>anatole</span>
           <small>beta</small>
         </Link>
@@ -437,6 +711,8 @@ export function AppSidebar({
         <button
           className="sidebar-search"
           type="button"
+          aria-haspopup="dialog"
+          aria-expanded={searchOpen}
           onClick={openSearch}
         >
           <Search size={17} />
@@ -457,48 +733,36 @@ export function AppSidebar({
                 {group.label}
               </span>
 
-              {group.items.map(
-                (item) => {
-                  const Icon =
-                    item.icon;
-                  const active =
-                    isActive(
-                      pathname,
-                      item,
-                    );
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(
+                  pathname,
+                  item,
+                );
 
-                  return (
-                    <Link
-                      key={item.label}
-                      href={item.href}
-                      onClick={() =>
-                        setDrawerOpen(
-                          false,
-                        )
-                      }
-                      className={`nav-item ${
-                        active
-                          ? "is-active"
-                          : ""
-                      } ${
-                        item.available
-                          ? ""
-                          : "is-planned"
-                      }`}
-                    >
-                      <Icon size={18} />
-                      <span>
-                        {item.label}
-                      </span>
-                      {!item.available ? (
-                        <em>
-                          Bientôt
-                        </em>
-                      ) : null}
-                    </Link>
-                  );
-                },
-              )}
+                return (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    onClick={() =>
+                      setDrawerOpen(false)
+                    }
+                    className={`nav-item ${
+                      active ? "is-active" : ""
+                    } ${
+                      item.available
+                        ? ""
+                        : "is-planned"
+                    }`}
+                  >
+                    <Icon size={18} />
+                    <span>{item.label}</span>
+                    {!item.available ? (
+                      <em>Bientôt</em>
+                    ) : null}
+                  </Link>
+                );
+              })}
             </section>
           ))}
         </nav>
@@ -512,9 +776,7 @@ export function AppSidebar({
           <Link href="/roadmap">
             Migration Anatole v0.5
           </Link>
-          <span>
-            Next.js · FastAPI
-          </span>
+          <span>Next.js · FastAPI</span>
         </div>
       </aside>
     </>
