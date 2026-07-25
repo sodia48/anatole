@@ -1,16 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import {
   type ChangeEvent,
   type CSSProperties,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
-import Link from "next/link";
 
-import styles from "../cockpit/MarketHeatmap.module.css";
+import styles from "./EtfHeatmap.module.css";
 
 export type EtfHeatmapItem = {
   ticker: string;
@@ -25,6 +24,14 @@ export type EtfHeatmapItem = {
   currency: string;
   delayed: boolean;
   source: string;
+};
+
+type RawItem = Partial<EtfHeatmapItem> & {
+  symbol?: unknown;
+  issuer?: unknown;
+  category?: unknown;
+  description?: unknown;
+  change_percent?: unknown;
 };
 
 type GroupingMode =
@@ -55,6 +62,21 @@ type WeightedItem<T> = {
 type PositionedItem<T> = {
   item: T;
   rect: Rect;
+};
+
+type Viewport = {
+  width: number;
+  height: number;
+};
+
+const DESKTOP_VIEWPORT: Viewport = {
+  width: 1200,
+  height: 690,
+};
+
+const MOBILE_VIEWPORT: Viewport = {
+  width: 760,
+  height: 1150,
 };
 
 const MIN_WEIGHT = 0.65;
@@ -107,7 +129,17 @@ function clamp(
   );
 }
 
-function finiteNumber(
+function textValue(
+  value: unknown,
+  fallback = "",
+): string {
+  return typeof value === "string" &&
+    value.trim()
+    ? value.trim()
+    : fallback;
+}
+
+function numberValue(
   value: unknown,
   fallback = 0,
 ): number {
@@ -124,13 +156,17 @@ function finiteNumber(
 }
 
 function normalizeItem(
-  raw: EtfHeatmapItem,
+  raw: unknown,
 ): EtfHeatmapItem | null {
-  const ticker = String(
-    raw.ticker ?? "",
-  )
-    .trim()
-    .toUpperCase();
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const item = raw as RawItem;
+  const ticker = textValue(
+    item.ticker,
+    textValue(item.symbol),
+  ).toUpperCase();
 
   if (!ticker) {
     return null;
@@ -138,36 +174,43 @@ function normalizeItem(
 
   return {
     ticker,
-    name:
-      String(raw.name ?? "").trim() ||
-      ticker,
-    provider:
-      String(raw.provider ?? "").trim() ||
-      "Autres fournisseurs",
-    sector:
-      String(raw.sector ?? "").trim() ||
-      "Autres expositions",
-    exposure:
-      String(raw.exposure ?? "").trim(),
-    region:
-      String(raw.region ?? "").trim(),
+    name: textValue(item.name, ticker),
+    provider: textValue(
+      item.provider,
+      textValue(
+        item.issuer,
+        "Autres fournisseurs",
+      ),
+    ),
+    sector: textValue(
+      item.sector,
+      textValue(
+        item.category,
+        "Autres expositions",
+      ),
+    ),
+    exposure: textValue(
+      item.exposure,
+      textValue(item.description),
+    ),
+    region: textValue(item.region),
     price: Math.max(
-      finiteNumber(raw.price),
+      numberValue(item.price),
       0,
     ),
-    changePercent: finiteNumber(
-      raw.changePercent,
+    changePercent: numberValue(
+      item.changePercent,
+      numberValue(item.change_percent),
     ),
     volume: Math.max(
-      finiteNumber(raw.volume),
+      numberValue(item.volume),
       0,
     ),
     currency:
-      String(raw.currency ?? "CAD")
-        .trim()
-        .toUpperCase() || "CAD",
-    delayed: Boolean(raw.delayed),
-    source: String(raw.source ?? "").trim(),
+      textValue(item.currency, "CAD")
+        .toUpperCase(),
+    delayed: Boolean(item.delayed),
+    source: textValue(item.source),
   };
 }
 
@@ -258,7 +301,8 @@ function buildGroups(
       },
       {
         key: "unchanged",
-        label: "Inchangés / sans cotation",
+        label:
+          "Inchangés / sans cotation",
         items: items.filter(
           (item) =>
             item.price <= 0 ||
@@ -394,10 +438,13 @@ function binaryTreemap<T>(
       Math.max(entry.weight, 0.001),
     0,
   );
-  const ratio =
+  const ratio = clamp(
     totalWeight > 0
       ? firstTotal / totalWeight
-      : 0.5;
+      : 0.5,
+    0.025,
+    0.975,
+  );
 
   if (rect.width >= rect.height) {
     const firstWidth =
@@ -526,29 +573,34 @@ function shortGroupLabel(
 
 function detailLevel(
   rect: Rect,
+  viewport: Viewport,
 ): 0 | 1 | 2 | 3 {
-  const area =
-    rect.width * rect.height;
+  const widthRatio =
+    rect.width / viewport.width;
+  const heightRatio =
+    rect.height / viewport.height;
+  const areaRatio =
+    widthRatio * heightRatio;
 
   if (
-    rect.width < 28 ||
-    rect.height < 22
+    widthRatio < 0.035 ||
+    heightRatio < 0.022
   ) {
     return 0;
   }
 
   if (
-    rect.width < 52 ||
-    rect.height < 36 ||
-    area < 2300
+    widthRatio < 0.07 ||
+    heightRatio < 0.04 ||
+    areaRatio < 0.003
   ) {
     return 1;
   }
 
   if (
-    rect.width < 92 ||
-    rect.height < 60 ||
-    area < 5400
+    widthRatio < 0.13 ||
+    heightRatio < 0.075 ||
+    areaRatio < 0.008
   ) {
     return 2;
   }
@@ -556,24 +608,73 @@ function detailLevel(
   return 3;
 }
 
+function percent(
+  value: number,
+  total: number,
+): string {
+  if (total <= 0) {
+    return "0%";
+  }
+
+  return `${(
+    (value / total) * 100
+  ).toFixed(5)}%`;
+}
+
+function useTreemapViewport(): Viewport {
+  const [viewport, setViewport] =
+    useState<Viewport>(
+      DESKTOP_VIEWPORT,
+    );
+
+  useEffect(() => {
+    const media = window.matchMedia(
+      "(max-width: 820px)",
+    );
+
+    const update = () => {
+      setViewport(
+        media.matches
+          ? MOBILE_VIEWPORT
+          : DESKTOP_VIEWPORT,
+      );
+    };
+
+    update();
+
+    if (media.addEventListener) {
+      media.addEventListener(
+        "change",
+        update,
+      );
+
+      return () =>
+        media.removeEventListener(
+          "change",
+          update,
+        );
+    }
+
+    media.addListener(update);
+
+    return () =>
+      media.removeListener(update);
+  }, []);
+
+  return viewport;
+}
+
 export function EtfHeatmap({
   items,
 }: {
-  items: EtfHeatmapItem[];
+  items: readonly unknown[];
 }) {
   const [grouping, setGrouping] =
     useState<GroupingMode>("sector");
   const [expandedGroup, setExpandedGroup] =
     useState<string | null>(null);
-  const canvasRef =
-    useRef<HTMLDivElement | null>(
-      null,
-    );
-  const [canvasSize, setCanvasSize] =
-    useState({
-      width: 0,
-      height: 0,
-    });
+  const viewport =
+    useTreemapViewport();
 
   const normalizedItems = useMemo(
     () =>
@@ -601,31 +702,6 @@ export function EtfHeatmap({
     setExpandedGroup(null);
   }, [grouping]);
 
-  useEffect(() => {
-    const element = canvasRef.current;
-
-    if (!element) {
-      return;
-    }
-
-    const update = () => {
-      setCanvasSize({
-        width: element.clientWidth,
-        height: element.clientHeight,
-      });
-    };
-
-    update();
-
-    const observer =
-      new ResizeObserver(update);
-
-    observer.observe(element);
-
-    return () =>
-      observer.disconnect();
-  }, []);
-
   const visibleGroups = useMemo(() => {
     if (!expandedGroup) {
       return groups;
@@ -638,13 +714,6 @@ export function EtfHeatmap({
   }, [expandedGroup, groups]);
 
   const positionedGroups = useMemo(() => {
-    const { width, height } =
-      canvasSize;
-
-    if (width <= 0 || height <= 0) {
-      return [];
-    }
-
     const outerPadding = 4;
     const gap = 3;
     const groupLayout = binaryTreemap(
@@ -656,9 +725,11 @@ export function EtfHeatmap({
         x: outerPadding,
         y: outerPadding,
         width:
-          width - outerPadding * 2,
+          viewport.width -
+          outerPadding * 2,
         height:
-          height - outerPadding * 2,
+          viewport.height -
+          outerPadding * 2,
       },
     );
 
@@ -678,7 +749,9 @@ export function EtfHeatmap({
         };
         const headerHeight = clamp(
           groupRect.height * 0.15,
-          26,
+          viewport === MOBILE_VIEWPORT
+            ? 24
+            : 26,
           40,
         );
         const bodyRect = {
@@ -731,9 +804,7 @@ export function EtfHeatmap({
         };
       },
     );
-  }, [canvasSize, visibleGroups]);
-
-
+  }, [viewport, visibleGroups]);
 
   if (normalizedItems.length === 0) {
     return (
@@ -824,9 +895,9 @@ export function EtfHeatmap({
       </div>
 
       <div
-        ref={canvasRef}
         className={styles.treemap}
         aria-label={`Carte de ${normalizedItems.length} ETF canadiens`}
+        data-layout-ready="true"
       >
         {positionedGroups.map(
           ({
@@ -836,8 +907,31 @@ export function EtfHeatmap({
             tiles,
           }) => {
             const compactHeader =
-              rect.width < 120 ||
-              rect.height < 82;
+              rect.width /
+                viewport.width <
+                0.16 ||
+              rect.height /
+                viewport.height <
+                0.075;
+
+            const groupStyle = {
+              left: percent(
+                rect.x,
+                viewport.width,
+              ),
+              top: percent(
+                rect.y,
+                viewport.height,
+              ),
+              width: percent(
+                rect.width,
+                viewport.width,
+              ),
+              height: percent(
+                rect.height,
+                viewport.height,
+              ),
+            } as CSSProperties;
 
             return (
               <article
@@ -848,14 +942,7 @@ export function EtfHeatmap({
                     : "false"
                 }
                 key={group.key}
-                style={
-                  {
-                    left: rect.x,
-                    top: rect.y,
-                    width: rect.width,
-                    height: rect.height,
-                  } as CSSProperties
-                }
+                style={groupStyle}
               >
                 <button
                   type="button"
@@ -863,7 +950,11 @@ export function EtfHeatmap({
                     styles.groupHeader
                   }
                   style={{
-                    height: headerHeight,
+                    height: percent(
+                      headerHeight,
+                      rect.height,
+                    ),
+                    minHeight: 0,
                   }}
                   onClick={() =>
                     setExpandedGroup(
@@ -899,17 +990,34 @@ export function EtfHeatmap({
                 {tiles.map(
                   ({ item, rect: tileRect }) => {
                     const detail =
-                      detailLevel(tileRect);
+                      detailLevel(
+                        tileRect,
+                        viewport,
+                      );
+                    const relativeX =
+                      tileRect.x - rect.x;
+                    const relativeY =
+                      tileRect.y - rect.y;
                     const relativeStyle = {
-                      left:
-                        tileRect.x - rect.x,
-                      top:
-                        tileRect.y - rect.y,
-                      width: tileRect.width,
-                      height: tileRect.height,
+                      left: percent(
+                        relativeX,
+                        rect.width,
+                      ),
+                      top: percent(
+                        relativeY,
+                        rect.height,
+                      ),
+                      width: percent(
+                        tileRect.width,
+                        rect.width,
+                      ),
+                      height: percent(
+                        tileRect.height,
+                        rect.height,
+                      ),
                       background:
                         tileBackground(item),
-                    };
+                    } as CSSProperties;
                     const accessibleLabel = `${item.ticker}, ${item.name}, ${formatItemChange(
                       item,
                     )}`;
