@@ -1,0 +1,16 @@
+ANATOLE SIGNATURE MOBILE v3.1 — HOTFIX TYPESCRIPT
+
+Cause corrigée :
+React 19 / TypeScript strict exige que null soit inclus dans le type
+d’une référence initialisée avec null.
+
+Ancien code :
+useRef<HTMLDivElement>(null)
+
+Nouveau code :
+useRef<HTMLDivElement | null>(null)
+
+Fichier à remplacer :
+apps/web/components/cockpit/MarketHeatmap.tsx
+
+Si la version v3 est déjà installée, seul ce fichier doit être remplacé.

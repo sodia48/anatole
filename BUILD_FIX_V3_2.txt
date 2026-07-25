@@ -1,0 +1,46 @@
+ANATOLE SIGNATURE MOBILE v3.2 — BUILD SAFE
+==========================================
+
+ERREUR CORRIGÉE
+
+La page /preferences était pré-rendue sans PreferencesProvider :
+
+    Error: usePreferences must be used inside PreferencesProvider
+
+CORRECTION
+
+1. apps/web/app/providers.tsx
+   Nouveau composant client global qui monte PreferencesProvider.
+
+2. apps/web/app/layout.tsx
+   Le shell Anatole, la sidebar et toutes les pages sont maintenant placés
+   sous AppProviders. L’import de mobile.css et le viewport iPhone sont
+   conservés.
+
+FICHIERS À AJOUTER / REMPLACER
+
+- AJOUTER :
+  apps/web/app/providers.tsx
+
+- REMPLACER :
+  apps/web/app/layout.tsx
+
+Les autres fichiers de Signature Mobile v3.1 sont inclus dans le ZIP complet.
+
+IMPORTANT
+
+Le dépôt doit déjà contenir :
+
+  apps/web/components/providers/PreferencesProvider.tsx
+
+C’est le provider existant utilisé par PreferencesForm et usePreferences.
+
+DÉPLOIEMENT
+
+1. Ajouter providers.tsx.
+2. Remplacer layout.tsx.
+3. Commit et push.
+4. Vercel → Redeploy.
+5. Désactiver Use existing Build Cache.
+
+Aucun changement Render/FastAPI n’est requis.

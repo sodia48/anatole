@@ -4,6 +4,7 @@ import type {
 } from "next";
 
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { AppProviders } from "./providers";
 
 import "./globals.css";
 import "./mobile.css";
@@ -37,12 +38,14 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
-        <div className="app-shell">
-          <AppSidebar />
-          <main className="app-main">
-            {children}
-          </main>
-        </div>
+        <AppProviders>
+          <div className="app-shell">
+            <AppSidebar />
+            <main className="app-main">
+              {children}
+            </main>
+          </div>
+        </AppProviders>
       </body>
     </html>
   );
