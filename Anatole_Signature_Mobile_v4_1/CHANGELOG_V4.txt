@@ -1,0 +1,24 @@
+ANATOLE SIGNATURE MOBILE v4
+============================
+
+OBJECTIF
+- Étendre la qualité mobile du Cockpit à toutes les sections Next.js.
+
+MODIFICATIONS
+- AppSidebar ajoute automatiquement data-anatole-section et data-anatole-path au body.
+- mobile.css contient maintenant des règles isolées par section.
+- Focus : modules, indicateurs, formulaires et graphiques en flux vertical.
+- Screener : filtres tactiles, KPI 2 x 2, résultats et actions adaptés.
+- Actualités : filtres, métriques, cartes et graphiques adaptés.
+- Calendrier : filtres, événements et grille mensuelle adaptés.
+- ETF : hero, statistiques, filtres et heatmap SVG adaptés.
+- IPO & insiders : onglets, cartes, contrôles et tableaux adaptés.
+- Psychologie : jauges, scores et filtres adaptés.
+- Watchlist : ajout de titre, cartes, métriques et actions adaptés.
+- Préférences : cartes de réglages et actions pleine largeur.
+- Roadmap : cartes et ancres adaptées à la barre mobile fixe.
+
+SÉCURITÉ DU BUILD
+- PreferencesProvider global conservé.
+- useRef<HTMLDivElement | null>(null) conservé dans MarketHeatmap.
+- Aucun changement API ou Render.

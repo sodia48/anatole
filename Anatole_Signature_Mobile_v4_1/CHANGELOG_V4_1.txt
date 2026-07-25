@@ -1,0 +1,21 @@
+ANATOLE SIGNATURE MOBILE v4.1
+============================
+
+PSYCHOLOGIE
+- Correction des pourcentages coupés ou renvoyés à la ligne.
+- Les quatre indicateurs conservent la grille 2 × 2 du Cockpit.
+- Valeur, unité et légende restent lisibles sans chevauchement.
+
+ETF
+- Suppression de la carte SVG fixe qui créait une grande zone vide.
+- Remplacement par la même architecture responsive que la heatmap du Cockpit.
+- La carte utilise toute la largeur et toute la hauteur disponibles.
+- Tous les ETF transmis au composant sont dessinés, sans limite 50/100.
+- Un seul sélecteur de regroupement, comme dans le Cockpit.
+- Clic sur un ETF vers /etf/[ticker].
+
+AUCUN CHANGEMENT
+- Backend FastAPI.
+- Render.
+- Données et filtres de la page ETF.
+- Version ordinateur des autres sections.
