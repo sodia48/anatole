@@ -1,12 +1,16 @@
 "use client";
 
 import {
+  type ChangeEvent,
   type CSSProperties,
-  type KeyboardEvent,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+import styles from "../cockpit/MarketHeatmap.module.css";
 
 export type EtfHeatmapItem = {
   ticker: string;
@@ -23,8 +27,10 @@ export type EtfHeatmapItem = {
   source: string;
 };
 
-type GroupingMode = "sector" | "provider" | "direction";
-type DensityMode = "100" | "all" | "50";
+type GroupingMode =
+  | "sector"
+  | "provider"
+  | "direction";
 
 type Group = {
   key: string;
@@ -32,8 +38,6 @@ type Group = {
   items: EtfHeatmapItem[];
   weight: number;
   changePercent: number;
-  advancers: number;
-  decliners: number;
 };
 
 type Rect = {
@@ -43,69 +47,173 @@ type Rect = {
   height: number;
 };
 
-type LayoutItem<T> = {
+type WeightedItem<T> = {
+  item: T;
+  weight: number;
+};
+
+type PositionedItem<T> = {
   item: T;
   rect: Rect;
 };
 
-const VIEW_WIDTH = 1200;
-const VIEW_HEIGHT = 690;
-const OUTER_GAP = 5;
-const GROUP_HEADER_HEIGHT = 25;
-const GROUP_INSET = 4;
 const MIN_WEIGHT = 0.65;
 
-const GROUPING_LABELS: Record<GroupingMode, string> = {
+const GROUPING_LABELS: Record<
+  GroupingMode,
+  string
+> = {
   sector: "Par secteur",
   provider: "Par fournisseur",
-  direction: "Gagnants / perdants",
+  direction: "Hausses / baisses",
 };
 
-const DENSITY_LABELS: Record<DensityMode, string> = {
-  "100": "100 plus liquides",
-  all: "Tous les ETF",
-  "50": "50 plus liquides",
-};
+const SHORT_GROUP_LABELS:
+  Record<string, string> = {
+    "Obligations et liquidités":
+      "Obligations",
+    "Marché américain": "États-Unis",
+    "Marché canadien": "Canada",
+    "International et émergents":
+      "International",
+    "Revenu amélioré et options":
+      "Revenu / options",
+    "Finance et dividendes":
+      "Finance",
+    "Portefeuilles tout-en-un":
+      "Tout-en-un",
+    "Immobilier, infrastructures et services publics":
+      "Immobilier / infra",
+    "Matériaux et métaux":
+      "Matériaux",
+    "Consommation et santé":
+      "Conso. / santé",
+    "Technologie et innovation":
+      "Technologie",
+    "Actifs numériques et matières premières":
+      "Actifs numériques",
+    "Énergie et ressources":
+      "Énergie",
+  };
 
 function clamp(
   value: number,
   minimum: number,
   maximum: number,
 ): number {
-  return Math.min(Math.max(value, minimum), maximum);
+  return Math.min(
+    Math.max(value, minimum),
+    maximum,
+  );
 }
 
-function liquidityWeight(item: EtfHeatmapItem): number {
+function finiteNumber(
+  value: unknown,
+  fallback = 0,
+): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number.parseFloat(value)
+        : Number.NaN;
+
+  return Number.isFinite(parsed)
+    ? parsed
+    : fallback;
+}
+
+function normalizeItem(
+  raw: EtfHeatmapItem,
+): EtfHeatmapItem | null {
+  const ticker = String(
+    raw.ticker ?? "",
+  )
+    .trim()
+    .toUpperCase();
+
+  if (!ticker) {
+    return null;
+  }
+
+  return {
+    ticker,
+    name:
+      String(raw.name ?? "").trim() ||
+      ticker,
+    provider:
+      String(raw.provider ?? "").trim() ||
+      "Autres fournisseurs",
+    sector:
+      String(raw.sector ?? "").trim() ||
+      "Autres expositions",
+    exposure:
+      String(raw.exposure ?? "").trim(),
+    region:
+      String(raw.region ?? "").trim(),
+    price: Math.max(
+      finiteNumber(raw.price),
+      0,
+    ),
+    changePercent: finiteNumber(
+      raw.changePercent,
+    ),
+    volume: Math.max(
+      finiteNumber(raw.volume),
+      0,
+    ),
+    currency:
+      String(raw.currency ?? "CAD")
+        .trim()
+        .toUpperCase() || "CAD",
+    delayed: Boolean(raw.delayed),
+    source: String(raw.source ?? "").trim(),
+  };
+}
+
+function liquidityWeight(
+  item: EtfHeatmapItem,
+): number {
   if (item.volume <= 0) {
     return MIN_WEIGHT;
   }
 
-  // Logarithmic liquidity avoids one heavily traded ETF swallowing the map.
   return Math.max(
     1 + Math.log10(item.volume + 1),
     MIN_WEIGHT,
   );
 }
 
-function weightedChange(items: EtfHeatmapItem[]): number {
-  const available = items.filter(
+function weightedChange(
+  items: EtfHeatmapItem[],
+): number {
+  const quoted = items.filter(
     (item) => item.price > 0,
   );
 
-  if (!available.length) {
+  if (quoted.length === 0) {
     return 0;
   }
 
-  const totalWeight = available.reduce(
-    (sum, item) => sum + liquidityWeight(item),
+  const totalWeight = quoted.reduce(
+    (total, item) =>
+      total + liquidityWeight(item),
     0,
   );
 
-  return available.reduce(
-    (sum, item) =>
-      sum + item.changePercent * liquidityWeight(item),
-    0,
-  ) / totalWeight;
+  if (totalWeight <= 0) {
+    return 0;
+  }
+
+  return (
+    quoted.reduce(
+      (total, item) =>
+        total +
+        item.changePercent *
+          liquidityWeight(item),
+      0,
+    ) / totalWeight
+  );
 }
 
 function createGroup(
@@ -115,7 +223,8 @@ function createGroup(
 ): Group {
   const sorted = [...items].sort(
     (left, right) =>
-      liquidityWeight(right) - liquidityWeight(left),
+      liquidityWeight(right) -
+      liquidityWeight(left),
   );
 
   return {
@@ -123,20 +232,12 @@ function createGroup(
     label,
     items: sorted,
     weight: sorted.reduce(
-      (sum, item) => sum + liquidityWeight(item),
+      (total, item) =>
+        total + liquidityWeight(item),
       0,
     ),
-    changePercent: weightedChange(sorted),
-    advancers: sorted.filter(
-      (item) =>
-        item.price > 0 &&
-        item.changePercent > 0.005,
-    ).length,
-    decliners: sorted.filter(
-      (item) =>
-        item.price > 0 &&
-        item.changePercent < -0.005,
-    ).length,
+    changePercent:
+      weightedChange(sorted),
   };
 }
 
@@ -145,256 +246,254 @@ function buildGroups(
   mode: GroupingMode,
 ): Group[] {
   if (mode === "direction") {
-    return [
-      createGroup(
-        "gainers",
-        "Hausses",
-        items.filter(
+    const definitions = [
+      {
+        key: "gainers",
+        label: "Hausses",
+        items: items.filter(
           (item) =>
             item.price > 0 &&
             item.changePercent > 0.005,
         ),
-      ),
-      createGroup(
-        "unchanged",
-        "Inchangés / sans cotation",
-        items.filter(
+      },
+      {
+        key: "unchanged",
+        label: "Inchangés / sans cotation",
+        items: items.filter(
           (item) =>
             item.price <= 0 ||
-            (
-              item.changePercent >= -0.005 &&
-              item.changePercent <= 0.005
-            ),
+            (item.changePercent >=
+              -0.005 &&
+              item.changePercent <=
+                0.005),
         ),
-      ),
-      createGroup(
-        "losers",
-        "Baisses",
-        items.filter(
+      },
+      {
+        key: "losers",
+        label: "Baisses",
+        items: items.filter(
           (item) =>
             item.price > 0 &&
             item.changePercent < -0.005,
         ),
-      ),
-    ].filter((group) => group.items.length > 0);
+      },
+    ];
+
+    return definitions
+      .filter(
+        (definition) =>
+          definition.items.length > 0,
+      )
+      .map((definition) =>
+        createGroup(
+          definition.key,
+          definition.label,
+          definition.items,
+        ),
+      );
   }
 
-  const grouped = new Map<string, EtfHeatmapItem[]>();
+  const grouped = new Map<
+    string,
+    EtfHeatmapItem[]
+  >();
 
   for (const item of items) {
     const key =
       mode === "provider"
-        ? item.provider || "Autres fournisseurs"
-        : item.sector || "Autres expositions";
+        ? item.provider
+        : item.sector;
+    const current =
+      grouped.get(key) ?? [];
 
-    const current = grouped.get(key) ?? [];
     current.push(item);
     grouped.set(key, current);
   }
 
   return [...grouped.entries()]
     .map(([key, groupItems]) =>
-      createGroup(key, key, groupItems),
+      createGroup(
+        key,
+        key,
+        groupItems,
+      ),
     )
     .sort(
-      (left, right) => right.weight - left.weight,
+      (left, right) =>
+        right.weight - left.weight,
     );
 }
 
-/**
- * Dependency-free binary treemap using a single SVG coordinate system.
- * It preserves the professional rectangular layout used by the stock map.
- */
 function binaryTreemap<T>(
-  items: T[],
-  getWeight: (item: T) => number,
+  items: WeightedItem<T>[],
   rect: Rect,
-): LayoutItem<T>[] {
-  if (!items.length) {
+): PositionedItem<T>[] {
+  if (
+    items.length === 0 ||
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
     return [];
   }
 
   if (items.length === 1) {
-    return [{ item: items[0], rect }];
+    return [
+      {
+        item: items[0].item,
+        rect,
+      },
+    ];
   }
 
   const sorted = [...items].sort(
     (left, right) =>
-      getWeight(right) - getWeight(left),
+      right.weight - left.weight,
   );
-  const weights = sorted.map((item) =>
-    Math.max(getWeight(item), 0.0001),
-  );
-  const total = weights.reduce(
-    (sum, weight) => sum + weight,
+  const totalWeight = sorted.reduce(
+    (total, entry) =>
+      total +
+      Math.max(entry.weight, 0.001),
     0,
   );
-  const target = total / 2;
 
-  let running = 0;
+  let firstWeight = 0;
   let splitIndex = 1;
+  let bestDistance =
+    Number.POSITIVE_INFINITY;
 
   for (
-    let index = 0;
-    index < sorted.length - 1;
+    let index = 1;
+    index < sorted.length;
     index += 1
   ) {
-    const before = running;
-    running += weights[index];
-    splitIndex = index + 1;
+    firstWeight += Math.max(
+      sorted[index - 1].weight,
+      0.001,
+    );
 
-    if (running >= target) {
-      if (
-        index > 0 &&
-        Math.abs(target - before) <
-          Math.abs(target - running)
-      ) {
-        splitIndex = index;
-      }
-      break;
+    const distance = Math.abs(
+      totalWeight / 2 - firstWeight,
+    );
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      splitIndex = index;
     }
   }
 
-  const first = sorted.slice(0, splitIndex);
-  const second = sorted.slice(splitIndex);
-  const firstWeight = first.reduce(
-    (sum, item) =>
-      sum + Math.max(getWeight(item), 0.0001),
+  const first = sorted.slice(
+    0,
+    splitIndex,
+  );
+  const second = sorted.slice(
+    splitIndex,
+  );
+  const firstTotal = first.reduce(
+    (total, entry) =>
+      total +
+      Math.max(entry.weight, 0.001),
     0,
   );
-  const ratio = clamp(
-    firstWeight / total,
-    0.035,
-    0.965,
-  );
+  const ratio =
+    totalWeight > 0
+      ? firstTotal / totalWeight
+      : 0.5;
 
   if (rect.width >= rect.height) {
-    const firstWidth = rect.width * ratio;
+    const firstWidth =
+      rect.width * ratio;
 
     return [
-      ...binaryTreemap(first, getWeight, {
+      ...binaryTreemap(first, {
         x: rect.x,
         y: rect.y,
         width: firstWidth,
         height: rect.height,
       }),
-      ...binaryTreemap(second, getWeight, {
+      ...binaryTreemap(second, {
         x: rect.x + firstWidth,
         y: rect.y,
-        width: rect.width - firstWidth,
+        width:
+          rect.width - firstWidth,
         height: rect.height,
       }),
     ];
   }
 
-  const firstHeight = rect.height * ratio;
+  const firstHeight =
+    rect.height * ratio;
 
   return [
-    ...binaryTreemap(first, getWeight, {
+    ...binaryTreemap(first, {
       x: rect.x,
       y: rect.y,
       width: rect.width,
       height: firstHeight,
     }),
-    ...binaryTreemap(second, getWeight, {
+    ...binaryTreemap(second, {
       x: rect.x,
       y: rect.y + firstHeight,
       width: rect.width,
-      height: rect.height - firstHeight,
+      height:
+        rect.height - firstHeight,
     }),
   ];
 }
 
-function marketColor(
+function tileBackground(
   item: EtfHeatmapItem,
 ): string {
   if (item.price <= 0) {
-    return "hsl(212 23% 31%)";
+    return (
+      "linear-gradient(145deg, " +
+      "rgba(67, 91, 111, .94), " +
+      "rgba(31, 51, 67, .98))"
+    );
   }
 
-  const intensity = clamp(
-    Math.abs(item.changePercent) / 4.5,
-    0.08,
+  const strength = clamp(
+    Math.abs(item.changePercent) / 5,
+    0.16,
     1,
   );
 
   if (item.changePercent > 0.005) {
-    return `hsl(165 69% ${27 + intensity * 12}%)`;
+    return `linear-gradient(145deg, rgba(11, 154, 112, ${
+      0.44 + strength * 0.48
+    }), rgba(5, 78, 63, ${
+      0.78 + strength * 0.18
+    }))`;
   }
 
   if (item.changePercent < -0.005) {
-    return `hsl(346 48% ${29 + intensity * 11}%)`;
+    return `linear-gradient(145deg, rgba(206, 35, 71, ${
+      0.45 + strength * 0.47
+    }), rgba(103, 35, 50, ${
+      0.78 + strength * 0.18
+    }))`;
   }
 
-  return "hsl(213 25% 38%)";
-}
-
-function groupColor(
-  group: Group,
-): string {
-  const quoted = group.items.some(
-    (item) => item.price > 0,
+  return (
+    "linear-gradient(145deg, " +
+    "rgba(67, 91, 111, .94), " +
+    "rgba(31, 51, 67, .98))"
   );
-
-  if (!quoted) {
-    return "rgba(52, 83, 105, 0.95)";
-  }
-
-  if (group.changePercent > 0.005) {
-    return "rgba(12, 111, 91, 0.95)";
-  }
-
-  if (group.changePercent < -0.005) {
-    return "rgba(108, 56, 75, 0.95)";
-  }
-
-  return "rgba(52, 83, 105, 0.95)";
-}
-
-function insetRect(
-  rect: Rect,
-  amount: number,
-): Rect {
-  return {
-    x: rect.x + amount,
-    y: rect.y + amount,
-    width: Math.max(
-      rect.width - amount * 2,
-      1,
-    ),
-    height: Math.max(
-      rect.height - amount * 2,
-      1,
-    ),
-  };
 }
 
 function formatChange(
-  item: EtfHeatmapItem,
+  value: number,
 ): string {
-  if (item.price <= 0) {
-    return "N/D";
-  }
-
   return `${
-    item.changePercent >= 0 ? "+" : ""
-  }${item.changePercent.toFixed(2)}%`;
+    value >= 0 ? "+" : ""
+  }${value.toFixed(2)}%`;
 }
 
-function formatGroupChange(
-  group: Group,
+function formatItemChange(
+  item: EtfHeatmapItem,
 ): string {
-  if (
-    !group.items.some(
-      (item) => item.price > 0,
-    )
-  ) {
-    return "N/D";
-  }
-
-  return `${
-    group.changePercent >= 0 ? "+" : ""
-  }${group.changePercent.toFixed(2)}%`;
+  return item.price > 0
+    ? formatChange(item.changePercent)
+    : "N/D";
 }
 
 function formatPrice(
@@ -404,95 +503,57 @@ function formatPrice(
     return "Cotation en attente";
   }
 
-  return item.price.toLocaleString("fr-CA", {
-    style: "currency",
-    currency: item.currency || "CAD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function tileTextSize(
-  rect: Rect,
-): {
-  symbol: number;
-  change: number;
-  showChange: boolean;
-  showPrice: boolean;
-} {
-  const minSide = Math.min(
-    rect.width,
-    rect.height,
+  return item.price.toLocaleString(
+    "fr-CA",
+    {
+      style: "currency",
+      currency:
+        item.currency || "CAD",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    },
   );
-  const area = rect.width * rect.height;
-
-  if (minSide < 26 || area < 1_150) {
-    return {
-      symbol: 7.5,
-      change: 0,
-      showChange: false,
-      showPrice: false,
-    };
-  }
-
-  if (minSide < 44 || area < 3_000) {
-    return {
-      symbol: 9.5,
-      change: 8,
-      showChange: true,
-      showPrice: false,
-    };
-  }
-
-  if (minSide > 110 && area > 18_000) {
-    return {
-      symbol: 18,
-      change: 14,
-      showChange: true,
-      showPrice: true,
-    };
-  }
-
-  return {
-    symbol: 12.5,
-    change: 10.5,
-    showChange: true,
-    showPrice: area > 7_000,
-  };
 }
 
-function densityItems(
-  items: EtfHeatmapItem[],
-  density: DensityMode,
-): EtfHeatmapItem[] {
-  if (density === "all") {
-    return items;
+function shortGroupLabel(
+  label: string,
+): string {
+  return (
+    SHORT_GROUP_LABELS[label] ??
+    label
+  );
+}
+
+function detailLevel(
+  rect: Rect,
+): 0 | 1 | 2 | 3 {
+  const area =
+    rect.width * rect.height;
+
+  if (
+    rect.width < 28 ||
+    rect.height < 22
+  ) {
+    return 0;
   }
 
-  const limit = density === "50" ? 50 : 100;
+  if (
+    rect.width < 52 ||
+    rect.height < 36 ||
+    area < 2300
+  ) {
+    return 1;
+  }
 
-  return [...items]
-    .sort((left, right) => {
-      const liquidityDifference =
-        right.volume - left.volume;
+  if (
+    rect.width < 92 ||
+    rect.height < 60 ||
+    area < 5400
+  ) {
+    return 2;
+  }
 
-      if (liquidityDifference !== 0) {
-        return liquidityDifference;
-      }
-
-      const quoteDifference =
-        Number(right.price > 0) -
-        Number(left.price > 0);
-
-      if (quoteDifference !== 0) {
-        return quoteDifference;
-      }
-
-      return left.ticker.localeCompare(
-        right.ticker,
-      );
-    })
-    .slice(0, limit);
+  return 3;
 }
 
 export function EtfHeatmap({
@@ -500,23 +561,70 @@ export function EtfHeatmap({
 }: {
   items: EtfHeatmapItem[];
 }) {
-  const router = useRouter();
   const [grouping, setGrouping] =
     useState<GroupingMode>("sector");
-  const [density, setDensity] =
-    useState<DensityMode>("100");
   const [expandedGroup, setExpandedGroup] =
     useState<string | null>(null);
+  const canvasRef =
+    useRef<HTMLDivElement | null>(
+      null,
+    );
+  const [canvasSize, setCanvasSize] =
+    useState({
+      width: 0,
+      height: 0,
+    });
 
-  const visibleItems = useMemo(
-    () => densityItems(items, density),
-    [density, items],
+  const normalizedItems = useMemo(
+    () =>
+      items
+        .map(normalizeItem)
+        .filter(
+          (
+            item,
+          ): item is EtfHeatmapItem =>
+            item !== null,
+        ),
+    [items],
   );
 
   const groups = useMemo(
-    () => buildGroups(visibleItems, grouping),
-    [grouping, visibleItems],
+    () =>
+      buildGroups(
+        normalizedItems,
+        grouping,
+      ),
+    [grouping, normalizedItems],
   );
+
+  useEffect(() => {
+    setExpandedGroup(null);
+  }, [grouping]);
+
+  useEffect(() => {
+    const element = canvasRef.current;
+
+    if (!element) {
+      return;
+    }
+
+    const update = () => {
+      setCanvasSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      });
+    };
+
+    update();
+
+    const observer =
+      new ResizeObserver(update);
+
+    observer.observe(element);
+
+    return () =>
+      observer.disconnect();
+  }, []);
 
   const visibleGroups = useMemo(() => {
     if (!expandedGroup) {
@@ -524,305 +632,239 @@ export function EtfHeatmap({
     }
 
     return groups.filter(
-      (group) => group.key === expandedGroup,
+      (group) =>
+        group.key === expandedGroup,
     );
   }, [expandedGroup, groups]);
 
-  const groupLayout = useMemo(
-    () =>
-      binaryTreemap(
-        visibleGroups,
-        (group) => Math.max(group.weight, 0.0001),
-        {
-          x: OUTER_GAP,
-          y: OUTER_GAP,
-          width:
-            VIEW_WIDTH - OUTER_GAP * 2,
-          height:
-            VIEW_HEIGHT - OUTER_GAP * 2,
-        },
-      ),
-    [visibleGroups],
-  );
+  const positionedGroups = useMemo(() => {
+    const { width, height } =
+      canvasSize;
 
-  function openEtf(
-    item: EtfHeatmapItem,
-  ): void {
-    router.push(
-      `/focus/${encodeURIComponent(
-        item.ticker,
-      )}`,
-    );
-  }
-
-  function handleTileKey(
-    event: KeyboardEvent<SVGGElement>,
-    item: EtfHeatmapItem,
-  ): void {
-    if (
-      event.key === "Enter" ||
-      event.key === " "
-    ) {
-      event.preventDefault();
-      openEtf(item);
+    if (width <= 0 || height <= 0) {
+      return [];
     }
-  }
 
-  if (!items.length) {
+    const outerPadding = 4;
+    const gap = 3;
+    const groupLayout = binaryTreemap(
+      visibleGroups.map((group) => ({
+        item: group,
+        weight: group.weight,
+      })),
+      {
+        x: outerPadding,
+        y: outerPadding,
+        width:
+          width - outerPadding * 2,
+        height:
+          height - outerPadding * 2,
+      },
+    );
+
+    return groupLayout.map(
+      ({ item: group, rect }) => {
+        const groupRect = {
+          x: rect.x + gap / 2,
+          y: rect.y + gap / 2,
+          width: Math.max(
+            rect.width - gap,
+            0,
+          ),
+          height: Math.max(
+            rect.height - gap,
+            0,
+          ),
+        };
+        const headerHeight = clamp(
+          groupRect.height * 0.15,
+          26,
+          40,
+        );
+        const bodyRect = {
+          x: groupRect.x + 3,
+          y:
+            groupRect.y +
+            headerHeight +
+            2,
+          width: Math.max(
+            groupRect.width - 6,
+            0,
+          ),
+          height: Math.max(
+            groupRect.height -
+              headerHeight -
+              5,
+            0,
+          ),
+        };
+        const tileLayout = binaryTreemap(
+          group.items.map((item) => ({
+            item,
+            weight:
+              liquidityWeight(item),
+          })),
+          bodyRect,
+        );
+
+        return {
+          group,
+          rect: groupRect,
+          headerHeight,
+          tiles: tileLayout.map(
+            ({ item, rect: tileRect }) => ({
+              item,
+              rect: {
+                x: tileRect.x + 1.5,
+                y: tileRect.y + 1.5,
+                width: Math.max(
+                  tileRect.width - 3,
+                  0,
+                ),
+                height: Math.max(
+                  tileRect.height - 3,
+                  0,
+                ),
+              },
+            }),
+          ),
+        };
+      },
+    );
+  }, [canvasSize, visibleGroups]);
+
+
+
+  if (normalizedItems.length === 0) {
     return (
       <section
-        className="panel"
-        style={{
-          minHeight: 300,
-          display: "grid",
-          placeItems: "center",
-          color: "var(--muted)",
-        }}
+        className={`panel ${styles.panel}`}
       >
-        Aucun ETF disponible pour la carte.
+        <div className={styles.heading}>
+          <div>
+            <span className="eyebrow">
+              CARTE DES ETF
+            </span>
+            <h2>ETF canadiens</h2>
+          </div>
+        </div>
+        <p className={styles.empty}>
+          Aucun ETF n’est disponible
+          pour la carte.
+        </p>
       </section>
     );
   }
 
-  const sectionStyle: CSSProperties = {
-    display: "grid",
-    gap: 10,
-    padding: 14,
-    overflow: "hidden",
-  };
-
-  const canvasStyle: CSSProperties = {
-    width: "100%",
-    minWidth: 0,
-    height: "clamp(440px, 105vw, 720px)",
-    display: "block",
-    overflow: "hidden",
-    border:
-      "1px solid rgba(92, 126, 148, 0.66)",
-    borderRadius: 10,
-    background:
-      "linear-gradient(145deg, rgba(54, 58, 64, 0.98), rgba(28, 38, 47, 0.99))",
-  };
-
   return (
     <section
-      className="panel"
-      style={sectionStyle}
+      className={`panel ${styles.panel}`}
     >
-      <header
-        style={{
-          minHeight: 45,
-          display: "flex",
-          alignItems: "flex-end",
-          justifyContent: "space-between",
-          gap: 14,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className={styles.heading}>
         <div>
           <span className="eyebrow">
             CARTE DES ETF
           </span>
-          <h2
-            style={{
-              margin: "3px 0 0",
-              fontSize:
-                "clamp(21px, 2vw, 29px)",
-            }}
-          >
-            ETF canadiens
-          </h2>
-          <p
-            style={{
-              margin: "6px 0 0",
-              color: "#77a6c6",
-              fontSize: 11,
-            }}
-          >
-            Taille des blocs : liquidité ·
-            couleur : variation de séance
+          <h2>ETF canadiens</h2>
+          <p>
+            Tous les ETF sont affichés ·
+            taille selon la liquidité ·
+            couleur selon la variation.
           </p>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 9,
-            flexWrap: "wrap",
-          }}
-        >
-          <select
-            aria-label="Nombre d’ETF affichés"
-            value={density}
-            onChange={(event) => {
-              setDensity(
-                event.target.value as DensityMode,
-              );
-              setExpandedGroup(null);
-            }}
-            style={{
-              height: 34,
-              minWidth: 158,
-              padding:
-                "0 30px 0 10px",
-              border:
-                "1px solid var(--border)",
-              borderRadius: 9,
-              background:
-                "rgba(5, 18, 29, 0.95)",
-              color: "var(--text)",
-              fontSize: 11,
-            }}
+        <div className={styles.controls}>
+          <label
+            className={styles.selectLabel}
           >
-            {Object.entries(
-              DENSITY_LABELS,
-            ).map(([value, label]) => (
-              <option
-                value={value}
-                key={value}
-              >
-                {label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            aria-label="Regroupement des ETF"
-            value={grouping}
-            onChange={(event) => {
-              setGrouping(
-                event.target
-                  .value as GroupingMode,
-              );
-              setExpandedGroup(null);
-            }}
-            style={{
-              height: 34,
-              minWidth: 178,
-              padding:
-                "0 30px 0 10px",
-              border:
-                "1px solid var(--border)",
-              borderRadius: 9,
-              background:
-                "rgba(5, 18, 29, 0.95)",
-              color: "var(--text)",
-              fontSize: 11,
-            }}
-          >
-            {Object.entries(
-              GROUPING_LABELS,
-            ).map(([value, label]) => (
-              <option
-                value={value}
-                key={value}
-              >
-                {label}
-              </option>
-            ))}
-          </select>
+            <span>Regroupement</span>
+            <select
+              aria-label="Regroupement de la carte des ETF"
+              value={grouping}
+              onChange={(
+                event:
+                  ChangeEvent<HTMLSelectElement>,
+              ) =>
+                setGrouping(
+                  event.target
+                    .value as GroupingMode,
+                )
+              }
+            >
+              {Object.entries(
+                GROUPING_LABELS,
+              ).map(([value, label]) => (
+                <option
+                  value={value}
+                  key={value}
+                >
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
 
           {expandedGroup ? (
             <button
               type="button"
+              className={styles.resetButton}
               onClick={() =>
                 setExpandedGroup(null)
               }
-              style={{
-                height: 34,
-                padding: "0 11px",
-                border:
-                  "1px solid var(--border)",
-                borderRadius: 9,
-                background:
-                  "rgba(5, 18, 29, 0.95)",
-                color: "var(--text)",
-                fontSize: 11,
-                cursor: "pointer",
-              }}
             >
-              Voir tous les groupes
+              Vue complète
             </button>
           ) : (
-            <span
-              style={{
-                color: "#77a6c6",
-                fontSize: 10,
-              }}
-            >
-              Clique sur un groupe pour
+            <span className={styles.hint}>
+              Touchez un groupe pour
               l’agrandir
             </span>
           )}
         </div>
-      </header>
+      </div>
 
-      <svg
-        viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-        aria-label="Carte sectorielle des ETF canadiens"
-        style={canvasStyle}
+      <div
+        ref={canvasRef}
+        className={styles.treemap}
+        aria-label={`Carte de ${normalizedItems.length} ETF canadiens`}
       >
-        {groupLayout.map(
-          ({ item: group, rect }) => {
-            const groupRect = insetRect(
-              rect,
-              1.5,
-            );
-            const headerHeight = Math.min(
-              GROUP_HEADER_HEIGHT,
-              Math.max(
-                18,
-                groupRect.height * 0.12,
-              ),
-            );
-
-            const itemsRect: Rect = {
-              x:
-                groupRect.x +
-                GROUP_INSET,
-              y:
-                groupRect.y +
-                headerHeight +
-                GROUP_INSET,
-              width: Math.max(
-                groupRect.width -
-                  GROUP_INSET * 2,
-                1,
-              ),
-              height: Math.max(
-                groupRect.height -
-                  headerHeight -
-                  GROUP_INSET * 2,
-                1,
-              ),
-            };
-
-            const itemLayout =
-              binaryTreemap(
-                group.items,
-                liquidityWeight,
-                itemsRect,
-              );
+        {positionedGroups.map(
+          ({
+            group,
+            rect,
+            headerHeight,
+            tiles,
+          }) => {
+            const compactHeader =
+              rect.width < 120 ||
+              rect.height < 82;
 
             return (
-              <g key={group.key}>
-                <rect
-                  x={groupRect.x}
-                  y={groupRect.y}
-                  width={groupRect.width}
-                  height={groupRect.height}
-                  fill="rgba(50, 58, 65, 0.82)"
-                  stroke="rgba(232, 238, 242, 0.82)"
-                  strokeWidth={1.7}
-                />
-
-                <g
-                  role="button"
-                  tabIndex={0}
+              <article
+                className={styles.group}
+                data-compact={
+                  compactHeader
+                    ? "true"
+                    : "false"
+                }
+                key={group.key}
+                style={
+                  {
+                    left: rect.x,
+                    top: rect.y,
+                    width: rect.width,
+                    height: rect.height,
+                  } as CSSProperties
+                }
+              >
+                <button
+                  type="button"
+                  className={
+                    styles.groupHeader
+                  }
+                  style={{
+                    height: headerHeight,
+                  }}
                   onClick={() =>
                     setExpandedGroup(
                       (current) =>
@@ -831,242 +873,133 @@ export function EtfHeatmap({
                           : group.key,
                     )
                   }
-                  onKeyDown={(event) => {
-                    if (
-                      event.key ===
-                        "Enter" ||
-                      event.key === " "
-                    ) {
-                      event.preventDefault();
-                      setExpandedGroup(
-                        (current) =>
-                          current ===
-                          group.key
-                            ? null
-                            : group.key,
-                      );
-                    }
-                  }}
-                  style={{
-                    cursor: "pointer",
-                  }}
+                  aria-pressed={
+                    expandedGroup ===
+                    group.key
+                  }
                 >
-                  <rect
-                    x={groupRect.x}
-                    y={groupRect.y}
-                    width={groupRect.width}
-                    height={headerHeight}
-                    fill={groupColor(group)}
-                    stroke="rgba(232, 238, 242, 0.72)"
-                    strokeWidth={1}
-                  />
-
-                  <text
-                    x={groupRect.x + 7}
-                    y={
-                      groupRect.y +
-                      headerHeight / 2 +
-                      4
-                    }
-                    fill="#ffffff"
-                    fontSize={Math.min(
-                      12,
-                      Math.max(
-                        7.5,
-                        groupRect.width / 24,
-                      ),
+                  <strong>
+                    {shortGroupLabel(
+                      group.label,
                     )}
-                    fontWeight={700}
-                    pointerEvents="none"
+                  </strong>
+                  <span
+                    className={
+                      group.changePercent >= 0
+                        ? styles.groupPositive
+                        : styles.groupNegative
+                    }
                   >
-                    {group.label}
-                  </text>
+                    {formatChange(
+                      group.changePercent,
+                    )}
+                  </span>
+                </button>
 
-                  {groupRect.width > 120 ? (
-                    <text
-                      x={
-                        groupRect.x +
-                        groupRect.width -
-                        7
-                      }
-                      y={
-                        groupRect.y +
-                        headerHeight / 2 +
-                        4
-                      }
-                      fill="#ffffff"
-                      fontSize={8.5}
-                      fontWeight={800}
-                      textAnchor="end"
-                      pointerEvents="none"
-                    >
-                      {formatGroupChange(
-                        group,
-                      )}
-                    </text>
-                  ) : null}
-                </g>
+                {tiles.map(
+                  ({ item, rect: tileRect }) => {
+                    const detail =
+                      detailLevel(tileRect);
+                    const relativeStyle = {
+                      left:
+                        tileRect.x - rect.x,
+                      top:
+                        tileRect.y - rect.y,
+                      width: tileRect.width,
+                      height: tileRect.height,
+                      background:
+                        tileBackground(item),
+                    };
+                    const accessibleLabel = `${item.ticker}, ${item.name}, ${formatItemChange(
+                      item,
+                    )}`;
 
-                {itemLayout.map(
-                  ({
-                    item,
-                    rect: rawItemRect,
-                  }) => {
-                    const itemRect =
-                      insetRect(
-                        rawItemRect,
-                        1.25,
+                    if (detail === 0) {
+                      return (
+                        <Link
+                          href={`/etf/${encodeURIComponent(
+                            item.ticker,
+                          )}`}
+                          className={
+                            styles.microTile
+                          }
+                          style={relativeStyle}
+                          aria-label={
+                            accessibleLabel
+                          }
+                          title={
+                            accessibleLabel
+                          }
+                          key={item.ticker}
+                        />
                       );
-                    const textSize =
-                      tileTextSize(itemRect);
-                    const textX =
-                      itemRect.x + 5;
-                    const textY =
-                      itemRect.y +
-                      textSize.symbol +
-                      4;
+                    }
 
                     return (
-                      <g
+                      <Link
+                        href={`/etf/${encodeURIComponent(
+                          item.ticker,
+                        )}`}
+                        className={styles.tile}
+                        data-detail={detail}
+                        style={relativeStyle}
                         key={item.ticker}
-                        role="link"
-                        tabIndex={0}
-                        onClick={() =>
-                          openEtf(item)
+                        aria-label={
+                          accessibleLabel
                         }
-                        onKeyDown={(event) =>
-                          handleTileKey(
-                            event,
-                            item,
-                          )
-                        }
-                        style={{
-                          cursor:
-                            "pointer",
-                        }}
+                        title={`${item.name} · ${item.provider} · ${item.sector} · ${formatItemChange(
+                          item,
+                        )}`}
                       >
-                        <title>
-                          {`${item.ticker} · ${item.name} · ${item.provider} · ${formatPrice(
-                            item,
-                          )} · ${formatChange(
-                            item,
-                          )}`}
-                        </title>
-
-                        <rect
-                          x={itemRect.x}
-                          y={itemRect.y}
-                          width={
-                            itemRect.width
+                        <span
+                          className={
+                            styles.tileSymbol
                           }
-                          height={
-                            itemRect.height
-                          }
-                          rx={1}
-                          fill={marketColor(
-                            item,
-                          )}
-                          stroke="rgba(238, 242, 245, 0.88)"
-                          strokeWidth={1.25}
-                        />
-
-                        <text
-                          x={textX}
-                          y={textY}
-                          fill="#ffffff"
-                          fontSize={
-                            textSize.symbol
-                          }
-                          fontWeight={850}
-                          pointerEvents="none"
                         >
                           {item.ticker}
-                        </text>
+                        </span>
 
-                        {textSize.showChange ? (
-                          <text
-                            x={textX}
-                            y={
-                              textY +
-                              textSize.change +
-                              3
-                            }
-                            fill="#ffffff"
-                            fontSize={
-                              textSize.change
-                            }
-                            fontWeight={700}
-                            pointerEvents="none"
-                          >
-                            {formatChange(
+                        {detail >= 2 ? (
+                          <strong>
+                            {formatItemChange(
                               item,
                             )}
-                          </text>
+                          </strong>
                         ) : null}
 
-                        {textSize.showPrice ? (
-                          <text
-                            x={textX}
-                            y={
-                              textY +
-                              textSize.change +
-                              16
-                            }
-                            fill="rgba(245, 249, 252, 0.82)"
-                            fontSize={8}
-                            pointerEvents="none"
-                          >
-                            {formatPrice(
-                              item,
-                            )}
-                          </text>
+                        {detail >= 3 ? (
+                          <>
+                            <small>
+                              {formatPrice(item)}
+                            </small>
+                            <span
+                              className={
+                                styles.tileName
+                              }
+                            >
+                              {item.name}
+                            </span>
+                          </>
                         ) : null}
-                      </g>
+
+                        {item.delayed &&
+                        detail >= 3 ? (
+                          <span
+                            className={
+                              styles.delayed
+                            }
+                          >
+                            différé
+                          </span>
+                        ) : null}
+                      </Link>
                     );
                   },
                 )}
-              </g>
+              </article>
             );
           },
         )}
-      </svg>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent:
-            "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          color: "#6f9eb9",
-          fontSize: 10,
-        }}
-      >
-        <span>
-          {visibleItems.length} ETF
-          affichés ·{" "}
-          {
-            visibleItems.filter(
-              (item) => item.price > 0,
-            ).length
-          }{" "}
-          cotations disponibles
-        </span>
-        <span>
-          {groups.reduce(
-            (sum, group) =>
-              sum + group.advancers,
-            0,
-          )}
-          ↑ ·{" "}
-          {groups.reduce(
-            (sum, group) =>
-              sum + group.decliners,
-            0,
-          )}
-          ↓
-        </span>
       </div>
     </section>
   );
