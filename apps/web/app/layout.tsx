@@ -1,23 +1,48 @@
-import type { Metadata } from "next";
-import { AppShell } from "@/components/layout/AppShell";
-import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
+import type {
+  Metadata,
+  Viewport,
+} from "next";
+
+import { AppSidebar } from "@/components/layout/AppSidebar";
+
 import "./globals.css";
+import "./mobile.css";
 
 export const metadata: Metadata = {
-  title: {
-    default: "Anatole",
-    template: "%s · Anatole",
+  title: "Anatole",
+  description:
+    "Plateforme d’analyse du marché canadien.",
+  applicationName: "Anatole",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Anatole",
   },
-  description: "Plateforme d’analyse du marché canadien.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: "cover",
+  colorScheme: "dark",
+  themeColor: "#050d15",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <html lang="fr" data-theme="dark" data-density="comfortable" suppressHydrationWarning>
+    <html lang="fr">
       <body>
-        <PreferencesProvider>
-          <AppShell>{children}</AppShell>
-        </PreferencesProvider>
+        <div className="app-shell">
+          <AppSidebar />
+          <main className="app-main">
+            {children}
+          </main>
+        </div>
       </body>
     </html>
   );

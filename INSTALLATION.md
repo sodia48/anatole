@@ -1,45 +1,52 @@
-# Anatole mobile responsive v2
+# Anatole Signature Mobile v3
 
-Cette version corrige directement les deux problèmes visibles sur iPhone :
-
-1. le tiroir latéral n'est plus décalé ni coupé;
-2. le cockpit ne force plus des sections de 720 à 1 010 pixels dans un
-   écran d'environ 390 pixels.
+Cette version remplace les anciens correctifs mobiles injectés dans le
+composant Sidebar. Le CSS mobile est maintenant importé directement après
+`globals.css`, ce qui lui donne la priorité réelle dans Next.js.
 
 ## Fichiers à remplacer
 
+- `apps/web/app/layout.tsx`
 - `apps/web/components/layout/AppSidebar.tsx`
-- `apps/web/components/layout/MobileDesktopParity.tsx`
 - `apps/web/components/cockpit/MarketHeatmap.tsx`
 - `apps/web/components/cockpit/MarketHeatmap.module.css`
-- `apps/web/components/etf/EtfHeatmap.tsx`
-- `apps/web/components/ipo-insiders/IpoInsiders.module.css`
 
-Les copies sous `components/layout/` sont également incluses pour garder
-synchronisées les deux arborescences déjà présentes dans le dépôt.
+## Fichier à ajouter
 
-## Résultat attendu sur téléphone
+- `apps/web/app/mobile.css`
 
-- logo Anatole en haut du tiroir;
-- barre de recherche sous le logo;
-- navigation verticale complète, sans noms tronqués;
-- bouton de fermeture dans le tiroir;
-- quatre KPI affichés en grille 2 × 2;
-- heatmap TSX 60 entièrement contenue dans la largeur du téléphone;
-- tous les secteurs affichés dans une grille compacte;
-- meilleures variations, baisses et contribution sectorielle empilées;
-- Focus en une colonne avec le graphique pleine largeur;
-- ETF redimensionné dans la largeur disponible;
-- IPO et Initiés en cartes mobiles lisibles;
-- seuls les tableaux détaillés utilisent un défilement horizontal local.
+## Fichier à supprimer
+
+Si ce fichier existe encore, il faut le supprimer :
+
+- `apps/web/components/layout/MobileDesktopParity.tsx`
+
+Le nouveau `AppSidebar.tsx` ne l’importe plus.
+
+## Résultat mobile
+
+- barre Anatole fixe et compacte au sommet;
+- tiroir latéral réellement aligné, sans espace vide;
+- logo, recherche et navigation placés dans le bon ordre;
+- tous les intitulés lisibles;
+- quatre KPI en grille 2 × 2;
+- Focus en colonne complète;
+- tableaux avec défilement horizontal local;
+- nouvelles inscriptions en cartes mobiles;
+- nouvelle heatmap binaire responsive;
+- les 60 titres et tous les secteurs restent dans la largeur du téléphone;
+- aucun canvas de 720 ou 980 pixels;
+- aucune heatmap déformée ou rognée.
 
 ## Déploiement
 
-1. Remplacer les fichiers dans GitHub.
-2. Commit et push sur la branche de production.
-3. Vercel → Redeploy.
-4. Désactiver `Use existing Build Cache`.
-5. Sur iPhone, fermer l'ancien onglet ou vider les données du site.
-6. Ouvrir de nouveau `https://anatole-mu.vercel.app/cockpit`.
+1. Respecter exactement les chemins.
+2. Supprimer l’ancien `MobileDesktopParity.tsx` si présent.
+3. Commit et push sur la branche de production.
+4. Vercel → Redeploy.
+5. Désactiver `Use existing Build Cache`.
+6. Sur iPhone : Réglages Safari → Avancé → Données de sites →
+   rechercher `anatole-mu.vercel.app` → supprimer.
+7. Ouvrir de nouveau `/cockpit`.
 
-Aucun redéploiement Render n'est requis.
+Aucun changement Render/FastAPI n’est requis.

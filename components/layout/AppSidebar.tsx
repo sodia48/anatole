@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react";
 import {
@@ -27,8 +28,6 @@ import {
   TableProperties,
   X,
 } from "lucide-react";
-
-import { MobileDesktopParity } from "./MobileDesktopParity";
 
 type NavItem = {
   href: string;
@@ -185,35 +184,70 @@ function isActive(
   return pathname === item.href;
 }
 
+function openSearchFallback(): void {
+  window.dispatchEvent(
+    new CustomEvent("anatole:open-search"),
+  );
+
+  const candidate =
+    document.querySelector<HTMLInputElement>(
+      'input[placeholder*="Rechercher"], input[type="search"]',
+    );
+
+  candidate?.focus();
+}
+
 export function AppSidebar({
-  onOpenSearch = () => undefined,
+  onOpenSearch,
 }: {
   onOpenSearch?: () => void;
 }) {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] =
+  const [drawerOpen, setDrawerOpen] =
     useState(false);
 
-  useEffect(() => {
-    setMobileOpen(false);
+  const activeLabel = useMemo(() => {
+    for (const group of groups) {
+      const active = group.items.find(
+        (item) =>
+          isActive(pathname, item),
+      );
+
+      if (active) {
+        return active.label;
+      }
+    }
+
+    return "Anatole";
   }, [pathname]);
 
   useEffect(() => {
-    if (!mobileOpen) {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    document.body.classList.toggle(
+      "anatole-drawer-open",
+      drawerOpen,
+    );
+
+    return () => {
+      document.body.classList.remove(
+        "anatole-drawer-open",
+      );
+    };
+  }, [drawerOpen]);
+
+  useEffect(() => {
+    if (!drawerOpen) {
       return;
     }
-
-    const previousOverflow =
-      document.body.style.overflow;
-
-    document.body.style.overflow =
-      "hidden";
 
     const closeOnEscape = (
       event: KeyboardEvent,
     ) => {
       if (event.key === "Escape") {
-        setMobileOpen(false);
+        setDrawerOpen(false);
       }
     };
 
@@ -222,75 +256,102 @@ export function AppSidebar({
       closeOnEscape,
     );
 
-    return () => {
-      document.body.style.overflow =
-        previousOverflow;
+    return () =>
       window.removeEventListener(
         "keydown",
         closeOnEscape,
       );
-    };
-  }, [mobileOpen]);
+  }, [drawerOpen]);
 
   function openSearch(): void {
-    setMobileOpen(false);
-    onOpenSearch();
+    setDrawerOpen(false);
+
+    if (onOpenSearch) {
+      onOpenSearch();
+      return;
+    }
+
+    window.setTimeout(
+      openSearchFallback,
+      50,
+    );
   }
 
   return (
     <>
-      <MobileDesktopParity />
+      <header className="mobile-appbar">
+        <button
+          type="button"
+          className="mobile-appbar-button"
+          aria-label="Ouvrir le menu Anatole"
+          aria-controls="anatole-sidebar"
+          aria-expanded={drawerOpen}
+          onClick={() =>
+            setDrawerOpen(true)
+          }
+        >
+          <Menu size={21} />
+        </button>
 
-      <button
-        type="button"
-        className={`mobile-menu-toggle ${
-          mobileOpen
-            ? "is-drawer-open"
-            : ""
-        }`}
-        aria-label="Ouvrir le menu Anatole"
-        aria-controls="anatole-sidebar"
-        aria-expanded={mobileOpen}
-        onClick={() =>
-          setMobileOpen(true)
-        }
-      >
-        <Menu size={22} />
-      </button>
+        <Link
+          href="/cockpit"
+          className="mobile-appbar-brand"
+          aria-label="Accueil Anatole"
+        >
+          <span className="mobile-brand-mark">
+            A
+          </span>
+          <span>
+            <strong>anatole</strong>
+            <small>{activeLabel}</small>
+          </span>
+        </Link>
+
+        <button
+          type="button"
+          className="mobile-appbar-button"
+          aria-label="Rechercher dans Anatole"
+          onClick={openSearch}
+        >
+          <Search size={20} />
+        </button>
+      </header>
 
       <button
         type="button"
         className="mobile-sidebar-backdrop"
         aria-label="Fermer le menu"
-        hidden={!mobileOpen}
+        hidden={!drawerOpen}
         onClick={() =>
-          setMobileOpen(false)
+          setDrawerOpen(false)
         }
       />
 
       <aside
         id="anatole-sidebar"
         className={`sidebar ${
-          mobileOpen
+          drawerOpen
             ? "is-mobile-open"
             : ""
         }`}
-        aria-hidden={!mobileOpen}
       >
-        <div className="mobile-sidebar-header">
+        <div className="mobile-drawer-heading">
           <Link
             href="/cockpit"
-            className="brand"
-            aria-label="Anatole"
+            className="mobile-drawer-brand"
             onClick={() =>
-              setMobileOpen(false)
+              setDrawerOpen(false)
             }
           >
             <span className="brand-mark">
               A
             </span>
-            <span>anatole</span>
-            <small>beta</small>
+            <span>
+              <strong>anatole</strong>
+              <small>
+                Intelligence de marché
+              </small>
+            </span>
           </Link>
 
           <button
@@ -298,16 +359,16 @@ export function AppSidebar({
             className="mobile-drawer-close"
             aria-label="Fermer le menu Anatole"
             onClick={() =>
-              setMobileOpen(false)
+              setDrawerOpen(false)
             }
           >
-            <X size={22} />
+            <X size={21} />
           </button>
         </div>
 
         <Link
           href="/cockpit"
-          className="brand desktop-sidebar-brand"
+          className="brand desktop-brand"
           aria-label="Anatole"
         >
           <span className="brand-mark">
@@ -332,7 +393,7 @@ export function AppSidebar({
           aria-label="Navigation principale"
         >
           {groups.map((group) => (
-            <div
+            <section
               className="nav-group"
               key={group.label}
             >
@@ -355,7 +416,7 @@ export function AppSidebar({
                       key={item.label}
                       href={item.href}
                       onClick={() =>
-                        setMobileOpen(
+                        setDrawerOpen(
                           false,
                         )
                       }
@@ -374,27 +435,29 @@ export function AppSidebar({
                         {item.label}
                       </span>
                       {!item.available ? (
-                        <em>Bientôt</em>
+                        <em>
+                          Bientôt
+                        </em>
                       ) : null}
                     </Link>
                   );
                 },
               )}
-            </div>
+            </section>
           ))}
         </nav>
 
+        <nav
+          className="mobile-nav"
+          aria-hidden="true"
+        />
+
         <div className="sidebar-footer">
-          <Link
-            href="/roadmap"
-            onClick={() =>
-              setMobileOpen(false)
-            }
-          >
-            Migration v0.5
+          <Link href="/roadmap">
+            Migration Anatole v0.5
           </Link>
           <span>
-            Next.js + FastAPI
+            Next.js · FastAPI
           </span>
         </div>
       </aside>
