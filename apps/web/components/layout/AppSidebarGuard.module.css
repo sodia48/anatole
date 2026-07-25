@@ -1,0 +1,28 @@
+/*
+ * Structural safety net for AppSidebar.
+ * It prevents mobile-only controls from leaking into desktop even if the
+ * global mobile stylesheet is temporarily missing or stale in a deployment.
+ */
+.mobileAppbar,
+.mobileBackdrop,
+.mobileDrawerHeading {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .mobileAppbar {
+    display: grid;
+  }
+
+  .mobileBackdrop {
+    display: block;
+  }
+
+  .mobileBackdrop[hidden] {
+    display: none !important;
+  }
+
+  .mobileDrawerHeading {
+    display: flex;
+  }
+}

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+import guardStyles from "./AppSidebarGuard.module.css";
 import {
   useEffect,
   useMemo,
@@ -329,7 +331,9 @@ export function AppSidebar({
 
   return (
     <>
-      <header className="mobile-appbar">
+      <header
+        className={`mobile-appbar ${guardStyles.mobileAppbar}`}
+      >
         <button
           type="button"
           className="mobile-appbar-button"
@@ -369,7 +373,7 @@ export function AppSidebar({
 
       <button
         type="button"
-        className="mobile-sidebar-backdrop"
+        className={`mobile-sidebar-backdrop ${guardStyles.mobileBackdrop}`}
         aria-label="Fermer le menu"
         hidden={!drawerOpen}
         onClick={() =>
@@ -385,7 +389,9 @@ export function AppSidebar({
             : ""
         }`}
       >
-        <div className="mobile-drawer-heading">
+        <div
+          className={`mobile-drawer-heading ${guardStyles.mobileDrawerHeading}`}
+        >
           <Link
             href="/cockpit"
             className="mobile-drawer-brand"

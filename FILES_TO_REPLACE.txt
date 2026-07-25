@@ -1,0 +1,7 @@
+apps/web/app/layout.tsx
+apps/web/app/providers.tsx
+apps/web/app/mobile.css
+apps/web/components/layout/AppSidebar.tsx
+apps/web/components/layout/AppSidebarGuard.module.css
+apps/web/components/etf/EtfHeatmap.tsx
+apps/web/components/etf/EtfHeatmap.module.css
