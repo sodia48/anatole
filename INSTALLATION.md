@@ -1,52 +1,62 @@
-# Anatole Signature Mobile v3
+# Anatole Signature Mobile v4 — toutes les sections
 
-Cette version remplace les anciens correctifs mobiles injectés dans le
-composant Sidebar. Le CSS mobile est maintenant importé directement après
-`globals.css`, ce qui lui donne la priorité réelle dans Next.js.
+Cette version conserve le Cockpit mobile validé et applique le même niveau de finition à l’ensemble de l’application Next.js.
+
+## Sections couvertes
+
+- Cockpit
+- Focus
+- Screener
+- Actualités
+- Calendrier
+- ETF et fiches ETF
+- IPO & insiders
+- Psychologie
+- Watchlist
+- Préférences
+- Roadmap et fonctions à venir
 
 ## Fichiers à remplacer
 
-- `apps/web/app/layout.tsx`
+- `apps/web/app/mobile.css`
 - `apps/web/components/layout/AppSidebar.tsx`
+
+Le ZIP contient aussi les fichiers v3.2 build-safe déjà validés afin de pouvoir réinstaller tout le correctif proprement :
+
+- `apps/web/app/layout.tsx`
+- `apps/web/app/providers.tsx`
 - `apps/web/components/cockpit/MarketHeatmap.tsx`
 - `apps/web/components/cockpit/MarketHeatmap.module.css`
 
-## Fichier à ajouter
-
-- `apps/web/app/mobile.css`
-
 ## Fichier à supprimer
 
-Si ce fichier existe encore, il faut le supprimer :
+S’il existe encore :
 
 - `apps/web/components/layout/MobileDesktopParity.tsx`
 
-Le nouveau `AppSidebar.tsx` ne l’importe plus.
+## Ce que fait v4
 
-## Résultat mobile
+- identifie automatiquement la route mobile active avec `data-anatole-section`;
+- garde le CSS ordinateur intact;
+- transforme les filtres complexes en grilles tactiles lisibles;
+- affiche les KPI en 2 × 2;
+- empile proprement les cartes et modules analytiques;
+- limite le défilement horizontal aux tableaux qui en ont réellement besoin;
+- rend les onglets horizontalement défilables sans couper les libellés;
+- adapte les cartes ETF, IPO, actualités, calendrier et watchlist;
+- conserve la heatmap Cockpit responsive déjà validée;
+- conserve `PreferencesProvider` autour de toute l’application.
 
-- barre Anatole fixe et compacte au sommet;
-- tiroir latéral réellement aligné, sans espace vide;
-- logo, recherche et navigation placés dans le bon ordre;
-- tous les intitulés lisibles;
-- quatre KPI en grille 2 × 2;
-- Focus en colonne complète;
-- tableaux avec défilement horizontal local;
-- nouvelles inscriptions en cartes mobiles;
-- nouvelle heatmap binaire responsive;
-- les 60 titres et tous les secteurs restent dans la largeur du téléphone;
-- aucun canvas de 720 ou 980 pixels;
-- aucune heatmap déformée ou rognée.
+## Installation
 
-## Déploiement
+1. Décompresser le ZIP.
+2. Copier les fichiers dans le dépôt en respectant exactement les chemins.
+3. Supprimer `MobileDesktopParity.tsx` s’il existe.
+4. Commit et push sur la branche de production.
+5. Dans Vercel, lancer **Redeploy**.
+6. Désactiver **Use existing Build Cache** pour ce premier déploiement.
+7. Tester au minimum : `/cockpit`, `/focus/RY`, `/screener`, `/actualites`, `/calendrier`, `/etf`, `/ipo-insiders`, `/psychologie`, `/watchlist`, `/preferences`.
 
-1. Respecter exactement les chemins.
-2. Supprimer l’ancien `MobileDesktopParity.tsx` si présent.
-3. Commit et push sur la branche de production.
-4. Vercel → Redeploy.
-5. Désactiver `Use existing Build Cache`.
-6. Sur iPhone : Réglages Safari → Avancé → Données de sites →
-   rechercher `anatole-mu.vercel.app` → supprimer.
-7. Ouvrir de nouveau `/cockpit`.
+## Backend
 
-Aucun changement Render/FastAPI n’est requis.
+Aucun changement Render ou FastAPI n’est requis.

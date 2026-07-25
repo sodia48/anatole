@@ -1,5 +1,5 @@
 /*
- * Anatole Signature Mobile v3
+ * Anatole Signature Mobile v4
  * Loaded after globals.css. This is the authoritative mobile layer.
  */
 
@@ -958,6 +958,1398 @@
       rgba(76, 158, 255, .9);
     outline-offset: 2px;
   }
+}
+
+
+/* ================================================================
+ * ANATOLE SIGNATURE MOBILE v4 — ALL SECTIONS
+ * Route-scoped rules use body[data-anatole-section] set by AppSidebar.
+ * Desktop styles remain untouched because everything stays under 820px.
+ * ================================================================ */
+
+@media (max-width: 820px) {
+  body[data-anatole-section]
+  .app-main > *,
+  body[data-anatole-section]
+  .app-main > * > *,
+  body[data-anatole-section]
+  .app-main section,
+  body[data-anatole-section]
+  .app-main article,
+  body[data-anatole-section]
+  .app-main header,
+  body[data-anatole-section]
+  .app-main footer,
+  body[data-anatole-section]
+  .app-main form,
+  body[data-anatole-section]
+  .app-main nav,
+  body[data-anatole-section]
+  .app-main div {
+    min-width: 0;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    p,
+    span,
+    small,
+    strong,
+    a,
+    button,
+    label
+  ) {
+    overflow-wrap: anywhere;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .page-header,
+    .page-hero,
+    .section-header,
+    .panel-header,
+    [class*="_hero__"],
+    [class*="_pageHeader__"],
+    [class*="_sectionHeader__"],
+    [class*="_panelHeader__"]
+  ) {
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  ) > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .filters,
+    .filter-grid,
+    .filter-panel,
+    .toolbar,
+    .controls,
+    [class*="_filters__"],
+    [class*="_filterGrid__"],
+    [class*="_filterPanel__"],
+    [class*="_toolbar__"],
+    [class*="_controls__"]
+  ) {
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .card-grid,
+    .cards-grid,
+    .content-grid,
+    .results-grid,
+    .news-grid,
+    .event-grid,
+    .feature-grid,
+    [class*="_cardGrid__"],
+    [class*="_cardsGrid__"],
+    [class*="_contentGrid__"],
+    [class*="_resultsGrid__"],
+    [class*="_newsGrid__"],
+    [class*="_eventGrid__"],
+    [class*="_featureGrid__"]
+  ) {
+    grid-template-columns:
+      minmax(0, 1fr) !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .table-wrap,
+    .table-container,
+    .data-table,
+    .results-table,
+    .financial-table,
+    [class*="_tableWrap__"],
+    [class*="_tableContainer__"],
+    [class*="_dataTable__"],
+    [class*="_resultsTable__"],
+    [class*="_financialTable__"],
+    [class*="_tradeTable__"]
+  ) {
+    position: relative;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-radius: 14px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .table-wrap,
+    .table-container,
+    .data-table,
+    .results-table,
+    .financial-table,
+    [class*="_tableWrap__"],
+    [class*="_tableContainer__"],
+    [class*="_dataTable__"],
+    [class*="_resultsTable__"],
+    [class*="_financialTable__"],
+    [class*="_tradeTable__"]
+  ) table {
+    min-width: 680px;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    canvas,
+    svg,
+    iframe
+  ) {
+    max-width: 100%;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    input,
+    select,
+    textarea
+  ) {
+    width: 100%;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    button,
+    [role="button"]
+  ) {
+    min-height: 42px;
+    touch-action: manipulation;
+  }
+
+  /* ---------- Shared premium page hero ---------- */
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) {
+    border-radius: 18px !important;
+    background:
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(34, 105, 151, .27),
+        transparent 48%
+      ),
+      linear-gradient(
+        145deg,
+        rgba(13, 36, 52, .98),
+        rgba(6, 20, 31, .99)
+      ) !important;
+    box-shadow:
+      inset 0 1px 0
+      rgba(255,255,255,.035),
+      0 14px 34px
+      rgba(0,0,0,.18);
+  }
+
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) h1 {
+    font-size:
+      clamp(27px, 8vw, 39px)
+      !important;
+    line-height: 1 !important;
+    letter-spacing: -.035em;
+  }
+
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) p {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* ---------- Focus ---------- */
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_summaryGrid__"],
+    [class*="_statsGrid__"],
+    [class*="_indicatorGrid__"],
+    [class*="_fundamentalGrid__"],
+    [class*="_ownershipGrid__"],
+    [class*="_scenarioGrid__"],
+    .summary-grid,
+    .stats-grid,
+    .indicator-grid,
+    .fundamental-grid
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2, minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_contentGrid__"],
+    [class*="_detailGrid__"],
+    [class*="_analysisGrid__"],
+    [class*="_ecosystemGrid__"],
+    [class*="_newsGrid__"],
+    [class*="_financialGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 11px !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_chartPanel__"],
+    [class*="_chartContainer__"],
+    [class*="_chartShell__"],
+    .chart-panel,
+    .chart-container,
+    .chart-shell
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_chartPanel__"],
+    [class*="_chartContainer__"],
+    [class*="_chartShell__"],
+    .chart-panel,
+    .chart-container,
+    .chart-shell
+  ) canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_toolbar__"],
+    [class*="_chartToolbar__"],
+    .chart-toolbar
+  ) {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_tickerSearch__"],
+    [class*="_symbolForm__"],
+    .ticker-search,
+    .symbol-form
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  /* ---------- Screener ---------- */
+  body[data-anatole-section="screener"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-header,
+    .screener-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-filters,
+    .filter-grid,
+    [class*="_filters__"],
+    [class*="_filterGrid__"],
+    [class*="_advancedFilters__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2, minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .preset-tabs,
+    .screener-tabs,
+    [class*="_preset__"],
+    [class*="_tabs__"]
+  ) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding-bottom: 3px;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-summary,
+    [class*="_summaryGrid__"],
+    [class*="_metricGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .result-actions,
+    [class*="_actions__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 7px !important;
+  }
+
+  /* ---------- Actualités ---------- */
+  body[data-anatole-section="actualites"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-header,
+    .news-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-filters,
+    [class*="_filters__"],
+    [class*="_filterGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-list,
+    .news-grid,
+    [class*="_newsList__"],
+    [class*="_newsGrid__"],
+    [class*="_articleGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) h2,
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) h3 {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .sentiment-chart,
+    .category-chart,
+    [class*="_chart__"]
+  ) {
+    min-height: 260px !important;
+  }
+
+  /* ---------- Calendrier ---------- */
+  body[data-anatole-section="calendrier"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-header,
+    .calendar-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-filters,
+    [class*="_filters__"],
+    [class*="_filterGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .event-list,
+    .event-grid,
+    [class*="_eventList__"],
+    [class*="_eventGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .month-grid,
+    .calendar-grid,
+    [class*="_monthGrid__"],
+    [class*="_calendarGrid__"]
+  ) {
+    width: 100% !important;
+    min-width: 350px;
+    grid-template-columns:
+      repeat(7,minmax(42px,1fr))
+      !important;
+    gap: 4px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-canvas,
+    .calendar-scroll,
+    [class*="_calendarCanvas__"],
+    [class*="_calendarScroll__"]
+  ) {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---------- ETF directory and ETF detail ---------- */
+  body[data-anatole-section="etf"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 0
+      calc(18px + var(--mobile-safe-bottom))
+      !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_hero__"] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 15px !important;
+    padding: 18px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] > div {
+    min-height: 78px;
+    align-content: center;
+    justify-items: start !important;
+    padding: 12px;
+    border: 1px solid
+      rgba(38, 91, 120, .72);
+    border-radius: 13px;
+    background:
+      rgba(5, 25, 38, .72);
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] strong {
+    font-size: 27px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_liveBar__"] {
+    min-height: 0 !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+    padding: 11px 13px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_filters__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_search__"] {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-height: 46px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_selectField__"] {
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel {
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    align-items: start !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header > div:last-child {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 7px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header label {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel svg {
+    width: 100% !important;
+    height:
+      clamp(520px, 142vw, 690px)
+      !important;
+    display: block;
+    touch-action: manipulation;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main :is(
+    [class*="_detailGrid__"],
+    [class*="_holdingGrid__"],
+    [class*="_compositionGrid__"],
+    [class*="_performanceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_footer__"] {
+    padding: 7px 3px
+      calc(8px + var(--mobile-safe-bottom))
+      !important;
+    font-size: 8px !important;
+    line-height: 1.45;
+  }
+
+  /* ---------- IPO & insiders ---------- */
+  body[data-anatole-section="ipo-insiders"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 0
+      calc(18px + var(--mobile-safe-bottom))
+      !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_hero__"] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    align-items: start !important;
+    gap: 15px !important;
+    padding: 18px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_heroMetrics__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_heroMetrics__"] > div {
+    min-height: 78px;
+    align-content: center;
+    justify-items: start !important;
+    padding: 12px;
+    border: 1px solid
+      rgba(38, 91, 120, .72);
+    border-radius: 13px;
+    background:
+      rgba(5, 25, 38, .72);
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTabs__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(154px,1fr))
+      !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTab__"] {
+    min-height: 58px !important;
+    padding: 9px 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_metricGrid__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_filters__"],
+    [class*="_insiderControls__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_search__"],
+    [class*="_tickerForm__"]
+  ) {
+    grid-column: 1 / -1;
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_tickerForm__"] {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    align-items: end !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_panelHeader__"] {
+    min-height: 0 !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 9px !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_panelHeader__"] p {
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_ipoGrid__"],
+    [class*="_sourceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_ipoCard__"] {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_flowPanel__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_sourcesPanel__"] > header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  /* ---------- Psychologie ---------- */
+  body[data-anatole-section="psychologie"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-header,
+    .psychology-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 13px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-grid,
+    .sentiment-grid,
+    [class*="_contentGrid__"],
+    [class*="_sentimentGrid__"],
+    [class*="_psychologyGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .fear-greed-gauge,
+    .sentiment-gauge,
+    [class*="_gauge__"],
+    [class*="_Gauge__"]
+  ) {
+    width: min(100%, 380px) !important;
+    min-height: 250px !important;
+    margin-inline: auto !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-filters,
+    [class*="_filters__"],
+    [class*="_controls__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .ticker-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  /* ---------- Watchlist ---------- */
+  body[data-anatole-section="watchlist"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-header,
+    .watchlist-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-form,
+    .add-symbol-form,
+    [class*="_addForm__"],
+    [class*="_tickerForm__"],
+    [class*="_searchForm__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-grid,
+    .watchlist-list,
+    [class*="_watchlistGrid__"],
+    [class*="_watchlistList__"],
+    [class*="_cardGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-card,
+    [class*="_watchlistCard__"],
+    [class*="_quoteCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .row-actions,
+    [class*="_actions__"]
+  ) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 7px !important;
+  }
+
+  /* ---------- Préférences ---------- */
+  body[data-anatole-section="preferences"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preferences-header,
+    .preferences-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preferences-grid,
+    [class*="_preferencesGrid__"],
+    [class*="_settingsGrid__"],
+    [class*="_contentGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preference-section,
+    .settings-card,
+    [class*="_section__"],
+    [class*="_settingsCard__"]
+  ) {
+    max-width: 100% !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .setting-row,
+    .preference-row,
+    [class*="_settingRow__"],
+    [class*="_preferenceRow__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .theme-grid,
+    .option-grid,
+    [class*="_themeGrid__"],
+    [class*="_optionGrid__"],
+    [class*="_choiceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .save-bar,
+    .form-actions,
+    [class*="_saveBar__"],
+    [class*="_formActions__"]
+  ) {
+    position: static !important;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .save-bar,
+    .form-actions,
+    [class*="_saveBar__"],
+    [class*="_formActions__"]
+  ) button {
+    width: 100% !important;
+  }
+
+  /* ---------- Roadmap ---------- */
+  body[data-anatole-section="roadmap"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-header,
+    .roadmap-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-grid,
+    .phase-grid,
+    .feature-grid,
+    [class*="_roadmapGrid__"],
+    [class*="_phaseGrid__"],
+    [class*="_featureGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-card,
+    .phase-card,
+    .feature-card,
+    [class*="_roadmapCard__"],
+    [class*="_phaseCard__"],
+    [class*="_featureCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main [id] {
+    scroll-margin-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        14px
+      );
+  }
+
+}
+
+/* ---------- Small screen refinements ---------- */
+@media (max-width: 560px) {
+    body[data-anatole-section]
+    .app-main :is(
+      .filters,
+      .filter-grid,
+      .filter-panel,
+      [class*="_filters__"],
+      [class*="_filterGrid__"],
+      [class*="_filterPanel__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="screener"]
+    .app-main :is(
+      .screener-filters,
+      .filter-grid,
+      [class*="_filters__"],
+      [class*="_filterGrid__"],
+      [class*="_advancedFilters__"]
+    ),
+    body[data-anatole-section="actualites"]
+    .app-main :is(
+      .news-filters,
+      [class*="_filters__"],
+      [class*="_filterGrid__"]
+    ),
+    body[data-anatole-section="calendrier"]
+    .app-main :is(
+      .calendar-filters,
+      [class*="_filters__"],
+      [class*="_filterGrid__"]
+    ),
+    body[data-anatole-section="etf"]
+    .app-main [class*="_filters__"],
+    body[data-anatole-section="ipo-insiders"]
+    .app-main :is(
+      [class*="_filters__"],
+      [class*="_insiderControls__"]
+    ),
+    body[data-anatole-section="psychologie"]
+    .app-main :is(
+      .psychology-filters,
+      [class*="_filters__"],
+      [class*="_controls__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="etf"]
+    .app-main .panel > header > div:last-child {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_summaryGrid__"],
+      [class*="_statsGrid__"],
+      [class*="_indicatorGrid__"],
+      [class*="_fundamentalGrid__"],
+      [class*="_ownershipGrid__"],
+      [class*="_scenarioGrid__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="watchlist"]
+    .app-main :is(
+      .watchlist-form,
+      .add-symbol-form,
+      [class*="_addForm__"],
+      [class*="_tickerForm__"],
+      [class*="_searchForm__"]
+    ),
+    body[data-anatole-section="ipo-insiders"]
+    .app-main [class*="_tickerForm__"],
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_tickerSearch__"],
+      [class*="_symbolForm__"],
+      .ticker-search,
+      .symbol-form
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="watchlist"]
+    .app-main :is(
+      .watchlist-form,
+      .add-symbol-form,
+      [class*="_addForm__"],
+      [class*="_tickerForm__"],
+      [class*="_searchForm__"]
+    ) button,
+    body[data-anatole-section="ipo-insiders"]
+    .app-main [class*="_tickerForm__"] button,
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_tickerSearch__"],
+      [class*="_symbolForm__"],
+      .ticker-search,
+      .symbol-form
+    ) button {
+      width: 100% !important;
+    }
 }
 
 @media (max-width: 430px) {

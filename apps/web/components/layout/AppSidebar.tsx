@@ -184,6 +184,32 @@ function isActive(
   return pathname === item.href;
 }
 
+function mobileSectionFromPath(
+  pathname: string,
+): string {
+  if (pathname.startsWith("/focus")) {
+    return "focus";
+  }
+
+  if (pathname.startsWith("/etf")) {
+    return "etf";
+  }
+
+  if (
+    pathname === "/ipo-insiders" ||
+    pathname.startsWith("/ipo") ||
+    pathname.startsWith("/insiders")
+  ) {
+    return "ipo-insiders";
+  }
+
+  const firstSegment = pathname
+    .split("/")
+    .filter(Boolean)[0];
+
+  return firstSegment || "cockpit";
+}
+
 function openSearchFallback(): void {
   window.dispatchEvent(
     new CustomEvent("anatole:open-search"),
@@ -206,6 +232,11 @@ export function AppSidebar({
   const [drawerOpen, setDrawerOpen] =
     useState(false);
 
+  const mobileSection = useMemo(
+    () => mobileSectionFromPath(pathname),
+    [pathname],
+  );
+
   const activeLabel = useMemo(() => {
     for (const group of groups) {
       const active = group.items.find(
@@ -224,6 +255,25 @@ export function AppSidebar({
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    document.body.dataset.anatoleSection =
+      mobileSection;
+    document.body.dataset.anatolePath =
+      pathname;
+
+    return () => {
+      if (
+        document.body.dataset
+          .anatolePath === pathname
+      ) {
+        delete document.body.dataset
+          .anatoleSection;
+        delete document.body.dataset
+          .anatolePath;
+      }
+    };
+  }, [mobileSection, pathname]);
 
   useEffect(() => {
     document.body.classList.toggle(
