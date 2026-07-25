@@ -604,7 +604,7 @@ export function MarketHeatmap({
       null,
     );
   const canvasRef =
-    useRef<HTMLDivElement>(
+    useRef<HTMLDivElement | null>(
       null,
     );
   const [canvasSize, setCanvasSize] =
