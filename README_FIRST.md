@@ -1,30 +1,59 @@
-# Anatole — Search Fix v4.2.2
+# Anatole — Correctif final API 502 v1
 
-Ce correctif rend le bouton **Recherche** réellement fonctionnel sur mobile et ordinateur.
+Ce paquet corrige les causes applicatives principales des 502 :
 
-## Ce qui est corrigé
+1. un `httpx.AsyncClient` était recréé dans les chemins chauds;
+2. le Cockpit pouvait lancer près de 60 appels Yahoo en rafale;
+3. l'ETF relançait jusqu'à 28 titres par lot toutes les 45 secondes;
+4. Focus dupliquait les appels de cotation via `quote`, `history` et `profile`;
+5. chaque WebSocket réinterrogeait le fournisseur toutes les 5 secondes;
+6. le frontend affichait immédiatement le premier 502 sans retry.
 
-- le bouton loupe ouvre maintenant une vraie fenêtre de recherche;
-- le bouton « Rechercher » dans la barre latérale ouvre la même fenêtre;
-- `Ctrl + K` et `⌘ + K` ouvrent la recherche;
-- saisie d’un symbole comme `RY`, `SHOP` ou `MDA` → ouverture directe de la page Focus;
-- recherche des sections : Cockpit, Screener, Actualités, Calendrier, ETF, IPO & insiders, Psychologie, Watchlist et Préférences;
-- navigation clavier avec ↑, ↓ et Entrée;
-- fermeture avec Échap, le bouton X ou un clic à l’extérieur.
+## Installation
 
-## Fichiers à remplacer
+Copier le contenu de ce ZIP à la racine du dépôt Anatole et accepter les
+remplacements.
 
-- `apps/web/components/layout/AppSidebar.tsx`
-- `apps/web/components/layout/AppSidebarGuard.module.css`
+Fichiers ajoutés :
 
-Les autres fichiers du ZIP sont repris de la version d’urgence v4.2.1 afin de permettre une installation complète si nécessaire.
+- `apps/api/app/core/resilience.py`
+- `apps/web/lib/resilient-fetch.ts`
 
-## Déploiement
+Fichiers remplacés :
 
-1. Copier le dossier `apps/` à la racine du dépôt.
-2. Commit et push.
-3. Vercel → Redeploy.
-4. Désactiver `Use existing Build Cache`.
-5. Rechargement forcé du navigateur.
+- `apps/api/app/services/session_quotes.py`
+- `apps/api/app/services/market_data.py`
+- `apps/api/app/services/etf_service.py`
+- `apps/api/app/api/routes/ws.py`
+- `apps/api/app/api/routes/health.py`
+- `apps/api/app/main.py`
+- `apps/web/lib/api.ts`
+- `render.yaml`
 
-Aucun changement Render ou FastAPI n’est requis.
+## Déploiement dans l'ordre
+
+1. Commit et push.
+2. Render : synchroniser le Blueprint ou redeployer l'API.
+3. Attendre que `https://anatole-api.onrender.com/health` retourne `status=ok`.
+4. Vérifier `https://anatole-api.onrender.com/ready`.
+5. Vercel : redeployer le frontend sans cache.
+6. Tester Cockpit, ETF, Focus et Psychologie simultanément.
+
+## Important
+
+Le fichier actif du répertoire ETF doit être :
+
+`apps/api/app/services/etf_service.py`
+
+Si ton dépôt utilise encore un nom temporaire comme
+`etf_service_live_refresh.py`, copie le contenu du nouveau `etf_service.py`
+dans le fichier réellement importé par `discovery.py`, puis supprime le
+doublon temporaire.
+
+## Render
+
+Pour supprimer aussi les cold starts, l'API doit utiliser une instance Render
+payante. Pour une disponibilité forte malgré le redémarrage d'une machine,
+utiliser deux instances. Le code de ce paquet élimine la surcharge applicative,
+mais une instance gratuite unique ne peut pas offrir une garantie absolue de
+zéro interruption.

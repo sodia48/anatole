@@ -4,8 +4,16 @@ services:
     runtime: python
     rootDir: apps/api
     buildCommand: pip install -e .
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    startCommand: >-
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port $PORT
+      --workers 1
+      --timeout-keep-alive 30
+      --limit-concurrency 100
+      --backlog 2048
     healthCheckPath: /health
+    maxShutdownDelaySeconds: 60
     envVars:
       - key: APP_ENV
         value: production
@@ -13,3 +21,23 @@ services:
         value: yahoo
       - key: CORS_ORIGINS
         sync: false
+      - key: UPSTREAM_MAX_CONCURRENCY
+        value: "6"
+      - key: UPSTREAM_MAX_CONNECTIONS
+        value: "12"
+      - key: UPSTREAM_MAX_KEEPALIVE
+        value: "6"
+      - key: UPSTREAM_REQUEST_ATTEMPTS
+        value: "3"
+      - key: QUOTE_CACHE_TTL_SECONDS
+        value: "25"
+      - key: QUOTE_STALE_TTL_SECONDS
+        value: "1800"
+      - key: HISTORY_INTRADAY_TTL_SECONDS
+        value: "30"
+      - key: HISTORY_INTRADAY_STALE_SECONDS
+        value: "1800"
+      - key: HISTORY_DAILY_TTL_SECONDS
+        value: "300"
+      - key: HISTORY_DAILY_STALE_SECONDS
+        value: "86400"
