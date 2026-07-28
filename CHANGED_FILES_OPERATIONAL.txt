@@ -1,0 +1,27 @@
+FICHIERS BACKEND MODIFIÉS
+apps/api/app/api/router.py
+apps/api/app/api/routes/health.py
+apps/api/app/services/cockpit.py
+apps/api/app/services/etf.py
+apps/api/app/services/fundamentals.py
+apps/api/app/services/market_data.py
+
+TESTS BACKEND MODIFIÉS / AJOUTÉS
+apps/api/tests/test_discovery.py
+apps/api/tests/test_etf_live_treemap.py
+apps/api/tests/test_operational_routes.py
+
+FICHIERS FRONTEND MODIFIÉS
+apps/web/lib/api.ts
+apps/web/lib/ipo-insiders-api.ts
+apps/web/next.config.ts
+
+FICHIER À SUPPRIMER
+apps/web/app/route_anatole_proxy.ts
+
+VÉRIFICATION / DOCUMENTATION
+verify_restore.py
+README_FIRST.md
+INSTALLATION.md
+VALIDATION.md
+CHANGED_FILES_OPERATIONAL.txt

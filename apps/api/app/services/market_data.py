@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import math
 import os
 import random
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Awaitable, Callable, TypeVar
 
+from app.core.config import settings
 from app.core.resilience import AsyncStaleCache, shared_http_client
 from app.schemas.stocks import (
     Candle,
@@ -16,6 +19,10 @@ from app.schemas.stocks import (
 )
 from app.services.indicators import calculate_technicals
 from app.services.session_quotes import session_quote_service
+
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class DemoProvider:
@@ -81,7 +88,12 @@ class DemoProvider:
             price = close
         return output
 
-    async def quote(self, ticker: str) -> Quote:
+    async def quote(
+        self,
+        ticker: str,
+        *,
+        source: str = "demo-explicit",
+    ) -> Quote:
         history = await self.history(ticker, "1mo", "1d")
         last, previous = history[-1], history[-2]
         normalized = self.normalize_ticker(ticker)
@@ -100,7 +112,7 @@ class DemoProvider:
             day_low=last.low,
             volume=last.volume,
             timestamp=datetime.now(UTC),
-            source="demo-explicit",
+            source=source,
             delayed=True,
         )
 
@@ -251,25 +263,105 @@ class MarketDataService:
 
     @property
     def demo_mode(self) -> bool:
-        return os.getenv("MARKET_DATA_PROVIDER", "yahoo").lower() == "demo"
+        return settings.market_data_provider.lower() == "demo"
 
     def normalize_ticker(self, ticker: str) -> str:
         return self.yahoo.normalize_ticker(ticker)
 
+    async def _with_fallback(
+        self,
+        primary: Callable[[], Awaitable[T]],
+        fallback: Callable[[], Awaitable[T]],
+        *,
+        label: str,
+    ) -> T:
+        if self.demo_mode:
+            return await fallback()
+
+        try:
+            return await primary()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "market_data_fallback label=%s error=%s detail=%s",
+                label,
+                type(error).__name__,
+                error,
+            )
+            return await fallback()
+
     async def get_quote(self, ticker: str) -> Quote:
         if self.demo_mode:
-            return await self.demo.quote(ticker)
-        return await self.yahoo.quote(ticker)
+            return await self.demo.quote(
+                ticker,
+                source="demo-explicit",
+            )
+
+        return await self._with_fallback(
+            lambda: self.yahoo.quote(ticker),
+            lambda: self.demo.quote(
+                ticker,
+                source="demo-fallback",
+            ),
+            label=f"quote:{ticker}",
+        )
 
     async def get_quotes(self, tickers: list[str]) -> list[Quote]:
+        unique: list[str] = []
+        seen: set[str] = set()
+        for ticker in tickers:
+            clean = ticker.strip().upper()
+            if clean and clean not in seen:
+                seen.add(clean)
+                unique.append(ticker)
+
         if self.demo_mode:
-            import asyncio
             return list(
                 await asyncio.gather(
-                    *(self.demo.quote(ticker) for ticker in tickers)
+                    *(
+                        self.demo.quote(
+                            ticker,
+                            source="demo-explicit",
+                        )
+                        for ticker in unique
+                    )
                 )
             )
-        return await session_quote_service.get_quotes(tickers)
+
+        public_quotes = await session_quote_service.get_quotes(unique)
+        public_by_symbol = {
+            quote.symbol.replace("-", ".").upper(): quote
+            for quote in public_quotes
+        }
+
+        missing = [
+            ticker
+            for ticker in unique
+            if ticker.strip().upper().replace("-", ".")
+            not in public_by_symbol
+        ]
+        fallback_quotes = await asyncio.gather(
+            *(
+                self.demo.quote(
+                    ticker,
+                    source="demo-fallback",
+                )
+                for ticker in missing
+            )
+        )
+        fallback_by_symbol = {
+            quote.symbol.replace("-", ".").upper(): quote
+            for quote in fallback_quotes
+        }
+
+        output: list[Quote] = []
+        for ticker in unique:
+            key = ticker.strip().upper().replace("-", ".")
+            quote = public_by_symbol.get(key) or fallback_by_symbol.get(key)
+            if quote is not None:
+                output.append(quote)
+        return output
 
     async def get_history(
         self,
@@ -277,13 +369,38 @@ class MarketDataService:
         range_: str = "1y",
         interval: str = "1d",
     ) -> list[Candle]:
-        if self.demo_mode:
-            return await self.demo.history(ticker, range_, interval)
-        return await self.yahoo.history(ticker, range_, interval)
+        return await self._with_fallback(
+            lambda: self.yahoo.history(ticker, range_, interval),
+            lambda: self.demo.history(ticker, range_, interval),
+            label=f"history:{ticker}:{range_}:{interval}",
+        )
+
+    async def get_history_many(
+        self,
+        tickers: list[str],
+        *,
+        range_: str = "1y",
+        interval: str = "1d",
+        concurrency: int = 6,
+    ) -> dict[str, list[Candle]]:
+        semaphore = asyncio.Semaphore(max(1, min(concurrency, 8)))
+
+        async def load(ticker: str) -> tuple[str, list[Candle]]:
+            async with semaphore:
+                candles = await self.get_history(
+                    ticker,
+                    range_=range_,
+                    interval=interval,
+                )
+                return ticker, candles
+
+        pairs = await asyncio.gather(*(load(ticker) for ticker in tickers))
+        return dict(pairs)
 
     async def get_profile(self, ticker: str) -> StockProfile:
         if self.demo_mode:
             return await self.demo.profile(ticker)
+
         quote = await self.get_quote(ticker)
         return self.yahoo.profile_from_quote(quote)
 
@@ -299,9 +416,6 @@ class MarketDataService:
         range_: str = "1y",
         interval: str = "1d",
     ) -> FocusSnapshot:
-        # Deux appels maximum : une cotation + un historique.
-        # Le profil est construit à partir de la cotation déjà reçue.
-        import asyncio
         quote, history = await asyncio.gather(
             self.get_quote(ticker),
             self.get_history(ticker, range_, interval),

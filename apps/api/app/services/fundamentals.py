@@ -80,7 +80,7 @@ def timestamp(value: Any) -> datetime | None:
 
 def percent(value: Any) -> float | None:
     parsed = number(value)
-    return parsed * 100 if parsed is not None else None
+    return round(parsed * 100, 10) if parsed is not None else None
 
 
 def safe_div(

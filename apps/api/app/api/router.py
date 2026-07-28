@@ -2,8 +2,10 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     discovery,
+    etf_holdings,
     fundamentals,
     health,
+    ipo_insiders,
     market,
     search,
     stocks,
@@ -44,11 +46,25 @@ api_router.include_router(
     tags=["search"],
 )
 
-# Screener, actualités, calendrier, ETF, IPO, initiés et psychologie
+# Screener, actualités, calendrier, répertoire ETF et psychologie
 api_router.include_router(
     discovery.router,
     prefix="/api/v1/discovery",
     tags=["discovery"],
+)
+
+# Participations et historique détaillé des ETF
+api_router.include_router(
+    etf_holdings.router,
+    prefix="/api/v1/discovery/etfs",
+    tags=["etf-holdings"],
+)
+
+# IPO et transactions d'initiés
+api_router.include_router(
+    ipo_insiders.router,
+    prefix="/api/v1/discovery",
+    tags=["ipo-insiders"],
 )
 
 # Flux de cotations WebSocket

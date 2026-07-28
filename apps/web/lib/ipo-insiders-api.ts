@@ -1,3 +1,5 @@
+import { resilientFetch } from "./resilient-fetch";
+
 export type IpoInstrumentType =
   | "company"
   | "etf"
@@ -125,7 +127,12 @@ export type InsiderSnapshot = {
 };
 
 function apiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api/anatole";
+  }
+
   const configured =
+    process.env.ANATOLE_API_URL ??
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.NEXT_PUBLIC_API_BASE_URL ??
     "https://anatole-api.onrender.com";
@@ -137,13 +144,15 @@ async function apiGet<T>(
   path: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(
+  const response = await resilientFetch(
     `${apiBaseUrl()}${path}`,
     {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
       signal,
+      retries: 2,
+      timeoutMs: 45_000,
     },
   );
 

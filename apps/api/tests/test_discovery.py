@@ -46,7 +46,7 @@ def test_etf_directory_with_demo_provider() -> None:
         payload = response.json()
         assert len(payload["items"]) >= 25
         assert any(item["symbol"] == "XIC" for item in payload["items"])
-        assert "Obligations" in payload["categories"]
+        assert "Obligations et liquidités" in payload["categories"]
     finally:
         settings.market_data_provider = original
         etf_service._cached = None

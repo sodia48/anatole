@@ -1,42 +1,38 @@
-# Anatole Signature Mobile v4.2 — ETF Black Canvas Hotfix
+# Installation — Anatole Operational Final v1
 
-## Cause corrigée
+## Option recommandée : paquet PATCH
 
-La version v4.1 attendait que `ResizeObserver` fournisse une largeur et une
-hauteur avant de calculer les groupes. Si cette mesure restait à `0 × 0`
-pendant l’hydratation mobile, le fond de la heatmap était visible mais aucun
-groupe ni ETF n’était rendu.
+Décompresser `Anatole_Operational_Final_v1_PATCH.zip` à la racine du dépôt.
+Les chemins contenus dans le ZIP correspondent directement aux chemins GitHub.
 
-La v4.2 n’utilise plus `ResizeObserver`. Le calcul possède immédiatement un
-viewport mobile ou ordinateur valide, puis positionne les groupes en
-pourcentages. La carte ne peut donc plus rester vide et noire à cause d’une
-mesure absente.
+Supprimer ensuite :
 
-## Fichiers à remplacer / ajouter
+`apps/web/app/route_anatole_proxy.ts`
 
-- REMPLACER :
-  `apps/web/components/etf/EtfHeatmap.tsx`
+Ce fichier est obsolète. Le relais correct est déjà défini dans
+`apps/web/next.config.ts` avec la réécriture `/api/anatole/:path*`.
 
-- AJOUTER :
-  `apps/web/components/etf/EtfHeatmap.module.css`
+## Ordre obligatoire
 
-Le nouveau composant importe son propre module CSS. Il ne dépend plus du CSS
-du Cockpit pour fonctionner.
+1. Commit et push.
+2. Render : déployer `anatole-api`.
+3. Tester les sept URL indiquées dans `README_FIRST.md`.
+4. Vercel : déployer le frontend seulement après la réussite des routes Render.
+5. Désactiver la réutilisation du Build Cache pour ce premier déploiement.
 
-## Résultat
+## Configuration Render
 
-- tous les ETF filtrés sont affichés;
-- aucun sélecteur 50/100 ne limite les titres;
-- même structure visuelle que la heatmap du Cockpit;
-- toute la surface disponible est utilisée;
-- aucun canevas vide pendant l’hydratation;
-- fonctionnement mobile et ordinateur conservé;
-- aucun changement FastAPI ou Render.
+- Root Directory : `apps/api`
+- Build Command : `pip install -e .`
+- Start Command : celui défini dans `render.yaml`
+- Health Check Path : `/health`
 
-## Déploiement
+Le fichier `apps/api/pyproject.toml` contient les dépendances des participations
+ETF et des transactions d’initiés, notamment `pandas` et `yfinance`.
 
-1. Copier les deux fichiers aux chemins exacts.
-2. Commit et push.
-3. Vercel → Redeploy.
-4. Désactiver `Use existing Build Cache`.
-5. Sur iPhone, fermer totalement Safari puis rouvrir `/etf`.
+## Configuration Vercel
+
+- Root Directory : laisser la configuration actuelle du monorepo si elle
+  fonctionnait auparavant.
+- `NEXT_PUBLIC_API_URL=https://anatole-api.onrender.com`
+- `ANATOLE_API_URL=https://anatole-api.onrender.com` recommandé.

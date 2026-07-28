@@ -1,0 +1,74 @@
+{
+  "CHANGED_FILES_OPERATIONAL.txt": {
+    "sha256": "9797f11572b29efe1c31068e349232f04cffd99e5698bbfb78cbb12adaeaba92",
+    "bytes": 665
+  },
+  "DELETE_FILES.txt": {
+    "sha256": "8383cdf2ab7a43a8d9e79b42af3ebfd74abf628a332591676055574028a8b48f",
+    "bytes": 99
+  },
+  "INSTALLATION.md": {
+    "sha256": "07adbde8d750a909bec47eed037da26224d1d432f3c3087072c2d36569909f51",
+    "bytes": 1324
+  },
+  "README_FIRST.md": {
+    "sha256": "21eb3b5676573e99c3f1a091320e3b6235011f73f8693a02479c2e6f8770817d",
+    "bytes": 2576
+  },
+  "VALIDATION.md": {
+    "sha256": "15da399b73effd8e7f537b15cda1c64b3a1d60e2fe5c0d3f0b33ed6ec93b7d4a",
+    "bytes": 1796
+  },
+  "apps/api/app/api/router.py": {
+    "sha256": "1e80d52060a83bb4d39700904aa5d135090051370d99e9912bbb1d130056c9f5",
+    "bytes": 1441
+  },
+  "apps/api/app/api/routes/health.py": {
+    "sha256": "053d0c5df1a285e70975bb28915018a9e9953ac2da2739686a77ad43202ee4ef",
+    "bytes": 705
+  },
+  "apps/api/app/services/cockpit.py": {
+    "sha256": "d88e326ae80eb45d6515b07cbd6da059f57b02354aa0f1dd88d08f5ce371a095",
+    "bytes": 6381
+  },
+  "apps/api/app/services/etf.py": {
+    "sha256": "a5e314fb015bc1fa1d71930c1af94ff8db0dca5f5c26b63a06c427b1a388d674",
+    "bytes": 9214
+  },
+  "apps/api/app/services/fundamentals.py": {
+    "sha256": "57573c890deda336ee5c407c40a0f47fc1d267e5844e655367cf2cc78a0350a3",
+    "bytes": 34290
+  },
+  "apps/api/app/services/market_data.py": {
+    "sha256": "a63ca463be25068684ac2f801a96b20f3f3513f11c11fab3e3de4678a6526f3c",
+    "bytes": 13693
+  },
+  "apps/api/tests/test_discovery.py": {
+    "sha256": "81ea693bc1aff013230877f3f23aa8a5952a37832083a4abbc4f9f01e68f2efb",
+    "bytes": 4313
+  },
+  "apps/api/tests/test_etf_live_treemap.py": {
+    "sha256": "682b112101068c5e4725900885723c9a848821a23811765e88784f1725b3aa1a",
+    "bytes": 710
+  },
+  "apps/api/tests/test_operational_routes.py": {
+    "sha256": "a26c5dea991e2505fde256f9c9d6e1ac767206f932c7de0cdffd05a67e18ca8e",
+    "bytes": 3348
+  },
+  "apps/web/lib/api.ts": {
+    "sha256": "ff6c41826057795035ad6be9109973b0a575e664e21517fda316f09de7664ab8",
+    "bytes": 4301
+  },
+  "apps/web/lib/ipo-insiders-api.ts": {
+    "sha256": "d24458ee4fd5e2e73ff6c278ef7ff1167763fda7bddd7ec6ff687d8e35f3cf87",
+    "bytes": 4563
+  },
+  "apps/web/next.config.ts": {
+    "sha256": "db8dd6b7b1bf26235453091d7ee509f6ec60e70080e648f5190d0133b7c3f031",
+    "bytes": 485
+  },
+  "verify_restore.py": {
+    "sha256": "4facfe4f2ebec7fb50892602723545c8b541269dd5de3d8d37756455c6a17ee3",
+    "bytes": 3065
+  }
+}

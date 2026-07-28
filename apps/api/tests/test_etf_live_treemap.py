@@ -12,7 +12,7 @@ def test_etf_snapshot_keeps_complete_catalog() -> None:
     assert len(snapshot.items) == len(ETF_CATALOG)
     assert len(snapshot.items) >= 100
     assert snapshot.categories
-    assert snapshot.refresh_after_seconds == 15
+    assert snapshot.refresh_after_seconds == 60
 
 
 def test_etf_items_are_groupable_and_quote_ready() -> None:

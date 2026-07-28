@@ -17,11 +17,11 @@ from app.schemas.discovery import (
 from app.services.market_data import market_data_service
 
 
-CLIENT_REFRESH_SECONDS = 15
-FULL_REFRESH_SECONDS = 45
-QUOTE_BATCH_SIZE = 28
-QUOTE_TIMEOUT_SECONDS = 14
-COLD_START_TIMEOUT_SECONDS = 5
+CLIENT_REFRESH_SECONDS = 60
+FULL_REFRESH_SECONDS = 300
+QUOTE_BATCH_SIZE = 8
+QUOTE_TIMEOUT_SECONDS = 12
+COLD_START_TIMEOUT_SECONDS = 2.5
 
 
 def _chunks(
@@ -150,7 +150,7 @@ class EtfDirectoryService:
                 return
 
             self._cold_start_attempted = True
-            priority = list(PRIORITY_ETF_TICKERS)[:36]
+            priority = list(PRIORITY_ETF_TICKERS)[:QUOTE_BATCH_SIZE]
 
             try:
                 await asyncio.wait_for(
@@ -178,7 +178,7 @@ class EtfDirectoryService:
             ):
                 await self._refresh_batch(batch)
                 # A tiny pause prevents a burst of public-data requests.
-                await asyncio.sleep(0.35)
+                await asyncio.sleep(0.8)
 
             self._last_full_refresh = monotonic()
         finally:

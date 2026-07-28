@@ -1,59 +1,63 @@
-# Anatole — Correctif final API 502 v1
+# Anatole — restauration opérationnelle finale
 
-Ce paquet corrige les causes applicatives principales des 502 :
+Ce dépôt a été vérifié à partir du ZIP complet `anatole-main.zip`.
+Le correctif restaure ensemble :
 
-1. un `httpx.AsyncClient` était recréé dans les chemins chauds;
-2. le Cockpit pouvait lancer près de 60 appels Yahoo en rafale;
-3. l'ETF relançait jusqu'à 28 titres par lot toutes les 45 secondes;
-4. Focus dupliquait les appels de cotation via `quote`, `history` et `profile`;
-5. chaque WebSocket réinterrogeait le fournisseur toutes les 5 secondes;
-6. le frontend affichait immédiatement le premier 502 sans retry.
+- le Screener TSX 60;
+- le répertoire ETF;
+- les participations et l’historique détaillé des ETF;
+- les IPO;
+- les transactions d’initiés;
+- la façade API utilisée par le frontend Vercel.
 
-## Installation
+## Causes trouvées dans le dépôt
 
-Copier le contenu de ce ZIP à la racine du dépôt Anatole et accepter les
-remplacements.
+1. Le Screener appelait `market_data_service.get_history_many(...)`, mais cette
+   méthode n’existait plus. La route répondait donc HTTP 500.
+2. Les fichiers de routes ETF détaillés et IPO/initiés existaient, mais ils
+   n’étaient pas montés dans `app/api/router.py`. Les endpoints répondaient 404.
+3. `apps/web/lib/api.ts` avait perdu plusieurs exports, notamment
+   `getHealthStatus`, ce qui faisait échouer `pnpm run build` sur Vercel.
+4. La watchlist utilisait une requête GET alors que FastAPI attend une requête
+   POST.
+5. Un ancien fichier de relais était placé au mauvais endroit dans `app/`.
+6. Le service ETF actif envoyait des lots trop importants et trop fréquents.
 
-Fichiers ajoutés :
+## Installation recommandée
 
-- `apps/api/app/core/resilience.py`
-- `apps/web/lib/resilient-fetch.ts`
+Utiliser `Anatole_Operational_Final_v1_PATCH.zip` :
 
-Fichiers remplacés :
+1. Décompresser le ZIP à la racine du dépôt.
+2. Accepter tous les remplacements.
+3. Supprimer le fichier indiqué dans `DELETE_FILES.txt`.
+4. Commit et push sur `main`.
+5. Déployer Render avant Vercel.
 
-- `apps/api/app/services/session_quotes.py`
-- `apps/api/app/services/market_data.py`
-- `apps/api/app/services/etf_service.py`
-- `apps/api/app/api/routes/ws.py`
-- `apps/api/app/api/routes/health.py`
-- `apps/api/app/main.py`
-- `apps/web/lib/api.ts`
-- `render.yaml`
+Le ZIP complet est fourni comme copie de sécurité du dépôt corrigé.
 
-## Déploiement dans l'ordre
+## Vérification Render
 
-1. Commit et push.
-2. Render : synchroniser le Blueprint ou redeployer l'API.
-3. Attendre que `https://anatole-api.onrender.com/health` retourne `status=ok`.
-4. Vérifier `https://anatole-api.onrender.com/ready`.
-5. Vercel : redeployer le frontend sans cache.
-6. Tester Cockpit, ETF, Focus et Psychologie simultanément.
+Quand le déploiement Render est vert, ouvrir dans cet ordre :
 
-## Important
+- `https://anatole-api.onrender.com/health`
+- `https://anatole-api.onrender.com/api/v1/discovery/screener?universe=tsx60`
+- `https://anatole-api.onrender.com/api/v1/discovery/etfs`
+- `https://anatole-api.onrender.com/api/v1/discovery/etfs/XIC/holdings?limit=5`
+- `https://anatole-api.onrender.com/api/v1/discovery/etfs/XIC/history?range=1mo`
+- `https://anatole-api.onrender.com/api/v1/discovery/ipo?limit=5`
+- `https://anatole-api.onrender.com/api/v1/discovery/insiders?market=canada&days=30&scan_limit=2&limit=5`
 
-Le fichier actif du répertoire ETF doit être :
+Les routes doivent répondre en JSON et ne plus retourner 404 ou 500.
 
-`apps/api/app/services/etf_service.py`
+## Déploiement Vercel
 
-Si ton dépôt utilise encore un nom temporaire comme
-`etf_service_live_refresh.py`, copie le contenu du nouveau `etf_service.py`
-dans le fichier réellement importé par `discovery.py`, puis supprime le
-doublon temporaire.
+Après la validation Render :
 
-## Render
+1. Vérifier la variable :
+   `NEXT_PUBLIC_API_URL=https://anatole-api.onrender.com`
+2. Facultatif mais recommandé :
+   `ANATOLE_API_URL=https://anatole-api.onrender.com`
+3. Lancer un nouveau déploiement sans réutiliser l’ancien Build Cache.
 
-Pour supprimer aussi les cold starts, l'API doit utiliser une instance Render
-payante. Pour une disponibilité forte malgré le redémarrage d'une machine,
-utiliser deux instances. Le code de ce paquet élimine la surcharge applicative,
-mais une instance gratuite unique ne peut pas offrir une garantie absolue de
-zéro interruption.
+Ne réinstaller aucun ancien ZIP `Search Fix`, `ETF Failed Fetch`,
+`API 502 Final Fix` ou `Operational Restore` au-dessus de cette version.

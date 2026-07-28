@@ -9,7 +9,7 @@ from app.schemas.market import (
     MarketTile,
     SectorSnapshot,
 )
-from app.services.session_quotes import session_quote_service
+from app.services.market_data import market_data_service
 from app.services.tsx60 import (
     TSX60,
     TSX60_AS_OF,
@@ -44,7 +44,7 @@ class CockpitService:
                 return self._cached
 
             symbols = [item.symbol for item in TSX60]
-            quotes = await session_quote_service.get_quotes(symbols)
+            quotes = await market_data_service.get_quotes(symbols)
             quote_by_symbol = {
                 quote.symbol.replace("-", "."): quote
                 for quote in quotes
@@ -89,7 +89,7 @@ class CockpitService:
                     )
                 )
 
-            # Ne remplace jamais une bonne carte complÃ¨te par une rÃ©ponse vide.
+            # Ne remplace jamais une bonne carte complète par une réponse vide.
             if not tiles and self._cached is not None:
                 return self._cached
 

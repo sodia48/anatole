@@ -1,0 +1,2 @@
+Supprimer ce fichier du dépôt avant le déploiement Vercel :
+apps/web/app/route_anatole_proxy.ts
