@@ -1,21 +1,15 @@
-# Validation du correctif
+# Validation effectuée
 
-Contrôles exécutés lors de la création du paquet :
+- compilation Python de `router.py`;
+- vérification statique des sept routeurs montés;
+- compilation TypeScript stricte des deux clients de données;
+- compilation TypeScript de la façade `api.ts` avec un stub de `resilientFetch`;
+- compilation TypeScript de la route Next.js neutralisée avec un stub `next/server`;
+- contrôle que les clients n’utilisent plus `/api/anatole`;
+- contrôle des chemins Screener, ETF holdings/history, IPO et insiders;
+- contrôle de l’intégrité du ZIP.
 
-- compilation syntaxique de tous les fichiers Python;
-- vérification des imports relatifs du correctif;
-- présence du client HTTP partagé;
-- concurrence Yahoo globale limitée à 6;
-- cache quote frais de 25 secondes;
-- stale-if-error quote de 30 minutes;
-- ETF : lots de 8, rafraîchissement complet de 5 minutes;
-- WebSocket : 15 secondes au lieu de 5;
-- health check local sans dépendance Yahoo;
-- retry frontend sur 429/502/503/504.
-
-Après déploiement, surveiller dans Render :
-
-- `request_finished ... status=... duration_ms=...`
-- `cf_ray=...`
-- absence de `SIGKILL`, `MemoryError`, `WORKER TIMEOUT`;
-- `peak_active` dans `/ready` qui ne doit pas dépasser 6 pour l'upstream.
+La validation réseau complète des routes de découverte doit être faite après le
+redéploiement Render. L’endpoint `/health` répondait correctement au moment du
+diagnostic, mais cela ne prouve pas que les routes `/api/v1/discovery/*` sont
+montées.
