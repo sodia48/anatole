@@ -11,6 +11,7 @@ from app.api.routes import (
     search,
     stocks,
     ws,
+    workspace,
 )
 
 
@@ -74,6 +75,14 @@ api_router.include_router(
     analysis.router,
     prefix="/api/v1/analysis",
     tags=["analysis"],
+)
+
+
+# Portefeuille, alertes, assistant et observabilité des données
+api_router.include_router(
+    workspace.router,
+    prefix="/api/v1/workspace",
+    tags=["workspace"],
 )
 
 # Flux de cotations WebSocket

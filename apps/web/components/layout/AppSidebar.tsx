@@ -135,16 +135,16 @@ const groups: Array<{
         available: true,
       },
       {
-        href: "/roadmap#portefeuille",
+        href: "/portefeuille",
         label: "Portefeuille",
         icon: BriefcaseBusiness,
-        available: false,
+        available: true,
       },
       {
-        href: "/roadmap#alertes",
+        href: "/alertes",
         label: "Alertes",
         icon: Bell,
-        available: false,
+        available: true,
       },
     ],
   },
@@ -152,16 +152,16 @@ const groups: Array<{
     label: "Intelligence",
     items: [
       {
-        href: "/roadmap#assistant",
+        href: "/assistant",
         label: "Assistant",
         icon: Bot,
-        available: false,
+        available: true,
       },
       {
-        href: "/roadmap#qualite",
+        href: "/qualite",
         label: "Qualité des données",
         icon: ShieldCheck,
-        available: false,
+        available: true,
       },
       {
         href: "/preferences",
@@ -819,9 +819,9 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Migration Anatole v0.5
+            Anatole v0.7
           </Link>
-          <span>Next.js · FastAPI</span>
+          <span>Portefeuille · Alertes · Intelligence</span>
         </div>
       </aside>
     </>

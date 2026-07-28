@@ -17,31 +17,31 @@ const phases = [
   {
     title: "Analyse professionnelle",
     version: "v0.6",
-    status: "active",
-    items: ["Focus Chart Studio", "Comparateur multi-actifs", "Corrélations", "Terminal Pro", "Prochaine sous-étape : outils de dessin et backtesting"],
+    status: "done",
+    items: ["Focus Chart Studio", "Comparateur multi-actifs", "Corrélations", "Terminal Pro", "Radar d'opportunités"],
   },
   {
-    title: "Espace utilisateur",
+    title: "Espace utilisateur et intelligence",
     version: "v0.7",
-    status: "planned",
-    items: ["Comptes", "PostgreSQL", "Portefeuille", "Alertes", "Notifications", "Rapports", "Synchronisation multiappareil"],
+    status: "done",
+    items: ["Portefeuille local", "Alertes de marché", "Notifications navigateur", "Assistant contextuel", "Qualité des données", "Observabilité des sources"],
   },
   {
-    title: "Intelligence et bêta publique",
+    title: "Bêta publique et comptes",
     version: "v0.8",
     status: "planned",
-    items: ["Assistant contextuel", "Qualité des données", "Consentement", "Feedback", "Diagnostics administrateur", "État des sources"],
+    items: ["Comptes utilisateurs", "PostgreSQL", "Synchronisation multiappareil", "Alertes serveur", "Rapports", "Feedback bêta"],
   },
 ];
 
-const featureIds = ["composite", "dessin", "backtesting", "portefeuille", "alertes", "assistant", "qualite"];
+const featureIds = ["comptes", "synchronisation", "alertes-serveur", "rapports", "feedback-beta"];
 
 export default function RoadmapPage() {
   return (
     <div className="roadmap-page">
       <header className="panel roadmap-header">
         <div><span className="eyebrow">PARITÉ BÊTA STREAMLIT</span><h1>Migration Anatole</h1><p>La nouvelle plateforme progresse par blocs testables, sans fragiliser les sections déjà en production.</p></div>
-        <div className="roadmap-progress"><strong>11</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · IPO & insiders · Psychologie · Comparateur · Terminal Pro</small></div>
+        <div className="roadmap-progress"><strong>15</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · IPO & insiders · Psychologie · Comparateur · Terminal Pro · Portefeuille · Alertes · Assistant · Qualité</small></div>
       </header>
 
       <section className="roadmap-summary">
@@ -63,7 +63,7 @@ export default function RoadmapPage() {
       </section>
 
       <section className="panel feature-index">
-        <div><span className="eyebrow">PROCHAINES MIGRATIONS</span><h2>Fonctions restantes de la bêta</h2><p>Les fonctions ci-dessous seront activées progressivement après validation des sections Marchés.</p></div>
+        <div><span className="eyebrow">PROCHAINE PHASE</span><h2>Comptes et synchronisation</h2><p>Le socle fonctionnel est complet. La prochaine étape concerne la persistance serveur et la bêta multiutilisateur.</p></div>
         <div className="feature-anchor-grid">{featureIds.map((id) => <span id={id} key={id}>{id.replace(/-/g, " ")}</span>)}</div>
         <Link href="/cockpit" className="primary-button">Retour au Cockpit</Link>
       </section>

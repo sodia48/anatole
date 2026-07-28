@@ -403,3 +403,193 @@ export type TerminalSnapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
+
+export type PortfolioPositionInput = {
+  symbol: string;
+  quantity: number;
+  average_cost: number;
+};
+
+export type PortfolioPositionSnapshot = {
+  symbol: string;
+  ticker: string;
+  name: string;
+  sector: string;
+  currency: string;
+  quantity: number;
+  average_cost: number;
+  price: number;
+  fx_rate: number;
+  cost_basis: number;
+  market_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_percent: number;
+  day_pnl: number;
+  day_change_percent: number;
+  weight_percent: number;
+  momentum_20d: number;
+  rsi_14: number | null;
+  trend: string;
+  score: number;
+  source: string;
+  delayed: boolean;
+};
+
+export type PortfolioAllocation = {
+  key: string;
+  label: string;
+  value: number;
+  weight_percent: number;
+};
+
+export type PortfolioPerformancePoint = {
+  time: number;
+  portfolio: number;
+  benchmark: number | null;
+};
+
+export type PortfolioContributor = {
+  symbol: string;
+  name: string;
+  value: number;
+  value_percent: number;
+  kind: "day" | "unrealized";
+};
+
+export type PortfolioSnapshot = {
+  base_currency: string;
+  benchmark: string;
+  benchmark_name: string;
+  total_market_value: number;
+  total_cost_basis: number;
+  total_unrealized_pnl: number;
+  total_unrealized_pnl_percent: number;
+  total_day_pnl: number;
+  total_day_change_percent: number;
+  portfolio_score: number;
+  positions: PortfolioPositionSnapshot[];
+  sector_allocation: PortfolioAllocation[];
+  currency_allocation: PortfolioAllocation[];
+  performance: PortfolioPerformancePoint[];
+  risk: {
+    volatility_percent: number | null;
+    beta: number | null;
+    max_drawdown_percent: number | null;
+    sharpe_ratio: number | null;
+    concentration_hhi: number;
+    top_position_percent: number;
+    top_three_percent: number;
+    diversification_score: number;
+    risk_level: "Faible" | "Modéré" | "Élevé" | "Très élevé";
+  };
+  contributors: PortfolioContributor[];
+  detractors: PortfolioContributor[];
+  notes: string[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type AlertMetric =
+  | "price"
+  | "change_percent"
+  | "rsi_14"
+  | "momentum_20d"
+  | "relative_volume"
+  | "score";
+
+export type AlertRule = {
+  id: string;
+  symbol: string;
+  metric: AlertMetric;
+  operator: "above" | "below";
+  threshold: number;
+  enabled: boolean;
+  label?: string | null;
+};
+
+export type AlertEvaluation = {
+  id: string;
+  symbol: string;
+  name: string;
+  metric: AlertMetric;
+  metric_label: string;
+  operator: "above" | "below";
+  threshold: number;
+  current_value: number | null;
+  unit: string;
+  triggered: boolean;
+  status: "triggered" | "monitoring" | "unavailable" | "disabled";
+  message: string;
+  source: string | null;
+  evaluated_at: string;
+};
+
+export type AlertSnapshot = {
+  items: AlertEvaluation[];
+  triggered_count: number;
+  monitored_count: number;
+  unavailable_count: number;
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type AssistantFact = {
+  label: string;
+  value: string;
+  tone: "positive" | "negative" | "neutral" | "info";
+};
+
+export type AssistantResponse = {
+  intent: string;
+  title: string;
+  answer: string;
+  facts: AssistantFact[];
+  links: Array<{ label: string; href: string }>;
+  sources: Array<{
+    label: string;
+    detail: string;
+    status: "live" | "delayed" | "fallback" | "internal";
+  }>;
+  suggestions: string[];
+  confidence: "élevée" | "moyenne" | "limitée";
+  disclaimer: string;
+  generated_at: string;
+};
+
+export type DataQualitySource = {
+  key: string;
+  label: string;
+  category: string;
+  status: "healthy" | "degraded" | "stale" | "unavailable" | "idle";
+  coverage_percent: number;
+  freshness_seconds: number | null;
+  item_count: number | null;
+  source: string;
+  detail: string;
+};
+
+export type DataQualityMetric = {
+  key: string;
+  label: string;
+  value: string;
+  status: "healthy" | "degraded" | "critical" | "neutral";
+  detail: string;
+};
+
+export type DataQualitySnapshot = {
+  overall_score: number;
+  overall_status: "Excellent" | "Bon" | "Dégradé" | "Critique";
+  provider_mode: string;
+  uptime_seconds: number;
+  metrics: DataQualityMetric[];
+  sources: DataQualitySource[];
+  endpoints: Array<{
+    path: string;
+    label: string;
+    status: "available" | "degraded" | "not_warmed";
+    detail: string;
+  }>;
+  recommendations: string[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};

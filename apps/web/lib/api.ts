@@ -12,6 +12,12 @@ import type {
   SymbolSearchResponse,
   TerminalSnapshot,
   WatchlistSnapshot,
+  AlertRule,
+  AlertSnapshot,
+  AssistantResponse,
+  DataQualitySnapshot,
+  PortfolioPositionInput,
+  PortfolioSnapshot,
 } from "./types";
 import { resilientFetch } from "./resilient-fetch";
 
@@ -231,5 +237,64 @@ export function getTerminalSnapshot(
     {},
     signal,
     60_000,
+  );
+}
+
+
+export function analyzePortfolio(
+  positions: PortfolioPositionInput[],
+  signal?: AbortSignal,
+): Promise<PortfolioSnapshot> {
+  return apiRequest<PortfolioSnapshot>(
+    "/api/v1/workspace/portfolio",
+    { method: "POST", body: JSON.stringify({ positions, base_currency: "CAD" }) },
+    signal,
+    60_000,
+  );
+}
+
+export function evaluateAlerts(
+  rules: AlertRule[],
+  signal?: AbortSignal,
+): Promise<AlertSnapshot> {
+  return apiRequest<AlertSnapshot>(
+    "/api/v1/workspace/alerts/evaluate",
+    { method: "POST", body: JSON.stringify({ rules }) },
+    signal,
+    45_000,
+  );
+}
+
+export function askAnatole(
+  message: string,
+  options: {
+    contextSymbol?: string;
+    portfolioPositions?: PortfolioPositionInput[];
+  } = {},
+  signal?: AbortSignal,
+): Promise<AssistantResponse> {
+  return apiRequest<AssistantResponse>(
+    "/api/v1/workspace/assistant",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        message,
+        context_symbol: options.contextSymbol ?? null,
+        portfolio_positions: options.portfolioPositions ?? [],
+      }),
+    },
+    signal,
+    60_000,
+  );
+}
+
+export function getDataQuality(
+  signal?: AbortSignal,
+): Promise<DataQualitySnapshot> {
+  return apiRequest<DataQualitySnapshot>(
+    "/api/v1/workspace/data-quality",
+    {},
+    signal,
+    20_000,
   );
 }

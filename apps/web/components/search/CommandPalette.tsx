@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
+  Bell,
+  Bot,
   BriefcaseBusiness,
   CalendarDays,
   Gauge,
@@ -14,6 +16,7 @@ import {
   Activity,
   Search,
   Settings2,
+  ShieldCheck,
   Star,
   TableProperties,
   X,
@@ -31,8 +34,11 @@ const routes = [
   { label: "ETF", description: "Répertoire des ETF canadiens", href: "/etf", icon: CircleDollarSign, available: true },
   { label: "Psychologie", description: "Indice Anatole Canada", href: "/psychologie", icon: Activity, available: true },
   { label: "Comparateur", description: "Rendement, risque et corrélations", href: "/comparateur", icon: GitCompareArrows, available: true },
-  { label: "Portefeuille", description: "Positions et performance", href: "/roadmap#portefeuille", icon: BriefcaseBusiness, available: false },
+  { label: "Portefeuille", description: "Positions, P&L, allocation et risque", href: "/portefeuille", icon: BriefcaseBusiness, available: true },
   { label: "Terminal Pro", description: "Régime, rotation et dislocations", href: "/terminal", icon: Gauge, available: true },
+  { label: "Alertes", description: "Prix, RSI, momentum et score", href: "/alertes", icon: Bell, available: true },
+  { label: "Assistant", description: "Analyse contextuelle fondée sur Anatole", href: "/assistant", icon: Bot, available: true },
+  { label: "Qualité des données", description: "Couverture, fraîcheur et sources", href: "/qualite", icon: ShieldCheck, available: true },
   { label: "Préférences", description: "Thème, densité et affichage", href: "/preferences", icon: Settings2, available: true },
 ];
 
