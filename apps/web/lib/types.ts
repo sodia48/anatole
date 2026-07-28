@@ -257,3 +257,149 @@ export type PsychologySnapshot = {
   refresh_after_seconds: number;
   source: string;
 };
+
+export type ComparisonRange =
+  | "1mo"
+  | "3mo"
+  | "6mo"
+  | "ytd"
+  | "1y"
+  | "3y"
+  | "5y";
+
+export type ComparisonPoint = {
+  time: number;
+  value: number;
+};
+
+export type ComparisonSeries = {
+  symbol: string;
+  name: string;
+  points: ComparisonPoint[];
+};
+
+export type ComparisonInstrument = {
+  ticker: string;
+  symbol: string;
+  name: string;
+  sector: string;
+  instrument_type: "action" | "etf" | "indice" | "autre";
+  currency: string;
+  price: number;
+  change_percent: number;
+  total_return_percent: number;
+  annualized_return_percent: number | null;
+  volatility_percent: number | null;
+  beta: number | null;
+  max_drawdown_percent: number | null;
+  sharpe_ratio: number | null;
+  momentum_20d: number;
+  rsi_14: number | null;
+  relative_volume: number;
+  trend: string;
+  market_cap: number | null;
+  trailing_pe: number | null;
+  forward_pe: number | null;
+  price_to_book: number | null;
+  dividend_yield_percent: number | null;
+  score: number;
+  rank: number;
+  strengths: string[];
+  weaknesses: string[];
+  source: string;
+  delayed: boolean;
+};
+
+export type ComparisonSnapshot = {
+  range: ComparisonRange;
+  range_label: string;
+  benchmark: string;
+  benchmark_name: string;
+  instruments: ComparisonInstrument[];
+  series: ComparisonSeries[];
+  correlation: {
+    symbols: string[];
+    values: Array<Array<number | null>>;
+  };
+  risk_free_rate_percent: number;
+  methodology: string;
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
+export type TerminalComponent = {
+  key: string;
+  label: string;
+  score: number;
+  value: string;
+  description: string;
+};
+
+export type TerminalSector = {
+  sector: string;
+  change_percent: number;
+  momentum_20d: number;
+  average_score: number;
+  relative_volume: number;
+  advancers: number;
+  decliners: number;
+  leadership_score: number;
+  state:
+    | "Leadership"
+    | "Accumulation"
+    | "Neutre"
+    | "Distribution"
+    | "Faiblesse";
+};
+
+export type TerminalOpportunity = {
+  symbol: string;
+  name: string;
+  sector: string;
+  price: number;
+  change_percent: number;
+  momentum_20d: number;
+  rsi_14: number | null;
+  relative_volume: number;
+  score: number;
+  signal: string;
+  opportunity_type: string;
+  reasons: string[];
+};
+
+export type TerminalAlert = {
+  id: string;
+  severity: "info" | "watch" | "high";
+  category: string;
+  symbol: string | null;
+  title: string;
+  detail: string;
+};
+
+export type TerminalSnapshot = {
+  universe: string;
+  regime:
+    | "Haussier"
+    | "Constructif"
+    | "Neutre"
+    | "Fragile"
+    | "Baissier";
+  regime_score: number;
+  risk_level: "Faible" | "Modéré" | "Élevé" | "Critique";
+  weighted_change_percent: number;
+  advance_ratio: number;
+  average_anatole_score: number;
+  average_momentum_20d: number;
+  above_sma20_percent: number;
+  above_sma50_percent: number;
+  high_relative_volume_count: number;
+  components: TerminalComponent[];
+  sectors: TerminalSector[];
+  opportunities: TerminalOpportunity[];
+  alerts: TerminalAlert[];
+  leaders: TerminalOpportunity[];
+  laggards: TerminalOpportunity[];
+  methodology: string;
+  generated_at: string;
+  refresh_after_seconds: number;
+};

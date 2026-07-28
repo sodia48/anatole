@@ -106,10 +106,10 @@ const groups: Array<{
         available: true,
       },
       {
-        href: "/roadmap#comparateur",
+        href: "/comparateur",
         label: "Comparateur",
         icon: GitCompareArrows,
-        available: false,
+        available: true,
       },
       {
         href: "/psychologie",
@@ -118,10 +118,10 @@ const groups: Array<{
         available: true,
       },
       {
-        href: "/roadmap#terminal",
+        href: "/terminal",
         label: "Terminal Pro",
         icon: Gauge,
-        available: false,
+        available: true,
       },
     ],
   },
@@ -259,6 +259,31 @@ function tickerFromQuery(value: string): string | null {
   return ticker;
 }
 
+function comparisonSymbolsFromQuery(
+  value: string,
+): string[] {
+  const hasComparisonIntent =
+    /(?:comparer|compare|comparaison|\bvs\b|\bversus\b|,|\+|;|\/|\|)/i.test(value);
+
+  if (!hasComparisonIntent) {
+    return [];
+  }
+
+  const normalized = value
+    .toUpperCase()
+    .replace(/COMPARER|COMPARE|COMPARAISON/g, " ")
+    .replace(/\.TO/g, "")
+    .replace(/\b(?:AVEC|ET|VS|VERSUS)\b/g, ",")
+    .replace(/[+;/|]/g, ",");
+
+  const symbols = normalized
+    .split(/[\s,]+/)
+    .map((item) => item.replace(/[^A-Z0-9.^-]/g, ""))
+    .filter((item) => /^[A-Z0-9][A-Z0-9.^-]{0,14}$/.test(item));
+
+  return [...new Set(symbols)].slice(0, 5);
+}
+
 export function AppSidebar({
   onOpenSearch,
 }: {
@@ -322,8 +347,28 @@ export function AppSidebar({
           },
         ]
       : [];
+    const comparisonSymbols =
+      comparisonSymbolsFromQuery(searchQuery);
+    const comparisonResult: SearchResult[] =
+      comparisonSymbols.length >= 2
+        ? [
+            {
+              key: `compare:${comparisonSymbols.join(":")}`,
+              href: `/comparateur?symbols=${encodeURIComponent(
+                comparisonSymbols.join(","),
+              )}`,
+              label: `Comparer ${comparisonSymbols.join(" · ")}`,
+              description: "Ouvrir le Comparateur",
+              icon: GitCompareArrows,
+            },
+          ]
+        : [];
 
-    return [...directResult, ...pages].slice(0, 12);
+    return [
+      ...comparisonResult,
+      ...directResult,
+      ...pages,
+    ].slice(0, 12);
   }, [searchQuery]);
 
   useEffect(() => {

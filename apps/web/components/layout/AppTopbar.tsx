@@ -13,6 +13,8 @@ const titles: Array<[string, string]> = [
   ["/calendrier", "Calendrier économique"],
   ["/etf", "ETF"],
   ["/psychologie", "Psychologie du marché"],
+  ["/comparateur", "Comparateur"],
+  ["/terminal", "Terminal Pro"],
   ["/watchlist", "Watchlist"],
   ["/preferences", "Préférences"],
   ["/roadmap", "Migration Anatole"],

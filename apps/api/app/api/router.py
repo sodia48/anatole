@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    analysis,
     discovery,
     etf_holdings,
     fundamentals,
@@ -65,6 +66,14 @@ api_router.include_router(
     ipo_insiders.router,
     prefix="/api/v1/discovery",
     tags=["ipo-insiders"],
+)
+
+
+# Comparateur multi-actifs et Terminal Pro
+api_router.include_router(
+    analysis.router,
+    prefix="/api/v1/analysis",
+    tags=["analysis"],
 )
 
 # Flux de cotations WebSocket

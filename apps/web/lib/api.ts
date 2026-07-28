@@ -1,5 +1,7 @@
 import type {
   CalendarSnapshot,
+  ComparisonRange,
+  ComparisonSnapshot,
   CockpitSnapshot,
   EtfDirectorySnapshot,
   FocusSnapshot,
@@ -8,6 +10,7 @@ import type {
   PsychologySnapshot,
   ScreenerSnapshot,
   SymbolSearchResponse,
+  TerminalSnapshot,
   WatchlistSnapshot,
 } from "./types";
 import { resilientFetch } from "./resilient-fetch";
@@ -201,4 +204,32 @@ export function quoteWebSocketUrl(ticker: string): string {
     .replace(/^http:/, "ws:");
 
   return `${base}/ws/v1/quotes/${encodeURIComponent(ticker)}`;
+}
+
+
+export function compareInstruments(
+  symbols: string[],
+  range: ComparisonRange,
+  signal?: AbortSignal,
+): Promise<ComparisonSnapshot> {
+  return apiRequest<ComparisonSnapshot>(
+    "/api/v1/analysis/compare",
+    {
+      method: "POST",
+      body: JSON.stringify({ symbols, range }),
+    },
+    signal,
+    60_000,
+  );
+}
+
+export function getTerminalSnapshot(
+  signal?: AbortSignal,
+): Promise<TerminalSnapshot> {
+  return apiRequest<TerminalSnapshot>(
+    "/api/v1/analysis/terminal",
+    {},
+    signal,
+    60_000,
+  );
 }

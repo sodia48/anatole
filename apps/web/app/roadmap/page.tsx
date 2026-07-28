@@ -11,14 +11,14 @@ const phases = [
   {
     title: "Marchés",
     version: "v0.5",
-    status: "active",
-    items: ["Screener TSX 60", "Actualités officielles", "Calendrier économique", "Répertoire ETF", "Psychologie du marché", "Prochaine sous-étape : Composite, IPO et insiders"],
+    status: "done",
+    items: ["Screener TSX 60", "Actualités officielles", "Calendrier économique", "Répertoire ETF", "Psychologie du marché", "IPO et transactions d’initiés"],
   },
   {
     title: "Analyse professionnelle",
     version: "v0.6",
-    status: "next",
-    items: ["Focus Chart Studio", "Outils de dessin persistants", "Comparateur", "Backtesting", "Corrélations", "Terminal Pro"],
+    status: "active",
+    items: ["Focus Chart Studio", "Comparateur multi-actifs", "Corrélations", "Terminal Pro", "Prochaine sous-étape : outils de dessin et backtesting"],
   },
   {
     title: "Espace utilisateur",
@@ -34,14 +34,14 @@ const phases = [
   },
 ];
 
-const featureIds = ["composite", "ipo", "insiders", "comparateur", "terminal", "portefeuille", "alertes", "assistant", "qualite"];
+const featureIds = ["composite", "dessin", "backtesting", "portefeuille", "alertes", "assistant", "qualite"];
 
 export default function RoadmapPage() {
   return (
     <div className="roadmap-page">
       <header className="panel roadmap-header">
         <div><span className="eyebrow">PARITÉ BÊTA STREAMLIT</span><h1>Migration Anatole</h1><p>La nouvelle plateforme progresse par blocs testables, sans fragiliser les sections déjà en production.</p></div>
-        <div className="roadmap-progress"><strong>8</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · Psychologie</small></div>
+        <div className="roadmap-progress"><strong>11</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · IPO & insiders · Psychologie · Comparateur · Terminal Pro</small></div>
       </header>
 
       <section className="roadmap-summary">

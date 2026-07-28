@@ -30,14 +30,37 @@ const routes = [
   { label: "Calendrier", description: "Événements économiques", href: "/calendrier", icon: CalendarDays, available: true },
   { label: "ETF", description: "Répertoire des ETF canadiens", href: "/etf", icon: CircleDollarSign, available: true },
   { label: "Psychologie", description: "Indice Anatole Canada", href: "/psychologie", icon: Activity, available: true },
-  { label: "Comparateur", description: "Comparer plusieurs titres", href: "/roadmap#comparateur", icon: GitCompareArrows, available: false },
+  { label: "Comparateur", description: "Rendement, risque et corrélations", href: "/comparateur", icon: GitCompareArrows, available: true },
   { label: "Portefeuille", description: "Positions et performance", href: "/roadmap#portefeuille", icon: BriefcaseBusiness, available: false },
-  { label: "Terminal Pro", description: "Régime, score et dislocations", href: "/roadmap#terminal", icon: Gauge, available: false },
+  { label: "Terminal Pro", description: "Régime, rotation et dislocations", href: "/terminal", icon: Gauge, available: true },
   { label: "Préférences", description: "Thème, densité et affichage", href: "/preferences", icon: Settings2, available: true },
 ];
 
 function normalizeTicker(value: string): string {
   return value.toUpperCase().trim().replace(/[^A-Z0-9.-]/g, "").slice(0, 15);
+}
+
+function comparisonSymbolsFromQuery(value: string): string[] {
+  const hasComparisonIntent =
+    /(?:comparer|compare|comparaison|\bvs\b|\bversus\b|,|\+|;|\/|\|)/i.test(value);
+
+  if (!hasComparisonIntent) {
+    return [];
+  }
+
+  const normalized = value
+    .toUpperCase()
+    .replace(/COMPARER|COMPARE|COMPARAISON/g, " ")
+    .replace(/\.TO/g, "")
+    .replace(/\b(?:AVEC|ET|VS|VERSUS)\b/g, ",")
+    .replace(/[+;/|]/g, ",");
+
+  return [...new Set(
+    normalized
+      .split(/[\s,]+/)
+      .map((item) => item.replace(/[^A-Z0-9.^-]/g, ""))
+      .filter((item) => /^[A-Z0-9][A-Z0-9.^-]{0,14}$/.test(item)),
+  )].slice(0, 5);
 }
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
@@ -101,7 +124,10 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   }, [query]);
 
   const directTicker = normalizeTicker(query);
-  const canOpenTicker = /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(directTicker);
+  const comparisonSymbols = comparisonSymbolsFromQuery(query);
+  const canOpenTicker =
+    comparisonSymbols.length < 2 &&
+    /^[A-Z0-9][A-Z0-9.-]{0,14}$/.test(directTicker);
 
   const navigate = (href: string) => {
     onOpenChange(false);
@@ -127,6 +153,17 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
         </div>
 
         <div className="command-results">
+          {comparisonSymbols.length >= 2 ? (
+            <button
+              className="command-result command-direct"
+              type="button"
+              onClick={() => navigate(`/comparateur?symbols=${encodeURIComponent(comparisonSymbols.join(","))}`)}
+            >
+              <span className="command-result-icon"><GitCompareArrows size={18} /></span>
+              <span><strong>Comparer {comparisonSymbols.join(" · ")}</strong><small>Ouvrir directement le Comparateur</small></span>
+            </button>
+          ) : null}
+
           {canOpenTicker ? (
             <button className="command-result command-direct" type="button" onClick={() => navigate(`/focus/${directTicker}`)}>
               <span className="command-result-icon"><BarChart3 size={18} /></span>
