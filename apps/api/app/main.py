@@ -32,7 +32,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Anatole API",
-    version="0.7.1",
+    version="0.7.2",
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )

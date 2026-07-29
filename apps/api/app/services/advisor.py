@@ -15,9 +15,9 @@ from app.services.portfolio import portfolio_service
 
 
 SCENARIOS: tuple[tuple[str, str, float], ...] = (
-    ("Préservation", "Capital stable", 0.0),
-    ("Modéré", "Hypothèse illustrative", 3.0),
-    ("Croissance", "Hypothèse illustrative", 6.0),
+    ("sans_croissance", "Sans croissance", 0.0),
+    ("croissance_moderee", "Croissance modérée", 3.0),
+    ("croissance_soutenue", "Croissance soutenue", 6.0),
 )
 
 BOUNDARIES = [
@@ -349,8 +349,9 @@ class AdvisorService:
             middle = projections[1]
             if middle.gap_to_target is not None and isfinite(middle.gap_to_target):
                 goal_status = (
-                    f"écart illustratif de {_money(abs(middle.gap_to_target), currency)} "
-                    f"{'au-dessus' if middle.gap_to_target >= 0 else 'sous'} l’objectif"
+                    f"une marge de {_money(middle.gap_to_target, currency)} au-dessus de l’objectif"
+                    if middle.gap_to_target >= 0
+                    else f"un manque de {_money(abs(middle.gap_to_target), currency)} pour atteindre l’objectif"
                 )
             else:
                 goal_status = "écart non calculable"
@@ -358,10 +359,10 @@ class AdvisorService:
             goal_status = "objectif financier à compléter"
 
         summary = (
-            f"Le profil est complété à {completeness} % et le score de préparation atteint "
-            f"{readiness_score:.0f}/100. La capacité de risque ressort comme "
-            f"{_capacity_label(capacity_score).lower()}. Pour {goal_name}, le scénario modéré indique un "
-            f"{goal_status}. Ce résultat est une simulation de planification, pas une prévision ni une recommandation de placement."
+            f"Ton profil est rempli à {completeness} % et ton score de préparation est de "
+            f"{readiness_score:.0f}/100. Ta marge face aux variations est "
+            f"{_capacity_label(capacity_score).lower()}. Pour {goal_name}, le scénario modéré montre "
+            f"{goal_status}. Ces chiffres servent à comprendre ton plan; ils ne prédisent pas le rendement et ne recommandent aucun placement."
         )
 
         return AdvisorPlan(

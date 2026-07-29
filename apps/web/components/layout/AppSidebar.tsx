@@ -819,7 +819,7 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7.1
+            Anatole v0.7.2
           </Link>
           <span>Portefeuille · Alertes · Intelligence</span>
         </div>

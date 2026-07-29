@@ -347,12 +347,12 @@ class AssistantService:
                 intent="advisor",
                 title="Profil de planification à compléter",
                 answer=(
-                    "Renseigne ton objectif, ton horizon, ta réserve liquide, ta cadence de contribution et "
-                    "tes contraintes. Anatole construira ensuite un diagnostic, des scénarios et un ordre de "
-                    "priorités sans sélectionner de placement."
+                    "Commence par trois choses : indique ton objectif, le moment où tu auras besoin de l’argent "
+                    "et ta situation financière actuelle. Anatole t’expliquera ensuite les prochaines étapes, "
+                    "sans choisir de placement."
                 ),
-                links=[AssistantLink(label="Ouvrir le profil", href="/assistant#profil")],
-                suggestions=["Quel est le rôle de l’horizon ?", "Analyse mon portefeuille"],
+                links=[AssistantLink(label="Commencer le parcours", href="/assistant")],
+                suggestions=["Pourquoi l’horizon est-il important ?", "Comment calculer ma réserve ?"],
                 confidence="limitée",
                 disclaimer=DISCLAIMER,
                 generated_at=datetime.now(UTC),
@@ -364,9 +364,9 @@ class AssistantService:
             )
         )
         facts = [
-            AssistantFact(label="Préparation", value=f"{plan.readiness_score:.0f}/100", tone="positive" if plan.readiness_score >= 70 else "negative" if plan.readiness_score < 45 else "neutral"),
-            AssistantFact(label="Profil de capacité", value=plan.capacity_profile, tone="info"),
-            AssistantFact(label="Profil complété", value=f"{plan.profile_completeness} %", tone="positive" if plan.profile_completeness >= 80 else "neutral"),
+            AssistantFact(label="Score du plan", value=f"{plan.readiness_score:.0f}/100", tone="positive" if plan.readiness_score >= 70 else "negative" if plan.readiness_score < 45 else "neutral"),
+            AssistantFact(label="Marge face au risque", value=plan.capacity_profile, tone="info"),
+            AssistantFact(label="Profil rempli", value=f"{plan.profile_completeness} %", tone="positive" if plan.profile_completeness >= 80 else "neutral"),
         ]
         if plan.reserve_months is not None:
             facts.append(
@@ -382,9 +382,9 @@ class AssistantService:
             answer=plan.summary,
             facts=facts,
             links=[
-                AssistantLink(label="Voir le portefeuille", href="/portefeuille"),
-                AssistantLink(label="Tester des scénarios", href="/assistant#scenarios"),
-                AssistantLink(label="Créer des alertes de suivi", href="/alertes"),
+                AssistantLink(label="Voir mon portefeuille", href="/portefeuille"),
+                AssistantLink(label="Revoir mes réponses", href="/assistant#profil"),
+                AssistantLink(label="Créer une alerte", href="/alertes"),
             ],
             sources=[
                 AssistantSource(
@@ -394,9 +394,9 @@ class AssistantService:
                 )
             ],
             suggestions=[
-                "Explique ma priorité numéro un",
-                "Teste une baisse de 20 %",
-                "Où se concentre mon risque ?",
+                "Explique ma première étape simplement",
+                "Montre l’effet d’une baisse de 20 %",
+                "Qu’est-ce qui limite mon plan ?",
             ],
             confidence="élevée" if plan.profile_completeness >= 80 else "moyenne",
             disclaimer=DISCLAIMER,
