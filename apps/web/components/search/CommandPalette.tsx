@@ -37,7 +37,7 @@ const routes = [
   { label: "Portefeuille", description: "Positions, P&L, allocation et risque", href: "/portefeuille", icon: BriefcaseBusiness, available: true },
   { label: "Terminal Pro", description: "Régime, rotation et dislocations", href: "/terminal", icon: Gauge, available: true },
   { label: "Alertes", description: "Prix, RSI, momentum et score", href: "/alertes", icon: Bell, available: true },
-  { label: "Assistant", description: "Analyse contextuelle fondée sur Anatole", href: "/assistant", icon: Bot, available: true },
+  { label: "Anatole Conseil", description: "Planification, scénarios et risques sans recommandation de placement", href: "/assistant", icon: Bot, available: true },
   { label: "Qualité des données", description: "Couverture, fraîcheur et sources", href: "/qualite", icon: ShieldCheck, available: true },
   { label: "Préférences", description: "Thème, densité et affichage", href: "/preferences", icon: Settings2, available: true },
 ];

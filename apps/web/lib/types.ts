@@ -533,6 +533,85 @@ export type AlertSnapshot = {
   refresh_after_seconds: number;
 };
 
+export type AdvisorLevel = "low" | "medium" | "high";
+export type AdvisorGoalType =
+  | "retirement"
+  | "home"
+  | "education"
+  | "reserve"
+  | "wealth"
+  | "flexible";
+
+export type AdvisorProfile = {
+  currency: "CAD" | "USD";
+  goal_type: AdvisorGoalType | null;
+  goal_name: string | null;
+  horizon_years: number | null;
+  target_amount: number | null;
+  current_savings: number | null;
+  monthly_contribution: number | null;
+  essential_monthly_expenses: number | null;
+  liquid_reserve: number | null;
+  high_interest_debt: boolean | null;
+  income_stability: AdvisorLevel | null;
+  liquidity_need: AdvisorLevel | null;
+  loss_comfort: AdvisorLevel | null;
+  experience: "beginner" | "intermediate" | "advanced" | null;
+};
+
+export type AdvisorProjection = {
+  key: string;
+  label: string;
+  annual_return_percent: number;
+  projected_value: number;
+  gap_to_target: number | null;
+  progress_percent: number | null;
+};
+
+export type AdvisorPriority = {
+  key: string;
+  level: "low" | "medium" | "high";
+  title: string;
+  detail: string;
+  action: string;
+};
+
+export type AdvisorRiskDimension = {
+  key: string;
+  label: string;
+  value: string;
+  status: "favorable" | "balanced" | "caution" | "incomplete";
+  detail: string;
+};
+
+export type AdvisorStressTest = {
+  label: string;
+  shock_percent: number;
+  estimated_loss: number;
+  estimated_value: number;
+  detail: string;
+};
+
+export type AdvisorPlan = {
+  title: string;
+  summary: string;
+  currency: string;
+  profile_completeness: number;
+  readiness_score: number;
+  capacity_profile: "Prudente" | "Équilibrée" | "Dynamique";
+  capacity_score: number;
+  reserve_months: number | null;
+  portfolio_score: number | null;
+  portfolio_risk_level: string | null;
+  top_position_percent: number | null;
+  projections: AdvisorProjection[];
+  priorities: AdvisorPriority[];
+  risk_dimensions: AdvisorRiskDimension[];
+  stress_tests: AdvisorStressTest[];
+  boundaries: string[];
+  generated_at: string;
+};
+
 export type AssistantFact = {
   label: string;
   value: string;
@@ -553,6 +632,8 @@ export type AssistantResponse = {
   suggestions: string[];
   confidence: "élevée" | "moyenne" | "limitée";
   disclaimer: string;
+  guardrail_triggered: boolean;
+  plan: AdvisorPlan | null;
   generated_at: string;
 };
 

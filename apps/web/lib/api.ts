@@ -13,6 +13,8 @@ import type {
   TerminalSnapshot,
   WatchlistSnapshot,
   AlertRule,
+  AdvisorPlan,
+  AdvisorProfile,
   AlertSnapshot,
   AssistantResponse,
   DataQualitySnapshot,
@@ -265,11 +267,31 @@ export function evaluateAlerts(
   );
 }
 
+export function getAdvisorPlan(
+  profile: AdvisorProfile,
+  portfolioPositions: PortfolioPositionInput[] = [],
+  signal?: AbortSignal,
+): Promise<AdvisorPlan> {
+  return apiRequest<AdvisorPlan>(
+    "/api/v1/workspace/advisor-plan",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        profile,
+        portfolio_positions: portfolioPositions,
+      }),
+    },
+    signal,
+    60_000,
+  );
+}
+
 export function askAnatole(
   message: string,
   options: {
     contextSymbol?: string;
     portfolioPositions?: PortfolioPositionInput[];
+    advisorProfile?: AdvisorProfile;
   } = {},
   signal?: AbortSignal,
 ): Promise<AssistantResponse> {
@@ -281,6 +303,7 @@ export function askAnatole(
         message,
         context_symbol: options.contextSymbol ?? null,
         portfolio_positions: options.portfolioPositions ?? [],
+        advisor_profile: options.advisorProfile ?? null,
       }),
     },
     signal,

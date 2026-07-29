@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.analysis import CompareRequest
 from app.schemas.workspace import (
+    AdvisorPlanRequest,
     AssistantFact,
     AssistantLink,
     AssistantRequest,
@@ -14,6 +15,7 @@ from app.schemas.workspace import (
     PortfolioAnalyzeRequest,
 )
 from app.services.analysis import analysis_service
+from app.services.advisor import advisor_service
 from app.services.data_quality import data_quality_service
 from app.services.market_data import market_data_service
 from app.services.portfolio import portfolio_service
@@ -21,8 +23,8 @@ from app.services.tsx60 import TSX60
 
 
 DISCLAIMER = (
-    "Lecture informative fondée sur les données disponibles dans Anatole; "
-    "ce n’est ni un conseil financier ni un ordre de transaction."
+    "Outil de planification et d’analyse éducative. Anatole ne recommande aucun "
+    "achat, aucune vente, aucun maintien de titre et n’exécute aucune transaction."
 )
 
 _KNOWN_SYMBOLS = {
@@ -76,12 +78,12 @@ class AssistantService:
     async def _market(self) -> AssistantResponse:
         snapshot = await analysis_service.terminal()
         leading = snapshot.sectors[:3]
-        opportunities = snapshot.opportunities[:3]
+        signals = snapshot.opportunities[:3]
         sectors_text = ", ".join(
             f"{item.sector} ({item.state.lower()})"
             for item in leading
         ) or "aucun leadership sectoriel clair"
-        opportunities_text = ", ".join(item.symbol for item in opportunities) or "aucun titre"
+        signals_text = ", ".join(item.symbol for item in signals) or "aucun signal quantitatif marqué"
         answer = (
             f"Le régime du {snapshot.universe} est **{snapshot.regime.lower()}** "
             f"avec un score de {snapshot.regime_score:.0f}/100 et un risque "
@@ -89,8 +91,8 @@ class AssistantService:
             f"{snapshot.advance_ratio:.0f} % d’avancées, tandis que "
             f"{snapshot.above_sma50_percent:.0f} % des titres se maintiennent "
             f"au-dessus de leur moyenne mobile 50 séances.\n\n"
-            f"Les zones de leadership sont {sectors_text}. Le radar fait ressortir "
-            f"{opportunities_text}; ouvre leur fiche Focus avant toute décision."
+            f"Les zones de leadership sont {sectors_text}. Les signaux quantitatifs les plus marqués "
+            f"concernent {signals_text}; ils servent à approfondir l’analyse, pas à formuler une instruction de placement."
         )
         return AssistantResponse(
             intent="market",
@@ -132,17 +134,17 @@ class AssistantService:
             for item in snapshot.instruments
         )
         answer = (
-            f"Sur un an, **{winner.symbol}** arrive en tête du classement Anatole. "
+            f"Sur un an, **{winner.symbol}** obtient le score quantitatif le plus élevé dans cette comparaison. "
             f"Comparaison synthétique : {rows}.\n\n"
-            "Le classement combine rendement, risque, momentum, tendance et valorisation disponible. "
-            "La matrice de corrélation du Comparateur reste la meilleure vue pour juger la diversification."
+            "Ce classement décrit les données observées; il ne constitue pas une recommandation. "
+            "La matrice de corrélation du Comparateur aide à examiner les différences de risque et de diversification."
         )
         return AssistantResponse(
             intent="compare",
             title=f"Comparaison {' · '.join(symbols)}",
             answer=answer,
             facts=[
-                AssistantFact(label="Premier", value=winner.symbol, tone="positive"),
+                AssistantFact(label="Score le plus élevé", value=winner.symbol, tone="info"),
                 AssistantFact(label="Score", value=f"{winner.score:.0f}/100", tone="positive"),
                 AssistantFact(label="Rendement 1 an", value=f"{winner.total_return_percent:+.1f} %", tone=_tone(winner.total_return_percent)),
             ],
@@ -200,7 +202,6 @@ class AssistantService:
             links=[
                 AssistantLink(label="Ouvrir Focus", href=f"/focus/{quote.symbol}"),
                 AssistantLink(label="Créer une alerte", href=f"/alertes?symbol={quote.symbol}"),
-                AssistantLink(label="Ajouter au portefeuille", href=f"/portefeuille?add={quote.symbol}"),
             ],
             sources=[
                 AssistantSource(label=quote.source, detail=f"Horodatage {quote.timestamp.isoformat()}", status=source_status),
@@ -208,7 +209,7 @@ class AssistantService:
             ],
             suggestions=[
                 f"Compare {quote.symbol} et RY",
-                f"Crée une alerte RSI pour {quote.symbol}",
+                f"Quels risques ressortent pour {quote.symbol} ?",
                 "Quel est le régime du marché ?",
             ],
             confidence="moyenne" if quote.source.startswith("demo") else "élevée",
@@ -295,13 +296,142 @@ class AssistantService:
             generated_at=datetime.now(UTC),
         )
 
+    async def _guardrail(self, request: AssistantRequest) -> AssistantResponse:
+        symbols = _symbols(request.message, request.context_symbol)
+        facts = [
+            AssistantFact(label="Limite", value="Aucun achat/vente", tone="info"),
+            AssistantFact(label="Alternative", value="Cadre de décision", tone="neutral"),
+        ]
+        links = [
+            AssistantLink(label="Comparer les faits", href=f"/comparateur?symbols={','.join(symbols)}" if len(symbols) >= 2 else "/comparateur"),
+            AssistantLink(label="Examiner le risque", href="/portefeuille"),
+        ]
+        answer = (
+            "Je ne peux pas choisir un placement, dire quoi acheter ou vendre, ni confirmer qu’un titre "
+            "convient à une personne. Je peux toutefois transformer la question en analyse contrôlable : "
+            "objectif, horizon, liquidité, capacité d’absorber une baisse, concentration, coûts, scénarios "
+            "et critères de suivi."
+        )
+        if symbols:
+            answer += (
+                f" Pour {' et '.join(symbols)}, Anatole peut comparer les données observées et simuler leur "
+                "impact hypothétique sans conclure par une instruction de transaction."
+            )
+        return AssistantResponse(
+            intent="guardrail",
+            title="Cadre de décision, sans recommandation",
+            answer=answer,
+            facts=facts,
+            links=links,
+            sources=[
+                AssistantSource(
+                    label="Garde-fous Anatole",
+                    detail="Blocage des demandes d’achat, vente, maintien et sélection personnalisée de titres.",
+                    status="internal",
+                )
+            ],
+            suggestions=[
+                "Construis mon plan à partir de mon objectif",
+                "Teste une baisse de 20 % sur mon portefeuille",
+                "Montre les principales concentrations de risque",
+            ],
+            confidence="élevée",
+            disclaimer=DISCLAIMER,
+            guardrail_triggered=True,
+            generated_at=datetime.now(UTC),
+        )
+
+    async def _advisor(self, request: AssistantRequest) -> AssistantResponse:
+        if request.advisor_profile is None:
+            return AssistantResponse(
+                intent="advisor",
+                title="Profil de planification à compléter",
+                answer=(
+                    "Renseigne ton objectif, ton horizon, ta réserve liquide, ta cadence de contribution et "
+                    "tes contraintes. Anatole construira ensuite un diagnostic, des scénarios et un ordre de "
+                    "priorités sans sélectionner de placement."
+                ),
+                links=[AssistantLink(label="Ouvrir le profil", href="/assistant#profil")],
+                suggestions=["Quel est le rôle de l’horizon ?", "Analyse mon portefeuille"],
+                confidence="limitée",
+                disclaimer=DISCLAIMER,
+                generated_at=datetime.now(UTC),
+            )
+        plan = await advisor_service.build(
+            AdvisorPlanRequest(
+                profile=request.advisor_profile,
+                portfolio_positions=request.portfolio_positions,
+            )
+        )
+        facts = [
+            AssistantFact(label="Préparation", value=f"{plan.readiness_score:.0f}/100", tone="positive" if plan.readiness_score >= 70 else "negative" if plan.readiness_score < 45 else "neutral"),
+            AssistantFact(label="Profil de capacité", value=plan.capacity_profile, tone="info"),
+            AssistantFact(label="Profil complété", value=f"{plan.profile_completeness} %", tone="positive" if plan.profile_completeness >= 80 else "neutral"),
+        ]
+        if plan.reserve_months is not None:
+            facts.append(
+                AssistantFact(
+                    label="Réserve",
+                    value=f"{plan.reserve_months:.1f} mois",
+                    tone="positive" if plan.reserve_months >= 3 else "negative",
+                )
+            )
+        return AssistantResponse(
+            intent="advisor",
+            title=plan.title,
+            answer=plan.summary,
+            facts=facts,
+            links=[
+                AssistantLink(label="Voir le portefeuille", href="/portefeuille"),
+                AssistantLink(label="Tester des scénarios", href="/assistant#scenarios"),
+                AssistantLink(label="Créer des alertes de suivi", href="/alertes"),
+            ],
+            sources=[
+                AssistantSource(
+                    label="Planificateur Anatole",
+                    detail="Profil déclaré, scénarios illustratifs et diagnostic du portefeuille local.",
+                    status="internal",
+                )
+            ],
+            suggestions=[
+                "Explique ma priorité numéro un",
+                "Teste une baisse de 20 %",
+                "Où se concentre mon risque ?",
+            ],
+            confidence="élevée" if plan.profile_completeness >= 80 else "moyenne",
+            disclaimer=DISCLAIMER,
+            plan=plan,
+            generated_at=datetime.now(UTC),
+        )
+
     async def answer(self, request: AssistantRequest) -> AssistantResponse:
         text = request.message.casefold()
         symbols = _symbols(request.message, request.context_symbol)
+        trade_action_terms = (
+            "acheter", "vendre", "conserver", "garder", "accumuler", "alléger",
+            "alleger", "surpondérer", "surponderer", "sous-pondérer", "sous-ponderer",
+            "buy", "sell", "hold",
+        )
+        selection_terms = (
+            "recommande", "recommandation", "meilleur placement", "meilleure action",
+            "meilleur titre", "meilleur etf", "bon placement", "où investir", "ou investir",
+            "dans quoi investir", "quel etf", "quelle action choisir", "quel titre choisir",
+            "choisis pour moi", "dois-je investir", "devrais-je investir",
+        )
+        if any(term in text for term in trade_action_terms + selection_terms):
+            return await self._guardrail(request)
+        advisor_terms = (
+            "plan", "objectif", "horizon", "retraite", "maison", "mise de fonds",
+            "épargne", "epargne", "contribution", "capacité de risque", "capacite de risque",
+            "profil de risque", "stress test", "scénario", "scenario", "suis-je sur la bonne voie",
+            "priorité", "priorite", "robot-conseiller", "conseiller",
+        )
+        if any(term in text for term in advisor_terms):
+            return await self._advisor(request)
         compare_intent = any(word in text for word in ("compare", "comparer", "versus", " vs "))
         if compare_intent and len(symbols) >= 2:
             return await self._compare(symbols)
-        if any(word in text for word in ("portefeuille", "positions", "allocation", "diversification")):
+        if any(word in text for word in ("portefeuille", "positions", "allocation", "diversification", "concentration")):
             return await self._portfolio(request)
         if any(word in text for word in ("qualité", "qualite", "source", "donnée", "donnee", "502", "api")):
             return await self._quality()
@@ -309,6 +439,8 @@ class AssistantService:
             return await self._ticker(symbols[0])
         if any(word in text for word in ("marché", "marche", "tsx", "régime", "regime", "secteur", "terminal")):
             return await self._market()
+        if request.advisor_profile is not None:
+            return await self._advisor(request)
         return await self._market()
 
 

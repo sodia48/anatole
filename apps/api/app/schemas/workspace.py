@@ -188,6 +188,99 @@ class AlertSnapshot(BaseModel):
     refresh_after_seconds: int = 30
 
 
+GoalType = Literal["retirement", "home", "education", "reserve", "wealth", "flexible"]
+AdvisorLevel = Literal["low", "medium", "high"]
+
+
+class AdvisorProfile(BaseModel):
+    currency: Literal["CAD", "USD"] = "CAD"
+    goal_type: GoalType | None = None
+    goal_name: str | None = Field(default=None, max_length=80)
+    horizon_years: int | None = Field(default=None, ge=1, le=50)
+    target_amount: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    current_savings: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    monthly_contribution: float | None = Field(default=None, ge=0, le=10_000_000)
+    essential_monthly_expenses: float | None = Field(default=None, ge=0, le=10_000_000)
+    liquid_reserve: float | None = Field(default=None, ge=0, le=1_000_000_000)
+    high_interest_debt: bool | None = None
+    income_stability: AdvisorLevel | None = None
+    liquidity_need: AdvisorLevel | None = None
+    loss_comfort: AdvisorLevel | None = None
+    experience: Literal["beginner", "intermediate", "advanced"] | None = None
+
+    @field_validator("goal_name")
+    @classmethod
+    def clean_goal_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        return clean or None
+
+
+class AdvisorProjection(BaseModel):
+    key: str
+    label: str
+    annual_return_percent: float
+    projected_value: float
+    gap_to_target: float | None = None
+    progress_percent: float | None = None
+
+
+class AdvisorPriority(BaseModel):
+    key: str
+    level: Literal["low", "medium", "high"]
+    title: str
+    detail: str
+    action: str
+
+
+class AdvisorRiskDimension(BaseModel):
+    key: str
+    label: str
+    value: str
+    status: Literal["favorable", "balanced", "caution", "incomplete"]
+    detail: str
+
+
+class AdvisorStressTest(BaseModel):
+    label: str
+    shock_percent: float
+    estimated_loss: float
+    estimated_value: float
+    detail: str
+
+
+class AdvisorPlanRequest(BaseModel):
+    profile: AdvisorProfile
+    portfolio_positions: list[PortfolioPositionInput] = Field(default_factory=list, max_length=30)
+
+    def to_portfolio_request(self) -> PortfolioAnalyzeRequest:
+        return PortfolioAnalyzeRequest(
+            positions=self.portfolio_positions,
+            base_currency=self.profile.currency,
+        )
+
+
+class AdvisorPlan(BaseModel):
+    title: str
+    summary: str
+    currency: str
+    profile_completeness: int = Field(ge=0, le=100)
+    readiness_score: float = Field(ge=0, le=100)
+    capacity_profile: Literal["Prudente", "Équilibrée", "Dynamique"]
+    capacity_score: int
+    reserve_months: float | None = None
+    portfolio_score: float | None = None
+    portfolio_risk_level: str | None = None
+    top_position_percent: float | None = None
+    projections: list[AdvisorProjection] = Field(default_factory=list)
+    priorities: list[AdvisorPriority] = Field(default_factory=list)
+    risk_dimensions: list[AdvisorRiskDimension] = Field(default_factory=list)
+    stress_tests: list[AdvisorStressTest] = Field(default_factory=list)
+    boundaries: list[str] = Field(default_factory=list)
+    generated_at: datetime
+
+
 class AssistantFact(BaseModel):
     label: str
     value: str
@@ -212,6 +305,7 @@ class AssistantRequest(BaseModel):
         default_factory=list,
         max_length=30,
     )
+    advisor_profile: AdvisorProfile | None = None
 
 
 class AssistantResponse(BaseModel):
@@ -224,6 +318,8 @@ class AssistantResponse(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
     confidence: Literal["élevée", "moyenne", "limitée"]
     disclaimer: str
+    guardrail_triggered: bool = False
+    plan: AdvisorPlan | None = None
     generated_at: datetime
 
 

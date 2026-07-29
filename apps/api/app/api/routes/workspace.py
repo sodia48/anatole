@@ -3,6 +3,8 @@ from fastapi import APIRouter
 from app.schemas.workspace import (
     AlertEvaluateRequest,
     AlertSnapshot,
+    AdvisorPlan,
+    AdvisorPlanRequest,
     AssistantRequest,
     AssistantResponse,
     DataQualitySnapshot,
@@ -10,6 +12,7 @@ from app.schemas.workspace import (
     PortfolioSnapshot,
 )
 from app.services.alerts import alert_service
+from app.services.advisor import advisor_service
 from app.services.assistant import assistant_service
 from app.services.data_quality import data_quality_service
 from app.services.portfolio import portfolio_service
@@ -34,6 +37,15 @@ async def portfolio(request: PortfolioAnalyzeRequest) -> PortfolioSnapshot:
 )
 async def evaluate_alerts(request: AlertEvaluateRequest) -> AlertSnapshot:
     return await alert_service.evaluate(request)
+
+
+@router.post(
+    "/advisor-plan",
+    response_model=AdvisorPlan,
+    summary="Construit un plan de décision sans recommandation de placement",
+)
+async def advisor_plan(request: AdvisorPlanRequest) -> AdvisorPlan:
+    return await advisor_service.build(request)
 
 
 @router.post(

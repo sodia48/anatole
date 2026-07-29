@@ -172,3 +172,94 @@ def test_disabled_alert_is_not_evaluated() -> None:
     payload = response.json()
     assert payload["items"][0]["status"] == "disabled"
     assert payload["triggered_count"] == 0
+
+
+def _advisor_profile() -> dict[str, object]:
+    return {
+        "currency": "CAD",
+        "goal_type": "home",
+        "goal_name": "Mise de fonds",
+        "horizon_years": 7,
+        "target_amount": 120000,
+        "current_savings": 32000,
+        "monthly_contribution": 850,
+        "essential_monthly_expenses": 2600,
+        "liquid_reserve": 10400,
+        "high_interest_debt": False,
+        "income_stability": "high",
+        "liquidity_need": "medium",
+        "loss_comfort": "medium",
+        "experience": "intermediate",
+    }
+
+
+def test_advisor_plan_builds_scenarios_without_recommendations() -> None:
+    response = client.post(
+        "/api/v1/workspace/advisor-plan",
+        json={"profile": _advisor_profile(), "portfolio_positions": []},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["profile_completeness"] == 100
+    assert len(payload["projections"]) == 3
+    assert payload["capacity_profile"] in {"Prudente", "Équilibrée", "Dynamique"}
+    assert any("n’indique jamais quel titre acheter" in item for item in payload["boundaries"])
+    serialized = str(payload).casefold()
+    assert "achète" not in serialized
+    assert "vends" not in serialized
+
+
+def test_advisor_plan_uses_local_portfolio_demo() -> None:
+    original = settings.market_data_provider
+    settings.market_data_provider = "demo"
+    _reset()
+    try:
+        response = client.post(
+            "/api/v1/workspace/advisor-plan",
+            json={
+                "profile": _advisor_profile(),
+                "portfolio_positions": [
+                    {"symbol": "RY", "quantity": 10, "average_cost": 120},
+                    {"symbol": "XIC", "quantity": 30, "average_cost": 32},
+                ],
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["portfolio_score"] is not None
+        assert payload["portfolio_risk_level"] is not None
+        assert len(payload["stress_tests"]) == 3
+    finally:
+        settings.market_data_provider = original
+        _reset()
+
+
+def test_assistant_blocks_personalized_buy_sell_request() -> None:
+    response = client.post(
+        "/api/v1/workspace/assistant",
+        json={
+            "message": "Quelle action devrais-je acheter maintenant ?",
+            "advisor_profile": _advisor_profile(),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "guardrail"
+    assert payload["guardrail_triggered"] is True
+    assert "ne peux pas choisir un placement" in payload["answer"]
+
+
+def test_assistant_returns_structured_advisor_plan() -> None:
+    response = client.post(
+        "/api/v1/workspace/assistant",
+        json={
+            "message": "Construis mon plan selon mon objectif",
+            "advisor_profile": _advisor_profile(),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["intent"] == "advisor"
+    assert payload["plan"] is not None
+    assert payload["plan"]["projections"]
+    assert payload["guardrail_triggered"] is False

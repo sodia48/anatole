@@ -24,7 +24,7 @@ const phases = [
     title: "Espace utilisateur et intelligence",
     version: "v0.7",
     status: "done",
-    items: ["Portefeuille local", "Alertes de marché", "Notifications navigateur", "Assistant contextuel", "Qualité des données", "Observabilité des sources"],
+    items: ["Portefeuille local", "Alertes de marché", "Notifications navigateur", "Anatole Conseil sans recommandations", "Qualité des données", "Observabilité des sources"],
   },
   {
     title: "Bêta publique et comptes",

@@ -153,7 +153,7 @@ const groups: Array<{
     items: [
       {
         href: "/assistant",
-        label: "Assistant",
+        label: "Anatole Conseil",
         icon: Bot,
         available: true,
       },
@@ -819,7 +819,7 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7
+            Anatole v0.7.1
           </Link>
           <span>Portefeuille · Alertes · Intelligence</span>
         </div>
