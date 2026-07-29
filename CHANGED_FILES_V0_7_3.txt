@@ -1,0 +1,13 @@
+apps/web/app/layout.tsx
+apps/web/app/mobile.css
+apps/web/components/layout/AppSidebar.tsx
+apps/web/components/layout/AppSidebarGuard.module.css
+apps/web/components/cockpit/MarketHeatmap.tsx
+apps/web/components/cockpit/MarketHeatmap.module.css
+apps/web/components/etf/EtfHeatmap.tsx
+apps/web/components/etf/EtfHeatmap.module.css
+apps/web/package.json
+README_MOBILE_V0_7_3.md
+DEPLOY_V0_7_3.md
+VALIDATION_V0_7_3.md
+CHANGED_FILES_V0_7_3.txt

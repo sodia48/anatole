@@ -4,7 +4,8 @@
  */
 .mobileAppbar,
 .mobileBackdrop,
-.mobileDrawerHeading {
+.mobileDrawerHeading,
+.mobileBottomNav {
   display: none;
 }
 
@@ -249,6 +250,10 @@
 
   .mobileDrawerHeading {
     display: flex;
+  }
+
+  .mobileBottomNav {
+    display: grid;
   }
 
   .searchBackdrop {

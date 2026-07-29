@@ -6,7 +6,9 @@ import {
   useRouter,
 } from "next/navigation";
 import {
+  type ChangeEvent as ReactChangeEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   useEffect,
   useMemo,
   useRef,
@@ -595,7 +597,7 @@ export function AppSidebar({
         <div
           className={guardStyles.searchBackdrop}
           role="presentation"
-          onMouseDown={(event) => {
+          onMouseDown={(event: ReactMouseEvent<HTMLDivElement>) => {
             if (event.target === event.currentTarget) {
               closeSearch();
             }
@@ -635,7 +637,7 @@ export function AppSidebar({
                 placeholder="Ex. RY, SHOP, ETF, Psychologie…"
                 autoComplete="off"
                 spellCheck={false}
-                onChange={(event) =>
+                onChange={(event: ReactChangeEvent<HTMLInputElement>) =>
                   setSearchQuery(event.target.value)
                 }
                 onKeyDown={handleSearchKeyDown}
@@ -819,11 +821,67 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7.2
+            Anatole v0.7.3
           </Link>
-          <span>Portefeuille · Alertes · Intelligence</span>
+          <span>Navigation mobile professionnelle</span>
         </div>
       </aside>
+
+      <nav
+        className={`mobile-bottom-nav ${guardStyles.mobileBottomNav}`}
+        aria-label="Accès rapide Anatole"
+      >
+        <Link
+          href="/cockpit"
+          className={pathname === "/cockpit" ? "is-active" : ""}
+          aria-current={pathname === "/cockpit" ? "page" : undefined}
+        >
+          <LayoutDashboard size={20} />
+          <span>Cockpit</span>
+        </Link>
+        <Link
+          href="/screener"
+          className={pathname === "/screener" ? "is-active" : ""}
+          aria-current={pathname === "/screener" ? "page" : undefined}
+        >
+          <TableProperties size={20} />
+          <span>Screener</span>
+        </Link>
+        <Link
+          href="/etf"
+          className={pathname.startsWith("/etf") ? "is-active" : ""}
+          aria-current={pathname.startsWith("/etf") ? "page" : undefined}
+        >
+          <CircleDollarSign size={20} />
+          <span>ETF</span>
+        </Link>
+        <Link
+          href="/portefeuille"
+          className={pathname === "/portefeuille" ? "is-active" : ""}
+          aria-current={pathname === "/portefeuille" ? "page" : undefined}
+        >
+          <BriefcaseBusiness size={20} />
+          <span>Espace</span>
+        </Link>
+        <button
+          type="button"
+          className={
+            pathname !== "/cockpit" &&
+            pathname !== "/screener" &&
+            !pathname.startsWith("/etf") &&
+            pathname !== "/portefeuille"
+              ? "is-active"
+              : ""
+          }
+          aria-label="Ouvrir toutes les sections"
+          aria-controls="anatole-sidebar"
+          aria-expanded={drawerOpen}
+          onClick={() => setDrawerOpen(true)}
+        >
+          <Menu size={20} />
+          <span>Menu</span>
+        </button>
+      </nav>
     </>
   );
 }

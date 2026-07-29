@@ -838,9 +838,8 @@ export function EtfHeatmap({
           </span>
           <h2>ETF canadiens</h2>
           <p>
-            Tous les ETF sont affichés ·
-            taille selon la liquidité ·
-            couleur selon la variation.
+            {normalizedItems.length} ETF affichés · couleur selon la variation ·
+            taille proportionnelle sur ordinateur.
           </p>
         </div>
 
@@ -892,6 +891,69 @@ export function EtfHeatmap({
             </span>
           )}
         </div>
+      </div>
+
+      <div
+        className={styles.mobileMap}
+        aria-label={`Carte mobile de ${normalizedItems.length} ETF avec leurs variations`}
+      >
+        {visibleGroups.map((group) => (
+          <section
+            className={styles.mobileGroup}
+            key={`mobile-${group.key}`}
+          >
+            <button
+              type="button"
+              className={styles.mobileGroupHeader}
+              onClick={() =>
+                setExpandedGroup((current) =>
+                  current === group.key ? null : group.key,
+                )
+              }
+              aria-pressed={expandedGroup === group.key}
+            >
+              <span>
+                <strong>{shortGroupLabel(group.label)}</strong>
+                <small>{group.items.length} ETF</small>
+              </span>
+              <b
+                className={
+                  group.changePercent >= 0
+                    ? styles.groupPositive
+                    : styles.groupNegative
+                }
+              >
+                {formatChange(group.changePercent)}
+              </b>
+            </button>
+
+            <div className={styles.mobileTileGrid}>
+              {group.items.map((item) => {
+                const accessibleLabel = `${item.ticker}, ${item.name}, ${formatItemChange(
+                  item,
+                )}`;
+
+                return (
+                  <Link
+                    href={`/etf/${encodeURIComponent(item.ticker)}`}
+                    className={styles.mobileTile}
+                    data-quoted={item.price > 0 ? "true" : "false"}
+                    style={{ background: tileBackground(item) }}
+                    aria-label={accessibleLabel}
+                    title={`${item.name} · ${item.provider} · ${formatItemChange(
+                      item,
+                    )}`}
+                    key={`mobile-${group.key}-${item.ticker}`}
+                  >
+                    <span>{item.ticker}</span>
+                    <strong>{formatItemChange(item)}</strong>
+                    <small>{formatPrice(item)}</small>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <div

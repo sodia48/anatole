@@ -879,9 +879,8 @@ export function MarketHeatmap({
             S&amp;P/TSX 60
           </h2>
           <p>
-            Taille selon le poids du
-            titre · couleur selon la
-            variation de séance.
+            {normalizedTiles.length} titres affichés · couleur selon la
+            variation · taille proportionnelle sur ordinateur.
           </p>
         </div>
 
@@ -958,6 +957,70 @@ export function MarketHeatmap({
             </span>
           )}
         </div>
+      </div>
+
+      <div
+        className={styles.mobileMap}
+        aria-label={`Carte mobile de ${normalizedTiles.length} actions avec leurs variations`}
+      >
+        {visibleGroups.map((group) => (
+          <section
+            className={styles.mobileGroup}
+            key={`mobile-${group.key}`}
+          >
+            <button
+              type="button"
+              className={styles.mobileGroupHeader}
+              onClick={() =>
+                setExpandedGroup((current) =>
+                  current === group.key ? null : group.key,
+                )
+              }
+              aria-pressed={expandedGroup === group.key}
+            >
+              <span>
+                <strong>{shortGroupLabel(group.label)}</strong>
+                <small>{group.tiles.length} titre{group.tiles.length > 1 ? "s" : ""}</small>
+              </span>
+              <b
+                className={
+                  group.changePercent >= 0
+                    ? styles.groupPositive
+                    : styles.groupNegative
+                }
+              >
+                {formatChange(group.changePercent)}
+              </b>
+            </button>
+
+            <div className={styles.mobileTileGrid}>
+              {group.tiles.map((tile) => {
+                const accessibleLabel = `${tile.symbol}, ${tile.name}, ${formatChange(
+                  tile.changePercent,
+                )}`;
+
+                return (
+                  <Link
+                    href={stockPath(tile)}
+                    className={styles.mobileTile}
+                    style={{
+                      background: tileBackground(tile.changePercent),
+                    }}
+                    aria-label={accessibleLabel}
+                    title={`${tile.name} · ${formatPrice(tile.price)} · ${formatChange(
+                      tile.changePercent,
+                    )}`}
+                    key={`mobile-${group.key}-${tile.ticker}`}
+                  >
+                    <span>{tile.symbol}</span>
+                    <strong>{formatChange(tile.changePercent)}</strong>
+                    <small>{formatPrice(tile.price)}</small>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
 
       <div
