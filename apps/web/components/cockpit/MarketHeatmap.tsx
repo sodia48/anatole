@@ -135,7 +135,7 @@ function layoutTileWeight(tile: NormalizedTile, mobile: boolean): number {
 
   // On mobile, compress the weight range. Large caps stay larger, but no
   // constituent is reduced to an unreadable strip.
-  return mobile ? 1 + Math.pow(raw, 0.36) : raw;
+  return mobile ? 1 + Math.pow(raw, 0.22) : raw;
 }
 
 function weightedChange(tiles: NormalizedTile[]): number {
@@ -294,17 +294,38 @@ function useMobileBreakpoint(): boolean {
   return mobile;
 }
 
+function useMobileViewportHeight(): number {
+  const [height, setHeight] = useState(720);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const update = () =>
+      setHeight(Math.max(viewport?.height ?? window.innerHeight, 320));
+
+    update();
+    window.addEventListener("resize", update);
+    viewport?.addEventListener("resize", update);
+
+    return () => {
+      window.removeEventListener("resize", update);
+      viewport?.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return height;
+}
+
 function mobileCanvasHeight(
-  itemCount: number,
+  viewportHeight: number,
   expanded: boolean,
   fullscreen: boolean,
 ): number {
-  // The mobile treemap grows vertically instead of compressing 60 titles into
-  // unreadable strips. Every tile keeps enough room for ticker + variation.
-  const pixelsPerItem = fullscreen ? 27 : expanded ? 28 : 23;
-  const minimum = expanded ? 760 : 1_080;
-  const maximum = fullscreen ? 2_700 : 1_820;
-  return clamp(itemCount * pixelsPerItem, minimum, maximum);
+  // The complete TSX 60 must fit between the fixed mobile app bar and dock.
+  // The treemap is denser instead of extending the page vertically.
+  const reserved = fullscreen ? 112 : expanded ? 232 : 270;
+  const minimum = fullscreen ? 430 : 360;
+  const maximum = fullscreen ? 900 : 620;
+  return clamp(viewportHeight - reserved, minimum, maximum);
 }
 
 export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
@@ -313,6 +334,7 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
   const [fullscreen, setFullscreen] = useState(false);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useMobileBreakpoint();
+  const mobileViewportHeight = useMobileViewportHeight();
   const [canvasWidth, setCanvasWidth] = useState(0);
 
   const normalizedTiles = useMemo(
@@ -377,7 +399,11 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
   );
 
   const canvasHeight = isMobile
-    ? mobileCanvasHeight(visibleItemCount, Boolean(expandedGroup), fullscreen)
+    ? mobileCanvasHeight(
+        mobileViewportHeight,
+        Boolean(expandedGroup),
+        fullscreen,
+      )
     : clamp(canvasWidth * 0.58, 540, 760);
 
   const canvasSize: CanvasSize = {
@@ -413,9 +439,9 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
     return groupLayout.map(({ item: group, rect }) => {
       const groupRect = insetRect(rect, groupGap / 2);
       const headerHeight = clamp(
-        groupRect.height * (isMobile ? 0.07 : 0.15),
-        isMobile ? 29 : 26,
-        isMobile ? 36 : 40,
+        groupRect.height * (isMobile ? 0.1 : 0.15),
+        isMobile ? (expandedGroup ? 22 : 15) : 26,
+        isMobile ? (expandedGroup ? 30 : 22) : 40,
       );
       const bodyRect = {
         x: groupRect.x + (isMobile ? 2 : 3),
@@ -441,7 +467,13 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
         })),
       };
     });
-  }, [canvasSize.height, canvasSize.width, isMobile, visibleGroups]);
+  }, [
+    canvasSize.height,
+    canvasSize.width,
+    expandedGroup,
+    isMobile,
+    visibleGroups,
+  ]);
 
   if (normalizedTiles.length === 0) {
     return (
@@ -519,7 +551,7 @@ export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
             <i className={styles.legendFlat} /> Stable
             <i className={styles.legendUp} /> Hausse
           </span>
-          <small>Lecture verticale · aucun défilement horizontal</small>
+          <small>Tous les titres tiennent dans la carte mobile</small>
         </div>
       </div>
 

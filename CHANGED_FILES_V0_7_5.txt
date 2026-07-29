@@ -1,0 +1,6 @@
+apps/web/app/mobile.css
+apps/web/components/cockpit/MarketHeatmap.tsx
+apps/web/components/cockpit/MarketHeatmap.module.css
+apps/web/components/stock/FocusClient.tsx
+apps/web/components/layout/AppSidebar.tsx
+apps/web/package.json

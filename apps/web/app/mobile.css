@@ -3662,3 +3662,173 @@
     grid-column: 1;
   }
 }
+
+/* ========================================================================== */
+/* Anatole Mobile v0.7.5 — Cockpit viewport + Focus one-screen width          */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  html,
+  body,
+  .app-shell,
+  .app-main,
+  .focus-page,
+  .focus-page > *,
+  .focus-grid,
+  .right-column,
+  .chart-panel,
+  .info-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html,
+  body,
+  .app-shell,
+  .app-main,
+  .focus-page {
+    overflow-x: hidden !important;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main {
+    padding-top: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-page {
+    gap: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-heatmap-panel,
+  body[data-anatole-section="cockpit"] [class*="MarketHeatmap_panel__"] {
+    margin: 0 !important;
+  }
+
+  .focus-section-tabs,
+  .focus-period-tabs {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .focus-section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .focus-period-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .focus-section-tab,
+  .focus-period-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: none !important;
+    padding-inline: 5px !important;
+    white-space: nowrap !important;
+  }
+
+  .focus-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .chart-panel {
+    padding: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .chart-toolbar,
+  .chart-legend,
+  .right-column,
+  .metrics-grid,
+  .level-row,
+  .section-title-row {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .chart-legend {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .chart-legend > * {
+    min-width: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .chart-canvas {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 290px !important;
+    height: clamp(300px, 82vw, 390px) !important;
+    overflow: hidden !important;
+  }
+
+  .chart-canvas > *,
+  .chart-canvas canvas,
+  .chart-canvas table {
+    max-width: 100% !important;
+  }
+
+  .right-column {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .info-card {
+    padding: 14px !important;
+    overflow: hidden !important;
+  }
+
+  .section-title-row {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  .section-title-row > * {
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .metrics-grid > div {
+    min-width: 0 !important;
+  }
+
+  .metrics-grid :is(span, strong),
+  .level-row :is(span, strong),
+  .profile-card p,
+  .status-footer {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .level-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+  }
+
+  .status-footer {
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .focus-period-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .metrics-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

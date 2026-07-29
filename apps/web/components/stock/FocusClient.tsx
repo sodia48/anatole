@@ -136,7 +136,7 @@ function isIntradayPeriod(
   ].includes(period.interval);
 }
 
-function unixSeconds(value: Candle["time"]): number | null {
+function unixSeconds(value: string | number): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.floor(
       value > 10_000_000_000 ? value / 1000 : value,
@@ -160,7 +160,7 @@ function unixSeconds(value: Candle["time"]): number | null {
  * de l'heure avancée.
  */
 function torontoChartTimestamp(
-  value: Candle["time"],
+  value: string | number,
 ): UTCTimestamp {
   const seconds = unixSeconds(value);
 
@@ -200,7 +200,7 @@ function torontoChartTimestamp(
 }
 
 function chartTimestamp(
-  value: Candle["time"],
+  value: string | number,
   intraday: boolean,
 ): UTCTimestamp {
   if (intraday) {
@@ -346,6 +346,7 @@ function ChartPanel({
   candles,
   technicals,
   period,
+  quote,
   loading,
   refreshing,
   error,
@@ -354,6 +355,7 @@ function ChartPanel({
   candles: Candle[];
   technicals: Technicals;
   period: PeriodDefinition;
+  quote: Quote;
   loading: boolean;
   refreshing: boolean;
   error: string | null;
@@ -592,6 +594,48 @@ function ChartPanel({
     }
   }, [displayCandles, period.key, technicals]);
 
+  useEffect(() => {
+    if (period.key !== "live" || displayCandles.length === 0) {
+      return;
+    }
+
+    const tick = () => {
+      const chartRefs = refs.current;
+      const latest = displayCandles.at(-1);
+
+      if (!chartRefs || !latest) {
+        return;
+      }
+
+      const sourcePrice =
+        Number.isFinite(quote.price) && quote.price > 0
+          ? quote.price
+          : latest.close;
+      const latestTime = chartTimestamp(latest.time, true);
+      const quoteTime = chartTimestamp(quote.timestamp, true);
+      const quoteMinute = Math.floor(Number(quoteTime) / 60) * 60;
+      const barTime = Math.max(Number(latestTime), quoteMinute) as UTCTimestamp;
+      const sameBar = Number(barTime) === Number(latestTime);
+      const open = sameBar ? latest.open : latest.close;
+      const high = Math.max(sameBar ? latest.high : sourcePrice, sourcePrice);
+      const low = Math.min(sameBar ? latest.low : sourcePrice, sourcePrice);
+
+      chartRefs.candles.update({
+        time: barTime,
+        open,
+        high,
+        low,
+        close: sourcePrice,
+      });
+      chartRefs.chart.timeScale().scrollToRealTime();
+    };
+
+    tick();
+    const timer = window.setInterval(tick, 1_000);
+
+    return () => window.clearInterval(timer);
+  }, [displayCandles, period.key, quote.price]);
+
   return (
     <section className="panel chart-panel">
       <div className="chart-toolbar">
@@ -653,7 +697,7 @@ function ChartPanel({
               fontWeight: 750,
             }}
           >
-            ● actualisation 15 s
+            ● graphique actualisé chaque seconde
           </span>
         ) : period.key === "1w" ? (
           <span
@@ -752,7 +796,7 @@ export function FocusClient({
     useState<FocusSection>("chart");
 
   const [periodKey, setPeriodKey] =
-    useState<PeriodKey>("1y");
+    useState<PeriodKey>("live");
   const [periodSnapshot, setPeriodSnapshot] =
     useState<FocusSnapshot>(initialSnapshot);
   const [loading, setLoading] = useState(false);
@@ -767,7 +811,7 @@ export function FocusClient({
 
   const period =
     PERIODS.find((candidate) => candidate.key === periodKey) ??
-    PERIODS[4];
+    PERIODS[0];
 
   useEffect(() => {
     let stopped = false;
@@ -920,16 +964,18 @@ export function FocusClient({
       />
 
       <nav
+        className="focus-section-tabs"
         aria-label="Sections de Focus"
         style={{
           display: "flex",
           alignItems: "center",
           gap: 5,
-          width: "fit-content",
+          width: "100%",
           maxWidth: "100%",
           margin: "0 0 12px",
           padding: 4,
-          overflowX: "auto",
+          overflowX: "visible",
+          flexWrap: "wrap",
           border: "1px solid rgba(39,78,102,.8)",
           borderRadius: 11,
           background: "rgba(4,18,29,.82)",
@@ -944,8 +990,10 @@ export function FocusClient({
               key={section.key}
               aria-pressed={active}
               onClick={() => setActiveSection(section.key)}
+              className="focus-section-tab"
               style={{
-                minWidth: 105,
+                minWidth: 0,
+                flex: "1 1 140px",
                 height: 35,
                 padding: "0 13px",
                 border: active
@@ -970,6 +1018,7 @@ export function FocusClient({
       {activeSection === "chart" ? (
         <>
           <div
+            className="focus-period-tabs"
             style={{
               display: "flex",
               alignItems: "center",
@@ -977,12 +1026,12 @@ export function FocusClient({
               flexWrap: "wrap",
               margin: "0 0 12px",
               padding: 4,
-              width: "fit-content",
+              width: "100%",
               maxWidth: "100%",
               border: "1px solid rgba(39,78,102,.8)",
               borderRadius: 11,
               background: "rgba(4,18,29,.82)",
-              overflowX: "auto",
+              overflowX: "visible",
             }}
             role="group"
             aria-label="Période du graphique Focus"
@@ -998,6 +1047,7 @@ export function FocusClient({
                   onClick={() =>
                     setPeriodKey(candidate.key)
                   }
+                  className="focus-period-button"
                   style={chartButtonStyle(active)}
                 >
                   {candidate.key === "live" ? (
@@ -1024,6 +1074,7 @@ export function FocusClient({
               candles={periodSnapshot.history}
               technicals={periodSnapshot.technicals}
               period={period}
+              quote={quote}
               loading={loading}
               refreshing={refreshing}
               error={error}
