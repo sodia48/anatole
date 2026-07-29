@@ -10,12 +10,15 @@ import {
   useState,
 } from "react";
 
+import {
+  clamp,
+  insetRect,
+  squarifyTreemap,
+  type TreemapRect,
+} from "../heatmap/treemap";
 import styles from "./MarketHeatmap.module.css";
 
-type GroupingMode =
-  | "sector"
-  | "flat"
-  | "direction";
+type GroupingMode = "sector" | "flat" | "direction";
 
 type HeatmapTile = {
   ticker?: unknown;
@@ -52,27 +55,14 @@ type TileGroup = {
   decliners: number;
 };
 
-type Rect = {
-  x: number;
-  y: number;
+type CanvasSize = {
   width: number;
   height: number;
 };
 
-type WeightedItem<T> = {
-  item: T;
-  weight: number;
-};
+type Density = "micro" | "compact" | "normal" | "wide";
 
-type PositionedItem<T> = {
-  item: T;
-  rect: Rect;
-};
-
-const MODE_LABELS: Record<
-  GroupingMode,
-  string
-> = {
+const MODE_LABELS: Record<GroupingMode, string> = {
   sector: "Par secteur",
   flat: "Marché complet",
   direction: "Hausses / baisses",
@@ -80,39 +70,25 @@ const MODE_LABELS: Record<
 
 const UNKNOWN_SECTOR = "Autres";
 
-const SHORT_SECTOR_LABELS:
-  Record<string, string> = {
-    "Services financiers": "Finance",
-    Énergie: "Énergie",
-    Matériaux: "Matériaux",
-    Technologies: "Tech",
-    Industries: "Industries",
-    "Consommation de base": "Conso. base",
-    "Consommation discrétionnaire":
-      "Conso. discr.",
-    "Services publics":
-      "Services publics",
-    Communications: "Communications",
-    Immobilier: "Immobilier",
-    Autres: "Autres",
-  };
+const SHORT_SECTOR_LABELS: Record<string, string> = {
+  "Services financiers": "Finance",
+  Énergie: "Énergie",
+  Matériaux: "Matériaux",
+  Technologies: "Tech",
+  Industries: "Industries",
+  "Consommation de base": "Conso. base",
+  "Consommation discrétionnaire": "Conso. discr.",
+  "Services publics": "Services publics",
+  Communications: "Communications",
+  Immobilier: "Immobilier",
+  Autres: "Autres",
+};
 
-function text(
-  value: unknown,
-  fallback = "",
-): string {
-  return (
-    typeof value === "string" &&
-    value.trim()
-      ? value.trim()
-      : fallback
-  );
+function text(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function number(
-  value: unknown,
-  fallback = 0,
-): number {
+function number(value: unknown, fallback = 0): number {
   const parsed =
     typeof value === "number"
       ? value
@@ -120,78 +96,50 @@ function number(
         ? Number.parseFloat(value)
         : Number.NaN;
 
-  return Number.isFinite(parsed)
-    ? parsed
-    : fallback;
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeTile(
-  raw: unknown,
-): NormalizedTile | null {
-  if (
-    !raw ||
-    typeof raw !== "object"
-  ) {
+function normalizeTile(raw: unknown): NormalizedTile | null {
+  if (!raw || typeof raw !== "object") {
     return null;
   }
 
   const tile = raw as HeatmapTile;
-  const ticker = text(
-    tile.ticker,
-    text(tile.symbol),
-  ).toUpperCase();
+  const ticker = text(tile.ticker, text(tile.symbol)).toUpperCase();
 
   if (!ticker) {
     return null;
   }
 
-  const symbol = text(
-    tile.symbol,
-    ticker.replace(/\.TO$/i, ""),
-  ).toUpperCase();
+  const symbol = text(tile.symbol, ticker.replace(/\.TO$/i, "")).toUpperCase();
 
   return {
     ticker,
     symbol,
     name: text(tile.name, symbol),
-    sector: text(
-      tile.sector,
-      UNKNOWN_SECTOR,
-    ),
-    weight: Math.max(
-      number(tile.weight, 0),
-      0,
-    ),
-    price: Math.max(
-      number(tile.price, 0),
-      0,
-    ),
-    changePercent: number(
-      tile.change_percent,
-      0,
-    ),
-    volume: Math.max(
-      number(tile.volume, 0),
-      0,
-    ),
+    sector: text(tile.sector, UNKNOWN_SECTOR),
+    weight: Math.max(number(tile.weight), 0),
+    price: Math.max(number(tile.price), 0),
+    changePercent: number(tile.change_percent),
+    volume: Math.max(number(tile.volume), 0),
     delayed: Boolean(tile.delayed),
   };
 }
 
-function tileWeight(
-  tile: NormalizedTile,
-): number {
+function rawTileWeight(tile: NormalizedTile): number {
   return Math.max(tile.weight, 0.35);
 }
 
-function weightedChange(
-  tiles: NormalizedTile[],
-): number {
-  const totalWeight = tiles.reduce(
-    (total, tile) =>
-      total + tileWeight(tile),
-    0,
-  );
+function layoutTileWeight(tile: NormalizedTile, mobile: boolean): number {
+  const raw = rawTileWeight(tile);
+
+  // On mobile, compress the weight range. Large caps stay larger, but no
+  // constituent is reduced to an unreadable strip.
+  return mobile ? 1 + Math.pow(raw, 0.36) : raw;
+}
+
+function weightedChange(tiles: NormalizedTile[]): number {
+  const totalWeight = tiles.reduce((total, tile) => total + rawTileWeight(tile), 0);
 
   if (totalWeight <= 0) {
     return 0;
@@ -199,440 +147,184 @@ function weightedChange(
 
   return (
     tiles.reduce(
-      (total, tile) =>
-        total +
-        tile.changePercent *
-          tileWeight(tile),
+      (total, tile) => total + tile.changePercent * rawTileWeight(tile),
       0,
     ) / totalWeight
   );
 }
 
-function buildGroup(
-  key: string,
-  label: string,
-  tiles: NormalizedTile[],
-): TileGroup {
+function buildGroup(key: string, label: string, tiles: NormalizedTile[]): TileGroup {
   const sorted = [...tiles].sort(
-    (left, right) =>
-      tileWeight(right) -
-      tileWeight(left),
+    (left, right) => rawTileWeight(right) - rawTileWeight(left),
   );
 
   return {
     key,
     label,
     tiles: sorted,
-    weight: sorted.reduce(
-      (total, tile) =>
-        total + tileWeight(tile),
-      0,
-    ),
-    changePercent:
-      weightedChange(sorted),
-    advancers: sorted.filter(
-      (tile) =>
-        tile.changePercent >
-        0.005,
-    ).length,
-    decliners: sorted.filter(
-      (tile) =>
-        tile.changePercent <
-        -0.005,
-    ).length,
+    weight: sorted.reduce((total, tile) => total + rawTileWeight(tile), 0),
+    changePercent: weightedChange(sorted),
+    advancers: sorted.filter((tile) => tile.changePercent > 0.005).length,
+    decliners: sorted.filter((tile) => tile.changePercent < -0.005).length,
   };
 }
 
-function groupTiles(
-  tiles: NormalizedTile[],
-  mode: GroupingMode,
-): TileGroup[] {
+function groupTiles(tiles: NormalizedTile[], mode: GroupingMode): TileGroup[] {
   if (mode === "flat") {
-    return [
-      buildGroup(
-        "market",
-        "Marché complet",
-        tiles,
-      ),
-    ];
+    return [buildGroup("market", "Marché complet", tiles)];
   }
 
   if (mode === "direction") {
-    const definitions = [
+    return [
       {
         key: "gainers",
         label: "Hausses",
-        tiles: tiles.filter(
-          (tile) =>
-            tile.changePercent >
-            0.005,
-        ),
+        tiles: tiles.filter((tile) => tile.changePercent > 0.005),
       },
       {
         key: "unchanged",
         label: "Inchangées",
         tiles: tiles.filter(
-          (tile) =>
-            tile.changePercent >=
-              -0.005 &&
-            tile.changePercent <=
-              0.005,
+          (tile) => tile.changePercent >= -0.005 && tile.changePercent <= 0.005,
         ),
       },
       {
         key: "losers",
         label: "Baisses",
-        tiles: tiles.filter(
-          (tile) =>
-            tile.changePercent <
-            -0.005,
-        ),
+        tiles: tiles.filter((tile) => tile.changePercent < -0.005),
       },
-    ];
-
-    return definitions
-      .filter(
-        (definition) =>
-          definition.tiles.length >
-          0,
-      )
+    ]
+      .filter((definition) => definition.tiles.length > 0)
       .map((definition) =>
-        buildGroup(
-          definition.key,
-          definition.label,
-          definition.tiles,
-        ),
+        buildGroup(definition.key, definition.label, definition.tiles),
       );
   }
 
-  const sectors = new Map<
-    string,
-    NormalizedTile[]
-  >();
+  const sectors = new Map<string, NormalizedTile[]>();
 
   for (const tile of tiles) {
-    const current =
-      sectors.get(tile.sector) ??
-      [];
-
+    const current = sectors.get(tile.sector) ?? [];
     current.push(tile);
-    sectors.set(
-      tile.sector,
-      current,
-    );
+    sectors.set(tile.sector, current);
   }
 
   return [...sectors.entries()]
-    .map(
-      ([sector, sectorTiles]) =>
-        buildGroup(
-          sector,
-          sector,
-          sectorTiles,
-        ),
-    )
-    .sort(
-      (left, right) =>
-        right.weight -
-        left.weight,
-    );
+    .map(([sector, sectorTiles]) => buildGroup(sector, sector, sectorTiles))
+    .sort((left, right) => right.weight - left.weight);
 }
 
-function clamp(
-  value: number,
-  minimum: number,
-  maximum: number,
-): number {
-  return Math.min(
-    Math.max(value, minimum),
-    maximum,
-  );
+function tileBackground(changePercent: number): string {
+  const strength = clamp(Math.abs(changePercent) / 5, 0.16, 1);
+
+  if (changePercent > 0.005) {
+    return `linear-gradient(145deg, rgba(9, 176, 124, ${
+      0.52 + strength * 0.42
+    }), rgba(3, 83, 65, ${0.86 + strength * 0.12}))`;
+  }
+
+  if (changePercent < -0.005) {
+    return `linear-gradient(145deg, rgba(224, 45, 78, ${
+      0.52 + strength * 0.42
+    }), rgba(104, 25, 45, ${0.86 + strength * 0.12}))`;
+  }
+
+  return "linear-gradient(145deg, rgba(71, 99, 119, .97), rgba(29, 49, 65, .99))";
 }
 
-function binaryTreemap<T>(
-  items: WeightedItem<T>[],
-  rect: Rect,
-): PositionedItem<T>[] {
-  if (
-    items.length === 0 ||
-    rect.width <= 0 ||
-    rect.height <= 0
-  ) {
-    return [];
-  }
+function formatChange(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
 
-  if (items.length === 1) {
-    return [
-      {
-        item: items[0].item,
-        rect,
-      },
-    ];
-  }
+function formatPrice(value: number): string {
+  return value.toLocaleString("fr-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
-  const sorted = [...items].sort(
-    (left, right) =>
-      right.weight -
-      left.weight,
-  );
+function stockPath(tile: NormalizedTile): string {
+  return `/focus/${encodeURIComponent(tile.symbol)}`;
+}
 
-  const totalWeight = sorted.reduce(
-    (total, entry) =>
-      total +
-      Math.max(entry.weight, 0.001),
-    0,
-  );
+function shortGroupLabel(label: string): string {
+  return SHORT_SECTOR_LABELS[label] ?? label;
+}
 
-  let firstWeight = 0;
-  let splitIndex = 1;
-  let bestDistance =
-    Number.POSITIVE_INFINITY;
+function tileDensity(rect: TreemapRect, mobile: boolean): Density {
+  const area = rect.width * rect.height;
 
-  for (
-    let index = 1;
-    index < sorted.length;
-    index += 1
-  ) {
-    firstWeight += Math.max(
-      sorted[index - 1].weight,
-      0.001,
-    );
-
-    const distance = Math.abs(
-      totalWeight / 2 -
-        firstWeight,
-    );
-
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      splitIndex = index;
+  if (mobile) {
+    if (rect.width < 34 || rect.height < 30 || area < 1_250) {
+      return "micro";
     }
+    if (rect.width < 54 || rect.height < 44 || area < 2_500) {
+      return "compact";
+    }
+    if (rect.width < 94 || rect.height < 70 || area < 6_000) {
+      return "normal";
+    }
+    return "wide";
   }
 
-  const first = sorted.slice(
-    0,
-    splitIndex,
-  );
-  const second = sorted.slice(
-    splitIndex,
-  );
-
-  const firstTotal = first.reduce(
-    (total, entry) =>
-      total +
-      Math.max(entry.weight, 0.001),
-    0,
-  );
-
-  const ratio =
-    totalWeight > 0
-      ? firstTotal /
-        totalWeight
-      : 0.5;
-
-  if (rect.width >= rect.height) {
-    const firstWidth =
-      rect.width * ratio;
-
-    return [
-      ...binaryTreemap(first, {
-        x: rect.x,
-        y: rect.y,
-        width: firstWidth,
-        height: rect.height,
-      }),
-      ...binaryTreemap(second, {
-        x:
-          rect.x +
-          firstWidth,
-        y: rect.y,
-        width:
-          rect.width -
-          firstWidth,
-        height: rect.height,
-      }),
-    ];
+  if (rect.width < 28 || rect.height < 22) {
+    return "micro";
   }
-
-  const firstHeight =
-    rect.height * ratio;
-
-  return [
-    ...binaryTreemap(first, {
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: firstHeight,
-    }),
-    ...binaryTreemap(second, {
-      x: rect.x,
-      y:
-        rect.y +
-        firstHeight,
-      width: rect.width,
-      height:
-        rect.height -
-        firstHeight,
-    }),
-  ];
+  if (rect.width < 52 || rect.height < 36 || area < 2_300) {
+    return "compact";
+  }
+  if (rect.width < 92 || rect.height < 60 || area < 5_400) {
+    return "normal";
+  }
+  return "wide";
 }
 
-function tileBackground(
-  changePercent: number,
-): string {
-  const strength = clamp(
-    Math.abs(changePercent) / 5,
-    0.16,
-    1,
+function useMobileBreakpoint(): boolean {
+  const [mobile, setMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 820px)");
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+
+  return mobile;
+}
+
+function mobileCanvasHeight(
+  itemCount: number,
+  expanded: boolean,
+  fullscreen: boolean,
+): number {
+  // The mobile treemap grows vertically instead of compressing 60 titles into
+  // unreadable strips. Every tile keeps enough room for ticker + variation.
+  const pixelsPerItem = fullscreen ? 27 : expanded ? 28 : 23;
+  const minimum = expanded ? 760 : 1_080;
+  const maximum = fullscreen ? 2_700 : 1_820;
+  return clamp(itemCount * pixelsPerItem, minimum, maximum);
+}
+
+export function MarketHeatmap({ tiles }: { tiles: readonly unknown[] }) {
+  const [mode, setMode] = useState<GroupingMode>("sector");
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const isMobile = useMobileBreakpoint();
+  const [canvasWidth, setCanvasWidth] = useState(0);
+
+  const normalizedTiles = useMemo(
+    () =>
+      tiles
+        .map(normalizeTile)
+        .filter((tile): tile is NormalizedTile => tile !== null),
+    [tiles],
   );
-
-  if (
-    changePercent >
-    0.005
-  ) {
-    return `linear-gradient(145deg, rgba(11, 154, 112, ${
-      0.44 + strength * 0.48
-    }), rgba(5, 78, 63, ${
-      0.78 + strength * 0.18
-    }))`;
-  }
-
-  if (
-    changePercent <
-    -0.005
-  ) {
-    return `linear-gradient(145deg, rgba(206, 35, 71, ${
-      0.45 + strength * 0.47
-    }), rgba(103, 35, 50, ${
-      0.78 + strength * 0.18
-    }))`;
-  }
-
-  return (
-    "linear-gradient(145deg, " +
-    "rgba(67, 91, 111, .94), " +
-    "rgba(31, 51, 67, .98))"
-  );
-}
-
-function formatChange(
-  value: number,
-): string {
-  return `${
-    value >= 0 ? "+" : ""
-  }${value.toFixed(2)}%`;
-}
-
-function formatPrice(
-  value: number,
-): string {
-  return value.toLocaleString(
-    "fr-CA",
-    {
-      style: "currency",
-      currency: "CAD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    },
-  );
-}
-
-function stockPath(
-  tile: NormalizedTile,
-): string {
-  return `/focus/${encodeURIComponent(
-    tile.symbol,
-  )}`;
-}
-
-function shortGroupLabel(
-  label: string,
-): string {
-  return (
-    SHORT_SECTOR_LABELS[label] ??
-    label
-  );
-}
-
-function tileDetailLevel(
-  rect: Rect,
-): 0 | 1 | 2 | 3 {
-  const area =
-    rect.width *
-    rect.height;
-
-  if (
-    rect.width < 28 ||
-    rect.height < 22
-  ) {
-    return 0;
-  }
-
-  if (
-    rect.width < 52 ||
-    rect.height < 36 ||
-    area < 2300
-  ) {
-    return 1;
-  }
-
-  if (
-    rect.width < 92 ||
-    rect.height < 60 ||
-    area < 5400
-  ) {
-    return 2;
-  }
-
-  return 3;
-}
-
-export function MarketHeatmap({
-  tiles,
-}: {
-  tiles: readonly unknown[];
-}) {
-  const [mode, setMode] =
-    useState<GroupingMode>(
-      "sector",
-    );
-  const [
-    expandedGroup,
-    setExpandedGroup,
-  ] =
-    useState<string | null>(
-      null,
-    );
-  const canvasRef =
-    useRef<HTMLDivElement | null>(
-      null,
-    );
-  const [canvasSize, setCanvasSize] =
-    useState({
-      width: 0,
-      height: 0,
-    });
-
-  const normalizedTiles =
-    useMemo(
-      () =>
-        tiles
-          .map(normalizeTile)
-          .filter(
-            (
-              tile,
-            ): tile is NormalizedTile =>
-              tile !== null,
-          ),
-      [tiles],
-    );
 
   const groups = useMemo(
-    () =>
-      groupTiles(
-        normalizedTiles,
-        mode,
-      ),
+    () => groupTiles(normalizedTiles, mode),
     [mode, normalizedTiles],
   );
 
@@ -641,360 +333,244 @@ export function MarketHeatmap({
   }, [mode]);
 
   useEffect(() => {
-    const element =
-      canvasRef.current;
+    const element = canvasRef.current;
 
     if (!element) {
       return;
     }
 
-    const update = () => {
-      setCanvasSize({
-        width:
-          element.clientWidth,
-        height:
-          element.clientHeight,
-      });
-    };
-
+    const update = () => setCanvasWidth(Math.max(element.clientWidth, 1));
     update();
 
-    const observer =
-      new ResizeObserver(update);
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", update);
+      return () => window.removeEventListener("resize", update);
+    }
 
+    const observer = new ResizeObserver(update);
     observer.observe(element);
+    return () => observer.disconnect();
+  }, [fullscreen]);
 
-    return () =>
-      observer.disconnect();
-  }, []);
+  useEffect(() => {
+    if (!fullscreen) {
+      return;
+    }
 
-  const visibleGroups =
-    useMemo(() => {
-      if (!expandedGroup) {
-        return groups;
-      }
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [fullscreen]);
 
-      return groups.filter(
-        (group) =>
-          group.key ===
-          expandedGroup,
+  const visibleGroups = useMemo(() => {
+    if (!expandedGroup) {
+      return groups;
+    }
+    return groups.filter((group) => group.key === expandedGroup);
+  }, [expandedGroup, groups]);
+
+  const visibleItemCount = visibleGroups.reduce(
+    (total, group) => total + group.tiles.length,
+    0,
+  );
+
+  const canvasHeight = isMobile
+    ? mobileCanvasHeight(visibleItemCount, Boolean(expandedGroup), fullscreen)
+    : clamp(canvasWidth * 0.58, 540, 760);
+
+  const canvasSize: CanvasSize = {
+    width: Math.max(canvasWidth, 1),
+    height: Math.max(canvasHeight, 1),
+  };
+
+  const positionedGroups = useMemo(() => {
+    if (canvasSize.width <= 1 || canvasSize.height <= 1) {
+      return [];
+    }
+
+    const outerPadding = isMobile ? 3 : 4;
+    const groupGap = isMobile ? 2 : 3;
+    const groupLayout = squarifyTreemap(
+      visibleGroups.map((group) => ({
+        item: group,
+        weight: isMobile
+          ? group.tiles.reduce(
+              (sum, tile) => sum + layoutTileWeight(tile, true),
+              0,
+            )
+          : group.weight,
+      })),
+      {
+        x: outerPadding,
+        y: outerPadding,
+        width: canvasSize.width - outerPadding * 2,
+        height: canvasSize.height - outerPadding * 2,
+      },
+    );
+
+    return groupLayout.map(({ item: group, rect }) => {
+      const groupRect = insetRect(rect, groupGap / 2);
+      const headerHeight = clamp(
+        groupRect.height * (isMobile ? 0.07 : 0.15),
+        isMobile ? 29 : 26,
+        isMobile ? 36 : 40,
       );
-    }, [
-      expandedGroup,
-      groups,
-    ]);
-
-  const positionedGroups =
-    useMemo(() => {
-      const {
-        width,
-        height,
-      } = canvasSize;
-
-      if (
-        width <= 0 ||
-        height <= 0
-      ) {
-        return [];
-      }
-
-      const outerPadding = 4;
-      const gap = 3;
-
-      const groupLayout =
-        binaryTreemap(
-          visibleGroups.map(
-            (group) => ({
-              item: group,
-              weight:
-                group.weight,
-            }),
-          ),
-          {
-            x: outerPadding,
-            y: outerPadding,
-            width:
-              width -
-              outerPadding * 2,
-            height:
-              height -
-              outerPadding * 2,
-          },
-        );
-
-      return groupLayout.map(
-        ({
-          item: group,
-          rect,
-        }) => {
-          const groupRect = {
-            x:
-              rect.x +
-              gap / 2,
-            y:
-              rect.y +
-              gap / 2,
-            width: Math.max(
-              rect.width -
-                gap,
-              0,
-            ),
-            height: Math.max(
-              rect.height -
-                gap,
-              0,
-            ),
-          };
-
-          const headerHeight =
-            clamp(
-              groupRect.height *
-                0.15,
-              26,
-              40,
-            );
-
-          const bodyRect = {
-            x:
-              groupRect.x + 3,
-            y:
-              groupRect.y +
-              headerHeight +
-              2,
-            width: Math.max(
-              groupRect.width -
-                6,
-              0,
-            ),
-            height: Math.max(
-              groupRect.height -
-                headerHeight -
-                5,
-              0,
-            ),
-          };
-
-          const tileLayout =
-            binaryTreemap(
-              group.tiles.map(
-                (tile) => ({
-                  item: tile,
-                  weight:
-                    tileWeight(
-                      tile,
-                    ),
-                }),
-              ),
-              bodyRect,
-            );
-
-          return {
-            group,
-            rect: groupRect,
-            headerHeight,
-            tiles:
-              tileLayout.map(
-                ({
-                  item: tile,
-                  rect: tileRect,
-                }) => ({
-                  tile,
-                  rect: {
-                    x:
-                      tileRect.x +
-                      1.5,
-                    y:
-                      tileRect.y +
-                      1.5,
-                    width:
-                      Math.max(
-                        tileRect.width -
-                          3,
-                        0,
-                      ),
-                    height:
-                      Math.max(
-                        tileRect.height -
-                          3,
-                        0,
-                      ),
-                  },
-                }),
-              ),
-          };
-        },
+      const bodyRect = {
+        x: groupRect.x + (isMobile ? 2 : 3),
+        y: groupRect.y + headerHeight + 2,
+        width: Math.max(groupRect.width - (isMobile ? 4 : 6), 0),
+        height: Math.max(groupRect.height - headerHeight - (isMobile ? 4 : 5), 0),
+      };
+      const tileLayout = squarifyTreemap(
+        group.tiles.map((tile) => ({
+          item: tile,
+          weight: layoutTileWeight(tile, isMobile),
+        })),
+        bodyRect,
       );
-    }, [
-      canvasSize,
-      visibleGroups,
-    ]);
 
-  if (
-    normalizedTiles.length === 0
-  ) {
+      return {
+        group,
+        rect: groupRect,
+        headerHeight,
+        tiles: tileLayout.map(({ item: tile, rect: tileRect }) => ({
+          tile,
+          rect: insetRect(tileRect, isMobile ? 1 : 1.5),
+        })),
+      };
+    });
+  }, [canvasSize.height, canvasSize.width, isMobile, visibleGroups]);
+
+  if (normalizedTiles.length === 0) {
     return (
-      <section
-        className={`panel ${styles.panel}`}
-      >
-        <div
-          className={
-            styles.heading
-          }
-        >
+      <section className={`panel ${styles.panel}`}>
+        <div className={styles.heading}>
           <div>
-            <span className="eyebrow">
-              CARTE DU MARCHÉ
-            </span>
-            <h2>
-              S&amp;P/TSX 60
-            </h2>
+            <span className="eyebrow">CARTE DU MARCHÉ</span>
+            <h2>S&amp;P/TSX 60</h2>
           </div>
         </div>
-        <p
-          className={
-            styles.empty
-          }
-        >
-          Aucun titre n’est
-          disponible pour la carte.
-        </p>
+        <p className={styles.empty}>Aucun titre n’est disponible pour la carte.</p>
       </section>
     );
   }
 
   return (
     <section
-      className={`panel ${styles.panel}`}
+      className={`panel ${styles.panel} ${fullscreen ? styles.fullscreen : ""}`}
+      data-fullscreen={fullscreen ? "true" : "false"}
     >
-      <div
-        className={
-          styles.heading
-        }
-      >
-        <div>
-          <span className="eyebrow">
-            CARTE DU MARCHÉ
-          </span>
-          <h2>
-            S&amp;P/TSX 60
-          </h2>
-          <p>
-            {normalizedTiles.length} titres affichés · couleur selon la
-            variation · taille proportionnelle sur ordinateur.
-          </p>
-        </div>
+      <div className={styles.stickyTop}>
+        <div className={styles.heading}>
+          <div>
+            <span className="eyebrow">CARTE DU MARCHÉ</span>
+            <h2>S&amp;P/TSX 60</h2>
+            <p>
+              {normalizedTiles.length} titres · symbole et variation visibles dans chaque case ·
+              touchez un secteur pour agrandir sa lecture.
+            </p>
+          </div>
 
-        <div
-          className={
-            styles.controls
-          }
-        >
-          <label
-            className={
-              styles.selectLabel
-            }
-          >
-            <span>
-              Regroupement
-            </span>
-            <select
-              aria-label="Regroupement de la carte"
-              value={mode}
-              onChange={(
-                event:
-                  ChangeEvent<HTMLSelectElement>,
-              ) =>
-                setMode(
-                  event.target
-                    .value as GroupingMode,
-                )
-              }
-            >
-              {Object.entries(
-                MODE_LABELS,
-              ).map(
-                ([
-                  value,
-                  label,
-                ]) => (
-                  <option
-                    value={
-                      value
-                    }
-                    key={
-                      value
-                    }
-                  >
+          <div className={styles.controls}>
+            <label className={styles.selectLabel}>
+              <span>Regroupement</span>
+              <select
+                aria-label="Regroupement de la carte"
+                value={mode}
+                onChange={(event: ChangeEvent<HTMLSelectElement>) =>
+                  setMode(event.target.value as GroupingMode)
+                }
+              >
+                {Object.entries(MODE_LABELS).map(([value, label]) => (
+                  <option value={value} key={value}>
                     {label}
                   </option>
-                ),
-              )}
-            </select>
-          </label>
+                ))}
+              </select>
+            </label>
 
-          {expandedGroup ? (
+            {expandedGroup ? (
+              <button
+                type="button"
+                className={styles.resetButton}
+                onClick={() => setExpandedGroup(null)}
+              >
+                Vue complète
+              </button>
+            ) : null}
+
             <button
               type="button"
-              className={
-                styles.resetButton
-              }
-              onClick={() =>
-                setExpandedGroup(
-                  null,
-                )
-              }
+              className={styles.fullscreenButton}
+              onClick={() => setFullscreen((current) => !current)}
+              aria-pressed={fullscreen}
             >
-              Vue complète
+              {fullscreen ? "Quitter" : "Plein écran"}
             </button>
-          ) : (
-            <span
-              className={
-                styles.hint
-              }
-            >
-              Touchez un secteur
-              pour l’agrandir
-            </span>
-          )}
+          </div>
+        </div>
+
+        <div className={styles.readabilityBar}>
+          <strong>{visibleItemCount}/{normalizedTiles.length} titres visibles</strong>
+          <span className={styles.legend} aria-label="Légende des variations">
+            <i className={styles.legendDown} /> Baisse
+            <i className={styles.legendFlat} /> Stable
+            <i className={styles.legendUp} /> Hausse
+          </span>
+          <small>Lecture verticale · aucun défilement horizontal</small>
         </div>
       </div>
 
       <div
-        className={styles.mobileMap}
-        aria-label={`Carte mobile de ${normalizedTiles.length} actions avec leurs variations`}
+        ref={canvasRef}
+        className={styles.treemap}
+        style={{ height: canvasHeight } as CSSProperties}
+        aria-label={`Treemap du TSX 60 avec ${visibleItemCount} titres et leurs variations`}
       >
-        {visibleGroups.map((group) => (
-          <section
-            className={styles.mobileGroup}
-            key={`mobile-${group.key}`}
-          >
-            <button
-              type="button"
-              className={styles.mobileGroupHeader}
-              onClick={() =>
-                setExpandedGroup((current) =>
-                  current === group.key ? null : group.key,
-                )
-              }
-              aria-pressed={expandedGroup === group.key}
-            >
-              <span>
-                <strong>{shortGroupLabel(group.label)}</strong>
-                <small>{group.tiles.length} titre{group.tiles.length > 1 ? "s" : ""}</small>
-              </span>
-              <b
-                className={
-                  group.changePercent >= 0
-                    ? styles.groupPositive
-                    : styles.groupNegative
-                }
-              >
-                {formatChange(group.changePercent)}
-              </b>
-            </button>
+        {positionedGroups.map(({ group, rect, headerHeight, tiles: groupTilesPositioned }) => {
+          const compactHeader = rect.width < 132 || rect.height < 80;
 
-            <div className={styles.mobileTileGrid}>
-              {group.tiles.map((tile) => {
+          return (
+            <article
+              className={styles.group}
+              data-compact={compactHeader ? "true" : "false"}
+              key={group.key}
+              style={
+                {
+                  left: rect.x,
+                  top: rect.y,
+                  width: rect.width,
+                  height: rect.height,
+                } as CSSProperties
+              }
+            >
+              <button
+                type="button"
+                className={styles.groupHeader}
+                style={{ height: headerHeight }}
+                onClick={() =>
+                  setExpandedGroup((current) =>
+                    current === group.key ? null : group.key,
+                  )
+                }
+                aria-pressed={expandedGroup === group.key}
+              >
+                <strong>{shortGroupLabel(group.label)}</strong>
+                <span
+                  className={
+                    group.changePercent >= 0
+                      ? styles.groupPositive
+                      : styles.groupNegative
+                  }
+                >
+                  {formatChange(group.changePercent)}
+                </span>
+              </button>
+
+              {groupTilesPositioned.map(({ tile, rect: tileRect }) => {
+                const density = tileDensity(tileRect, isMobile);
                 const accessibleLabel = `${tile.symbol}, ${tile.name}, ${formatChange(
                   tile.changePercent,
                 )}`;
@@ -1002,265 +578,42 @@ export function MarketHeatmap({
                 return (
                   <Link
                     href={stockPath(tile)}
-                    className={styles.mobileTile}
-                    style={{
-                      background: tileBackground(tile.changePercent),
-                    }}
+                    className={styles.tile}
+                    data-density={density}
+                    style={
+                      {
+                        left: tileRect.x - rect.x,
+                        top: tileRect.y - rect.y,
+                        width: tileRect.width,
+                        height: tileRect.height,
+                        background: tileBackground(tile.changePercent),
+                      } as CSSProperties
+                    }
                     aria-label={accessibleLabel}
                     title={`${tile.name} · ${formatPrice(tile.price)} · ${formatChange(
                       tile.changePercent,
                     )}`}
-                    key={`mobile-${group.key}-${tile.ticker}`}
+                    key={tile.ticker}
                   >
-                    <span>{tile.symbol}</span>
-                    <strong>{formatChange(tile.changePercent)}</strong>
-                    <small>{formatPrice(tile.price)}</small>
+                    <span className={styles.tileSymbol}>{tile.symbol}</span>
+                    <strong className={styles.tileChange}>
+                      {formatChange(tile.changePercent)}
+                    </strong>
+                    {density === "normal" || density === "wide" ? (
+                      <small>{formatPrice(tile.price)}</small>
+                    ) : null}
+                    {density === "wide" ? (
+                      <span className={styles.tileName}>{tile.name}</span>
+                    ) : null}
+                    {tile.delayed && density === "wide" ? (
+                      <span className={styles.delayed}>différé</span>
+                    ) : null}
                   </Link>
                 );
               })}
-            </div>
-          </section>
-        ))}
-      </div>
-
-      <div
-        ref={canvasRef}
-        className={
-          styles.treemap
-        }
-        aria-label="Carte du marché TSX 60"
-      >
-        {positionedGroups.map(
-          ({
-            group,
-            rect,
-            headerHeight,
-            tiles:
-              positionedTiles,
-          }) => {
-            const compactHeader =
-              rect.width < 120 ||
-              rect.height < 82;
-
-            return (
-              <article
-                className={
-                  styles.group
-                }
-                data-compact={
-                  compactHeader
-                    ? "true"
-                    : "false"
-                }
-                key={group.key}
-                style={
-                  {
-                    left:
-                      rect.x,
-                    top:
-                      rect.y,
-                    width:
-                      rect.width,
-                    height:
-                      rect.height,
-                  } as CSSProperties
-                }
-              >
-                <button
-                  type="button"
-                  className={
-                    styles.groupHeader
-                  }
-                  style={{
-                    height:
-                      headerHeight,
-                  }}
-                  onClick={() =>
-                    setExpandedGroup(
-                      (
-                        current,
-                      ) =>
-                        current ===
-                        group.key
-                          ? null
-                          : group.key,
-                    )
-                  }
-                  aria-pressed={
-                    expandedGroup ===
-                    group.key
-                  }
-                >
-                  <strong>
-                    {shortGroupLabel(
-                      group.label,
-                    )}
-                  </strong>
-                  <span
-                    className={
-                      group.changePercent >=
-                      0
-                        ? styles.groupPositive
-                        : styles.groupNegative
-                    }
-                  >
-                    {formatChange(
-                      group.changePercent,
-                    )}
-                  </span>
-                </button>
-
-                {positionedTiles.map(
-                  ({
-                    tile,
-                    rect:
-                      tileRect,
-                  }) => {
-                    const detail =
-                      tileDetailLevel(
-                        tileRect,
-                      );
-
-                    if (
-                      detail === 0
-                    ) {
-                      return (
-                        <Link
-                          href={stockPath(
-                            tile,
-                          )}
-                          className={
-                            styles.microTile
-                          }
-                          style={{
-                            left:
-                              tileRect.x -
-                              rect.x,
-                            top:
-                              tileRect.y -
-                              rect.y,
-                            width:
-                              tileRect.width,
-                            height:
-                              tileRect.height,
-                            background:
-                              tileBackground(
-                                tile.changePercent,
-                              ),
-                          }}
-                          aria-label={`${tile.symbol}, ${formatChange(
-                            tile.changePercent,
-                          )}`}
-                          key={
-                            tile.ticker
-                          }
-                        />
-                      );
-                    }
-
-                    return (
-                      <Link
-                        href={stockPath(
-                          tile,
-                        )}
-                        className={
-                          styles.tile
-                        }
-                        data-detail={
-                          detail
-                        }
-                        style={{
-                          left:
-                            tileRect.x -
-                            rect.x,
-                          top:
-                            tileRect.y -
-                            rect.y,
-                          width:
-                            tileRect.width,
-                          height:
-                            tileRect.height,
-                          background:
-                            tileBackground(
-                              tile.changePercent,
-                            ),
-                        }}
-                        key={
-                          tile.ticker
-                        }
-                        title={`${tile.name} · ${tile.sector} · ${formatChange(
-                          tile.changePercent,
-                        )}`}
-                      >
-                        <span
-                          className={
-                            styles.tileSymbol
-                          }
-                        >
-                          {
-                            tile.symbol
-                          }
-                        </span>
-
-                        {detail >=
-                        2 ? (
-                          <strong>
-                            {formatChange(
-                              tile.changePercent,
-                            )}
-                          </strong>
-                        ) : null}
-
-                        {detail >=
-                        3 ? (
-                          <>
-                            <small>
-                              {formatPrice(
-                                tile.price,
-                              )}
-                            </small>
-                            <span
-                              className={
-                                styles.tileName
-                              }
-                            >
-                              {
-                                tile.name
-                              }
-                            </span>
-                          </>
-                        ) : null}
-
-                        {tile.delayed &&
-                        detail >=
-                          3 ? (
-                          <span
-                            className={
-                              styles.delayed
-                            }
-                          >
-                            Différé
-                          </span>
-                        ) : null}
-                      </Link>
-                    );
-                  },
-                )}
-              </article>
-            );
-          },
-        )}
-
-        {positionedGroups.length ===
-        0 ? (
-          <div
-            className={
-              styles.loadingCanvas
-            }
-          >
-            Construction de la carte…
-          </div>
-        ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

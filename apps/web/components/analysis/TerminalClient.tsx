@@ -148,7 +148,7 @@ function RankingTable({
         )}
       </div>
       <div className={styles.tableWrap}>
-        <table className={styles.rankTable} style={{ minWidth: 660 }}>
+        <table className={styles.rankTable} data-mobile-cards="terminal">
           <thead>
             <tr>
               <th>Titre</th>
@@ -162,7 +162,7 @@ function RankingTable({
           <tbody>
             {items.map((item, index) => (
               <tr key={item.symbol}>
-                <td>
+                <td data-label="Titre">
                   <div className={styles.instrumentCell}>
                     <span className={styles.rankBadge}>{index + 1}</span>
                     <span>
@@ -171,15 +171,15 @@ function RankingTable({
                     </span>
                   </div>
                 </td>
-                <td className={valueClass(item.change_percent)}>
+                <td data-label="Séance" className={valueClass(item.change_percent)}>
                   {formatPercent(item.change_percent)}
                 </td>
-                <td className={valueClass(item.momentum_20d)}>
+                <td data-label="Momentum" className={valueClass(item.momentum_20d)}>
                   {formatPercent(item.momentum_20d, 1)}
                 </td>
-                <td>{item.relative_volume.toFixed(1)}×</td>
-                <td>{item.rsi_14?.toFixed(1) ?? "—"}</td>
-                <td><span className={styles.scorePill}>{item.score.toFixed(0)}</span></td>
+                <td data-label="Volume relatif">{item.relative_volume.toFixed(1)}×</td>
+                <td data-label="RSI">{item.rsi_14?.toFixed(1) ?? "—"}</td>
+                <td data-label="Score"><span className={styles.scorePill}>{item.score.toFixed(0)}</span></td>
               </tr>
             ))}
           </tbody>

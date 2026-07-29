@@ -319,7 +319,7 @@ function CorrelationGrid({
   snapshot: ComparisonSnapshot;
 }) {
   const symbols = snapshot.correlation.symbols;
-  const columns = `repeat(${symbols.length + 1}, minmax(68px, 1fr))`;
+  const columns = `repeat(${symbols.length + 1}, minmax(0, 1fr))`;
 
   return (
     <div className={styles.tableWrap}>
@@ -741,7 +741,7 @@ export function ComparatorClient() {
               <Trophy size={21} color="#f2b84b" />
             </div>
             <div className={styles.tableWrap}>
-              <table className={styles.compareTable}>
+              <table className={styles.compareTable} data-mobile-cards="compare">
                 <thead>
                   <tr>
                     <th>Titre</th>
@@ -763,7 +763,7 @@ export function ComparatorClient() {
                 <tbody>
                   {snapshot.instruments.map((instrument) => (
                     <tr key={instrument.symbol}>
-                      <td>
+                      <td data-label="Titre">
                         <div className={styles.instrumentCell}>
                           <span className={styles.rankBadge}>{instrument.rank}</span>
                           <span>
@@ -772,19 +772,19 @@ export function ComparatorClient() {
                           </span>
                         </div>
                       </td>
-                      <td><span className={styles.typePill}>{instrument.instrument_type}</span></td>
-                      <td>{formatCurrency(instrument.price, instrument.currency)}</td>
-                      <td className={valueClass(instrument.total_return_percent)}>{formatPercent(instrument.total_return_percent)}</td>
-                      <td className={valueClass(instrument.annualized_return_percent)}>{formatPercent(instrument.annualized_return_percent)}</td>
-                      <td>{formatPercent(instrument.volatility_percent)}</td>
-                      <td>{formatNumber(instrument.sharpe_ratio)}</td>
-                      <td>{formatNumber(instrument.beta)}</td>
-                      <td className="negative">{formatPercent(instrument.max_drawdown_percent)}</td>
-                      <td className={valueClass(instrument.momentum_20d)}>{formatPercent(instrument.momentum_20d)}</td>
-                      <td>{formatNumber(instrument.rsi_14, 1)}</td>
-                      <td>{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1)}×`}</td>
-                      <td>{formatPercent(instrument.dividend_yield_percent)}</td>
-                      <td><span className={styles.scorePill}>{instrument.score}</span></td>
+                      <td data-label="Type"><span className={styles.typePill}>{instrument.instrument_type}</span></td>
+                      <td data-label="Prix">{formatCurrency(instrument.price, instrument.currency)}</td>
+                      <td data-label="Période" className={valueClass(instrument.total_return_percent)}>{formatPercent(instrument.total_return_percent)}</td>
+                      <td data-label="Annualisé" className={valueClass(instrument.annualized_return_percent)}>{formatPercent(instrument.annualized_return_percent)}</td>
+                      <td data-label="Volatilité">{formatPercent(instrument.volatility_percent)}</td>
+                      <td data-label="Sharpe">{formatNumber(instrument.sharpe_ratio)}</td>
+                      <td data-label="Bêta">{formatNumber(instrument.beta)}</td>
+                      <td data-label="Drawdown" className="negative">{formatPercent(instrument.max_drawdown_percent)}</td>
+                      <td data-label="Momentum 20j" className={valueClass(instrument.momentum_20d)}>{formatPercent(instrument.momentum_20d)}</td>
+                      <td data-label="RSI">{formatNumber(instrument.rsi_14, 1)}</td>
+                      <td data-label="P/E prévu">{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1)}×`}</td>
+                      <td data-label="Dividende">{formatPercent(instrument.dividend_yield_percent)}</td>
+                      <td data-label="Score"><span className={styles.scorePill}>{instrument.score}</span></td>
                     </tr>
                   ))}
                 </tbody>

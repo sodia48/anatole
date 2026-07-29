@@ -2524,7 +2524,7 @@
 
 
 /* ========================================================================== */
-/* ANATOLE MOBILE PRODUCT LAYER v0.7.3                                       */
+/* ANATOLE MOBILE PRODUCT LAYER v0.7.4                                       */
 /* Navigation stable, readable cards and complete stock / ETF maps.          */
 /* ========================================================================== */
 
@@ -3015,5 +3015,650 @@
   .sidebar {
     transition: none !important;
     animation: none !important;
+  }
+}
+
+
+/* ========================================================================== */
+/* ANATOLE MOBILE READABILITY v0.7.4                                          */
+/* Cockpit keeps a vertical treemap. ETF keeps its mobile card map.           */
+/* Every other section wraps or becomes a card: no information requires a     */
+/* left/right swipe to be discovered.                                         */
+/* ========================================================================== */
+
+@media (max-width: 820px) {
+  html,
+  body,
+  .app-shell,
+  .app-workspace,
+  .app-main {
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }
+
+  .app-main,
+  .app-main > *,
+  .app-main section,
+  .app-main article,
+  .app-main header,
+  .app-main footer,
+  .app-main div,
+  .app-main nav,
+  .app-main form {
+    min-width: 0;
+  }
+
+  .app-main :is(img, video, canvas, svg) {
+    max-width: 100%;
+  }
+
+  .app-main :is(h1, h2, h3, h4, p, span, strong, small, code, a) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Controls wrap in place instead of becoming horizontal carousels. */
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"],
+    [class*="_selectionRow__"],
+    [class*="_chartLegend__"],
+    [class*="_assistantLinks__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"]
+  ) > * {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Screener: one instrument card, all eight metrics visible. */
+  .screener-table-wrap {
+    overflow: visible !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .screener-table-head {
+    display: none !important;
+  }
+
+  .screener-rows {
+    display: grid !important;
+    gap: 10px !important;
+  }
+
+  .screener-row {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 14px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px 12px !important;
+    border: 1px solid rgba(45, 91, 118, .72) !important;
+    border-radius: 16px !important;
+    background: linear-gradient(155deg, rgba(12, 35, 50, .98), rgba(5, 20, 31, .98));
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+  }
+
+  .screener-name {
+    grid-column: 1 / -1;
+    padding-bottom: 9px;
+    border-bottom: 1px solid rgba(48, 88, 112, .52);
+  }
+
+  .screener-name span {
+    white-space: normal !important;
+  }
+
+  .screener-row > :nth-child(n + 2) {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 8px 9px !important;
+    display: grid !important;
+    align-content: center !important;
+    justify-items: start !important;
+    gap: 4px !important;
+    border-radius: 11px !important;
+    background: rgba(7, 25, 37, .72) !important;
+    font-size: 12px !important;
+    white-space: normal !important;
+  }
+
+  .screener-row > :nth-child(n + 2)::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .screener-row > :nth-child(2)::before { content: "Prix"; }
+  .screener-row > :nth-child(3)::before { content: "Séance"; }
+  .screener-row > :nth-child(4)::before { content: "Momentum 20j"; }
+  .screener-row > :nth-child(5)::before { content: "RSI"; }
+  .screener-row > :nth-child(6)::before { content: "Volume relatif"; }
+  .screener-row > :nth-child(7)::before { content: "Score"; }
+  .screener-row > :nth-child(8)::before { content: "Signal"; }
+
+  .screener-row .score-pill,
+  .screener-row .signal-badge {
+    width: 100% !important;
+    height: auto !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Calendar: date and importance on top, complete description below. */
+  .calendar-events {
+    overflow: visible !important;
+  }
+
+  .calendar-event {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 14px !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 9px 10px !important;
+    align-items: center !important;
+  }
+
+  .calendar-event > div {
+    grid-column: 1 / -1;
+    padding-top: 9px;
+    border-top: 1px solid rgba(47, 88, 112, .48);
+  }
+
+  .calendar-event p,
+  .calendar-event small {
+    overflow-wrap: anywhere;
+  }
+
+  /* Watchlist remains a card grid and never exposes hidden columns off-screen. */
+  .watchlist-table-wrap {
+    overflow: visible !important;
+  }
+
+  .watchlist-row {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) !important;
+    margin-bottom: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(45, 91, 118, .7) !important;
+    border-radius: 16px;
+    background: rgba(7, 24, 36, .86);
+  }
+
+  .watchlist-row-link {
+    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding: 14px 50px 14px 14px !important;
+  }
+
+  .watchlist-row-link .watchlist-cell:nth-of-type(4),
+  .watchlist-row-link .watchlist-cell:nth-of-type(5) {
+    display: grid !important;
+  }
+
+  .watchlist-remove {
+    position: absolute;
+    top: 11px;
+    right: 10px;
+    margin: 0 !important;
+  }
+
+  /* Real HTML tables become readable vertical cards. */
+  [data-mobile-table-wrap="true"],
+  .app-main [class*="_tableWrap__"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  table[data-mobile-cards] {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: block !important;
+    border-collapse: separate !important;
+    font-size: 11px !important;
+  }
+
+  table[data-mobile-cards] thead {
+    display: none !important;
+  }
+
+  table[data-mobile-cards] tbody {
+    width: 100% !important;
+    display: grid !important;
+    gap: 11px !important;
+  }
+
+  table[data-mobile-cards] tr {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px 9px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(45, 91, 118, .72) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(155deg, rgba(11, 34, 49, .98), rgba(5, 20, 31, .98));
+    box-shadow: 0 9px 22px rgba(0, 0, 0, .16);
+  }
+
+  table[data-mobile-cards] td {
+    position: static !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 49px !important;
+    padding: 8px 9px !important;
+    display: grid !important;
+    align-content: center !important;
+    justify-items: start !important;
+    gap: 4px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: rgba(6, 24, 36, .7) !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  table[data-mobile-cards] td::before {
+    content: attr(data-label);
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  table[data-mobile-cards] td:first-child {
+    grid-column: 1 / -1;
+    min-height: 58px !important;
+    background: rgba(12, 43, 61, .82) !important;
+  }
+
+  table[data-mobile-cards] td input {
+    width: 100% !important;
+    max-width: 100% !important;
+    text-align: left !important;
+  }
+
+  table[data-mobile-cards] td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  table[data-mobile-cards] td[colspan]::before {
+    content: none;
+  }
+
+  /* Financial statements: labels are generated from their selected view. */
+  table[data-mobile-cards="fundamentals"] td::before,
+  table[data-mobile-cards="estimates"] td::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  table[data-mobile-cards="fundamentals"] td:nth-child(1)::before { content: "Période"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(2)::before { content: "Revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(3)::before { content: "Coût revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(4)::before { content: "Bénéfice brut"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(5)::before { content: "Résultat opérationnel"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(6)::before { content: "BAIIA"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(7)::before { content: "Bénéfice net"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(8)::before { content: "BPA dilué"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(9)::before { content: "Croissance revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(10)::before { content: "Croissance bénéfice"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(2)::before { content: "Flux opérationnel"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(3)::before { content: "Immobilisations"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(4)::before { content: "Flux disponible"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(5)::before { content: "Marge FTD"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(6)::before { content: "Dividendes"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(7)::before { content: "Rachats"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(8)::before { content: "Croissance FTD"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(2)::before { content: "Trésorerie"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(3)::before { content: "Dette"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(4)::before { content: "Dette nette"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(5)::before { content: "Actifs courants"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(6)::before { content: "Passifs courants"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(7)::before { content: "Actifs"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(8)::before { content: "Passifs"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(9)::before { content: "Capitaux propres"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(2)::before { content: "Marge brute"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(3)::before { content: "Marge opérationnelle"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(4)::before { content: "Marge nette"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(5)::before { content: "Marge FTD"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(6)::before { content: "Croissance BPA"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(7)::before { content: "Actions diluées"; }
+
+  table[data-mobile-cards="estimates"] td:nth-child(1)::before { content: "Période"; }
+  table[data-mobile-cards="estimates"] td:nth-child(2)::before { content: "Fin"; }
+  table[data-mobile-cards="estimates"] td:nth-child(3)::before { content: "BPA moyen"; }
+  table[data-mobile-cards="estimates"] td:nth-child(4)::before { content: "Fourchette BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(5)::before { content: "BPA précédent"; }
+  table[data-mobile-cards="estimates"] td:nth-child(6)::before { content: "Croissance BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(7)::before { content: "Analystes BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(8)::before { content: "Revenus moyens"; }
+  table[data-mobile-cards="estimates"] td:nth-child(9)::before { content: "Fourchette revenus"; }
+  table[data-mobile-cards="estimates"] td:nth-child(10)::before { content: "Croissance revenus"; }
+  table[data-mobile-cards="estimates"] td:nth-child(11)::before { content: "Analystes revenus"; }
+
+  /* Correlation fits the viewport; 2–5 symbols remain visible together. */
+  [class*="_correlationGrid__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 4px !important;
+  }
+
+  [class*="_correlationCell__"],
+  [class*="_correlationHeader__"] {
+    min-width: 0 !important;
+    min-height: 42px !important;
+    padding: 3px !important;
+    font-size: clamp(7px, 2.3vw, 10px) !important;
+    overflow: hidden;
+  }
+
+  /* ETF detail holdings become cards instead of a four-column strip. */
+  [class*="_holdingsTable__"] {
+    gap: 9px !important;
+    overflow: visible !important;
+  }
+
+  [class*="_tableHeader__"] {
+    display: none !important;
+  }
+
+  [class*="_holdingRow__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    border: 1px solid rgba(45, 91, 118, .68) !important;
+    border-radius: 14px !important;
+    background: rgba(6, 24, 36, .72) !important;
+  }
+
+  [class*="_holdingIdentity__"] {
+    grid-column: 1 / -1;
+    grid-template-columns: 22px 52px minmax(0, 1fr) !important;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(48, 88, 112, .48);
+  }
+
+  [class*="_holdingIdentity__"] strong {
+    white-space: normal !important;
+  }
+
+  [class*="_weightCell__"] {
+    justify-items: start !important;
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3),
+  [class*="_holdingRow__"] > span:nth-child(4) {
+    min-height: 42px;
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    padding: 7px 8px;
+    border-radius: 9px;
+    background: rgba(8, 29, 42, .76);
+    text-align: left !important;
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3)::before {
+    content: "Variation";
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(4)::before {
+    content: "Contribution";
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3)::before,
+  [class*="_holdingRow__"] > span:nth-child(4)::before {
+    color: #6f93a9;
+    font-size: 8px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+
+  /* Generic fallback: remaining tables fit the screen and wrap their values. */
+  .app-main table:not([data-mobile-cards]) {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .app-main table:not([data-mobile-cards]) :is(th, td) {
+    min-width: 0 !important;
+    padding: 8px 5px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    font-size: clamp(7px, 2.2vw, 10px) !important;
+  }
+
+  /* Long endpoint names and source metadata never widen Quality. */
+  [class*="_endpointRow__"],
+  [class*="_sourceHeader__"],
+  [class*="_contributorRow__"],
+  [class*="_inlineBetween__"] {
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+  }
+
+  [class*="_endpointRow__"] code {
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+@media (max-width: 390px) {
+  table[data-mobile-cards] tr,
+  .screener-row,
+  [class*="_holdingRow__"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  table[data-mobile-cards] td:first-child,
+  .screener-name,
+  [class*="_holdingIdentity__"] {
+    grid-column: 1;
+  }
+}
+
+/* v0.7.4 completion: remaining controls, calendar grid and insider table. */
+@media (max-width: 820px) {
+  .app-main :is(
+    .chart-legend,
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    .preset-tabs,
+    .screener-tabs,
+    [class*="periodTabs"],
+    [class*="rangeTabs"],
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_sectionTabs__"],
+    [class*="_preset__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .app-main :is(
+    .chart-legend,
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    .preset-tabs,
+    .screener-tabs,
+    [class*="periodTabs"],
+    [class*="rangeTabs"],
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_sectionTabs__"],
+    [class*="_preset__"]
+  ) > * {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    white-space: normal !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .month-grid,
+    .calendar-grid,
+    [class*="_monthGrid__"],
+    [class*="_calendarGrid__"]
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-canvas,
+    .calendar-scroll,
+    [class*="_calendarCanvas__"],
+    [class*="_calendarScroll__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTabs__"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    overflow: visible !important;
+  }
+
+  .app-main [class*="_tradeTable__"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  .app-main [class*="_tradeHeader__"] {
+    display: none !important;
+  }
+
+  .app-main [class*="_tradeRow__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px 10px !important;
+    border: 1px solid rgba(45, 91, 118, .7) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(155deg, rgba(11, 34, 49, .98), rgba(5, 20, 31, .98));
+  }
+
+  .app-main [class*="_tradeIdentity__"] {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 2px 0 10px !important;
+    border-bottom: 1px solid rgba(48, 88, 112, .48) !important;
+  }
+
+  .app-main [class*="_tradeIdentity__"] :is(strong, small) {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .app-main [class*="_tradeRow__"] > span {
+    min-width: 0 !important;
+    min-height: 48px;
+    padding: 8px 9px;
+    display: grid !important;
+    align-content: center;
+    justify-items: start !important;
+    gap: 4px;
+    border-radius: 10px;
+    background: rgba(6, 24, 36, .72);
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .app-main [class*="_tradeRow__"] > span::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(1)::before { content: "Opération"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(2)::before { content: "Actions"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(3)::before { content: "Prix"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(4)::before { content: "Valeur"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(5)::before { content: "Date"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(6)::before { content: "Vérifier"; }
+
+  .app-main [class*="_verificationLinks__"] {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-main [class*="_verificationLinks__"] a {
+    min-height: 38px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid rgba(50, 94, 119, .62);
+    border-radius: 9px;
+  }
+}
+
+@media (max-width: 390px) {
+  .app-main [class*="_tradeRow__"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .app-main [class*="_tradeIdentity__"],
+  .app-main [class*="_verificationLinks__"] {
+    grid-column: 1;
   }
 }

@@ -821,9 +821,9 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7.3
+            Anatole v0.7.4
           </Link>
-          <span>Navigation mobile professionnelle</span>
+          <span>Treemap lisible · aucune vue tronquée</span>
         </div>
       </aside>
 

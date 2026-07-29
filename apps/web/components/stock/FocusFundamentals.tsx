@@ -657,8 +657,8 @@ function FinancialTable({
             ];
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table
+    <div data-mobile-table-wrap="true" style={{ overflowX: "auto" }}>
+      <table data-mobile-cards="fundamentals" data-view={view}
         style={{
           width: "100%",
           minWidth:
@@ -1108,8 +1108,8 @@ function Financials({
             Estimations de revenus et de BPA
           </h2>
 
-          <div style={{ overflowX: "auto" }}>
-            <table
+          <div data-mobile-table-wrap="true" style={{ overflowX: "auto" }}>
+            <table data-mobile-cards="estimates"
               style={{
                 width: "100%",
                 minWidth: 1150,

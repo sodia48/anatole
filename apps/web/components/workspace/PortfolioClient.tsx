@@ -369,22 +369,22 @@ export function PortfolioClient() {
           <section className={`panel ${styles.panel}`}>
             <div className={styles.sectionHeading}><div><span className="eyebrow">POSITIONS</span><h2>Détail du portefeuille</h2><p>Modifie les quantités ou coûts moyens directement dans le tableau.</p></div><button className={styles.secondaryButton} type="button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15} /> {loading ? "Actualisation…" : "Actualiser"}</button></div>
             <div className={styles.tableWrap}>
-              <table className={styles.table}>
+              <table className={styles.table} data-mobile-cards="portfolio">
                 <thead><tr><th>Titre</th><th>Quantité</th><th>Coût moyen</th><th>Prix</th><th>Valeur</th><th>Poids</th><th>P&amp;L</th><th>Jour</th><th>Score</th><th /></tr></thead>
                 <tbody>
                   {positions.map((position, index) => {
                     const result = snapshot?.positions.find((item) => item.symbol === position.symbol);
                     return <tr key={position.symbol}>
-                      <td><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? "En attente"}</small></span></div></td>
-                      <td><input style={{ width: 82, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
-                      <td><input style={{ width: 96, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
-                      <td>{result ? money(result.price, result.currency) : "…"}</td>
-                      <td>{result ? money(result.market_value, snapshot?.base_currency) : "…"}</td>
-                      <td>{result ? `${result.weight_percent.toFixed(1)} %` : "…"}</td>
-                      <td className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency)} · ${percent(result.unrealized_pnl_percent)}` : "…"}</td>
-                      <td className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency)} · ${percent(result.day_change_percent)}` : "…"}</td>
-                      <td>{result ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : "…"}</td>
-                      <td><button className={styles.iconButton} type="button" aria-label={`Supprimer ${position.symbol}`} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
+                      <td data-label="Titre"><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? "En attente"}</small></span></div></td>
+                      <td data-label="Quantité"><input style={{ width: 82, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
+                      <td data-label="Coût moyen"><input style={{ width: 96, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
+                      <td data-label="Prix">{result ? money(result.price, result.currency) : "…"}</td>
+                      <td data-label="Valeur">{result ? money(result.market_value, snapshot?.base_currency) : "…"}</td>
+                      <td data-label="Poids">{result ? `${result.weight_percent.toFixed(1)} %` : "…"}</td>
+                      <td data-label="P&L latent" className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency)} · ${percent(result.unrealized_pnl_percent)}` : "…"}</td>
+                      <td data-label="Séance" className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency)} · ${percent(result.day_change_percent)}` : "…"}</td>
+                      <td data-label="Score">{result ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : "…"}</td>
+                      <td data-label="Action"><button className={styles.iconButton} type="button" aria-label={`Supprimer ${position.symbol}`} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
                     </tr>;
                   })}
                 </tbody>
