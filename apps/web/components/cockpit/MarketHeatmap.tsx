@@ -27,6 +27,7 @@ type HeatmapTile = {
   change?: unknown;
   change_percent?: unknown;
   volume?: unknown;
+  source?: unknown;
   delayed?: unknown;
 };
 
@@ -39,6 +40,7 @@ type NormalizedTile = {
   price: number;
   changePercent: number;
   volume: number;
+  available: boolean;
   delayed: boolean;
 };
 
@@ -174,6 +176,7 @@ function normalizeTile(
       number(tile.volume, 0),
       0,
     ),
+    available: text(tile.source, "available") !== "unavailable",
     delayed: Boolean(tile.delayed),
   };
 }
@@ -479,7 +482,15 @@ function binaryTreemap<T>(
 
 function tileBackground(
   changePercent: number,
+  available = true,
 ): string {
+  if (!available) {
+    return (
+      "linear-gradient(145deg, " +
+      "rgba(69, 87, 101, .9), " +
+      "rgba(31, 48, 61, .98))"
+    );
+  }
   const strength = clamp(
     Math.abs(changePercent) / 5,
     0.16,
@@ -517,7 +528,12 @@ function tileBackground(
 
 function formatChange(
   value: number,
+  available = true,
 ): string {
+  if (!available) {
+    return "N/D";
+  }
+
   return `${
     value >= 0 ? "+" : ""
   }${value.toFixed(2)}%`;
@@ -589,8 +605,10 @@ function tileDetailLevel(
 
 export function MarketHeatmap({
   tiles,
+  universeLabel = "S&P/TSX 60",
 }: {
   tiles: readonly unknown[];
+  universeLabel?: string;
 }) {
   const [mode, setMode] =
     useState<GroupingMode>(
@@ -846,7 +864,7 @@ export function MarketHeatmap({
               CARTE DU MARCHÉ
             </span>
             <h2>
-              S&amp;P/TSX 60
+              {universeLabel}
             </h2>
           </div>
         </div>
@@ -876,7 +894,7 @@ export function MarketHeatmap({
             CARTE DU MARCHÉ
           </span>
           <h2>
-            S&amp;P/TSX 60
+            {universeLabel}
           </h2>
           <p>
             Taille selon le poids du
@@ -965,7 +983,7 @@ export function MarketHeatmap({
         className={
           styles.treemap
         }
-        aria-label="Carte du marché TSX 60"
+        aria-label={`Carte du marché ${universeLabel}`}
       >
         {positionedGroups.map(
           ({
@@ -1083,10 +1101,12 @@ export function MarketHeatmap({
                             background:
                               tileBackground(
                                 tile.changePercent,
+                                tile.available,
                               ),
                           }}
                           aria-label={`${tile.symbol}, ${formatChange(
                             tile.changePercent,
+                            tile.available,
                           )}`}
                           key={
                             tile.ticker
@@ -1120,6 +1140,7 @@ export function MarketHeatmap({
                           background:
                             tileBackground(
                               tile.changePercent,
+                              tile.available,
                             ),
                         }}
                         key={
@@ -1127,6 +1148,7 @@ export function MarketHeatmap({
                         }
                         title={`${tile.name} · ${tile.sector} · ${formatChange(
                           tile.changePercent,
+                          tile.available,
                         )}`}
                       >
                         <span
@@ -1144,6 +1166,7 @@ export function MarketHeatmap({
                           <strong>
                             {formatChange(
                               tile.changePercent,
+                              tile.available,
                             )}
                           </strong>
                         ) : null}

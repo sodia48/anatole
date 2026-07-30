@@ -2,7 +2,7 @@ export const REFRESH_INTERVALS = {
   focusQuote: 5_000,
   cockpitTsx60: 15_000,
   watchlist: 20_000,
-  composite: 45_000,
+  composite: 90_000,
   screener: 45_000,
   terminal: 45_000,
   etf: 45_000,

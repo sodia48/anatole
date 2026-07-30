@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 from dataclasses import dataclass
+from datetime import datetime
 from time import monotonic
 
-import httpx
+from app.core.resilience import shared_http_client
 
 
 XIC_HOLDINGS_URL = (
@@ -13,6 +15,7 @@ XIC_HOLDINGS_URL = (
     "ishares-sptsx-capped-composite-index-etf/"
     "1464253357814.ajax"
 )
+XIC_UNIVERSE_SOURCE = "BlackRock XIC holdings"
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,14 +30,12 @@ class CompositeConstituent:
 
 
 class TSXCompositeUniverseService:
-    """
-    Univers machine-readable du marché canadien.
+    """Univers opérationnel du S&P/TSX Composite.
 
     BlackRock publie quotidiennement les positions de XIC, un fonds qui
-    réplique le S&P/TSX Capped Composite. Après exclusion des espèces et
-    dérivés, cette liste sert de registre opérationnel des sociétés à
-    couvrir. Le moteur financier reste compatible avec tout ticker TSX,
-    même lorsqu'il n'apparaît pas encore dans ce registre.
+    réplique le S&P/TSX Capped Composite. Les espèces et dérivés sont exclus.
+    La dernière liste valide reste disponible si la source est temporairement
+    inaccessible.
     """
 
     cache_ttl_seconds = 21_600
@@ -44,6 +45,8 @@ class TSXCompositeUniverseService:
             float,
             list[CompositeConstituent],
         ] | None = None
+        self._lock = asyncio.Lock()
+        self.as_of: str | None = None
 
     @staticmethod
     def normalize_ticker(value: str) -> str:
@@ -61,35 +64,42 @@ class TSXCompositeUniverseService:
             return None
 
     @staticmethod
-    def _find_header(
-        rows: list[list[str]],
-    ) -> int:
+    def _find_header(rows: list[list[str]]) -> int:
         for index, row in enumerate(rows):
-            normalized = {
-                cell.strip().lower()
-                for cell in row
-            }
+            normalized = {cell.strip().lower() for cell in row}
             if {"ticker", "name", "sector"}.issubset(normalized):
                 return index
-        raise RuntimeError(
-            "BlackRock holdings header was not found"
-        )
+        raise RuntimeError("BlackRock holdings header was not found")
+
+    @staticmethod
+    def _parse_as_of(rows: list[list[str]], header_index: int) -> str | None:
+        for row in rows[:header_index]:
+            if not row:
+                continue
+            label = row[0].strip().lower()
+            if "holdings as of" not in label:
+                continue
+            raw = row[1].strip() if len(row) > 1 else ""
+            if not raw:
+                return None
+            for pattern in ("%b %d, %Y", "%Y-%m-%d", "%d-%b-%Y"):
+                try:
+                    return datetime.strptime(raw, pattern).date().isoformat()
+                except ValueError:
+                    continue
+            return raw
+        return None
 
     def _parse(
         self,
         content: bytes,
-    ) -> list[CompositeConstituent]:
+    ) -> tuple[list[CompositeConstituent], str | None]:
         text = content.decode("utf-8-sig", errors="replace")
         rows = list(csv.reader(io.StringIO(text)))
         header_index = self._find_header(rows)
-        header = [
-            cell.strip()
-            for cell in rows[header_index]
-        ]
-        indexes = {
-            name.lower(): index
-            for index, name in enumerate(header)
-        }
+        as_of = self._parse_as_of(rows, header_index)
+        header = [cell.strip() for cell in rows[header_index]]
+        indexes = {name.lower(): index for index, name in enumerate(header)}
 
         def cell(row: list[str], *names: str) -> str:
             for name in names:
@@ -102,22 +112,14 @@ class TSXCompositeUniverseService:
         seen: set[str] = set()
 
         for row in rows[header_index + 1 :]:
-            ticker = self.normalize_ticker(
-                cell(row, "Ticker")
-            )
+            ticker = self.normalize_ticker(cell(row, "Ticker"))
             name = cell(row, "Name")
             sector = cell(row, "Sector") or None
             exchange = cell(row, "Exchange") or None
             currency = cell(row, "Currency") or None
-            location = cell(
-                row,
-                "Location of Risk",
-                "Location",
-            )
+            location = cell(row, "Location of Risk", "Location")
             isin = cell(row, "ISIN") or None
-            weight = self._number(
-                cell(row, "Weight (%)", "Weight")
-            )
+            weight = self._number(cell(row, "Weight (%)", "Weight"))
 
             if (
                 not ticker
@@ -129,11 +131,8 @@ class TSXCompositeUniverseService:
             ):
                 continue
 
-            # Les positions actions de XIC sont canadiennes et négociées
-            # principalement à Toronto. Ce filtre évite les reliquats.
             if location and "CANADA" not in location.upper():
                 continue
-
             if ticker in seen:
                 continue
 
@@ -151,62 +150,66 @@ class TSXCompositeUniverseService:
             )
 
         if len(output) < 150:
-            raise RuntimeError(
-                "Composite holdings response is incomplete"
-            )
+            raise RuntimeError("Composite holdings response is incomplete")
 
-        return sorted(
-            output,
-            key=lambda item: item.weight or 0,
-            reverse=True,
+        return (
+            sorted(
+                output,
+                key=lambda item: item.weight or 0,
+                reverse=True,
+            ),
+            as_of,
         )
 
-    async def get_constituents(
-        self,
-    ) -> list[CompositeConstituent]:
+    async def get_constituents(self) -> list[CompositeConstituent]:
         now = monotonic()
-
         if (
             self._cache is not None
-            and now - self._cache[0]
-            < self.cache_ttl_seconds
+            and now - self._cache[0] < self.cache_ttl_seconds
         ):
             return self._cache[1]
 
-        params = {
-            "dataType": "fund",
-            "fileName": "XIC_holdings",
-            "fileType": "csv",
-        }
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 Anatole/1.0 "
-                "official-financials-engine"
-            ),
-            "Accept": "text/csv,*/*",
-        }
+        async with self._lock:
+            now = monotonic()
+            if (
+                self._cache is not None
+                and now - self._cache[0] < self.cache_ttl_seconds
+            ):
+                return self._cache[1]
 
-        async with httpx.AsyncClient(
-            timeout=20.0,
-            headers=headers,
-            follow_redirects=True,
-        ) as client:
-            response = await client.get(
-                XIC_HOLDINGS_URL,
-                params=params,
-            )
-            response.raise_for_status()
-            constituents = self._parse(response.content)
+            params = {
+                "dataType": "fund",
+                "fileName": "XIC_holdings",
+                "fileType": "csv",
+            }
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 Anatole/1.0 "
+                    "tsx-composite-universe"
+                ),
+                "Accept": "text/csv,*/*",
+            }
 
-        self._cache = (monotonic(), constituents)
-        return constituents
+            try:
+                response = await shared_http_client.request(
+                    "GET",
+                    XIC_HOLDINGS_URL,
+                    params=params,
+                    headers=headers,
+                    attempts=2,
+                )
+                constituents, as_of = self._parse(response.content)
+            except Exception:  # noqa: BLE001
+                if self._cache is not None:
+                    return self._cache[1]
+                raise
 
-    async def find(
-        self,
-        ticker: str,
-    ) -> CompositeConstituent | None:
-        normalized = self.normalize_ticker(ticker)
-        normalized = normalized.removesuffix(".TO")
+            self.as_of = as_of
+            self._cache = (monotonic(), constituents)
+            return constituents
+
+    async def find(self, ticker: str) -> CompositeConstituent | None:
+        normalized = self.normalize_ticker(ticker).removesuffix(".TO")
 
         try:
             constituents = await self.get_constituents()
@@ -214,15 +217,9 @@ class TSXCompositeUniverseService:
             return None
 
         return next(
-            (
-                item
-                for item in constituents
-                if item.ticker == normalized
-            ),
+            (item for item in constituents if item.ticker == normalized),
             None,
         )
 
 
-tsx_composite_universe_service = (
-    TSXCompositeUniverseService()
-)
+tsx_composite_universe_service = TSXCompositeUniverseService()

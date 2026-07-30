@@ -1,0 +1,14 @@
+apps/api/app/api/routes/market.py
+apps/api/app/services/cockpit.py
+apps/api/app/services/tsx_composite_universe.py
+apps/api/tests/test_cockpit.py
+apps/api/tests/test_tsx_composite_universe.py
+apps/web/app/globals.css
+apps/web/app/mobile.css
+apps/web/components/cockpit/CockpitClient.tsx
+apps/web/components/cockpit/MarketHeatmap.tsx
+apps/web/components/layout/AppSidebar.tsx
+apps/web/components/layout/AppTopbar.tsx
+apps/web/lib/api.ts
+apps/web/lib/refresh.ts
+apps/web/package.json

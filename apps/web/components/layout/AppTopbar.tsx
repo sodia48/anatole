@@ -6,7 +6,7 @@ import { Search, Settings2 } from "lucide-react";
 import { ApiStatus } from "@/components/status/ApiStatus";
 
 const titles: Array<[string, string]> = [
-  ["/cockpit", "Cockpit TSX 60"],
+  ["/cockpit", "Cockpit marché"],
   ["/focus", "Focus"],
   ["/screener", "Screener TSX 60"],
   ["/actualites", "Actualités officielles"],
@@ -32,7 +32,7 @@ export function AppTopbar({ onOpenSearch }: { onOpenSearch: () => void }) {
       </div>
       <div className="topbar-actions">
         <ApiStatus />
-        <span className="universe-pill">TSX 60</span>
+        <span className="universe-pill">{pathname.startsWith("/cockpit") ? "TSX 60 / Composite" : "TSX 60"}</span>
         <button className="search-trigger" type="button" onClick={onOpenSearch}>
           <Search size={17} />
           <span>Rechercher un titre ou une section</span>

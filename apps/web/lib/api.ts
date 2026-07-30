@@ -89,14 +89,19 @@ export function getHealthStatus(
   return apiRequest<HealthStatus>("/health", {}, signal, 10_000);
 }
 
+export type CockpitUniverse = "tsx60" | "composite";
+
 export function getCockpitSnapshot(
+  universe: CockpitUniverse = "tsx60",
   signal?: AbortSignal,
 ): Promise<CockpitSnapshot> {
+  const timeoutMs = universe === "composite" ? 95_000 : 30_000;
+
   return apiRequest<CockpitSnapshot>(
-    "/api/v1/market/cockpit?universe=tsx60",
+    `/api/v1/market/cockpit?universe=${encodeURIComponent(universe)}`,
     {},
     signal,
-    30_000,
+    timeoutMs,
   );
 }
 

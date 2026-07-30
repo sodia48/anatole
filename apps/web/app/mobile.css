@@ -3832,3 +3832,42 @@
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+@media (max-width: 820px) {
+  .cockpit-universe-switcher {
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .cockpit-universe-switcher legend {
+    margin-bottom: 7px;
+    font-size: 10px;
+  }
+
+  .cockpit-universe-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .cockpit-universe-option {
+    min-width: 0;
+    min-height: 54px;
+    padding: 9px 10px;
+  }
+
+  .cockpit-universe-option strong {
+    font-size: 11px;
+  }
+
+  .cockpit-universe-option small {
+    max-width: 100%;
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .cockpit-universe-options {
+    grid-template-columns: 1fr;
+  }
+}
