@@ -821,9 +821,9 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7.6
+            Anatole v0.7.7
           </Link>
-          <span>TSX 60 + Composite · Focus LIVE</span>
+          <span>TSX 60 + Composite · Terminal Flow</span>
         </div>
       </aside>
 
@@ -856,12 +856,12 @@ export function AppSidebar({
           <span>ETF</span>
         </Link>
         <Link
-          href="/portefeuille"
-          className={pathname === "/portefeuille" ? "is-active" : ""}
-          aria-current={pathname === "/portefeuille" ? "page" : undefined}
+          href="/terminal"
+          className={pathname === "/terminal" ? "is-active" : ""}
+          aria-current={pathname === "/terminal" ? "page" : undefined}
         >
-          <BriefcaseBusiness size={20} />
-          <span>Espace</span>
+          <Gauge size={20} />
+          <span>Terminal</span>
         </Link>
         <button
           type="button"
@@ -869,7 +869,7 @@ export function AppSidebar({
             pathname !== "/cockpit" &&
             pathname !== "/screener" &&
             !pathname.startsWith("/etf") &&
-            pathname !== "/portefeuille"
+            pathname !== "/terminal"
               ? "is-active"
               : ""
           }

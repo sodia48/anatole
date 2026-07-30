@@ -187,12 +187,12 @@ export function CockpitClient() {
     return (
       <div className="cockpit-page">
         <header className="panel cockpit-header">
-          <div>
+          <div className="cockpit-header-copy">
             <span className="eyebrow">ANATOLE COCKPIT</span>
             <h1>{selectedUniverse.label}</h1>
             <p>Choisis l’univers que tu souhaites lire dans la carte du marché.</p>
-            {universeSelector}
           </div>
+          {universeSelector}
         </header>
         <section className="panel cockpit-loading">
           <span className="live-dot" />
@@ -215,13 +215,12 @@ export function CockpitClient() {
   return (
     <div className="cockpit-page">
       <header className="panel cockpit-header">
-        <div>
+        <div className="cockpit-header-copy">
           <span className="eyebrow">ANATOLE COCKPIT</span>
           <h1>{snapshot.universe}</h1>
           <p>
             Lecture automatique du marché canadien · {refreshDescription(snapshot.refresh_after_seconds)}
           </p>
-          {universeSelector}
         </div>
         <div className="cockpit-market-score">
           <span>Variation pondérée</span>
@@ -233,6 +232,7 @@ export function CockpitClient() {
             {refreshing ? "Actualisation…" : "Flux actif"}
           </small>
         </div>
+        {universeSelector}
       </header>
 
       {error ? <div className="cockpit-warning">{error}</div> : null}

@@ -1,0 +1,10 @@
+apps/api/app/services/analysis.py
+apps/api/tests/test_analysis.py
+apps/web/app/mobile.css
+apps/web/components/analysis/Analysis.module.css
+apps/web/components/analysis/TerminalClient.tsx
+apps/web/components/cockpit/CockpitClient.tsx
+apps/web/components/cockpit/MarketHeatmap.module.css
+apps/web/components/cockpit/MarketHeatmap.tsx
+apps/web/components/layout/AppSidebar.tsx
+apps/web/package.json

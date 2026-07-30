@@ -68,8 +68,8 @@ def test_terminal_route_with_demo_provider() -> None:
         assert 0 <= payload["regime_score"] <= 100
         assert len(payload["components"]) == 4
         assert len(payload["sectors"]) >= 8
-        assert len(payload["leaders"]) == 5
-        assert len(payload["laggards"]) == 5
+        assert len(payload["leaders"]) == 8
+        assert len(payload["laggards"]) == 8
     finally:
         settings.market_data_provider = original
         _reset()

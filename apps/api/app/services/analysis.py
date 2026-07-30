@@ -703,10 +703,10 @@ class AnalysisService:
             sectors.sort(key=lambda item: item.leadership_score, reverse=True)
 
             ranked = sorted(rows, key=lambda row: row.score, reverse=True)
-            leaders = [_opportunity_from_row(row, "Leadership") for row in ranked[:5]]
+            leaders = [_opportunity_from_row(row, "Leadership") for row in ranked[:8]]
             laggards = [
                 _opportunity_from_row(row, "Sous pression")
-                for row in sorted(rows, key=lambda row: row.score)[:5]
+                for row in sorted(rows, key=lambda row: row.score)[:8]
             ]
             opportunity_rows = [
                 row
@@ -714,7 +714,7 @@ class AnalysisService:
                 if row.score >= 62
                 and row.momentum_20d > 0
                 and (row.rsi_14 is None or row.rsi_14 < 75)
-            ][:8]
+            ][:12]
             opportunities = [
                 _opportunity_from_row(
                     row,
@@ -778,7 +778,7 @@ class AnalysisService:
             alerts = sorted(
                 alerts,
                 key=lambda item: {"high": 0, "watch": 1, "info": 2}[item.severity],
-            )[:12]
+            )[:16]
 
             snapshot = TerminalSnapshot(
                 universe=screener.universe,
