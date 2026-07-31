@@ -13,6 +13,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
+from app.services.accounts import account_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,17 +25,19 @@ logger = logging.getLogger("anatole.api")
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await shared_http_client.start()
+    await account_service.start()
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
         await shared_http_client.close()
+        await account_service.close()
         logger.info("anatole_api_stopped shared_http_pool=false")
 
 
 app = FastAPI(
     title="Anatole API",
-    version="0.8.0",
+    version="0.9.0",
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
@@ -101,7 +104,7 @@ async def request_observability(
         request_id=request_id,
     )
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Anatole-Version"] = "0.8.0"
+    response.headers["X-Anatole-Version"] = "0.9.0"
     response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
 
     logger.info(

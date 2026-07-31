@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "anatole-api"
-version = "0.8.0"
+version = "0.9.0"
 description = "API FastAPI de la plateforme Anatole"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,7 +16,9 @@ dependencies = [
   "pandas>=2.2,<4.0",
   "yfinance>=1.5.1,<2.0",
   "pypdf>=5.7,<7.0",
-  "openpyxl>=3.1,<4.0"
+  "openpyxl>=3.1,<4.0",
+  "sqlalchemy>=2.0,<3.0",
+  "psycopg[binary]>=3.2,<4.0"
 ]
 
 [project.optional-dependencies]

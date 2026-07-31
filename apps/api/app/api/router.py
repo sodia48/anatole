@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    accounts,
     analysis,
     discovery,
     etf_holdings,
@@ -86,6 +87,14 @@ api_router.include_router(
     tags=["workspace"],
 )
 
+
+
+# Comptes et synchronisation multiappareil
+api_router.include_router(
+    accounts.router,
+    prefix="/api/v1/account",
+    tags=["account"],
+)
 
 # Observabilité, incidents clients et signalements bêta
 api_router.include_router(
