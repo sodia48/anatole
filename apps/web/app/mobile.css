@@ -4140,3 +4140,32 @@
 body.anatole-heatmap-focus {
   overflow: hidden !important;
 }
+
+/* ========================================================================== */
+/* Anatole Mobile v0.7.7.1 — fixed header clearance                          */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  :root {
+    --mobile-topbar-height: 74px;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main,
+  body[data-anatole-section="terminal"] .app-main {
+    padding-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        12px
+      ) !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header,
+  body[data-anatole-section="terminal"] .app-main > :first-child {
+    scroll-margin-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        12px
+      );
+  }
+}

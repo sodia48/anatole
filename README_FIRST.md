@@ -1,24 +1,22 @@
-# Restauration du heatmap Cockpit v0.7.2
+# Anatole Mobile v0.7.7.1 — correction de l'en-tête
 
-Ce correctif restaure uniquement le heatmap du Cockpit dans son état v0.7.2.
+Ce correctif résout uniquement le chevauchement entre la barre mobile fixe
+et le haut des pages Cockpit et Terminal Pro.
 
-## Fichiers remplacés
+## Résultat
 
-- `apps/web/components/cockpit/MarketHeatmap.tsx`
-- `apps/web/components/cockpit/MarketHeatmap.module.css`
+- le titre `S&P/TSX 60` est visible en entier;
+- le titre `S&P/TSX Composite` reste visible en entier;
+- le titre `Terminal Pro` n'est plus masqué;
+- la barre mobile, le heatmap, Terminal Pro et le dock restent inchangés.
 
-## Éléments qui ne sont pas modifiés
+## Fichier remplacé
 
-- Focus LIVE v0.7.5;
-- navigation mobile;
-- dock inférieur;
-- carte mobile ETF;
-- backend FastAPI;
-- Screener, Portefeuille, Alertes et Anatole Conseil.
+`apps/web/app/mobile.css`
 
-## Installation
+## Déploiement
 
-Décompressez le ZIP à la racine du dépôt, acceptez les deux remplacements,
-puis redéployez uniquement Vercel sans réutiliser l'ancien Build Cache.
+Décompressez le PATCH à la racine du dépôt, acceptez le remplacement, puis
+redéployez uniquement Vercel avec l'ancien Build Cache désactivé.
 
 Aucun redéploiement Render n'est nécessaire.
