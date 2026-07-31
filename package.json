@@ -9,6 +9,12 @@
     "dev:web": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
     "lint:web": "pnpm --dir apps/web lint",
-    "typecheck:web": "pnpm --dir apps/web typecheck"
+    "typecheck:web": "pnpm --dir apps/web typecheck",
+    "test:api": "python -m pytest apps/api/tests -q",
+    "test:e2e": "playwright test",
+    "quality": "pnpm test:api && pnpm typecheck:web && pnpm build:web && pnpm test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.0"
   }
 }

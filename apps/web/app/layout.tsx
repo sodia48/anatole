@@ -4,6 +4,8 @@ import type {
 } from "next";
 
 import { AppSidebar } from "@/components/layout/AppSidebar";
+import { FeedbackButton } from "@/components/reliability/FeedbackButton";
+import { ReliabilityNotice } from "@/components/reliability/ReliabilityNotice";
 import { AppProviders } from "./providers";
 
 import "./globals.css";
@@ -36,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body>
+      <body data-anatole-version="0.8.0">
         <AppProviders>
           <div className="app-shell">
             <AppSidebar />
@@ -44,6 +46,8 @@ export default function RootLayout({
               {children}
             </main>
           </div>
+          <ReliabilityNotice />
+          <FeedbackButton />
         </AppProviders>
       </body>
     </html>

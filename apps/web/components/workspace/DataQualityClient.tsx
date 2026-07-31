@@ -16,10 +16,11 @@ import {
   useState,
 } from "react";
 
-import { getDataQuality } from "@/lib/api";
+import { getDataQuality, getReliabilityStatus } from "@/lib/api";
 import type {
   DataQualitySnapshot,
   DataQualitySource,
+  ReliabilitySnapshot,
 } from "@/lib/types";
 
 import styles from "./Workspace.module.css";
@@ -51,6 +52,7 @@ function ageLabel(seconds: number | null): string {
 
 export function DataQualityClient() {
   const [snapshot, setSnapshot] = useState<DataQualitySnapshot | null>(null);
+  const [reliability, setReliability] = useState<ReliabilitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("Toutes");
@@ -60,7 +62,18 @@ export function DataQualityClient() {
     setLoading(true);
     setError(null);
     try {
-      setSnapshot(await getDataQuality(controller.signal));
+      const [qualityResult, reliabilityResult] = await Promise.allSettled([
+        getDataQuality(controller.signal),
+        getReliabilityStatus(controller.signal),
+      ]);
+      if (qualityResult.status === "fulfilled") {
+        setSnapshot(qualityResult.value);
+      } else {
+        throw qualityResult.reason;
+      }
+      if (reliabilityResult.status === "fulfilled") {
+        setReliability(reliabilityResult.value);
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Qualité des données indisponible.");
     } finally {
@@ -86,7 +99,7 @@ export function DataQualityClient() {
     <main className={styles.page}>
       <section className={`panel ${styles.hero}`}>
         <div className={styles.heroCopy}>
-          <span className="eyebrow">INTELLIGENCE · V0.7</span>
+          <span className="eyebrow">INTELLIGENCE · V0.8</span>
           <h1>Qualité des données</h1>
           <p>Couverture, fraîcheur, mode fournisseur, retries, erreurs upstream et état des principales routes. Cette vue distingue clairement les données publiques, les caches et les données de secours.</p>
         </div>
@@ -123,6 +136,35 @@ export function DataQualityClient() {
                 <small>{metric.detail}</small>
               </article>
             ))}
+          </section>
+
+
+          <section className={`panel ${styles.panel}`}>
+            <div className={styles.sectionHeading}>
+              <div>
+                <span className="eyebrow">FIABILITÉ PRODUCTION</span>
+                <h2>Erreurs et latence du processus</h2>
+                <p>Mesures réelles depuis le dernier démarrage Render, avec X-Request-ID pour retrouver chaque incident.</p>
+              </div>
+              <span className={`${styles.statusPill} ${reliability?.status === "healthy" ? styles.statusHealthy : reliability?.status === "critical" ? styles.statusUnavailable : styles.statusDegraded}`}>
+                {reliability?.status === "healthy" ? "Stable" : reliability?.status === "critical" ? "Critique" : "À surveiller"}
+              </span>
+            </div>
+            <div className={styles.qualityMetricGrid}>
+              <article className={styles.kpiCard}><span>Requêtes reçues</span><strong>{reliability?.total_requests ?? "—"}</strong><small>Depuis le démarrage courant</small></article>
+              <article className={styles.kpiCard}><span>Taux HTTP 5xx</span><strong className={(reliability?.error_rate_5xx ?? 0) >= 1 ? styles.negative : styles.positive}>{reliability ? `${reliability.error_rate_5xx.toFixed(2)} %` : "—"}</strong><small>{reliability?.total_5xx ?? 0} erreur(s) serveur</small></article>
+              <article className={styles.kpiCard}><span>Latence p95</span><strong>{reliability ? `${reliability.p95_duration_ms.toFixed(0)} ms` : "—"}</strong><small>{reliability?.slow_requests ?? 0} requête(s) au-delà de 2,5 s</small></article>
+              <article className={styles.kpiCard}><span>Signalements bêta</span><strong>{reliability?.reports_received ?? 0}</strong><small>Enregistrés dans les logs opérationnels</small></article>
+            </div>
+            <div className={styles.compactList} style={{ marginTop: 14 }}>
+              {reliability?.recent_errors.length ? reliability.recent_errors.slice(0, 6).map((incident) => (
+                <div className={styles.endpointRow} key={`${incident.request_id}-${incident.occurred_at}`}>
+                  <div><strong>{incident.method} {incident.path}</strong><small style={{ display: "block", marginTop: 4 }}>{new Date(incident.occurred_at).toLocaleString("fr-CA")} · {incident.duration_ms.toFixed(0)} ms</small></div>
+                  <code>{incident.request_id}</code>
+                  <span className={`${styles.statusPill} ${styles.statusUnavailable}`}>HTTP {incident.status_code}</span>
+                </div>
+              )) : <div className={styles.notice}><CheckCircle2 size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />Aucune erreur 5xx observée dans le processus courant.</div>}
+            </div>
           </section>
 
           <section className={`panel ${styles.panel}`}>

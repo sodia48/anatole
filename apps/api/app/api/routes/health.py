@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter
 
 from app.core.resilience import shared_http_client
+from app.core.telemetry import reliability_monitor
 
 router = APIRouter()
 
@@ -25,4 +26,5 @@ async def ready() -> dict[str, object]:
         "status": "ready",
         "http_pool_started": shared_http_client.started,
         "upstream_metrics": shared_http_client.metrics.as_dict(),
+        "reliability": reliability_monitor.snapshot(),
     }

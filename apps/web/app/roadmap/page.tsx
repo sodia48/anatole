@@ -27,14 +27,20 @@ const phases = [
     items: ["Portefeuille local", "Alertes de marché", "Notifications navigateur", "Anatole Conseil sans recommandations", "Qualité des données", "Observabilité des sources"],
   },
   {
-    title: "Bêta publique et comptes",
+    title: "Fiabilité production et bêta privée",
     version: "v0.8",
+    status: "active",
+    items: ["X-Request-ID de bout en bout", "Mesure des erreurs 5xx et latences", "Dernière donnée valide", "Signalements bêta intégrés", "Tests Playwright", "Quality gate GitHub"],
+  },
+  {
+    title: "Comptes et synchronisation",
+    version: "v0.9",
     status: "planned",
-    items: ["Comptes utilisateurs", "PostgreSQL", "Synchronisation multiappareil", "Alertes serveur", "Rapports", "Feedback bêta"],
+    items: ["Comptes utilisateurs", "PostgreSQL", "Synchronisation multiappareil", "Alertes serveur", "Historique des alertes"],
   },
 ];
 
-const featureIds = ["comptes", "synchronisation", "alertes-serveur", "rapports", "feedback-beta"];
+const featureIds = ["observabilite", "tests-e2e", "feedback-beta", "comptes", "synchronisation"];
 
 export default function RoadmapPage() {
   return (
@@ -63,7 +69,7 @@ export default function RoadmapPage() {
       </section>
 
       <section className="panel feature-index">
-        <div><span className="eyebrow">PROCHAINE PHASE</span><h2>Comptes et synchronisation</h2><p>Le socle fonctionnel est complet. La prochaine étape concerne la persistance serveur et la bêta multiutilisateur.</p></div>
+        <div><span className="eyebrow">PHASE ACTIVE</span><h2>Fiabilité production</h2><p>Chaque déploiement est désormais mesuré, testable et traçable avant l’ouverture de la bêta privée.</p></div>
         <div className="feature-anchor-grid">{featureIds.map((id) => <span id={id} key={id}>{id.replace(/-/g, " ")}</span>)}</div>
         <Link href="/cockpit" className="primary-button">Retour au Cockpit</Link>
       </section>

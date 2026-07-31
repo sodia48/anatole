@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from time import monotonic
 
 from app.core.resilience import shared_http_client
+from app.core.telemetry import reliability_monitor
 from app.schemas.workspace import (
     DataQualityEndpoint,
     DataQualityMetric,
@@ -74,6 +75,8 @@ class DataQualityService:
         request_count = max(metrics.requests, 1)
         retry_rate = metrics.retries / request_count * 100
         failure_rate = metrics.failures / request_count * 100
+        reliability = reliability_monitor.snapshot()
+        api_error_rate = float(reliability["error_rate_5xx"])
 
         cockpit = cockpit_service._cached
         screener = screener_service._cached
@@ -216,6 +219,7 @@ class DataQualityService:
         retry_penalty = min(12.0, retry_rate * 0.35)
         degraded_penalty = degraded * 4.0
         idle_penalty = max(0, len(sources) - active_sources) * 1.0
+        api_penalty = min(20.0, api_error_rate * 4.0)
         score = max(
             0.0,
             min(
@@ -225,7 +229,8 @@ class DataQualityService:
                 - failure_penalty
                 - retry_penalty
                 - degraded_penalty
-                - idle_penalty,
+                - idle_penalty
+                - api_penalty,
             ),
         )
         status = (
@@ -250,6 +255,14 @@ class DataQualityService:
         if retry_rate >= 10:
             recommendations.append(
                 "Les sources publiques demandent de nombreux retries; évite les rafraîchissements manuels répétés."
+            )
+        if api_error_rate >= 1:
+            recommendations.append(
+                "Le taux HTTP 5xx du processus dépasse 1 %; utilise le X-Request-ID pour isoler les routes concernées."
+            )
+        if float(reliability["p95_duration_ms"]) >= 2500:
+            recommendations.append(
+                "Le temps de réponse p95 dépasse 2,5 s; vérifie les routes lentes avant le prochain déploiement."
             )
         if degraded:
             recommendations.append(
@@ -290,6 +303,20 @@ class DataQualityService:
                 detail=f"Pic de {metrics.peak_active} requêtes simultanées; limite globale configurée à 6.",
             ),
             DataQualityMetric(
+                key="api-5xx",
+                label="Erreurs API 5xx",
+                value=f"{api_error_rate:.2f} %",
+                status="healthy" if api_error_rate < 1 else "degraded" if api_error_rate < 5 else "critical",
+                detail=f"{reliability['total_5xx']} réponses 5xx sur {reliability['total_requests']} requêtes reçues.",
+            ),
+            DataQualityMetric(
+                key="api-p95",
+                label="Latence API p95",
+                value=f"{float(reliability['p95_duration_ms']):.0f} ms",
+                status="healthy" if float(reliability["p95_duration_ms"]) < 1500 else "degraded" if float(reliability["p95_duration_ms"]) < 4000 else "critical",
+                detail=f"{reliability['slow_requests']} requêtes ont dépassé 2,5 secondes.",
+            ),
+            DataQualityMetric(
                 key="uptime",
                 label="Disponibilité du processus",
                 value=f"{(monotonic() - _STARTED_AT) / 3600:.1f} h",
@@ -307,6 +334,7 @@ class DataQualityService:
             DataQualityEndpoint(path="/api/v1/discovery/insiders", label="Initiés", status="available" if insider_service._snapshot_cache else "not_warmed", detail="Scans limités pour protéger l’API publique."),
             DataQualityEndpoint(path="/api/v1/analysis/terminal", label="Terminal Pro", status="available" if screener else "not_warmed", detail="Réutilise les caches Cockpit et Screener."),
             DataQualityEndpoint(path="/api/v1/workspace/portfolio", label="Portefeuille", status="available", detail="Analyse à la demande; positions stockées uniquement dans le navigateur."),
+            DataQualityEndpoint(path="/api/v1/reliability/status", label="Observabilité v0.8", status="available", detail="Latence, taux 5xx, erreurs récentes et signalements bêta du processus courant."),
         ]
 
         return DataQualitySnapshot(

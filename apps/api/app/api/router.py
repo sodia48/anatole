@@ -8,6 +8,7 @@ from app.api.routes import (
     health,
     ipo_insiders,
     market,
+    reliability,
     search,
     stocks,
     ws,
@@ -83,6 +84,14 @@ api_router.include_router(
     workspace.router,
     prefix="/api/v1/workspace",
     tags=["workspace"],
+)
+
+
+# Observabilité, incidents clients et signalements bêta
+api_router.include_router(
+    reliability.router,
+    prefix="/api/v1/reliability",
+    tags=["reliability"],
 )
 
 # Flux de cotations WebSocket

@@ -8,6 +8,7 @@ import type {
   HealthStatus,
   NewsSnapshot,
   PsychologySnapshot,
+  ReliabilitySnapshot,
   ScreenerSnapshot,
   SymbolSearchResponse,
   TerminalSnapshot,
@@ -54,7 +55,12 @@ async function apiError(response: Response): Promise<Error> {
     // Une réponse proxy peut être du texte ou du HTML.
   }
 
-  return new Error(detail);
+  const requestId = response.headers.get("X-Request-ID");
+  const error = new Error(
+    requestId ? `${detail} · Référence ${requestId}` : detail,
+  ) as Error & { requestId?: string };
+  if (requestId) error.requestId = requestId;
+  return error;
 }
 
 async function apiRequest<T>(
@@ -324,5 +330,16 @@ export function getDataQuality(
     {},
     signal,
     20_000,
+  );
+}
+
+export function getReliabilityStatus(
+  signal?: AbortSignal,
+): Promise<ReliabilitySnapshot> {
+  return apiRequest<ReliabilitySnapshot>(
+    "/api/v1/reliability/status",
+    {},
+    signal,
+    12_000,
   );
 }

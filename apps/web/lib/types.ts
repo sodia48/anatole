@@ -674,3 +674,31 @@ export type DataQualitySnapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
+
+export type ReliabilityRequestSample = {
+  path: string;
+  method: string;
+  status_code: number;
+  duration_ms: number;
+  request_id: string;
+  occurred_at: string;
+};
+
+export type ReliabilitySnapshot = {
+  status: "healthy" | "degraded" | "critical";
+  uptime_seconds: number;
+  total_requests: number;
+  total_4xx: number;
+  total_5xx: number;
+  total_exceptions: number;
+  error_rate_5xx: number;
+  average_duration_ms: number;
+  p95_duration_ms: number;
+  max_duration_ms: number;
+  slow_requests: number;
+  reports_received: number;
+  last_report_at: string | null;
+  upstream_metrics: Record<string, number | string | null>;
+  recent_errors: ReliabilityRequestSample[];
+  generated_at: string;
+};

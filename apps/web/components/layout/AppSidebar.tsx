@@ -821,9 +821,9 @@ export function AppSidebar({
 
         <div className="sidebar-footer">
           <Link href="/roadmap">
-            Anatole v0.7.7
+            Anatole v0.8.0
           </Link>
-          <span>TSX 60 + Composite · Terminal Flow</span>
+          <span>Bêta fiable · observabilité active</span>
         </div>
       </aside>
 
