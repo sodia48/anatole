@@ -5,6 +5,7 @@ import type {
 } from "react";
 
 import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
+import { AccountProvider } from "@/components/providers/AccountProvider";
 
 /**
  * Point unique pour les contextes globaux d’Anatole.
@@ -20,7 +21,9 @@ export function AppProviders({
 }) {
   return (
     <PreferencesProvider>
-      {children}
+      <AccountProvider>
+        {children}
+      </AccountProvider>
     </PreferencesProvider>
   );
 }

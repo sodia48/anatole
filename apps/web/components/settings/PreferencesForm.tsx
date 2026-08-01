@@ -64,16 +64,16 @@ export function PreferencesForm() {
       </section>
 
       <section className="panel preference-card preference-wide">
-        <div className="preference-heading"><span className="eyebrow">UNIVERS</span><h2>Marché par défaut</h2><p>Le TSX 60 est actif. Le TSX Composite sera ajouté au moteur de données lors de la phase Marchés.</p></div>
+        <div className="preference-heading"><span className="eyebrow">UNIVERS</span><h2>Marché par défaut</h2><p>Choisis l’univers affiché en priorité dans le Cockpit. Le choix est aussi synchronisé avec ton compte Anatole.</p></div>
         <div className="universe-options">
-          <button type="button" className="choice-card is-selected"><span className="universe-logo">60</span><span><strong>TSX 60</strong><small>Actif maintenant</small></span><Check size={17} /></button>
-          <button type="button" className="choice-card" disabled><span className="universe-logo">C</span><span><strong>TSX Composite</strong><small>Préparation v0.5</small></span></button>
+          <button type="button" className={`choice-card ${preferences.defaultUniverse === "tsx60" ? "is-selected" : ""}`} onClick={() => updatePreferences({ defaultUniverse: "tsx60" })}><span className="universe-logo">60</span><span><strong>TSX 60</strong><small>Grandes capitalisations canadiennes</small></span>{preferences.defaultUniverse === "tsx60" ? <Check size={17} /> : null}</button>
+          <button type="button" className={`choice-card ${preferences.defaultUniverse === "composite" ? "is-selected" : ""}`} onClick={() => updatePreferences({ defaultUniverse: "composite" })}><span className="universe-logo">C</span><span><strong>TSX Composite</strong><small>Marché canadien élargi</small></span>{preferences.defaultUniverse === "composite" ? <Check size={17} /> : null}</button>
         </div>
       </section>
 
       <div className="preferences-actions">
         <button type="button" className="secondary-button" onClick={resetPreferences}><RotateCcw size={16} />Réinitialiser</button>
-        <span>Les préférences sont sauvegardées automatiquement dans ce navigateur.</span>
+        <span>Les préférences sont sauvegardées sur cet appareil et synchronisées lorsqu’un compte Anatole est connecté.</span>
       </div>
     </div>
   );

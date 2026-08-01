@@ -18,6 +18,7 @@ import {
   Settings2,
   ShieldCheck,
   Star,
+  UserRound,
   TableProperties,
   X,
 } from "lucide-react";
@@ -40,6 +41,7 @@ const routes = [
   { label: "Anatole Conseil", description: "Planification, scénarios et risques sans recommandation de placement", href: "/assistant", icon: Bot, available: true },
   { label: "Qualité des données", description: "Couverture, fraîcheur et sources", href: "/qualite", icon: ShieldCheck, available: true },
   { label: "Préférences", description: "Thème, densité et affichage", href: "/preferences", icon: Settings2, available: true },
+  { label: "Compte & synchronisation", description: "Retrouver Watchlist, Portefeuille et Alertes sur tous les appareils", href: "/compte", icon: UserRound, available: true },
 ];
 
 function normalizeTicker(value: string): string {

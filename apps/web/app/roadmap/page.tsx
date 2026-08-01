@@ -29,25 +29,31 @@ const phases = [
   {
     title: "Fiabilité production et bêta privée",
     version: "v0.8",
-    status: "active",
+    status: "done",
     items: ["X-Request-ID de bout en bout", "Mesure des erreurs 5xx et latences", "Dernière donnée valide", "Signalements bêta intégrés", "Tests Playwright", "Quality gate GitHub"],
   },
   {
     title: "Comptes et synchronisation",
     version: "v0.9",
+    status: "active",
+    items: ["Compte optionnel", "Sessions sécurisées", "PostgreSQL ou SQLite", "Synchronisation multiappareil", "Migration des données locales", "Gestion de toutes les sessions"],
+  },
+  {
+    title: "Notifications et historique",
+    version: "v1.0",
     status: "planned",
-    items: ["Comptes utilisateurs", "PostgreSQL", "Synchronisation multiappareil", "Alertes serveur", "Historique des alertes"],
+    items: ["Alertes côté serveur", "Historique des déclenchements", "Notifications hors application", "Récupération de compte", "Export et suppression du compte"],
   },
 ];
 
-const featureIds = ["observabilite", "tests-e2e", "feedback-beta", "comptes", "synchronisation"];
+const featureIds = ["compte-optionnel", "sessions", "postgresql", "migration-locale", "synchronisation"];
 
 export default function RoadmapPage() {
   return (
     <div className="roadmap-page">
       <header className="panel roadmap-header">
         <div><span className="eyebrow">PARITÉ BÊTA STREAMLIT</span><h1>Migration Anatole</h1><p>La nouvelle plateforme progresse par blocs testables, sans fragiliser les sections déjà en production.</p></div>
-        <div className="roadmap-progress"><strong>15</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · IPO & insiders · Psychologie · Comparateur · Terminal Pro · Portefeuille · Alertes · Assistant · Qualité</small></div>
+        <div className="roadmap-progress"><strong>16</strong><span>sections actives</span><small>Cockpit · Focus · Watchlist · Screener · Actualités · Calendrier · ETF · IPO & insiders · Psychologie · Comparateur · Terminal Pro · Portefeuille · Alertes · Anatole Conseil · Qualité · Compte</small></div>
       </header>
 
       <section className="roadmap-summary">
@@ -69,7 +75,7 @@ export default function RoadmapPage() {
       </section>
 
       <section className="panel feature-index">
-        <div><span className="eyebrow">PHASE ACTIVE</span><h2>Fiabilité production</h2><p>Chaque déploiement est désormais mesuré, testable et traçable avant l’ouverture de la bêta privée.</p></div>
+        <div><span className="eyebrow">PHASE ACTIVE</span><h2>Compte et synchronisation</h2><p>Anatole reste entièrement utilisable en mode local. Le compte ajoute une restauration sécurisée de l’espace utilisateur sur plusieurs appareils.</p></div>
         <div className="feature-anchor-grid">{featureIds.map((id) => <span id={id} key={id}>{id.replace(/-/g, " ")}</span>)}</div>
         <Link href="/cockpit" className="primary-button">Retour au Cockpit</Link>
       </section>

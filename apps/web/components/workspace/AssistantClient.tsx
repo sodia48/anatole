@@ -37,6 +37,8 @@ import type {
   PortfolioPositionInput,
 } from "@/lib/types";
 
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+
 import styles from "./Workspace.module.css";
 
 const PORTFOLIO_KEY = "anatole:portfolio:v1";
@@ -227,6 +229,15 @@ export function AssistantClient() {
     setPortfolio(loadPortfolio());
     setProfile(loadProfile());
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const applySyncedPlan = () => {
+      setPortfolio(loadPortfolio());
+      setProfile(loadProfile());
+    };
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedPlan);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedPlan);
   }, []);
 
   useEffect(() => {

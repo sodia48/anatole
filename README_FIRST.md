@@ -1,35 +1,43 @@
-# Anatole v0.9.1 — Compte toujours visible
+# Anatole v0.9.1.1 — récupération complète du frontend Compte
 
-Le compte était bien présent dans la v0.9, mais son entrée se trouvait sous
-la zone défilante de la sidebar sur certains écrans.
+## Cause du build failed
 
-## Correction
+`AppSidebar.tsx` importait :
 
-Un raccourci permanent apparaît maintenant directement sous la recherche :
+`@/components/account/AccountStatus`
 
-- `Compte`
-- `Connexion & synchronisation`
+mais le dépôt déployé ne contenait pas toute la couche frontend v0.9.
+Le correctif v0.9.1 de visibilité supposait que ces fichiers étaient déjà
+présents.
 
-Il est visible :
+Ce paquet ajoute toute la chaîne nécessaire :
 
-- sur ordinateur;
-- dans la sidebar compacte;
-- dans le tiroir mobile.
-
-La navigation complète conserve aussi la section Compte dans « Mon espace ».
+- page `/compte`;
+- composants de connexion et d'état;
+- `AccountProvider`;
+- client API du compte;
+- route relais Next.js;
+- synchronisation locale/multiappareil;
+- intégration Watchlist, Portefeuille, Alertes, préférences et Comparateur;
+- raccourci Compte toujours visible.
 
 ## Installation
 
-Décompressez le PATCH à la racine du dépôt et acceptez les remplacements.
+1. Décompressez le PATCH à la racine du dépôt.
+2. Acceptez tous les remplacements et ajouts.
+3. Vérifiez dans GitHub que ce fichier existe réellement :
 
-Ce correctif est uniquement frontend :
+   `apps/web/components/account/AccountStatus.tsx`
 
-1. commit et push;
-2. redéployer Vercel;
-3. désactiver `Use existing Build Cache` pour ce déploiement.
+4. Committez et poussez sur `main`.
+5. Redéployez uniquement Vercel.
+6. Désactivez `Use existing Build Cache` pour ce déploiement.
 
 Aucun redéploiement Render ou PostgreSQL n'est nécessaire.
 
-La page est accessible directement à :
+## Test attendu
 
-`/compte`
+- le build Vercel réussit;
+- le bouton Compte apparaît sous la recherche;
+- `/compte` s'ouvre;
+- création de compte et connexion utilisent la base PostgreSQL déjà active.

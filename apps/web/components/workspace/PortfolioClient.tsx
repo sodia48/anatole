@@ -30,6 +30,8 @@ import type {
   SymbolSearchItem,
 } from "@/lib/types";
 
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+
 import styles from "./Workspace.module.css";
 
 const STORAGE_KEY = "anatole:portfolio:v1";
@@ -188,6 +190,12 @@ export function PortfolioClient() {
     setPositions(add && !saved.some((item) => item.symbol === add) ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }] : saved);
     setHydrated(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    const applySyncedPositions = () => setPositions(loadPositions());
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
+  }, []);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -428,7 +436,7 @@ export function PortfolioClient() {
         </>
       )}
 
-      <div className={styles.notice}>Portefeuille de suivi uniquement. Les quantités et coûts moyens sont enregistrés dans <strong>localStorage</strong> sur cet appareil; aucune donnée personnelle n’est envoyée vers une base Anatole.</div>
+      <div className={styles.notice}>Portefeuille de suivi uniquement. Les quantités et coûts moyens restent sur cet appareil en mode anonyme et sont synchronisés uniquement lorsqu’un compte Anatole est connecté.</div>
       <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}>{snapshot ? <>Dernière analyse {new Date(snapshot.generated_at).toLocaleString("fr-CA")} · <Link href="/qualite">Vérifier les sources</Link></> : null}</div>
     </main>
   );

@@ -32,6 +32,8 @@ import type {
   SymbolSearchItem,
 } from "@/lib/types";
 
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+
 import styles from "./Analysis.module.css";
 
 const RANGE_OPTIONS: Array<{
@@ -415,6 +417,22 @@ export function ComparatorClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestVersion = useRef(0);
+
+  useEffect(() => {
+    const applySyncedSymbols = () => {
+      try {
+        const stored = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "null") as unknown;
+        if (Array.isArray(stored)) {
+          const next = [...new Set(stored.filter((value): value is string => typeof value === "string").map(cleanSymbol).filter(Boolean))].slice(0, 5);
+          if (next.length >= 2) setSymbols(next);
+        }
+      } catch {
+        // Le comparateur conserve les symboles courants.
+      }
+    };
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedSymbols);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedSymbols);
+  }, []);
 
   useEffect(() => {
     try {

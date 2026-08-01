@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, Star } from "lucide-react";
 import { getWatchlistSnapshot } from "@/lib/api";
 import type { WatchlistSnapshot } from "@/lib/types";
-import { normalizeWatchlistSymbol, readWatchlist, writeWatchlist } from "@/lib/watchlist";
+import { normalizeWatchlistSymbol, readWatchlist, writeWatchlist, WATCHLIST_EVENT } from "@/lib/watchlist";
 import { WatchlistTable } from "./WatchlistTable";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 
@@ -19,6 +19,12 @@ export function WatchlistClient() {
   useEffect(() => {
     setTickers(readWatchlist());
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const applySyncedWatchlist = () => setTickers(readWatchlist());
+    window.addEventListener(WATCHLIST_EVENT, applySyncedWatchlist);
+    return () => window.removeEventListener(WATCHLIST_EVENT, applySyncedWatchlist);
   }, []);
 
   const load = useCallback(async (current: string[], signal?: AbortSignal) => {
@@ -117,7 +123,7 @@ export function WatchlistClient() {
           </section>
           <WatchlistTable items={snapshot.items} onRemove={removeTicker} />
           <footer className="status-footer">
-            {refreshing ? "Actualisation en cours…" : `Mis à jour ${new Date(snapshot.generated_at).toLocaleTimeString("fr-CA")}`} · Sauvegarde locale dans ce navigateur · Cotations publiques potentiellement différées
+            {refreshing ? "Actualisation en cours…" : `Mis à jour ${new Date(snapshot.generated_at).toLocaleTimeString("fr-CA")}`} · Sauvegarde locale, avec synchronisation optionnelle du compte · Cotations publiques potentiellement différées
           </footer>
         </>
       ) : (

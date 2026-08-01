@@ -16,6 +16,7 @@ const titles: Array<[string, string]> = [
   ["/comparateur", "Comparateur"],
   ["/terminal", "Terminal Pro"],
   ["/watchlist", "Watchlist"],
+  ["/compte", "Compte & synchronisation"],
   ["/preferences", "Préférences"],
   ["/roadmap", "Migration Anatole"],
 ];

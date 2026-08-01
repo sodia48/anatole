@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import type { CockpitSnapshot } from "@/lib/types";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 
 const STORAGE_KEY = "anatole-cockpit-universe";
 
@@ -73,6 +74,15 @@ export function CockpitClient() {
       setUniverse(stored);
     }
     setReady(true);
+  }, []);
+
+  useEffect(() => {
+    const applySyncedUniverse = () => {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (isCockpitUniverse(stored)) setUniverse(stored);
+    };
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
   }, []);
 
   const load = useCallback(

@@ -10,7 +10,7 @@ export type AnatolePreferences = {
   density: AnatoleDensity;
   decimals: AnatoleDecimals;
   defaultRange: AnatoleTimeRange;
-  defaultUniverse: "tsx60";
+  defaultUniverse: "tsx60" | "composite";
 };
 
 export const DEFAULT_PREFERENCES: AnatolePreferences = {
@@ -34,7 +34,7 @@ export function readPreferences(): AnatolePreferences {
       defaultRange: ["1m", "3m", "6m", "1y", "5y"].includes(parsed.defaultRange ?? "")
         ? (parsed.defaultRange as AnatoleTimeRange)
         : "1y",
-      defaultUniverse: "tsx60",
+      defaultUniverse: parsed.defaultUniverse === "composite" ? "composite" : "tsx60",
     };
   } catch {
     return DEFAULT_PREFERENCES;

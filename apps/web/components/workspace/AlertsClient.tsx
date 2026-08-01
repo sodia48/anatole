@@ -29,6 +29,8 @@ import type {
   SymbolSearchItem,
 } from "@/lib/types";
 
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+
 import styles from "./Workspace.module.css";
 
 const STORAGE_KEY = "anatole:alerts:v1";
@@ -87,6 +89,12 @@ export function AlertsClient() {
   const [error, setError] = useState<string | null>(null);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
   const hydrated = useRef(false);
+
+  useEffect(() => {
+    const applySyncedRules = () => setRules(loadRules());
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedRules);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedRules);
+  }, []);
 
   useEffect(() => {
     const saved = loadRules();

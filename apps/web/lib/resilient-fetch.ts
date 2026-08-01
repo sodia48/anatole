@@ -5,7 +5,7 @@ import {
 } from "./reliability";
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
-const CACHE_PREFIX = "anatole:0.8:last-good:";
+const CACHE_PREFIX = "anatole:0.9:last-good:";
 const DEFAULT_STALE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_BODY_LENGTH = 1_500_000;
 
@@ -169,7 +169,7 @@ export async function resilientFetch(
     try {
       const headers = new Headers(init.headers);
       if (!headers.has("X-Request-ID")) headers.set("X-Request-ID", id);
-      headers.set("X-Anatole-Client-Version", "0.8.0");
+      headers.set("X-Anatole-Client-Version", "0.9.0");
 
       const response = await fetch(input, {
         ...init,

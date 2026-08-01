@@ -7,6 +7,7 @@ import {
   writePreferences,
   type AnatolePreferences,
 } from "@/lib/preferences";
+import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 
 type PreferencesContextValue = {
   preferences: AnatolePreferences;
@@ -32,6 +33,16 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     setPreferences(stored);
     applyPreferences(stored);
     setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    const applySyncedPreferences = () => {
+      const stored = readPreferences();
+      setPreferences(stored);
+      applyPreferences(stored);
+    };
+    window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedPreferences);
+    return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedPreferences);
   }, []);
 
   const value = useMemo<PreferencesContextValue>(() => ({
