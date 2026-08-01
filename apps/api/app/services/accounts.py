@@ -434,4 +434,127 @@ class AccountService:
             return self._user_from_row(row), self._workspace_for_user_sync(connection, user_id)
 
 
+    async def update_profile(
+        self,
+        *,
+        user_id: str,
+        display_name: str | None,
+    ) -> AccountUser | None:
+        await self.start()
+        return await asyncio.to_thread(
+            self._update_profile_sync,
+            user_id,
+            display_name,
+        )
+
+    def _update_profile_sync(
+        self,
+        user_id: str,
+        display_name: str | None,
+    ) -> AccountUser | None:
+        now = _utc_now()
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(display_name=display_name, updated_at=_to_iso(now))
+            )
+            if result.rowcount == 0:
+                return None
+            row = connection.execute(
+                select(self.users).where(self.users.c.id == user_id)
+            ).mappings().first()
+            return self._user_from_row(row) if row is not None else None
+
+    async def change_password(
+        self,
+        *,
+        user_id: str,
+        current_password: str,
+        new_password: str,
+        current_token: str,
+    ) -> None:
+        await self.start()
+        await asyncio.to_thread(
+            self._change_password_sync,
+            user_id,
+            current_password,
+            new_password,
+            current_token,
+        )
+
+    def _change_password_sync(
+        self,
+        user_id: str,
+        current_password: str,
+        new_password: str,
+        current_token: str,
+    ) -> None:
+        now = _utc_now()
+        current_token_hash = _token_hash(current_token)
+        with self.engine.begin() as connection:
+            row = connection.execute(
+                select(self.users).where(self.users.c.id == user_id)
+            ).mappings().first()
+            if row is None or not _password_matches(
+                current_password,
+                row.password_hash,
+            ):
+                raise InvalidCredentialsError
+            connection.execute(
+                update(self.users)
+                .where(self.users.c.id == user_id)
+                .values(
+                    password_hash=_password_hash(new_password),
+                    updated_at=_to_iso(now),
+                )
+            )
+            connection.execute(
+                delete(self.sessions).where(
+                    (self.sessions.c.user_id == user_id)
+                    & (self.sessions.c.token_hash != current_token_hash)
+                )
+            )
+
+    async def export_account(
+        self,
+        user_id: str,
+    ) -> tuple[AccountUser, WorkspaceSnapshot] | None:
+        return await self.account_status(user_id)
+
+    async def delete_account(
+        self,
+        *,
+        user_id: str,
+        password: str,
+    ) -> None:
+        await self.start()
+        await asyncio.to_thread(
+            self._delete_account_sync,
+            user_id,
+            password,
+        )
+
+    def _delete_account_sync(
+        self,
+        user_id: str,
+        password: str,
+    ) -> None:
+        with self.engine.begin() as connection:
+            row = connection.execute(
+                select(self.users).where(self.users.c.id == user_id)
+            ).mappings().first()
+            if row is None or not _password_matches(password, row.password_hash):
+                raise InvalidCredentialsError
+            connection.execute(
+                delete(self.workspaces).where(self.workspaces.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(self.sessions).where(self.sessions.c.user_id == user_id)
+            )
+            connection.execute(
+                delete(self.users).where(self.users.c.id == user_id)
+            )
+
+
 account_service = AccountService()

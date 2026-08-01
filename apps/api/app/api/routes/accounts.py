@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import time
+from datetime import UTC, datetime
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,7 +10,11 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.schemas.accounts import (
+    AccountDeleteRequest,
+    AccountExport,
     AccountLoginRequest,
+    AccountPasswordChangeRequest,
+    AccountProfileUpdateRequest,
     AccountRegisterRequest,
     AccountSession,
     AccountStatus,
@@ -201,3 +206,79 @@ async def update_workspace(
                 "request_id": getattr(request.state, "request_id", None),
             },
         ) from error
+
+@router.put(
+    "/profile",
+    response_model=AccountUser,
+    summary="Met à jour le nom affiché du compte",
+)
+async def update_profile(
+    payload: AccountProfileUpdateRequest,
+    user: AccountUser = Depends(current_user),
+) -> AccountUser:
+    updated = await account_service.update_profile(
+        user_id=user.id,
+        display_name=payload.display_name,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Compte introuvable.")
+    return updated
+
+
+@router.post(
+    "/change-password",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change le mot de passe et ferme les autres sessions",
+)
+async def change_password(
+    payload: AccountPasswordChangeRequest,
+    token: str = Depends(_credentials),
+    user: AccountUser = Depends(current_user),
+) -> None:
+    try:
+        await account_service.change_password(
+            user_id=user.id,
+            current_password=payload.current_password.get_secret_value(),
+            new_password=payload.new_password.get_secret_value(),
+            current_token=token,
+        )
+    except InvalidCredentialsError as error:
+        raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.") from error
+
+
+@router.get(
+    "/export",
+    response_model=AccountExport,
+    summary="Exporte les données du compte Anatole",
+)
+async def export_account(
+    user: AccountUser = Depends(current_user),
+) -> AccountExport:
+    snapshot = await account_service.export_account(user.id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="Compte introuvable.")
+    fresh_user, workspace = snapshot
+    return AccountExport(
+        exported_at=datetime.now(UTC),
+        user=fresh_user,
+        workspace=workspace,
+    )
+
+
+@router.delete(
+    "/delete",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Supprime définitivement le compte et ses données synchronisées",
+)
+async def delete_account(
+    payload: AccountDeleteRequest,
+    user: AccountUser = Depends(current_user),
+) -> None:
+    try:
+        await account_service.delete_account(
+            user_id=user.id,
+            password=payload.password.get_secret_value(),
+        )
+    except InvalidCredentialsError as error:
+        raise HTTPException(status_code=401, detail="Mot de passe incorrect.") from error
+

@@ -113,3 +113,41 @@ class AccountStatus(BaseModel):
     user: AccountUser
     workspace_revision: int = Field(ge=0)
     workspace_updated_at: datetime | None = None
+
+class AccountProfileUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=60)
+
+    @field_validator("display_name")
+    @classmethod
+    def clean_display_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = " ".join(value.strip().split())
+        return clean or None
+
+
+class AccountPasswordChangeRequest(BaseModel):
+    current_password: SecretStr = Field(min_length=10, max_length=128)
+    new_password: SecretStr = Field(min_length=10, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, value: SecretStr) -> SecretStr:
+        password = value.get_secret_value()
+        if not any(character.isalpha() for character in password):
+            raise ValueError("Le nouveau mot de passe doit contenir une lettre.")
+        if not any(character.isdigit() for character in password):
+            raise ValueError("Le nouveau mot de passe doit contenir un chiffre.")
+        return value
+
+
+class AccountDeleteRequest(BaseModel):
+    password: SecretStr = Field(min_length=10, max_length=128)
+    confirmation: Literal["SUPPRIMER"]
+
+
+class AccountExport(BaseModel):
+    exported_at: datetime
+    user: AccountUser
+    workspace: WorkspaceSnapshot
+

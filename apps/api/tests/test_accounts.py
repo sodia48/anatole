@@ -146,3 +146,85 @@ def test_workspace_sync_revision_conflict_and_isolation(account_client: TestClie
     assert isolated.status_code == 200
     assert isolated.json()["revision"] == 0
     assert isolated.json()["data"]["watchlist"] == []
+
+
+def test_profile_password_export_and_delete(account_client: TestClient):
+    created = register(account_client, "control@example.com")
+    token = created["token"]
+
+    profile = account_client.put(
+        "/api/v1/account/profile",
+        headers=auth(token),
+        json={"display_name": "  Souleyman   Anatole  "},
+    )
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["display_name"] == "Souleyman Anatole"
+
+    second_login = account_client.post(
+        "/api/v1/account/login",
+        json={"email": "control@example.com", "password": "Anatole2026!"},
+    )
+    assert second_login.status_code == 200
+    second_token = second_login.json()["token"]
+
+    changed = account_client.post(
+        "/api/v1/account/change-password",
+        headers=auth(token),
+        json={
+            "current_password": "Anatole2026!",
+            "new_password": "Nouveau2027!",
+        },
+    )
+    assert changed.status_code == 204, changed.text
+    assert account_client.get(
+        "/api/v1/account/me",
+        headers=auth(token),
+    ).status_code == 200
+    assert account_client.get(
+        "/api/v1/account/me",
+        headers=auth(second_token),
+    ).status_code == 401
+
+    old_login = account_client.post(
+        "/api/v1/account/login",
+        json={"email": "control@example.com", "password": "Anatole2026!"},
+    )
+    assert old_login.status_code == 401
+    new_login = account_client.post(
+        "/api/v1/account/login",
+        json={"email": "control@example.com", "password": "Nouveau2027!"},
+    )
+    assert new_login.status_code == 200
+
+    exported = account_client.get(
+        "/api/v1/account/export",
+        headers=auth(token),
+    )
+    assert exported.status_code == 200, exported.text
+    assert exported.json()["user"]["email"] == "control@example.com"
+    assert exported.json()["workspace"]["revision"] == 0
+
+    wrong_delete = account_client.request(
+        "DELETE",
+        "/api/v1/account/delete",
+        headers=auth(token),
+        json={"password": "Incorrect2026", "confirmation": "SUPPRIMER"},
+    )
+    assert wrong_delete.status_code == 401
+
+    deleted = account_client.request(
+        "DELETE",
+        "/api/v1/account/delete",
+        headers=auth(token),
+        json={"password": "Nouveau2027!", "confirmation": "SUPPRIMER"},
+    )
+    assert deleted.status_code == 204, deleted.text
+    assert account_client.get(
+        "/api/v1/account/me",
+        headers=auth(token),
+    ).status_code == 401
+    assert account_client.post(
+        "/api/v1/account/login",
+        json={"email": "control@example.com", "password": "Nouveau2027!"},
+    ).status_code == 401
+
