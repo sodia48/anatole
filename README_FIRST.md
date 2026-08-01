@@ -1,22 +1,35 @@
-# Anatole Mobile v0.7.7.1 — correction de l'en-tête
+# Anatole v0.9.1 — Compte toujours visible
 
-Ce correctif résout uniquement le chevauchement entre la barre mobile fixe
-et le haut des pages Cockpit et Terminal Pro.
+Le compte était bien présent dans la v0.9, mais son entrée se trouvait sous
+la zone défilante de la sidebar sur certains écrans.
 
-## Résultat
+## Correction
 
-- le titre `S&P/TSX 60` est visible en entier;
-- le titre `S&P/TSX Composite` reste visible en entier;
-- le titre `Terminal Pro` n'est plus masqué;
-- la barre mobile, le heatmap, Terminal Pro et le dock restent inchangés.
+Un raccourci permanent apparaît maintenant directement sous la recherche :
 
-## Fichier remplacé
+- `Compte`
+- `Connexion & synchronisation`
 
-`apps/web/app/mobile.css`
+Il est visible :
 
-## Déploiement
+- sur ordinateur;
+- dans la sidebar compacte;
+- dans le tiroir mobile.
 
-Décompressez le PATCH à la racine du dépôt, acceptez le remplacement, puis
-redéployez uniquement Vercel avec l'ancien Build Cache désactivé.
+La navigation complète conserve aussi la section Compte dans « Mon espace ».
 
-Aucun redéploiement Render n'est nécessaire.
+## Installation
+
+Décompressez le PATCH à la racine du dépôt et acceptez les remplacements.
+
+Ce correctif est uniquement frontend :
+
+1. commit et push;
+2. redéployer Vercel;
+3. désactiver `Use existing Build Cache` pour ce déploiement.
+
+Aucun redéploiement Render ou PostgreSQL n'est nécessaire.
+
+La page est accessible directement à :
+
+`/compte`

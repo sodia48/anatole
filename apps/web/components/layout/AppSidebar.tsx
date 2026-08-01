@@ -33,10 +33,12 @@ import {
   ShieldCheck,
   Star,
   TableProperties,
+  UserRound,
   X,
 } from "lucide-react";
 
 import guardStyles from "./AppSidebarGuard.module.css";
+import { AccountStatus } from "@/components/account/AccountStatus";
 
 type NavItem = {
   href: string;
@@ -146,6 +148,12 @@ const groups: Array<{
         href: "/alertes",
         label: "Alertes",
         icon: Bell,
+        available: true,
+      },
+      {
+        href: "/compte",
+        label: "Compte & synchronisation",
+        icon: UserRound,
         available: true,
       },
     ],
@@ -767,6 +775,21 @@ export function AppSidebar({
           <kbd>⌘K</kbd>
         </button>
 
+        <Link
+          href="/compte"
+          className={`sidebar-account-shortcut ${
+            pathname === "/compte" ? "is-active" : ""
+          }`}
+          aria-current={pathname === "/compte" ? "page" : undefined}
+          onClick={() => setDrawerOpen(false)}
+        >
+          <UserRound size={19} />
+          <span>
+            <strong>Compte</strong>
+            <small>Connexion & synchronisation</small>
+          </span>
+        </Link>
+
         <nav
           className="sidebar-nav desktop-nav"
           aria-label="Navigation principale"
@@ -820,10 +843,11 @@ export function AppSidebar({
         />
 
         <div className="sidebar-footer">
+          <AccountStatus />
           <Link href="/roadmap">
-            Anatole v0.8.0
+            Anatole v0.9.0
           </Link>
-          <span>Bêta fiable · observabilité active</span>
+          <span>Compte optionnel · synchronisation active</span>
         </div>
       </aside>
 
