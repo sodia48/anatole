@@ -1,0 +1,11 @@
+apps/api/app/schemas/accounts.py
+apps/api/app/services/accounts.py
+apps/api/app/api/routes/accounts.py
+apps/api/tests/test_accounts.py
+apps/web/app/api/account/[...path]/route.ts
+apps/web/lib/account.ts
+apps/web/components/providers/AccountProvider.tsx
+apps/web/components/account/AccountClient.tsx
+apps/web/components/account/Account.module.css
+apps/web/app/layout.tsx
+apps/web/package.json
