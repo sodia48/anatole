@@ -12,8 +12,9 @@ const API_URL = (
 ).replace(/\/+$/, "");
 
 const COOKIE_NAME = "anatole_session";
-const PUBLIC_ACTIONS = new Set(["register", "login"]);
+const PUBLIC_ACTIONS = new Set(["registration", "register", "login"]);
 const ALLOWED_ACTIONS = new Set([
+  "registration",
   "register",
   "login",
   "logout",
