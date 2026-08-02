@@ -22,6 +22,7 @@ import {
   logoutAllAccounts,
   putRemoteWorkspace,
   registerAccount,
+  deleteAccount,
 } from "@/lib/account";
 import {
   type SyncedWorkspaceData,
@@ -51,6 +52,8 @@ type AccountContextValue = {
   signOut: () => Promise<void>;
   signOutEverywhere: () => Promise<void>;
   syncNow: () => Promise<void>;
+  refreshAccount: () => Promise<void>;
+  deleteMyAccount: (password: string) => Promise<void>;
 };
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -257,6 +260,16 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     };
   }, [pushLocal, rememberWorkspace, user]);
 
+  const clearAccountState = useCallback(() => {
+    setUser(null);
+    setWorkspaceRevision(0);
+    setLastSyncedAt(null);
+    setError(null);
+    setSyncState("anonymous");
+    revisionRef.current = 0;
+    lastFingerprintRef.current = "";
+  }, []);
+
   const value = useMemo<AccountContextValue>(() => ({
     user,
     hydrated,
@@ -293,24 +306,27 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       }
     },
     signOut: async () => {
-      setUser(null);
-      setWorkspaceRevision(0);
-      setLastSyncedAt(null);
-      setSyncState("anonymous");
+      clearAccountState();
       await logoutAccount().catch(() => undefined);
     },
     signOutEverywhere: async () => {
       await logoutAllAccounts().catch(() => undefined);
-      setUser(null);
-      setWorkspaceRevision(0);
-      setLastSyncedAt(null);
-      setSyncState("anonymous");
+      clearAccountState();
     },
     syncNow: async () => {
       await pushLocal();
     },
+    refreshAccount: async () => {
+      const status = await getAccountStatus();
+      setUser(status.user);
+    },
+    deleteMyAccount: async (password) => {
+      await deleteAccount({ password, confirmation: "SUPPRIMER" });
+      clearAccountState();
+    },
   }), [
     activateSession,
+    clearAccountState,
     error,
     hydrated,
     lastSyncedAt,
@@ -328,3 +344,4 @@ export function useAccount(): AccountContextValue {
   if (!value) throw new Error("useAccount doit être utilisé dans AccountProvider");
   return value;
 }
+
