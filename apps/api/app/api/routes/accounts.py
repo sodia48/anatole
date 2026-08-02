@@ -27,6 +27,7 @@ from app.schemas.accounts import (
 from app.services.accounts import (
     AccountAlreadyExistsError,
     InvalidCredentialsError,
+    InvalidInviteError,
     WorkspaceConflictError,
     account_service,
 )
@@ -96,7 +97,10 @@ async def current_user(token: str = Depends(_credentials)) -> AccountUser:
 async def registration_policy() -> AccountRegistrationPolicy:
     return AccountRegistrationPolicy(
         enabled=settings.account_registration_enabled,
-        invite_required=bool(settings.account_invite_code_set),
+        invite_required=(
+            bool(settings.account_invite_code_set)
+            or await account_service.has_active_invites()
+        ),
         terms_version=settings.account_terms_version,
         privacy_version=settings.account_privacy_version,
     )
@@ -119,18 +123,28 @@ async def register(payload: AccountRegisterRequest, request: Request) -> Account
         )
 
     invite_codes = settings.account_invite_code_set
-    if invite_codes:
-        supplied = payload.invite_code or ""
-        if not any(hmac.compare_digest(supplied, code) for code in invite_codes):
-            auth_throttle.failure(request, payload.email)
-            raise HTTPException(status_code=403, detail="Code d’invitation invalide.")
+    supplied = payload.invite_code or ""
+    static_invite_valid = any(
+        hmac.compare_digest(supplied, code)
+        for code in invite_codes
+    )
+    invite_required = (
+        bool(invite_codes)
+        or await account_service.has_active_invites()
+    )
 
     try:
         session = await account_service.register(
             email=payload.email,
             password=payload.password.get_secret_value(),
             display_name=payload.display_name,
+            invite_code=supplied,
+            invite_required=invite_required,
+            invite_already_valid=static_invite_valid,
         )
+    except InvalidInviteError as error:
+        auth_throttle.failure(request, payload.email)
+        raise HTTPException(status_code=403, detail="Code d’invitation invalide ou expiré.") from error
     except AccountAlreadyExistsError as error:
         auth_throttle.failure(request, payload.email)
         raise HTTPException(status_code=409, detail="Un compte existe déjà avec ce courriel.") from error

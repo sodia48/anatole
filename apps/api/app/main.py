@@ -37,7 +37,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Anatole API",
-    version="0.9.0",
+    version="1.1.0",
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
@@ -104,7 +104,7 @@ async def request_observability(
         request_id=request_id,
     )
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Anatole-Version"] = "0.9.0"
+    response.headers["X-Anatole-Version"] = "1.1.0"
     response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
 
     logger.info(

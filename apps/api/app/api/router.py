@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     accounts,
+    admin,
     analysis,
     discovery,
     etf_holdings,
@@ -94,6 +95,13 @@ api_router.include_router(
     accounts.router,
     prefix="/api/v1/account",
     tags=["account"],
+)
+
+# Console privée de pilotage de la bêta
+api_router.include_router(
+    admin.router,
+    prefix="/api/v1/admin",
+    tags=["admin"],
 )
 
 # Observabilité, incidents clients et signalements bêta

@@ -19,9 +19,19 @@ class Settings(BaseSettings):
     account_invite_codes: str = ""
     account_terms_version: str = "2026-08-01"
     account_privacy_version: str = "2026-08-01"
+    account_admin_emails: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
+
+    @property
+    def account_admin_email_set(self) -> tuple[str, ...]:
+        values = [
+            item.strip().lower()
+            for item in self.account_admin_emails.split(",")
+            if item.strip()
+        ]
+        return tuple(dict.fromkeys(values))
 
     @property
     def account_invite_code_set(self) -> tuple[str, ...]:

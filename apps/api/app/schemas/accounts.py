@@ -74,6 +74,7 @@ class AccountUser(BaseModel):
     display_name: str | None = None
     created_at: datetime
     last_login_at: datetime | None = None
+    is_admin: bool = False
 
 
 class SyncedPreferences(BaseModel):

@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request, status
 
 from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
+from app.services.accounts import account_service
 from app.schemas.reliability import (
     ClientEventRequest,
     FeedbackReportRequest,
@@ -77,6 +78,24 @@ async def feedback(
             ensure_ascii=False,
         ),
     )
+    try:
+        await account_service.store_feedback_report(
+            {
+                "report_id": report_id,
+                "category": report.category,
+                "message": report.message,
+                "route": report.route,
+                "section": report.section,
+                "universe": report.universe,
+                "request_id": report.request_id or request_id,
+                "viewport": diagnostics.get("viewport") if report.consent_diagnostics else None,
+                "app_version": report.app_version,
+                "user_agent": report.user_agent if report.consent_diagnostics else None,
+                "diagnostics_included": report.consent_diagnostics,
+            }
+        )
+    except Exception:
+        logger.exception("beta_feedback_persistence_failed report_id=%s", report_id)
     return FeedbackReportResponse(
         report_id=report_id,
         received_at=datetime.now(UTC),
