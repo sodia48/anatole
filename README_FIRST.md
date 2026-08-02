@@ -1,51 +1,62 @@
-# Anatole v1.1.0 — Console de bêta et opérations
+# Anatole v1.1.4 — correction définitive du 404 Admin
 
-Cette version ajoute un espace administrateur privé à `/admin`.
+## Cause
 
-## Fonctions
+Le frontend `/admin` est bien déployé, mais Render exécute encore un backend
+sans les routes `/api/v1/admin/*`. Un courriel correct dans
+`ACCOUNT_ADMIN_EMAILS` ne peut pas corriger une route absente : FastAPI répond
+404 avant même de vérifier le rôle administrateur.
 
-- tableau de bord de santé et d'utilisation;
-- liste des comptes bêta et de leurs dernières activités;
-- génération de codes d'invitation à usage limité;
-- expiration et révocation des invitations;
-- signalements bêta persistés dans PostgreSQL;
-- classement des signalements : Nouveau, En analyse, Résolu;
-- accès administrateur déterminé par l'adresse courriel;
-- aucun mot de passe, jeton ou contenu détaillé de portefeuille affiché.
+## Correction
 
-## Sécurité
+Ce paquet installe toute la couche backend Admin :
 
-La console exige une session Anatole valide et un courriel présent dans :
+- routeur `/api/v1/admin`;
+- endpoints overview, users, invites et reports;
+- schémas et stockage PostgreSQL;
+- rôle administrateur calculé depuis `ACCOUNT_ADMIN_EMAILS`;
+- signalements persistants;
+- garde de démarrage qui empêche Render de démarrer si les routes Admin sont absentes;
+- diagnostic Admin ajouté à `/ready`.
 
-`ACCOUNT_ADMIN_EMAILS`
+## Installation
 
-Exemple :
+1. Décompresser le PATCH à la racine du dépôt.
+2. Remplacer tous les fichiers proposés.
+3. Commit et push sur `main`.
+4. Déployer **Render uniquement**.
+5. Ne pas redéployer Vercel pour ce correctif.
 
-`ACCOUNT_ADMIN_EMAILS=mon-compte@exemple.ca`
+## Variable Render
 
-Plusieurs courriels peuvent être séparés par des virgules.
+Utiliser l'adresse exacte du compte Anatole :
 
-Les codes générés par la console sont stockés uniquement sous forme hachée.
-Le code complet est affiché une seule fois après sa création.
+`ACCOUNT_ADMIN_EMAILS=solo0112@live.fr`
 
-## Invitations
+Puis cliquer sur **Save, rebuild and deploy**.
 
-Les anciens codes définis dans `ACCOUNT_INVITE_CODES` restent compatibles.
-Les invitations créées dans `/admin` peuvent être :
+## Vérifications
 
-- à usage unique ou multiple;
-- limitées de 1 à 100 utilisations;
-- expirables de 1 à 365 jours;
-- révoquées immédiatement.
+Après le déploiement, ouvrir :
 
-Dès qu'une invitation administrée existe, les inscriptions restent fermées
-aux personnes ne possédant pas un code valide, même lorsque les anciens codes
-sont épuisés. Cela empêche une réouverture publique accidentelle.
+`https://anatole-api.onrender.com/ready`
 
-## Signalements
+Le JSON doit contenir :
 
-Les nouveaux signalements sont persistés dans la même base PostgreSQL que les
-comptes. Ils restent également inscrits dans les logs Render.
+```json
+"admin_console": {
+  "status": "ready",
+  "routes_enabled": true,
+  "configured_admins": 1
+}
+```
 
-Aucune position du portefeuille, quantité, coût moyen, mot de passe ou profil
-Anatole Conseil n'est enregistré dans un signalement.
+Puis ouvrir directement :
+
+`https://anatole-api.onrender.com/api/v1/admin/overview`
+
+Dans un navigateur sans jeton, la réponse correcte est **401** avec
+`Connexion administrateur requise.` Une réponse **404** signifie que Render
+n'a pas déployé ce commit.
+
+Enfin, se déconnecter/reconnecter dans Anatole et ouvrir `/admin`.

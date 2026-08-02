@@ -23,10 +23,34 @@ logger = logging.getLogger("anatole.api")
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(application: FastAPI):
     await shared_http_client.start()
     await account_service.start()
-    logger.info("anatole_api_started shared_http_pool=true")
+
+    required_admin_routes = {
+        "/api/v1/admin/overview",
+        "/api/v1/admin/users",
+        "/api/v1/admin/invites",
+        "/api/v1/admin/reports",
+    }
+    available_routes = {
+        getattr(route, "path", "")
+        for route in application.routes
+    }
+    missing_admin_routes = sorted(
+        required_admin_routes - available_routes
+    )
+    if missing_admin_routes:
+        raise RuntimeError(
+            "Admin routes missing: "
+            + ", ".join(missing_admin_routes)
+        )
+
+    logger.info(
+        "anatole_api_started shared_http_pool=true "
+        "admin_routes=true configured_admins=%s",
+        len(settings.account_admin_email_set),
+    )
     try:
         yield
     finally:
@@ -37,7 +61,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Anatole API",
-    version="1.1.0",
+    version="1.1.4",
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
@@ -104,7 +128,7 @@ async def request_observability(
         request_id=request_id,
     )
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Anatole-Version"] = "1.1.0"
+    response.headers["X-Anatole-Version"] = "1.1.4"
     response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
 
     logger.info(

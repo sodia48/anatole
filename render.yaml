@@ -45,3 +45,7 @@ services:
         value: "30"
       - key: ACCOUNT_REGISTRATION_ENABLED
         value: "true"
+      - key: ACCOUNT_ADMIN_EMAILS
+        sync: false
+      - key: ACCOUNT_INVITE_CODES
+        sync: false
