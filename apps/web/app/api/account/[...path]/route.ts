@@ -20,6 +20,10 @@ const ALLOWED_ACTIONS = new Set([
   "logout-all",
   "me",
   "workspace",
+  "profile",
+  "change-password",
+  "export",
+  "delete",
 ]);
 
 type Context = {
@@ -114,7 +118,7 @@ async function proxy(request: NextRequest, context: Context): Promise<NextRespon
         });
     const upstreamRequestId = upstream.headers.get("X-Request-ID");
     if (upstreamRequestId) response.headers.set("X-Request-ID", upstreamRequestId);
-    if (action === "logout" || action === "logout-all" || upstream.status === 401) {
+    if (action === "logout" || action === "logout-all" || action === "delete" || upstream.status === 401) {
       clearSession(response);
     }
     return response;
