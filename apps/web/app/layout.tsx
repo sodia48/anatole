@@ -45,7 +45,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body data-anatole-version="0.9.6">
+      <body data-anatole-version="1.0.0">
         <AppProviders>
           <div className="app-shell">
             <AppSidebar />
