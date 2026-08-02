@@ -1,36 +1,24 @@
-# Anatole v0.9.5 — correction du build ETF
+# Anatole v0.9.6 — sidebar pliable fiable
 
-## Cause
+## Cause du problème
 
-Le dépôt contient un dossier dupliqué :
-
-`apps/web/components/components/etf`
-
-Le composant exécuté depuis ce dossier interprétait l'import relatif
-`../../lib/etf-holdings-api` comme `apps/web/components/lib/...`, qui n'existe
-pas.
+Le premier bouton était placé dans l'en-tête du logo et dépendait d'un
+breakpoint desktop. De plus, d'anciennes règles CSS repliaient ou masquaient
+automatiquement certains éléments selon la largeur du navigateur.
 
 ## Correction
 
-- imports remplacés par les alias stables `@/lib` et `@/components`;
-- fichier `etf-holdings-api.ts` inclus au bon emplacement;
-- page ETF redirigée vers le composant canonique;
-- shim de compatibilité ajouté dans le dossier dupliqué;
-- dossier `components/components` exclu du contrôle TypeScript;
-- aucun changement au backend ou aux données ETF.
+- poignée permanente placée sur le bord droit de la sidebar;
+- visible sur tous les écrans de plus de 820 px;
+- largeur contrôlée uniquement par le bouton;
+- état mémorisé après rechargement;
+- anciennes règles automatiques neutralisées;
+- navigation mobile inchangée;
+- version visible `Anatole v0.9.6` dans le pied de la sidebar.
 
 ## Installation
 
-Décompressez le PATCH à la racine du dépôt et acceptez les remplacements.
+Remplacer les quatre fichiers du PATCH, commit et push, puis redéployer
+uniquement Vercel avec `Use existing Build Cache` désactivé.
 
-Vérifiez notamment ces chemins :
-
-- `apps/web/lib/etf-holdings-api.ts`
-- `apps/web/components/etf/EtfPerformanceChart.tsx`
-- `apps/web/app/etf/[ticker]/page.tsx`
-
-Puis committez et redéployez uniquement Vercel avec
-`Use existing Build Cache` désactivé.
-
-Le dossier dupliqué `apps/web/components/components` pourra être supprimé
-plus tard, mais il ne bloquera plus le build.
+Aucun redéploiement Render ou PostgreSQL n'est requis.

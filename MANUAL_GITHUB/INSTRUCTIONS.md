@@ -1,11 +1,15 @@
 # Remplacement manuel GitHub
 
-| Fichier | Chemin exact |
+| Fichier téléchargé | Chemin exact dans GitHub |
 |---|---|
-| `EtfPerformanceChart.tsx` | `apps/web/components/etf/EtfPerformanceChart.tsx` |
-| `etf-ticker-page.tsx` | `apps/web/app/etf/[ticker]/page.tsx` |
-| `etf-holdings-api.ts` | `apps/web/lib/etf-holdings-api.ts` |
-| `tsconfig.json` | `apps/web/tsconfig.json` |
+| `AppSidebar.tsx` | `apps/web/components/layout/AppSidebar.tsx` |
+| `globals.css` | `apps/web/app/globals.css` |
+| `layout.tsx` | `apps/web/app/layout.tsx` |
+| `package.json` | `apps/web/package.json` |
 
-Pour `[ticker]`, utilisez GitHub → Add file → Create new file si Windows refuse
-le dossier spécial.
+Après remplacement, vérifiez dans `AppSidebar.tsx` :
+
+- `desktop-sidebar-edge-toggle`
+- `Anatole v0.9.6`
+
+Puis redéployez Vercel sans le Build Cache.

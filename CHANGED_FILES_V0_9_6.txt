@@ -1,0 +1,4 @@
+apps/web/components/layout/AppSidebar.tsx
+apps/web/app/globals.css
+apps/web/app/layout.tsx
+apps/web/package.json
