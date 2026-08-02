@@ -1,0 +1,8 @@
+apps/web/app/etf/[ticker]/page.tsx
+apps/web/components/etf/EtfPerformanceChart.tsx
+apps/web/components/components/etf/EtfPerformanceChart.tsx
+apps/web/lib/etf-holdings-api.ts
+apps/web/app/etf/[ticker]/page.module.css
+apps/web/tsconfig.json
+apps/web/app/layout.tsx
+apps/web/package.json

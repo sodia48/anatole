@@ -1,51 +1,36 @@
-# Anatole v0.9.3 — Centre de contrôle
+# Anatole v0.9.5 — correction du build ETF
 
-Cette version regroupe dans une seule section :
+## Cause
 
-- Compte et synchronisation;
-- Préférences;
-- Qualité des données et fiabilité.
+Le dépôt contient un dossier dupliqué :
 
-## Nouvelle adresse
+`apps/web/components/components/etf`
 
-`/parametres`
+Le composant exécuté depuis ce dossier interprétait l'import relatif
+`../../lib/etf-holdings-api` comme `apps/web/components/lib/...`, qui n'existe
+pas.
 
-L'interface reprend les conventions des grands services numériques :
+## Correction
 
-- en-tête de compte clair;
-- navigation secondaire permanente;
-- catégories distinctes;
-- état du compte visible;
-- résumé des préférences;
-- contenu principal spacieux;
-- navigation mobile compacte;
-- hiérarchie visuelle cohérente.
-
-## Compatibilité
-
-Les anciennes adresses continuent de fonctionner :
-
-- `/compte` redirige vers Compte;
-- `/preferences` redirige vers Préférences;
-- `/qualite` redirige vers Qualité des données.
-
-Les liens depuis le Portefeuille, Anatole Conseil, la recherche et la barre
-supérieure ont aussi été mis à jour.
-
-## Sidebar
-
-Les trois anciennes entrées séparées sont remplacées par :
-
-`Compte & paramètres`
-
-Le raccourci sous la recherche ouvre le même Centre de contrôle.
+- imports remplacés par les alias stables `@/lib` et `@/components`;
+- fichier `etf-holdings-api.ts` inclus au bon emplacement;
+- page ETF redirigée vers le composant canonique;
+- shim de compatibilité ajouté dans le dossier dupliqué;
+- dossier `components/components` exclu du contrôle TypeScript;
+- aucun changement au backend ou aux données ETF.
 
 ## Installation
 
-1. Décompresser le PATCH à la racine du dépôt.
-2. Accepter les ajouts et remplacements.
-3. Commit et push sur `main`.
-4. Redéployer uniquement Vercel.
-5. Désactiver `Use existing Build Cache` pour ce déploiement.
+Décompressez le PATCH à la racine du dépôt et acceptez les remplacements.
 
-Aucun changement Render ou PostgreSQL n'est nécessaire.
+Vérifiez notamment ces chemins :
+
+- `apps/web/lib/etf-holdings-api.ts`
+- `apps/web/components/etf/EtfPerformanceChart.tsx`
+- `apps/web/app/etf/[ticker]/page.tsx`
+
+Puis committez et redéployez uniquement Vercel avec
+`Use existing Build Cache` désactivé.
+
+Le dossier dupliqué `apps/web/components/components` pourra être supprimé
+plus tard, mais il ne bloquera plus le build.
