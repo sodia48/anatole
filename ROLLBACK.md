@@ -1,9 +1,10 @@
 # Retour arrière
 
-En cas de problème de déploiement :
+En cas de problème de build :
 
-1. Render > Deploys > sélectionner le dernier déploiement opérationnel > Rollback.
-2. Vercel > Deployments > sélectionner la dernière version opérationnelle > Promote to Production.
-3. Revenir au commit Git précédent.
+1. Render > Deploys > sélectionner le déploiement précédent > Rollback.
+2. Vercel > Deployments > sélectionner le déploiement précédent > Promote.
+3. Ne modifier aucune variable CORS pendant le rollback.
 
-Aucune migration de base de données n’est incluse dans v0.6.
+Le correctif ne modifie aucun schéma de base de données et ne nécessite
+aucune migration.

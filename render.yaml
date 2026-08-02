@@ -41,3 +41,7 @@ services:
         value: "300"
       - key: HISTORY_DAILY_STALE_SECONDS
         value: "86400"
+      - key: ACCOUNT_SESSION_DAYS
+        value: "30"
+      - key: ACCOUNT_REGISTRATION_ENABLED
+        value: "true"

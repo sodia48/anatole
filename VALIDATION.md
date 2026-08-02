@@ -1,26 +1,37 @@
-# Validation Anatole v0.6
+# Rapport de validation — Anatole Operational Final v1
 
 ## Backend
 
-- Compilation Python de tous les modules : réussie.
-- Suite complète `pytest` : **62 tests réussis, 0 échec**.
-- `POST /api/v1/analysis/compare` en mode démo : HTTP 200, 3 instruments, 3 séries et matrice de corrélation.
-- `GET /api/v1/analysis/terminal` en mode démo : HTTP 200, régime, 10 secteurs, leaders, laggards, opportunités et alertes.
-- Cache Comparateur : 300 secondes.
-- Cache Terminal Pro : 60 secondes.
-- Historique chargé en lot avec concurrence bornée.
-- Fondamentaux limités à trois appels simultanés et douze secondes par titre.
+- Compilation Python de `apps/api/app` et `apps/api/tests` : réussie.
+- Suite complète : **59 tests réussis, 0 échec**.
+- Vérification OpenAPI : les six routes opérationnelles sont enregistrées :
+  Screener, répertoire ETF, participations ETF, historique ETF, IPO et initiés.
+- Smoke test FastAPI en mode de données de secours :
+  - `/health` : 200;
+  - `/api/v1/discovery/screener?universe=tsx60` : 200, 60 titres;
+  - `/api/v1/discovery/etfs` : 200, 172 ETF;
+  - `/api/v1/discovery/psychology` : 200, 5 composantes.
+- Tests de routes avec services isolés : participations ETF, historique ETF,
+  IPO et initiés répondent tous 200.
 
 ## Frontend
 
-- Vérification TypeScript de l’ensemble de `apps/web` avec TypeScript 5.8.3 : réussie.
-- Imports et exports API vérifiés.
-- Classes du module CSS vérifiées : aucune classe manquante.
-- Équilibre des accolades CSS : 181 ouvertures, 181 fermetures.
-- Navigation activée dans Sidebar, Topbar et Command Palette.
-- Commande `comparer RY et TD` reliée à `/comparateur`.
-- Mise en page responsive intégrée au module CSS.
+- Vérification statique TypeScript de l’ensemble de `apps/web` avec les modules
+  externes simulés : réussie.
+- Présence vérifiée de tous les exports consommés par les composants :
+  `getHealthStatus`, Cockpit, Watchlist, Focus, Screener, Actualités,
+  Calendrier, Psychologie, ETF, Recherche et WebSocket.
+- Méthode Watchlist restaurée en POST.
+- Relais same-origin `/api/anatole` vérifié dans `next.config.ts`.
 
-## Limite de validation
+## Limite de l’environnement de validation
 
-Le véritable `next build` n’a pas pu être lancé dans l’environnement de génération, car Corepack ne pouvait pas télécharger pnpm depuis le registre npm. Le code a toutefois passé la vérification TypeScript statique et les contrôles d’intégrité. Le build final doit être confirmé par Vercel.
+Le build Next.js réel n’a pas pu être exécuté ici, car l’environnement ne
+pouvait pas télécharger `pnpm` et les dépendances npm à cause d’un échec DNS
+vers le registre. Cette limite est distincte du code. La vérification statique
+a néanmoins détecté puis permis de corriger l’export frontend qui cassait le
+build précédent.
+
+La récupération réelle des compositions ETF dépend de la réponse de la source
+publique au moment du test après déploiement Render. Le service renvoie une
+réponse structurée et conserve les dernières données valides en cas d’échec.
