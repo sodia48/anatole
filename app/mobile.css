@@ -1,0 +1,4237 @@
+/*
+ * Anatole Signature Mobile v4
+ * Loaded after globals.css. This is the authoritative mobile layer.
+ */
+
+.mobile-appbar,
+.mobile-sidebar-backdrop,
+.mobile-drawer-heading {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --mobile-gutter: 12px;
+    --mobile-topbar-height: 64px;
+    --mobile-safe-top:
+      env(safe-area-inset-top, 0px);
+    --mobile-safe-bottom:
+      env(safe-area-inset-bottom, 0px);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    background:
+      radial-gradient(
+        circle at 90% -10%,
+        rgba(28, 87, 128, 0.32),
+        transparent 31rem
+      ),
+      linear-gradient(
+        180deg,
+        #050d15 0%,
+        #06111b 100%
+      );
+    background-attachment: fixed;
+  }
+
+  body.anatole-drawer-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .app-shell {
+    min-height: 100dvh !important;
+    display: block !important;
+  }
+
+  .app-main {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        14px
+      )
+      var(--mobile-gutter)
+      calc(
+        28px +
+        var(--mobile-safe-bottom)
+      ) !important;
+    overflow-x: clip !important;
+  }
+
+  /* Premium fixed top bar */
+  .mobile-appbar {
+    position: fixed;
+    inset:
+      var(--mobile-safe-top)
+      0
+      auto;
+    z-index: 900;
+    height:
+      var(--mobile-topbar-height);
+    display: grid;
+    grid-template-columns:
+      44px
+      minmax(0, 1fr)
+      44px;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom:
+      1px solid rgba(
+        54,
+        99,
+        127,
+        0.54
+      );
+    background:
+      linear-gradient(
+        180deg,
+        rgba(5, 13, 21, 0.98),
+        rgba(5, 13, 21, 0.91)
+      );
+    box-shadow:
+      0 12px 36px
+      rgba(0, 0, 0, 0.2);
+    backdrop-filter:
+      blur(22px)
+      saturate(1.15);
+    -webkit-backdrop-filter:
+      blur(22px)
+      saturate(1.15);
+  }
+
+  .mobile-appbar-button {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border:
+      1px solid rgba(
+        51,
+        93,
+        119,
+        0.78
+      );
+    border-radius: 14px;
+    background:
+      linear-gradient(
+        145deg,
+        rgba(17, 43, 61, 0.97),
+        rgba(7, 23, 35, 0.97)
+      );
+    color: #dfeefa;
+    box-shadow:
+      inset 0 1px 0
+      rgba(255,255,255,.04),
+      0 8px 22px
+      rgba(0,0,0,.18);
+    cursor: pointer;
+  }
+
+  .mobile-appbar-brand {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+  }
+
+  .mobile-brand-mark {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background:
+      linear-gradient(
+        135deg,
+        #2d76ff,
+        #21c8ff
+      );
+    color: white;
+    font-size: 21px;
+    font-weight: 900;
+    box-shadow:
+      0 9px 24px
+      rgba(45,118,255,.28);
+  }
+
+  .mobile-appbar-brand > span:last-child {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .mobile-appbar-brand strong {
+    font-size: 17px;
+    line-height: 1;
+    letter-spacing: -.02em;
+  }
+
+  .mobile-appbar-brand small {
+    max-width: 150px;
+    overflow: hidden;
+    color: #7898ae;
+    font-size: 9px;
+    line-height: 1.15;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Drawer */
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 950;
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+    border: 0;
+    background:
+      rgba(0, 5, 10, 0.72);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter:
+      blur(5px);
+  }
+
+  .mobile-sidebar-backdrop[hidden] {
+    display: none !important;
+  }
+
+  .sidebar {
+    position: fixed !important;
+    inset:
+      0
+      auto
+      0
+      0 !important;
+    z-index: 1000 !important;
+    width:
+      min(
+        calc(100vw - 32px),
+        348px
+      ) !important;
+    min-width: 0 !important;
+    max-width: 348px !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    padding:
+      calc(
+        10px +
+        var(--mobile-safe-top)
+      )
+      13px
+      calc(
+        16px +
+        var(--mobile-safe-bottom)
+      ) !important;
+    display: flex !important;
+    flex-direction:
+      column !important;
+    align-items:
+      stretch !important;
+    justify-content:
+      flex-start !important;
+    gap: 0 !important;
+    overflow-x:
+      hidden !important;
+    overflow-y:
+      auto !important;
+    overscroll-behavior:
+      contain;
+    border: 0 !important;
+    border-right:
+      1px solid
+      rgba(48, 96, 124, .78)
+      !important;
+    border-radius:
+      0 24px 24px 0
+      !important;
+    background:
+      linear-gradient(
+        170deg,
+        rgba(7, 21, 32, 0.995),
+        rgba(3, 12, 20, 0.995)
+      ) !important;
+    box-shadow:
+      28px 0 80px
+      rgba(0,0,0,.55)
+      !important;
+    transform:
+      translate3d(-106%,0,0);
+    transition:
+      transform
+      210ms
+      cubic-bezier(.22,.75,.24,1);
+  }
+
+  .sidebar.is-mobile-open {
+    transform:
+      translate3d(0,0,0);
+  }
+
+  .sidebar > *,
+  .sidebar nav,
+  .sidebar section,
+  .sidebar div,
+  .sidebar a,
+  .sidebar button {
+    grid-column:
+      auto !important;
+    grid-row:
+      auto !important;
+  }
+
+  .mobile-drawer-heading {
+    position: sticky;
+    top:
+      calc(
+        -10px -
+        var(--mobile-safe-top)
+      );
+    z-index: 3;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content:
+      space-between;
+    gap: 12px;
+    margin:
+      calc(
+        -10px -
+        var(--mobile-safe-top)
+      )
+      -13px
+      4px;
+    padding:
+      calc(
+        12px +
+        var(--mobile-safe-top)
+      )
+      13px
+      10px;
+    border-bottom:
+      1px solid
+      rgba(39, 80, 105, .55);
+    background:
+      rgba(5, 16, 25, .97);
+    backdrop-filter:
+      blur(20px);
+  }
+
+  .mobile-drawer-brand {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-drawer-brand .brand-mark {
+    width: 42px !important;
+    height: 42px !important;
+    flex: 0 0 42px;
+    font-size: 23px;
+  }
+
+  .mobile-drawer-brand > span:last-child {
+    min-width: 0;
+    display: grid !important;
+    gap: 3px;
+  }
+
+  .mobile-drawer-brand strong {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .mobile-drawer-brand small {
+    color: #7896aa;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+
+  .mobile-drawer-close {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border:
+      1px solid
+      rgba(57, 105, 132, .75);
+    border-radius: 13px;
+    background:
+      rgba(12, 36, 52, .92);
+    color: #eaf5fb;
+    cursor: pointer;
+  }
+
+  .sidebar .desktop-brand {
+    display: none !important;
+  }
+
+  .sidebar .sidebar-search {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 46px !important;
+    margin: 8px 0 16px !important;
+    padding: 0 12px !important;
+    display: grid !important;
+    grid-template-columns:
+      20px
+      minmax(0,1fr)
+      auto !important;
+    align-items: center !important;
+    gap: 9px !important;
+    border:
+      1px solid
+      rgba(46, 92, 119, .74)
+      !important;
+    border-radius: 14px !important;
+    background:
+      linear-gradient(
+        145deg,
+        rgba(11,34,49,.98),
+        rgba(5,20,31,.98)
+      ) !important;
+    color: #8da9bb !important;
+    text-align: left !important;
+  }
+
+  .sidebar .sidebar-search > span,
+  .sidebar .sidebar-search > kbd {
+    display: inline !important;
+  }
+
+  .sidebar .sidebar-search > kbd {
+    justify-self: end;
+    padding: 3px 6px;
+    border:
+      1px solid
+      rgba(64, 108, 133, .6);
+    border-radius: 7px;
+    color: #7898ac;
+    font-size: 8px;
+  }
+
+  .sidebar .desktop-nav,
+  .sidebar .sidebar-nav {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    align-content: start !important;
+    gap: 16px !important;
+    padding: 0 0 12px !important;
+  }
+
+  .sidebar .nav-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    gap: 4px !important;
+  }
+
+  .sidebar .nav-group-label {
+    display: block !important;
+    padding: 0 9px 5px !important;
+    color: #54798f !important;
+    font-size: 9px !important;
+    font-weight: 900 !important;
+    letter-spacing: .15em !important;
+    line-height: 1.2 !important;
+    text-transform: uppercase !important;
+  }
+
+  .sidebar .nav-item {
+    position: relative !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 45px !important;
+    margin: 0 !important;
+    padding: 9px 11px !important;
+    display: grid !important;
+    grid-template-columns:
+      25px
+      minmax(0,1fr)
+      auto !important;
+    align-items: center !important;
+    justify-content:
+      stretch !important;
+    gap: 10px !important;
+    border:
+      1px solid transparent;
+    border-radius: 12px !important;
+    color: #8ca8ba !important;
+    text-align: left !important;
+  }
+
+  .sidebar .nav-item::before {
+    position: absolute;
+    inset:
+      8px auto 8px 0;
+    width: 3px;
+    border-radius:
+      0 999px 999px 0;
+    content: "";
+    background: transparent;
+  }
+
+  .sidebar .nav-item:hover,
+  .sidebar .nav-item.is-active {
+    border-color:
+      rgba(62, 119, 153, .46);
+    background:
+      linear-gradient(
+        90deg,
+        rgba(35, 100, 142, .24),
+        rgba(12, 42, 61, .82)
+      ) !important;
+    color: #f3f8fc !important;
+  }
+
+  .sidebar .nav-item.is-active::before {
+    background:
+      linear-gradient(
+        180deg,
+        #43a4ff,
+        #1ed8b0
+      );
+    box-shadow:
+      0 0 16px
+      rgba(42, 170, 255, .6);
+  }
+
+  .sidebar .nav-item > svg {
+    width: 19px !important;
+    height: 19px !important;
+    justify-self: center;
+  }
+
+  .sidebar .nav-item > span {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    font-size: 13px !important;
+    font-weight: 650 !important;
+    line-height: 1.2 !important;
+    text-overflow:
+      ellipsis !important;
+    white-space:
+      nowrap !important;
+  }
+
+  .sidebar .nav-item > em {
+    justify-self: end;
+    color: #4d7186;
+    font-size: 7px;
+    font-style: normal;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  .sidebar .mobile-nav {
+    display: none !important;
+  }
+
+  .sidebar .sidebar-footer {
+    width: 100% !important;
+    margin: auto 0 0 !important;
+    padding: 15px 9px 2px !important;
+    display: grid !important;
+    gap: 4px !important;
+    border-top:
+      1px solid
+      rgba(39, 79, 103, .45);
+  }
+
+  .sidebar .sidebar-footer a {
+    color: #8ea9ba;
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .sidebar .sidebar-footer span {
+    color: #476b80;
+    font-size: 8px;
+  }
+
+  /* Global mobile visual rhythm */
+  .cockpit-page,
+  .focus-page,
+  .screener-page,
+  .news-page,
+  .calendar-page,
+  .watchlist-page,
+  .psychology-page,
+  .preferences-page,
+  .roadmap-page {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    display: grid !important;
+    gap: 12px !important;
+    overflow-x: clip !important;
+  }
+
+  .panel {
+    max-width: 100% !important;
+    border-radius: 18px !important;
+    box-shadow:
+      0 12px 30px
+      rgba(0,0,0,.18)
+      !important;
+  }
+
+  .cockpit-header,
+  .quote-header {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      auto !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 16px !important;
+    overflow: hidden;
+    background:
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(29, 95, 136, .28),
+        transparent 48%
+      ),
+      linear-gradient(
+        145deg,
+        rgba(14,36,52,.98),
+        rgba(7,21,33,.98)
+      ) !important;
+  }
+
+  .cockpit-header > div:first-child,
+  .quote-header > div:first-child {
+    min-width: 0;
+  }
+
+  .cockpit-header h1,
+  .quote-header h1 {
+    margin:
+      7px 0 0 !important;
+    font-size:
+      clamp(27px,8vw,38px)
+      !important;
+    line-height: .98 !important;
+    letter-spacing: -.035em;
+  }
+
+  .cockpit-header p,
+  .quote-header p {
+    margin: 9px 0 0 !important;
+    color: #79a4bd !important;
+    font-size: 10px !important;
+    line-height: 1.4 !important;
+  }
+
+  .cockpit-market-score,
+  .quote-meta {
+    min-width: 92px !important;
+    justify-content:
+      flex-end !important;
+    text-align:
+      right !important;
+  }
+
+  .cockpit-market-score > span {
+    color: #739ab1;
+    font-size: 8px;
+  }
+
+  .cockpit-market-score strong {
+    display: block;
+    margin-top: 5px;
+    font-size:
+      clamp(24px,7vw,31px)
+      !important;
+    line-height: 1;
+  }
+
+  .cockpit-market-score small {
+    display: block;
+    max-width: 112px;
+    margin-top: 7px;
+    color: #62a58f;
+    font-size: 7px;
+    line-height: 1.35;
+  }
+
+  .cockpit-kpis,
+  [class*="metricGrid"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    grid-auto-flow:
+      row !important;
+    gap: 9px !important;
+    overflow: visible !important;
+  }
+
+  .cockpit-kpi,
+  [class*="metricGrid"] > * {
+    min-width: 0 !important;
+    min-height: 94px !important;
+    padding: 14px !important;
+  }
+
+  .cockpit-kpi span {
+    color: #7fa1b6;
+    font-size: 10px;
+  }
+
+  .cockpit-kpi strong {
+    display: block;
+    margin-top: 10px;
+    font-size: 28px !important;
+    line-height: 1;
+  }
+
+  .cockpit-lower-grid,
+  .cockpit-movers-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    gap: 11px !important;
+  }
+
+  .cockpit-section-heading h2,
+  .sectors-panel h2 {
+    font-size: 20px !important;
+  }
+
+  .sector-row {
+    gap: 12px;
+  }
+
+  .status-footer {
+    padding:
+      5px 4px
+      calc(
+        12px +
+        var(--mobile-safe-bottom)
+      ) !important;
+    font-size: 8px !important;
+    line-height: 1.45;
+    text-align: left !important;
+  }
+
+  /* Focus keeps all information, in a clean vertical flow */
+  .focus-grid {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    gap: 12px !important;
+  }
+
+  .chart-panel {
+    padding: 12px !important;
+  }
+
+  .chart-toolbar {
+    min-height: 0 !important;
+    align-items:
+      flex-start !important;
+    flex-direction:
+      column !important;
+    gap: 10px !important;
+  }
+
+  .chart-legend,
+  .period-tabs,
+  .range-tabs,
+  [class*="periodTabs"],
+  [class*="rangeTabs"] {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling:
+      touch;
+  }
+
+  .chart-legend::-webkit-scrollbar,
+  .period-tabs::-webkit-scrollbar,
+  .range-tabs::-webkit-scrollbar,
+  [class*="periodTabs"]::-webkit-scrollbar,
+  [class*="rangeTabs"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  .chart-canvas {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 400px !important;
+    height:
+      clamp(
+        420px,
+        112vw,
+        560px
+      ) !important;
+  }
+
+  .right-column {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    gap: 11px !important;
+  }
+
+  .quote-header {
+    align-items:
+      flex-start !important;
+  }
+
+  .quote-meta {
+    justify-content:
+      flex-end !important;
+    gap: 6px !important;
+    font-size: 9px !important;
+  }
+
+  .price-line {
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+
+  .price-line strong {
+    font-size:
+      clamp(25px,8vw,35px)
+      !important;
+  }
+
+  /* Responsive cards for CSS-module pages */
+  [class*="IpoInsiders_page"] {
+    padding:
+      0 0
+      calc(
+        18px +
+        var(--mobile-safe-bottom)
+      )
+      !important;
+  }
+
+  [class*="IpoInsiders_hero"] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+    gap: 16px !important;
+    padding: 19px !important;
+  }
+
+  [class*="IpoInsiders_heroMetrics"] {
+    justify-content:
+      flex-start !important;
+    text-align:
+      left !important;
+  }
+
+  [class*="IpoInsiders_heroMetrics"] > div {
+    justify-items:
+      start !important;
+  }
+
+  [class*="IpoInsiders_metricGrid"] {
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+  }
+
+  [class*="IpoInsiders_filters"],
+  [class*="IpoInsiders_insiderControls"] {
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+  }
+
+  [class*="IpoInsiders_ipoGrid"],
+  [class*="IpoInsiders_sourceGrid"] {
+    grid-template-columns:
+      minmax(0,1fr)
+      !important;
+  }
+
+  [class*="IpoInsiders_flowPanel"] {
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+  }
+
+  [class*="IpoInsiders_tradeTable"],
+  .table-wrap,
+  .trade-table,
+  [class*="tableWrap"],
+  [class*="tableContainer"],
+  [class*="financialTable"],
+  [class*="statementTable"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x:
+      contain;
+    -webkit-overflow-scrolling:
+      touch;
+  }
+
+  table {
+    min-width:
+      max-content;
+  }
+
+  input,
+  select,
+  textarea {
+    max-width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color:
+      transparent;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible {
+    outline:
+      2px solid
+      rgba(76, 158, 255, .9);
+    outline-offset: 2px;
+  }
+}
+
+
+/* ================================================================
+ * ANATOLE SIGNATURE MOBILE v4 — ALL SECTIONS
+ * Route-scoped rules use body[data-anatole-section] set by AppSidebar.
+ * Desktop styles remain untouched because everything stays under 820px.
+ * ================================================================ */
+
+@media (max-width: 820px) {
+  body[data-anatole-section]
+  .app-main > *,
+  body[data-anatole-section]
+  .app-main > * > *,
+  body[data-anatole-section]
+  .app-main section,
+  body[data-anatole-section]
+  .app-main article,
+  body[data-anatole-section]
+  .app-main header,
+  body[data-anatole-section]
+  .app-main footer,
+  body[data-anatole-section]
+  .app-main form,
+  body[data-anatole-section]
+  .app-main nav,
+  body[data-anatole-section]
+  .app-main div {
+    min-width: 0;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    h1,
+    h2,
+    h3,
+    h4,
+    p,
+    span,
+    small,
+    strong,
+    a,
+    button,
+    label
+  ) {
+    overflow-wrap: anywhere;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .page-header,
+    .page-hero,
+    .section-header,
+    .panel-header,
+    [class*="_hero__"],
+    [class*="_pageHeader__"],
+    [class*="_sectionHeader__"],
+    [class*="_panelHeader__"]
+  ) {
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_mainTabs__"],
+    [class*="_sectionTabs__"]
+  ) > * {
+    flex: 0 0 auto !important;
+    white-space: nowrap;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .filters,
+    .filter-grid,
+    .filter-panel,
+    .toolbar,
+    .controls,
+    [class*="_filters__"],
+    [class*="_filterGrid__"],
+    [class*="_filterPanel__"],
+    [class*="_toolbar__"],
+    [class*="_controls__"]
+  ) {
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .card-grid,
+    .cards-grid,
+    .content-grid,
+    .results-grid,
+    .news-grid,
+    .event-grid,
+    .feature-grid,
+    [class*="_cardGrid__"],
+    [class*="_cardsGrid__"],
+    [class*="_contentGrid__"],
+    [class*="_resultsGrid__"],
+    [class*="_newsGrid__"],
+    [class*="_eventGrid__"],
+    [class*="_featureGrid__"]
+  ) {
+    grid-template-columns:
+      minmax(0, 1fr) !important;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .table-wrap,
+    .table-container,
+    .data-table,
+    .results-table,
+    .financial-table,
+    [class*="_tableWrap__"],
+    [class*="_tableContainer__"],
+    [class*="_dataTable__"],
+    [class*="_resultsTable__"],
+    [class*="_financialTable__"],
+    [class*="_tradeTable__"]
+  ) {
+    position: relative;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-radius: 14px;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    .table-wrap,
+    .table-container,
+    .data-table,
+    .results-table,
+    .financial-table,
+    [class*="_tableWrap__"],
+    [class*="_tableContainer__"],
+    [class*="_dataTable__"],
+    [class*="_resultsTable__"],
+    [class*="_financialTable__"],
+    [class*="_tradeTable__"]
+  ) table {
+    min-width: 680px;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    canvas,
+    svg,
+    iframe
+  ) {
+    max-width: 100%;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    input,
+    select,
+    textarea
+  ) {
+    width: 100%;
+  }
+
+  body[data-anatole-section]
+  .app-main :is(
+    button,
+    [role="button"]
+  ) {
+    min-height: 42px;
+    touch-action: manipulation;
+  }
+
+  /* ---------- Shared premium page hero ---------- */
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) {
+    border-radius: 18px !important;
+    background:
+      radial-gradient(
+        circle at 100% 0%,
+        rgba(34, 105, 151, .27),
+        transparent 48%
+      ),
+      linear-gradient(
+        145deg,
+        rgba(13, 36, 52, .98),
+        rgba(6, 20, 31, .99)
+      ) !important;
+    box-shadow:
+      inset 0 1px 0
+      rgba(255,255,255,.035),
+      0 14px 34px
+      rgba(0,0,0,.18);
+  }
+
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) h1 {
+    font-size:
+      clamp(27px, 8vw, 39px)
+      !important;
+    line-height: 1 !important;
+    letter-spacing: -.035em;
+  }
+
+  body[data-anatole-section]:not(
+    [data-anatole-section="cockpit"]
+  ) .app-main :is(
+    .page-header,
+    .page-hero,
+    [class*="_hero__"]
+  ) p {
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+  }
+
+  /* ---------- Focus ---------- */
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_summaryGrid__"],
+    [class*="_statsGrid__"],
+    [class*="_indicatorGrid__"],
+    [class*="_fundamentalGrid__"],
+    [class*="_ownershipGrid__"],
+    [class*="_scenarioGrid__"],
+    .summary-grid,
+    .stats-grid,
+    .indicator-grid,
+    .fundamental-grid
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2, minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_contentGrid__"],
+    [class*="_detailGrid__"],
+    [class*="_analysisGrid__"],
+    [class*="_ecosystemGrid__"],
+    [class*="_newsGrid__"],
+    [class*="_financialGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 11px !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_chartPanel__"],
+    [class*="_chartContainer__"],
+    [class*="_chartShell__"],
+    .chart-panel,
+    .chart-container,
+    .chart-shell
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_chartPanel__"],
+    [class*="_chartContainer__"],
+    [class*="_chartShell__"],
+    .chart-panel,
+    .chart-container,
+    .chart-shell
+  ) canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_toolbar__"],
+    [class*="_chartToolbar__"],
+    .chart-toolbar
+  ) {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  body[data-anatole-section="focus"]
+  .app-main :is(
+    [class*="_tickerSearch__"],
+    [class*="_symbolForm__"],
+    .ticker-search,
+    .symbol-form
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  /* ---------- Screener ---------- */
+  body[data-anatole-section="screener"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-header,
+    .screener-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-filters,
+    .filter-grid,
+    [class*="_filters__"],
+    [class*="_filterGrid__"],
+    [class*="_advancedFilters__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2, minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .preset-tabs,
+    .screener-tabs,
+    [class*="_preset__"],
+    [class*="_tabs__"]
+  ) {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    padding-bottom: 3px;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .screener-summary,
+    [class*="_summaryGrid__"],
+    [class*="_metricGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="screener"]
+  .app-main :is(
+    .result-actions,
+    [class*="_actions__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 7px !important;
+  }
+
+  /* ---------- Actualités ---------- */
+  body[data-anatole-section="actualites"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-header,
+    .news-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-filters,
+    [class*="_filters__"],
+    [class*="_filterGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-list,
+    .news-grid,
+    [class*="_newsList__"],
+    [class*="_newsGrid__"],
+    [class*="_articleGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) h2,
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .news-card,
+    .article-card,
+    [class*="_newsCard__"],
+    [class*="_articleCard__"]
+  ) h3 {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+  }
+
+  body[data-anatole-section="actualites"]
+  .app-main :is(
+    .sentiment-chart,
+    .category-chart,
+    [class*="_chart__"]
+  ) {
+    min-height: 260px !important;
+  }
+
+  /* ---------- Calendrier ---------- */
+  body[data-anatole-section="calendrier"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-header,
+    .calendar-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-filters,
+    [class*="_filters__"],
+    [class*="_filterGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .event-list,
+    .event-grid,
+    [class*="_eventList__"],
+    [class*="_eventGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .month-grid,
+    .calendar-grid,
+    [class*="_monthGrid__"],
+    [class*="_calendarGrid__"]
+  ) {
+    width: 100% !important;
+    min-width: 350px;
+    grid-template-columns:
+      repeat(7,minmax(42px,1fr))
+      !important;
+    gap: 4px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-canvas,
+    .calendar-scroll,
+    [class*="_calendarCanvas__"],
+    [class*="_calendarScroll__"]
+  ) {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ---------- ETF directory and ETF detail ---------- */
+  body[data-anatole-section="etf"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 0
+      calc(18px + var(--mobile-safe-bottom))
+      !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_hero__"] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 15px !important;
+    padding: 18px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] > div {
+    min-height: 78px;
+    align-content: center;
+    justify-items: start !important;
+    padding: 12px;
+    border: 1px solid
+      rgba(38, 91, 120, .72);
+    border-radius: 13px;
+    background:
+      rgba(5, 25, 38, .72);
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_heroMetrics__"] strong {
+    font-size: 27px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_liveBar__"] {
+    min-height: 0 !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+    padding: 11px 13px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_filters__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_search__"] {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-height: 46px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_selectField__"] {
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel {
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    align-items: start !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header > div:last-child {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 7px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header label {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > header button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel svg {
+    width: 100% !important;
+    height:
+      clamp(520px, 142vw, 690px)
+      !important;
+    display: block;
+    touch-action: manipulation;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main :is(
+    [class*="_detailGrid__"],
+    [class*="_holdingGrid__"],
+    [class*="_compositionGrid__"],
+    [class*="_performanceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main [class*="_footer__"] {
+    padding: 7px 3px
+      calc(8px + var(--mobile-safe-bottom))
+      !important;
+    font-size: 8px !important;
+    line-height: 1.45;
+  }
+
+  /* ---------- IPO & insiders ---------- */
+  body[data-anatole-section="ipo-insiders"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 0
+      calc(18px + var(--mobile-safe-bottom))
+      !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_hero__"] {
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    align-items: start !important;
+    gap: 15px !important;
+    padding: 18px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_heroMetrics__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    justify-content: stretch !important;
+    gap: 9px !important;
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_heroMetrics__"] > div {
+    min-height: 78px;
+    align-content: center;
+    justify-items: start !important;
+    padding: 12px;
+    border: 1px solid
+      rgba(38, 91, 120, .72);
+    border-radius: 13px;
+    background:
+      rgba(5, 25, 38, .72);
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTabs__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(154px,1fr))
+      !important;
+    overflow-x: auto !important;
+    gap: 6px !important;
+    padding: 6px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTab__"] {
+    min-height: 58px !important;
+    padding: 9px 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_metricGrid__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_filters__"],
+    [class*="_insiderControls__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    align-items: end !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_search__"],
+    [class*="_tickerForm__"]
+  ) {
+    grid-column: 1 / -1;
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_tickerForm__"] {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    align-items: end !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_panelHeader__"] {
+    min-height: 0 !important;
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 9px !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_panelHeader__"] p {
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main :is(
+    [class*="_ipoGrid__"],
+    [class*="_sourceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_ipoCard__"] {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_flowPanel__"] {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_sourcesPanel__"] > header {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  /* ---------- Psychologie ---------- */
+  body[data-anatole-section="psychologie"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-header,
+    .psychology-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 13px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-grid,
+    .sentiment-grid,
+    [class*="_contentGrid__"],
+    [class*="_sentimentGrid__"],
+    [class*="_psychologyGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .fear-greed-gauge,
+    .sentiment-gauge,
+    [class*="_gauge__"],
+    [class*="_Gauge__"]
+  ) {
+    width: min(100%, 380px) !important;
+    min-height: 250px !important;
+    margin-inline: auto !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-filters,
+    [class*="_filters__"],
+    [class*="_controls__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+    padding: 12px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .ticker-search,
+    [class*="_search__"]
+  ) {
+    grid-column: 1 / -1;
+  }
+
+  /* ---------- Watchlist ---------- */
+  body[data-anatole-section="watchlist"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-header,
+    .watchlist-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-form,
+    .add-symbol-form,
+    [class*="_addForm__"],
+    [class*="_tickerForm__"],
+    [class*="_searchForm__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-metrics,
+    [class*="_metricGrid__"],
+    [class*="_summaryGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      repeat(2,minmax(0,1fr))
+      !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-grid,
+    .watchlist-list,
+    [class*="_watchlistGrid__"],
+    [class*="_watchlistList__"],
+    [class*="_cardGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 9px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .watchlist-card,
+    [class*="_watchlistCard__"],
+    [class*="_quoteCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  body[data-anatole-section="watchlist"]
+  .app-main :is(
+    .row-actions,
+    [class*="_actions__"]
+  ) {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 7px !important;
+  }
+
+  /* ---------- Préférences ---------- */
+  body[data-anatole-section="preferences"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preferences-header,
+    .preferences-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preferences-grid,
+    [class*="_preferencesGrid__"],
+    [class*="_settingsGrid__"],
+    [class*="_contentGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .preference-section,
+    .settings-card,
+    [class*="_section__"],
+    [class*="_settingsCard__"]
+  ) {
+    max-width: 100% !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .setting-row,
+    .preference-row,
+    [class*="_settingRow__"],
+    [class*="_preferenceRow__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) auto !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .theme-grid,
+    .option-grid,
+    [class*="_themeGrid__"],
+    [class*="_optionGrid__"],
+    [class*="_choiceGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .save-bar,
+    .form-actions,
+    [class*="_saveBar__"],
+    [class*="_formActions__"]
+  ) {
+    position: static !important;
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 8px !important;
+  }
+
+  body[data-anatole-section="preferences"]
+  .app-main :is(
+    .save-bar,
+    .form-actions,
+    [class*="_saveBar__"],
+    [class*="_formActions__"]
+  ) button {
+    width: 100% !important;
+  }
+
+  /* ---------- Roadmap ---------- */
+  body[data-anatole-section="roadmap"]
+  .app-main > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 0 !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-header,
+    .roadmap-hero,
+    [class*="_hero__"],
+    [class*="_header__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 12px !important;
+    padding: 17px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-grid,
+    .phase-grid,
+    .feature-grid,
+    [class*="_roadmapGrid__"],
+    [class*="_phaseGrid__"],
+    [class*="_featureGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns:
+      minmax(0,1fr) !important;
+    gap: 10px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main :is(
+    .roadmap-card,
+    .phase-card,
+    .feature-card,
+    [class*="_roadmapCard__"],
+    [class*="_phaseCard__"],
+    [class*="_featureCard__"]
+  ) {
+    min-height: 0 !important;
+    padding: 15px !important;
+  }
+
+  body[data-anatole-section="roadmap"]
+  .app-main [id] {
+    scroll-margin-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        14px
+      );
+  }
+
+}
+
+/* ---------- Small screen refinements ---------- */
+@media (max-width: 560px) {
+    body[data-anatole-section]
+    .app-main :is(
+      .filters,
+      .filter-grid,
+      .filter-panel,
+      [class*="_filters__"],
+      [class*="_filterGrid__"],
+      [class*="_filterPanel__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="screener"]
+    .app-main :is(
+      .screener-filters,
+      .filter-grid,
+      [class*="_filters__"],
+      [class*="_filterGrid__"],
+      [class*="_advancedFilters__"]
+    ),
+    body[data-anatole-section="actualites"]
+    .app-main :is(
+      .news-filters,
+      [class*="_filters__"],
+      [class*="_filterGrid__"]
+    ),
+    body[data-anatole-section="calendrier"]
+    .app-main :is(
+      .calendar-filters,
+      [class*="_filters__"],
+      [class*="_filterGrid__"]
+    ),
+    body[data-anatole-section="etf"]
+    .app-main [class*="_filters__"],
+    body[data-anatole-section="ipo-insiders"]
+    .app-main :is(
+      [class*="_filters__"],
+      [class*="_insiderControls__"]
+    ),
+    body[data-anatole-section="psychologie"]
+    .app-main :is(
+      .psychology-filters,
+      [class*="_filters__"],
+      [class*="_controls__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="etf"]
+    .app-main .panel > header > div:last-child {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_summaryGrid__"],
+      [class*="_statsGrid__"],
+      [class*="_indicatorGrid__"],
+      [class*="_fundamentalGrid__"],
+      [class*="_ownershipGrid__"],
+      [class*="_scenarioGrid__"]
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="watchlist"]
+    .app-main :is(
+      .watchlist-form,
+      .add-symbol-form,
+      [class*="_addForm__"],
+      [class*="_tickerForm__"],
+      [class*="_searchForm__"]
+    ),
+    body[data-anatole-section="ipo-insiders"]
+    .app-main [class*="_tickerForm__"],
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_tickerSearch__"],
+      [class*="_symbolForm__"],
+      .ticker-search,
+      .symbol-form
+    ) {
+      grid-template-columns:
+        minmax(0,1fr) !important;
+    }
+
+    body[data-anatole-section="watchlist"]
+    .app-main :is(
+      .watchlist-form,
+      .add-symbol-form,
+      [class*="_addForm__"],
+      [class*="_tickerForm__"],
+      [class*="_searchForm__"]
+    ) button,
+    body[data-anatole-section="ipo-insiders"]
+    .app-main [class*="_tickerForm__"] button,
+    body[data-anatole-section="focus"]
+    .app-main :is(
+      [class*="_tickerSearch__"],
+      [class*="_symbolForm__"],
+      .ticker-search,
+      .symbol-form
+    ) button {
+      width: 100% !important;
+    }
+}
+
+@media (max-width: 430px) {
+  :root {
+    --mobile-gutter: 9px;
+  }
+
+  .cockpit-header p {
+    display: none;
+  }
+
+  .cockpit-header,
+  .quote-header {
+    padding: 14px !important;
+  }
+
+  .cockpit-kpi,
+  [class*="metricGrid"] > * {
+    min-height: 88px !important;
+    padding: 12px !important;
+  }
+
+  .mobile-appbar-brand small {
+    max-width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none !important;
+  }
+}
+
+/* ================================================================
+ * ANATOLE SIGNATURE MOBILE v4.1 — EXACT COCKPIT PARITY
+ * - Psychology metric values can no longer split before the % sign.
+ * - ETF map now uses the same responsive HTML treemap as Cockpit.
+ * ================================================================ */
+
+@media (max-width: 820px) {
+  /* Psychology: same 2 × 2 KPI cards as Cockpit, with stable value wrapping. */
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 96px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    padding: 12px 13px !important;
+    overflow: hidden !important;
+    text-align: left !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * :is(
+    span,
+    small,
+    p,
+    strong
+  ) {
+    max-width: 100% !important;
+    margin: 0 !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * :is(
+    strong,
+    [class*="_value__"],
+    [class*="_Value__"],
+    [class*="_number__"],
+    [class*="_Number__"]
+  ) {
+    display: block !important;
+    width: auto !important;
+    max-width: 100% !important;
+    flex: 0 0 auto !important;
+    font-size:
+      clamp(22px, 6.5vw, 30px)
+      !important;
+    font-weight: 850 !important;
+    line-height: 1 !important;
+    letter-spacing: -.025em !important;
+    white-space: nowrap !important;
+    overflow-wrap: normal !important;
+    word-break: keep-all !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * :is(
+    small,
+    [class*="_label__"],
+    [class*="_Label__"],
+    [class*="_caption__"],
+    [class*="_Caption__"]
+  ) {
+    display: block !important;
+    width: 100% !important;
+    color: #88a6b9 !important;
+    font-size: 10px !important;
+    line-height: 1.3 !important;
+    white-space: normal !important;
+  }
+
+  /* ETF: remove the old fixed-SVG sizing. The replacement component uses
+     the Cockpit treemap container and therefore consumes the full card. */
+  body[data-anatole-section="etf"]
+  .app-main .panel {
+    overflow: hidden !important;
+  }
+
+  body[data-anatole-section="etf"]
+  .app-main .panel > div:last-child {
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 430px) {
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * {
+    min-height: 92px !important;
+    padding: 11px !important;
+  }
+
+  body[data-anatole-section="psychologie"]
+  .app-main :is(
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_scoreGrid__"]
+  ) > * :is(
+    strong,
+    [class*="_value__"],
+    [class*="_Value__"],
+    [class*="_number__"],
+    [class*="_Number__"]
+  ) {
+    font-size:
+      clamp(21px, 6vw, 27px)
+      !important;
+  }
+}
+
+
+/* ========================================================================== */
+/* ANATOLE MOBILE PRODUCT LAYER v0.7.4                                       */
+/* Navigation stable, readable cards and complete stock / ETF maps.          */
+/* ========================================================================== */
+
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  :root {
+    --mobile-content-gutter: clamp(10px, 3.2vw, 15px);
+    --mobile-card-radius: 18px;
+    --mobile-dock-height: 70px;
+  }
+
+  html {
+    scroll-padding-top: calc(78px + env(safe-area-inset-top, 0px));
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 100% 0%, rgba(27, 83, 117, .26), transparent 34%),
+      linear-gradient(180deg, #06111b 0%, #030b12 100%);
+  }
+
+  body.anatole-drawer-open {
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  .app-main {
+    padding:
+      calc(76px + env(safe-area-inset-top, 0px))
+      var(--mobile-content-gutter)
+      calc(var(--mobile-dock-height) + 30px + env(safe-area-inset-bottom, 0px))
+      !important;
+  }
+
+  .mobile-appbar {
+    min-height: 64px !important;
+    padding:
+      calc(8px + env(safe-area-inset-top, 0px))
+      11px
+      8px !important;
+    border-bottom: 1px solid rgba(59, 106, 133, .6) !important;
+    background:
+      linear-gradient(180deg, rgba(5, 18, 28, .97), rgba(4, 14, 23, .92)) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .28) !important;
+    backdrop-filter: blur(22px) saturate(1.15) !important;
+    -webkit-backdrop-filter: blur(22px) saturate(1.15) !important;
+  }
+
+  .mobile-appbar-button {
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 14px !important;
+    border-color: rgba(69, 119, 147, .68) !important;
+    background: rgba(12, 39, 56, .88) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04) !important;
+  }
+
+  .mobile-appbar-brand {
+    min-width: 0;
+    justify-self: start !important;
+  }
+
+  .mobile-brand-mark {
+    width: 39px !important;
+    height: 39px !important;
+    flex: 0 0 39px !important;
+    border-radius: 12px !important;
+    box-shadow: 0 9px 24px rgba(45, 118, 255, .28) !important;
+  }
+
+  .mobile-appbar-brand strong {
+    font-size: 18px !important;
+    letter-spacing: -.03em !important;
+  }
+
+  .mobile-appbar-brand small {
+    max-width: min(48vw, 210px) !important;
+    overflow: hidden !important;
+    color: #77a2ba !important;
+    font-size: 9px !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    right: 9px;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    left: 9px;
+    z-index: 990;
+    min-height: var(--mobile-dock-height);
+    padding: 6px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 3px;
+    border: 1px solid rgba(64, 112, 140, .72);
+    border-radius: 21px;
+    background:
+      linear-gradient(155deg, rgba(10, 31, 45, .96), rgba(4, 16, 25, .97));
+    box-shadow:
+      0 20px 55px rgba(0, 0, 0, .5),
+      inset 0 1px 0 rgba(255, 255, 255, .045);
+    backdrop-filter: blur(22px) saturate(1.16);
+    -webkit-backdrop-filter: blur(22px) saturate(1.16);
+  }
+
+  .mobile-bottom-nav > a,
+  .mobile-bottom-nav > button {
+    min-width: 0;
+    min-height: 56px;
+    padding: 6px 2px 5px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 4px;
+    border: 0;
+    border-radius: 15px;
+    background: transparent;
+    color: #7898ab;
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .mobile-bottom-nav > :is(a, button) svg {
+    width: 20px;
+    height: 20px;
+    stroke-width: 1.9;
+  }
+
+  .mobile-bottom-nav > :is(a, button) span {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 8px;
+    font-weight: 750;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-bottom-nav > :is(a, button).is-active {
+    background:
+      linear-gradient(150deg, rgba(38, 111, 163, .42), rgba(11, 50, 72, .82));
+    color: #eff9ff;
+    box-shadow:
+      inset 0 0 0 1px rgba(76, 151, 198, .42),
+      0 7px 18px rgba(0, 0, 0, .2);
+  }
+
+  .mobile-bottom-nav > :is(a, button).is-active svg {
+    color: #4cb4ff;
+    filter: drop-shadow(0 0 8px rgba(44, 155, 255, .42));
+  }
+
+  /* Drawer hierarchy: every section stays accessible without visual noise. */
+  .sidebar {
+    width: min(calc(100vw - 34px), 348px) !important;
+    max-width: 348px !important;
+  }
+
+  .sidebar .nav-group {
+    padding: 6px !important;
+    border: 1px solid rgba(45, 84, 107, .44);
+    border-radius: 15px;
+    background: rgba(7, 25, 37, .52);
+  }
+
+  .sidebar .nav-group-label {
+    padding: 4px 7px 7px !important;
+  }
+
+  .sidebar .nav-item {
+    min-height: 47px !important;
+  }
+
+  /* Shared professional card language. */
+  .app-main > * {
+    width: min(100%, 1180px) !important;
+    margin-inline: auto !important;
+  }
+
+  .app-main .panel,
+  .app-main [class*="_hero__"],
+  .app-main [class*="_sectionPanel__"],
+  .app-main [class*="_controlPanel__"],
+  .app-main [class*="_filters__"],
+  .app-main [class*="_liveBar__"],
+  .app-main [class*="_holdingsPanel__"],
+  .app-main [class*="_sidePanel__"],
+  .app-main [class*="_performancePanel__"],
+  .app-main [class*="_chatPanel__"],
+  .app-main [class*="_advisorProfilePanel__"],
+  .app-main [class*="_advisorPlanPanel__"],
+  .app-main [class*="_advisorScenarioPanel__"] {
+    border-color: rgba(47, 92, 119, .68) !important;
+    border-radius: var(--mobile-card-radius) !important;
+    background:
+      radial-gradient(circle at 100% 0%, rgba(34, 96, 132, .15), transparent 42%),
+      linear-gradient(150deg, rgba(11, 31, 45, .98), rgba(5, 19, 29, .98)) !important;
+    box-shadow:
+      0 16px 34px rgba(0, 0, 0, .2),
+      inset 0 1px 0 rgba(255, 255, 255, .03) !important;
+  }
+
+  .app-main :is(h1, h2, h3) {
+    text-wrap: balance;
+  }
+
+  .app-main h1 {
+    font-size: clamp(29px, 9vw, 42px) !important;
+    line-height: .98 !important;
+    letter-spacing: -.045em !important;
+  }
+
+  .app-main h2 {
+    font-size: clamp(20px, 6vw, 28px) !important;
+    line-height: 1.06 !important;
+    letter-spacing: -.025em !important;
+  }
+
+  .app-main :is(p, li, small) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Heroes become concise and readable, not compressed desktop banners. */
+  .app-main :is(
+    .cockpit-header,
+    .quote-header,
+    .discovery-hero,
+    [class*="_hero__"]
+  ) {
+    min-height: 0 !important;
+    padding: 17px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 15px !important;
+  }
+
+  .app-main :is(
+    .cockpit-market-score,
+    .quote-meta,
+    .discovery-score,
+    [class*="_heroScore__"],
+    [class*="_heroMetrics__"]
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    text-align: left !important;
+  }
+
+  .cockpit-market-score {
+    padding-top: 12px !important;
+    border-top: 1px solid rgba(48, 91, 116, .5);
+  }
+
+  .cockpit-market-score > * {
+    max-width: none !important;
+  }
+
+  /* Metrics: two readable cards per row. */
+  .app-main :is(
+    .cockpit-kpis,
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_kpiGrid__"],
+    [class*="_riskGrid__"],
+    [class*="_performanceSummary__"],
+    [class*="_qualityMetricGrid__"],
+    [class*="_factGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 9px !important;
+  }
+
+  .app-main :is(
+    .cockpit-kpi,
+    [class*="_metricGrid__"] > *,
+    [class*="_kpiGrid__"] > *,
+    [class*="_riskGrid__"] > *,
+    [class*="_performanceSummary__"] > *,
+    [class*="_qualityMetricGrid__"] > *,
+    [class*="_factGrid__"] > *
+  ) {
+    min-width: 0 !important;
+    min-height: 92px !important;
+    padding: 13px !important;
+    border-radius: 15px !important;
+  }
+
+  /* Filters and forms: one clear task per line with touch-sized controls. */
+  .app-main :is(
+    .filter-bar,
+    [class*="_filters__"],
+    [class*="_insiderControls__"],
+    [class*="_controlTop__"],
+    [class*="_symbolComposer__"],
+    [class*="_tickerForm__"],
+    [class*="_advisorFormGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  .app-main :is(input, select, textarea, button) {
+    max-width: 100%;
+  }
+
+  .app-main :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+    select,
+    textarea
+  ) {
+    min-height: 46px !important;
+    font-size: 16px !important;
+  }
+
+  .app-main button,
+  .app-main a[class*="Button"],
+  .app-main [class*="_rangeTab__"],
+  .app-main [class*="_mainTab__"] {
+    min-height: 44px;
+  }
+
+  /* Horizontal controls remain usable without shrinking their labels. */
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"],
+    [class*="_selectionRow__"],
+    [class*="_chartLegend__"],
+    [class*="_assistantLinks__"]
+  ) {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"],
+    [class*="_selectionRow__"]
+  )::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Tables keep every column available, with a stable first column. */
+  .app-main :is(
+    .table-wrap,
+    [class*="_tableWrap__"],
+    [class*="_holdingsTable__"],
+    [class*="_tradeTable__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    border-radius: 14px !important;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-main :is(table, [class*="_tableHeader__"], [class*="_holdingRow__"], [class*="_tradeHeader__"], [class*="_tradeRow__"]) {
+    min-width: 680px;
+  }
+
+  .app-main table :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #0a1d2a;
+  }
+
+  /* Cards, lists and analysis columns collapse predictably. */
+  .app-main :is(
+    .cockpit-lower-grid,
+    .cockpit-movers-grid,
+    .focus-grid,
+    .etf-grid,
+    [class*="_mainGrid__"],
+    [class*="_terminalColumns__"],
+    [class*="_profileGrid__"],
+    [class*="_opportunityGrid__"],
+    [class*="_ipoGrid__"],
+    [class*="_sourceGrid__"],
+    [class*="_allocationLayout__"],
+    [class*="_assistantLayout__"],
+    [class*="_advisorWorkspace__"],
+    [class*="_advisorScenarioGrid__"],
+    [class*="_advisorStressGrid__"]
+  ) {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 11px !important;
+  }
+
+  .app-main :is(
+    .etf-card,
+    [class*="_ipoCard__"],
+    [class*="_opportunityCard__"],
+    [class*="_profileCard__"],
+    [class*="_sourceCard__"],
+    [class*="_alertCard__"],
+    [class*="_advisorScenario__"],
+    [class*="_advisorStress__"]
+  ) {
+    min-width: 0 !important;
+    border-radius: 16px !important;
+  }
+
+  /* Charts receive enough vertical space and never overflow the viewport. */
+  .app-main :is(
+    .chart-canvas,
+    [class*="_chartWrap__"],
+    [class*="_chartFrame__"],
+    [class*="_chartShell__"]
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 300px !important;
+    overflow: hidden !important;
+    border-radius: 15px !important;
+  }
+
+  .app-main svg,
+  .app-main canvas {
+    max-width: 100% !important;
+  }
+
+  /* Heatmap controls stay compact while the complete mobile map flows below. */
+  body[data-anatole-section="cockpit"] .app-main .panel,
+  body[data-anatole-section="etf"] .app-main .panel {
+    overflow: visible !important;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main .panel > div:first-child,
+  body[data-anatole-section="etf"] .app-main .panel > div:first-child {
+    min-width: 0;
+  }
+
+  /* Anchor targets remain visible below the fixed app bar. */
+  .app-main [id] {
+    scroll-margin-top: calc(82px + env(safe-area-inset-top, 0px));
+  }
+}
+
+@media (max-width: 390px) {
+  .app-main :is(
+    .cockpit-kpis,
+    .psychology-metrics,
+    .score-grid,
+    [class*="_metricGrid__"],
+    [class*="_kpiGrid__"],
+    [class*="_riskGrid__"],
+    [class*="_performanceSummary__"],
+    [class*="_qualityMetricGrid__"],
+    [class*="_factGrid__"]
+  ) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .mobile-bottom-nav {
+    right: 5px;
+    left: 5px;
+  }
+
+  .mobile-bottom-nav > :is(a, button) span {
+    font-size: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-bottom-nav,
+  .mobile-bottom-nav *,
+  .mobile-appbar,
+  .sidebar {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+
+/* ========================================================================== */
+/* ANATOLE MOBILE READABILITY v0.7.4                                          */
+/* Cockpit keeps a vertical treemap. ETF keeps its mobile card map.           */
+/* Every other section wraps or becomes a card: no information requires a     */
+/* left/right swipe to be discovered.                                         */
+/* ========================================================================== */
+
+@media (max-width: 820px) {
+  html,
+  body,
+  .app-shell,
+  .app-workspace,
+  .app-main {
+    max-width: 100% !important;
+    overflow-x: clip !important;
+  }
+
+  .app-main,
+  .app-main > *,
+  .app-main section,
+  .app-main article,
+  .app-main header,
+  .app-main footer,
+  .app-main div,
+  .app-main nav,
+  .app-main form {
+    min-width: 0;
+  }
+
+  .app-main :is(img, video, canvas, svg) {
+    max-width: 100%;
+  }
+
+  .app-main :is(h1, h2, h3, h4, p, span, strong, small, code, a) {
+    overflow-wrap: anywhere;
+  }
+
+  /* Controls wrap in place instead of becoming horizontal carousels. */
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"],
+    [class*="_selectionRow__"],
+    [class*="_chartLegend__"],
+    [class*="_assistantLinks__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .app-main :is(
+    .period-tabs,
+    .range-tabs,
+    [class*="_rangeTabs__"],
+    [class*="_mainTabs__"]
+  ) > * {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  /* Screener: one instrument card, all eight metrics visible. */
+  .screener-table-wrap {
+    overflow: visible !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .screener-table-head {
+    display: none !important;
+  }
+
+  .screener-rows {
+    display: grid !important;
+    gap: 10px !important;
+  }
+
+  .screener-row {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 14px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px 12px !important;
+    border: 1px solid rgba(45, 91, 118, .72) !important;
+    border-radius: 16px !important;
+    background: linear-gradient(155deg, rgba(12, 35, 50, .98), rgba(5, 20, 31, .98));
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
+  }
+
+  .screener-name {
+    grid-column: 1 / -1;
+    padding-bottom: 9px;
+    border-bottom: 1px solid rgba(48, 88, 112, .52);
+  }
+
+  .screener-name span {
+    white-space: normal !important;
+  }
+
+  .screener-row > :nth-child(n + 2) {
+    min-width: 0 !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 8px 9px !important;
+    display: grid !important;
+    align-content: center !important;
+    justify-items: start !important;
+    gap: 4px !important;
+    border-radius: 11px !important;
+    background: rgba(7, 25, 37, .72) !important;
+    font-size: 12px !important;
+    white-space: normal !important;
+  }
+
+  .screener-row > :nth-child(n + 2)::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .screener-row > :nth-child(2)::before { content: "Prix"; }
+  .screener-row > :nth-child(3)::before { content: "Séance"; }
+  .screener-row > :nth-child(4)::before { content: "Momentum 20j"; }
+  .screener-row > :nth-child(5)::before { content: "RSI"; }
+  .screener-row > :nth-child(6)::before { content: "Volume relatif"; }
+  .screener-row > :nth-child(7)::before { content: "Score"; }
+  .screener-row > :nth-child(8)::before { content: "Signal"; }
+
+  .screener-row .score-pill,
+  .screener-row .signal-badge {
+    width: 100% !important;
+    height: auto !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Calendar: date and importance on top, complete description below. */
+  .calendar-events {
+    overflow: visible !important;
+  }
+
+  .calendar-event {
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 14px !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 9px 10px !important;
+    align-items: center !important;
+  }
+
+  .calendar-event > div {
+    grid-column: 1 / -1;
+    padding-top: 9px;
+    border-top: 1px solid rgba(47, 88, 112, .48);
+  }
+
+  .calendar-event p,
+  .calendar-event small {
+    overflow-wrap: anywhere;
+  }
+
+  /* Watchlist remains a card grid and never exposes hidden columns off-screen. */
+  .watchlist-table-wrap {
+    overflow: visible !important;
+  }
+
+  .watchlist-row {
+    position: relative;
+    grid-template-columns: minmax(0, 1fr) !important;
+    margin-bottom: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(45, 91, 118, .7) !important;
+    border-radius: 16px;
+    background: rgba(7, 24, 36, .86);
+  }
+
+  .watchlist-row-link {
+    width: 100% !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    padding: 14px 50px 14px 14px !important;
+  }
+
+  .watchlist-row-link .watchlist-cell:nth-of-type(4),
+  .watchlist-row-link .watchlist-cell:nth-of-type(5) {
+    display: grid !important;
+  }
+
+  .watchlist-remove {
+    position: absolute;
+    top: 11px;
+    right: 10px;
+    margin: 0 !important;
+  }
+
+  /* Real HTML tables become readable vertical cards. */
+  [data-mobile-table-wrap="true"],
+  .app-main [class*="_tableWrap__"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  table[data-mobile-cards] {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: block !important;
+    border-collapse: separate !important;
+    font-size: 11px !important;
+  }
+
+  table[data-mobile-cards] thead {
+    display: none !important;
+  }
+
+  table[data-mobile-cards] tbody {
+    width: 100% !important;
+    display: grid !important;
+    gap: 11px !important;
+  }
+
+  table[data-mobile-cards] tr {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 7px 9px !important;
+    padding: 12px !important;
+    border: 1px solid rgba(45, 91, 118, .72) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(155deg, rgba(11, 34, 49, .98), rgba(5, 20, 31, .98));
+    box-shadow: 0 9px 22px rgba(0, 0, 0, .16);
+  }
+
+  table[data-mobile-cards] td {
+    position: static !important;
+    width: auto !important;
+    min-width: 0 !important;
+    min-height: 49px !important;
+    padding: 8px 9px !important;
+    display: grid !important;
+    align-content: center !important;
+    justify-items: start !important;
+    gap: 4px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    background: rgba(6, 24, 36, .7) !important;
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  table[data-mobile-cards] td::before {
+    content: attr(data-label);
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  table[data-mobile-cards] td:first-child {
+    grid-column: 1 / -1;
+    min-height: 58px !important;
+    background: rgba(12, 43, 61, .82) !important;
+  }
+
+  table[data-mobile-cards] td input {
+    width: 100% !important;
+    max-width: 100% !important;
+    text-align: left !important;
+  }
+
+  table[data-mobile-cards] td[colspan] {
+    grid-column: 1 / -1;
+  }
+
+  table[data-mobile-cards] td[colspan]::before {
+    content: none;
+  }
+
+  /* Financial statements: labels are generated from their selected view. */
+  table[data-mobile-cards="fundamentals"] td::before,
+  table[data-mobile-cards="estimates"] td::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+  }
+
+  table[data-mobile-cards="fundamentals"] td:nth-child(1)::before { content: "Période"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(2)::before { content: "Revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(3)::before { content: "Coût revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(4)::before { content: "Bénéfice brut"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(5)::before { content: "Résultat opérationnel"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(6)::before { content: "BAIIA"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(7)::before { content: "Bénéfice net"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(8)::before { content: "BPA dilué"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(9)::before { content: "Croissance revenus"; }
+  table[data-mobile-cards="fundamentals"][data-view="income"] td:nth-child(10)::before { content: "Croissance bénéfice"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(2)::before { content: "Flux opérationnel"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(3)::before { content: "Immobilisations"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(4)::before { content: "Flux disponible"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(5)::before { content: "Marge FTD"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(6)::before { content: "Dividendes"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(7)::before { content: "Rachats"; }
+  table[data-mobile-cards="fundamentals"][data-view="cashflow"] td:nth-child(8)::before { content: "Croissance FTD"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(2)::before { content: "Trésorerie"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(3)::before { content: "Dette"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(4)::before { content: "Dette nette"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(5)::before { content: "Actifs courants"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(6)::before { content: "Passifs courants"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(7)::before { content: "Actifs"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(8)::before { content: "Passifs"; }
+  table[data-mobile-cards="fundamentals"][data-view="balance"] td:nth-child(9)::before { content: "Capitaux propres"; }
+
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(2)::before { content: "Marge brute"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(3)::before { content: "Marge opérationnelle"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(4)::before { content: "Marge nette"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(5)::before { content: "Marge FTD"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(6)::before { content: "Croissance BPA"; }
+  table[data-mobile-cards="fundamentals"][data-view="margins"] td:nth-child(7)::before { content: "Actions diluées"; }
+
+  table[data-mobile-cards="estimates"] td:nth-child(1)::before { content: "Période"; }
+  table[data-mobile-cards="estimates"] td:nth-child(2)::before { content: "Fin"; }
+  table[data-mobile-cards="estimates"] td:nth-child(3)::before { content: "BPA moyen"; }
+  table[data-mobile-cards="estimates"] td:nth-child(4)::before { content: "Fourchette BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(5)::before { content: "BPA précédent"; }
+  table[data-mobile-cards="estimates"] td:nth-child(6)::before { content: "Croissance BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(7)::before { content: "Analystes BPA"; }
+  table[data-mobile-cards="estimates"] td:nth-child(8)::before { content: "Revenus moyens"; }
+  table[data-mobile-cards="estimates"] td:nth-child(9)::before { content: "Fourchette revenus"; }
+  table[data-mobile-cards="estimates"] td:nth-child(10)::before { content: "Croissance revenus"; }
+  table[data-mobile-cards="estimates"] td:nth-child(11)::before { content: "Analystes revenus"; }
+
+  /* Correlation fits the viewport; 2–5 symbols remain visible together. */
+  [class*="_correlationGrid__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    gap: 4px !important;
+  }
+
+  [class*="_correlationCell__"],
+  [class*="_correlationHeader__"] {
+    min-width: 0 !important;
+    min-height: 42px !important;
+    padding: 3px !important;
+    font-size: clamp(7px, 2.3vw, 10px) !important;
+    overflow: hidden;
+  }
+
+  /* ETF detail holdings become cards instead of a four-column strip. */
+  [class*="_holdingsTable__"] {
+    gap: 9px !important;
+    overflow: visible !important;
+  }
+
+  [class*="_tableHeader__"] {
+    display: none !important;
+  }
+
+  [class*="_holdingRow__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    border: 1px solid rgba(45, 91, 118, .68) !important;
+    border-radius: 14px !important;
+    background: rgba(6, 24, 36, .72) !important;
+  }
+
+  [class*="_holdingIdentity__"] {
+    grid-column: 1 / -1;
+    grid-template-columns: 22px 52px minmax(0, 1fr) !important;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(48, 88, 112, .48);
+  }
+
+  [class*="_holdingIdentity__"] strong {
+    white-space: normal !important;
+  }
+
+  [class*="_weightCell__"] {
+    justify-items: start !important;
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3),
+  [class*="_holdingRow__"] > span:nth-child(4) {
+    min-height: 42px;
+    display: grid;
+    align-content: center;
+    justify-items: start;
+    padding: 7px 8px;
+    border-radius: 9px;
+    background: rgba(8, 29, 42, .76);
+    text-align: left !important;
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3)::before {
+    content: "Variation";
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(4)::before {
+    content: "Contribution";
+  }
+
+  [class*="_holdingRow__"] > span:nth-child(3)::before,
+  [class*="_holdingRow__"] > span:nth-child(4)::before {
+    color: #6f93a9;
+    font-size: 8px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+
+  /* Generic fallback: remaining tables fit the screen and wrap their values. */
+  .app-main table:not([data-mobile-cards]) {
+    width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+  }
+
+  .app-main table:not([data-mobile-cards]) :is(th, td) {
+    min-width: 0 !important;
+    padding: 8px 5px !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    font-size: clamp(7px, 2.2vw, 10px) !important;
+  }
+
+  /* Long endpoint names and source metadata never widen Quality. */
+  [class*="_endpointRow__"],
+  [class*="_sourceHeader__"],
+  [class*="_contributorRow__"],
+  [class*="_inlineBetween__"] {
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+  }
+
+  [class*="_endpointRow__"] code {
+    max-width: 100% !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+@media (max-width: 390px) {
+  table[data-mobile-cards] tr,
+  .screener-row,
+  [class*="_holdingRow__"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  table[data-mobile-cards] td:first-child,
+  .screener-name,
+  [class*="_holdingIdentity__"] {
+    grid-column: 1;
+  }
+}
+
+/* v0.7.4 completion: remaining controls, calendar grid and insider table. */
+@media (max-width: 820px) {
+  .app-main :is(
+    .chart-legend,
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    .preset-tabs,
+    .screener-tabs,
+    [class*="periodTabs"],
+    [class*="rangeTabs"],
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_sectionTabs__"],
+    [class*="_preset__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+
+  .app-main :is(
+    .chart-legend,
+    .tabs,
+    .tab-list,
+    .segmented-control,
+    .section-tabs,
+    .preset-tabs,
+    .screener-tabs,
+    [class*="periodTabs"],
+    [class*="rangeTabs"],
+    [class*="_tabs__"],
+    [class*="_Tabs__"],
+    [class*="_tabList__"],
+    [class*="_sectionTabs__"],
+    [class*="_preset__"]
+  ) > * {
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    white-space: normal !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .month-grid,
+    .calendar-grid,
+    [class*="_monthGrid__"],
+    [class*="_calendarGrid__"]
+  ) {
+    width: 100% !important;
+    min-width: 0 !important;
+    grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+    gap: 3px !important;
+  }
+
+  body[data-anatole-section="calendrier"]
+  .app-main :is(
+    .calendar-canvas,
+    .calendar-scroll,
+    [class*="_calendarCanvas__"],
+    [class*="_calendarScroll__"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+
+  body[data-anatole-section="ipo-insiders"]
+  .app-main [class*="_mainTabs__"] {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    overflow: visible !important;
+  }
+
+  .app-main [class*="_tradeTable__"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    gap: 10px !important;
+    overflow: visible !important;
+  }
+
+  .app-main [class*="_tradeHeader__"] {
+    display: none !important;
+  }
+
+  .app-main [class*="_tradeRow__"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 12px !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px 10px !important;
+    border: 1px solid rgba(45, 91, 118, .7) !important;
+    border-radius: 15px !important;
+    background: linear-gradient(155deg, rgba(11, 34, 49, .98), rgba(5, 20, 31, .98));
+  }
+
+  .app-main [class*="_tradeIdentity__"] {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-width: 0 !important;
+    padding: 2px 0 10px !important;
+    border-bottom: 1px solid rgba(48, 88, 112, .48) !important;
+  }
+
+  .app-main [class*="_tradeIdentity__"] :is(strong, small) {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .app-main [class*="_tradeRow__"] > span {
+    min-width: 0 !important;
+    min-height: 48px;
+    padding: 8px 9px;
+    display: grid !important;
+    align-content: center;
+    justify-items: start !important;
+    gap: 4px;
+    border-radius: 10px;
+    background: rgba(6, 24, 36, .72);
+    text-align: left !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+  }
+
+  .app-main [class*="_tradeRow__"] > span::before {
+    color: #6f93a9;
+    font-size: 8px;
+    font-weight: 850;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(1)::before { content: "Opération"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(2)::before { content: "Actions"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(3)::before { content: "Prix"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(4)::before { content: "Valeur"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(5)::before { content: "Date"; }
+  .app-main [class*="_tradeRow__"] > span:nth-of-type(6)::before { content: "Vérifier"; }
+
+  .app-main [class*="_verificationLinks__"] {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-main [class*="_verificationLinks__"] a {
+    min-height: 38px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid rgba(50, 94, 119, .62);
+    border-radius: 9px;
+  }
+}
+
+@media (max-width: 390px) {
+  .app-main [class*="_tradeRow__"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .app-main [class*="_tradeIdentity__"],
+  .app-main [class*="_verificationLinks__"] {
+    grid-column: 1;
+  }
+}
+
+/* ========================================================================== */
+/* Anatole Mobile v0.7.5 — Cockpit viewport + Focus one-screen width          */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  html,
+  body,
+  .app-shell,
+  .app-main,
+  .focus-page,
+  .focus-page > *,
+  .focus-grid,
+  .right-column,
+  .chart-panel,
+  .info-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html,
+  body,
+  .app-shell,
+  .app-main,
+  .focus-page {
+    overflow-x: hidden !important;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main {
+    padding-top: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-page {
+    gap: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-heatmap-panel,
+  body[data-anatole-section="cockpit"] [class*="MarketHeatmap_panel__"] {
+    margin: 0 !important;
+  }
+
+  .focus-section-tabs,
+  .focus-period-tabs {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: grid !important;
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .focus-section-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .focus-period-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .focus-section-tab,
+  .focus-period-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: none !important;
+    padding-inline: 5px !important;
+    white-space: nowrap !important;
+  }
+
+  .focus-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .chart-panel {
+    padding: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .chart-toolbar,
+  .chart-legend,
+  .right-column,
+  .metrics-grid,
+  .level-row,
+  .section-title-row {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .chart-legend {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .chart-legend > * {
+    min-width: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .chart-canvas {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    min-height: 290px !important;
+    height: clamp(300px, 82vw, 390px) !important;
+    overflow: hidden !important;
+  }
+
+  .chart-canvas > *,
+  .chart-canvas canvas,
+  .chart-canvas table {
+    max-width: 100% !important;
+  }
+
+  .right-column {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .info-card {
+    padding: 14px !important;
+    overflow: hidden !important;
+  }
+
+  .section-title-row {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  .section-title-row > * {
+    min-width: 0 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .metrics-grid > div {
+    min-width: 0 !important;
+  }
+
+  .metrics-grid :is(span, strong),
+  .level-row :is(span, strong),
+  .profile-card p,
+  .status-footer {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  .level-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+  }
+
+  .status-footer {
+    white-space: normal !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .focus-period-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .metrics-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .cockpit-universe-switcher {
+    width: 100%;
+    margin-top: 14px;
+  }
+
+  .cockpit-universe-switcher legend {
+    margin-bottom: 7px;
+    font-size: 10px;
+  }
+
+  .cockpit-universe-options {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .cockpit-universe-option {
+    min-width: 0;
+    min-height: 54px;
+    padding: 9px 10px;
+  }
+
+  .cockpit-universe-option strong {
+    font-size: 11px;
+  }
+
+  .cockpit-universe-option small {
+    max-width: 100%;
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .cockpit-universe-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================================================== */
+/* Anatole Mobile v0.7.7 — smoother cockpit, inclusive heatmap, compact shell */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    overscroll-behavior-y: contain;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .app-main {
+    padding-inline: 8px !important;
+  }
+
+  .mobile-appbar {
+    min-height: 74px !important;
+    padding-inline: 11px !important;
+    background: rgba(4, 14, 23, .91) !important;
+    backdrop-filter: blur(24px) saturate(1.18) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .2) !important;
+  }
+
+  .mobile-appbar button {
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 15px !important;
+  }
+
+  .mobile-brand-mark {
+    width: 45px !important;
+    height: 45px !important;
+    border-radius: 14px !important;
+  }
+
+  .mobile-bottom-nav {
+    --mobile-dock-height: 64px !important;
+    left: 10px !important;
+    right: 10px !important;
+    bottom: calc(7px + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 23px !important;
+    background: rgba(5, 19, 30, .91) !important;
+    backdrop-filter: blur(25px) saturate(1.18) !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .42) !important;
+  }
+
+  .mobile-bottom-nav > a,
+  .mobile-bottom-nav > button {
+    min-height: 54px !important;
+    border-radius: 17px !important;
+  }
+
+  .mobile-bottom-nav > :is(a, button) span {
+    font-size: 8px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main {
+    padding-top: 5px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-page {
+    gap: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    grid-template-areas:
+      "identity score"
+      "universe universe" !important;
+    align-items: center !important;
+    gap: 8px 10px !important;
+    padding: 12px !important;
+    overflow: hidden !important;
+    border-radius: 16px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header-copy {
+    grid-area: identity;
+    min-width: 0 !important;
+    align-self: center;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header .eyebrow {
+    font-size: 7px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header h1 {
+    margin: 6px 0 0 !important;
+    font-size: clamp(27px, 8vw, 34px) !important;
+    line-height: .95 !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header p {
+    display: none !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-market-score {
+    grid-area: score;
+    min-width: 94px !important;
+    padding: 7px 9px !important;
+    border: 1px solid rgba(46, 91, 118, .62);
+    border-radius: 12px;
+    background: rgba(5, 22, 34, .66);
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-market-score > span {
+    font-size: 6px !important;
+    text-transform: uppercase;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-market-score strong {
+    margin-top: 3px !important;
+    font-size: clamp(21px, 6vw, 27px) !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-market-score small {
+    margin-top: 4px !important;
+    font-size: 6px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-switcher {
+    grid-area: universe;
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-switcher legend {
+    width: 100%;
+    margin: 0 0 5px !important;
+    color: #6f91a7;
+    font-size: 7px !important;
+    font-weight: 850;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-help {
+    width: 16px !important;
+    height: 16px !important;
+    margin-left: 4px !important;
+    font-size: 8px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-options {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-option {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 40px !important;
+    display: grid !important;
+    grid-template-columns: 16px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 7px !important;
+    padding: 7px 8px !important;
+    border-radius: 11px !important;
+    overflow: hidden !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-option input {
+    width: 14px !important;
+    height: 14px !important;
+    margin: 0 !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-option > span {
+    min-width: 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+    writing-mode: horizontal-tb !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-option strong {
+    display: block !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    word-break: normal !important;
+    writing-mode: horizontal-tb !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-universe-option small {
+    display: none !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-kpis {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-kpi {
+    min-height: 65px !important;
+    padding: 9px 7px !important;
+    border-radius: 12px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-kpi span {
+    font-size: 6px !important;
+    line-height: 1.15 !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-kpi strong {
+    margin-top: 7px !important;
+    font-size: clamp(19px, 5.5vw, 24px) !important;
+  }
+
+  body[data-anatole-section="cockpit"] [class*="MarketHeatmap_panel__"] {
+    width: calc(100% + 8px) !important;
+    margin-inline: -4px !important;
+  }
+
+  body[data-anatole-section="terminal"] .app-main {
+    padding-top: 7px !important;
+  }
+
+  .app-main a,
+  .app-main button,
+  .app-main input,
+  .app-main select,
+  .app-main summary {
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 380px) {
+  body[data-anatole-section="cockpit"] .cockpit-header {
+    grid-template-columns: minmax(0, 1fr) 86px !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  .mobile-appbar,
+  .mobile-bottom-nav,
+  .sidebar,
+  .app-main * {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+body.anatole-heatmap-focus {
+  overflow: hidden !important;
+}
+
+/* ========================================================================== */
+/* Anatole Mobile v0.7.7.1 — fixed header clearance                          */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  :root {
+    --mobile-topbar-height: 74px;
+  }
+
+  body[data-anatole-section="cockpit"] .app-main,
+  body[data-anatole-section="terminal"] .app-main {
+    padding-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        12px
+      ) !important;
+  }
+
+  body[data-anatole-section="cockpit"] .cockpit-header,
+  body[data-anatole-section="terminal"] .app-main > :first-child {
+    scroll-margin-top:
+      calc(
+        var(--mobile-safe-top) +
+        var(--mobile-topbar-height) +
+        12px
+      );
+  }
+}
+
+/* Anatole v0.9 — account entry in mobile drawer */
+@media (max-width: 820px) {
+  .sidebar .account-status {
+    width: 100%;
+    min-height: 42px;
+    box-sizing: border-box;
+    justify-content: center;
+    color: #a9c5d8 !important;
+    font-size: 11px !important;
+  }
+  .sidebar .account-status span {
+    color: inherit !important;
+    font-size: inherit !important;
+  }
+}
+
+/* ========================================================================== */
+/* Anatole v0.9.1 — raccourci Compte dans le tiroir mobile                   */
+/* ========================================================================== */
+@media (max-width: 820px) {
+  .sidebar .sidebar-account-shortcut {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 50px !important;
+    margin: 0 0 14px !important;
+    padding: 9px 12px !important;
+    display: grid !important;
+    grid-template-columns:
+      25px
+      minmax(0, 1fr)
+      !important;
+    align-items: center !important;
+    gap: 10px !important;
+    border:
+      1px solid
+      rgba(75, 139, 179, 0.58)
+      !important;
+    border-radius: 13px !important;
+    background:
+      linear-gradient(
+        145deg,
+        rgba(15, 48, 70, 0.98),
+        rgba(7, 28, 43, 0.98)
+      ) !important;
+    color: #eaf5fb !important;
+  }
+
+  .sidebar .sidebar-account-shortcut > span {
+    min-width: 0 !important;
+    display: grid !important;
+    gap: 3px !important;
+  }
+
+  .sidebar .sidebar-account-shortcut strong {
+    color: #f4f9fc !important;
+    font-size: 13px !important;
+  }
+
+  .sidebar .sidebar-account-shortcut small {
+    display: block !important;
+    color: #7899ad !important;
+    font-size: 9px !important;
+  }
+}
