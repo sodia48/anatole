@@ -48,7 +48,16 @@ type AccountContextValue = {
   lastSyncedAt: string | null;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    displayName: string | undefined,
+    options: {
+      inviteCode?: string;
+      acceptedTerms: boolean;
+      acceptedPrivacy: boolean;
+    },
+  ) => Promise<void>;
   signOut: () => Promise<void>;
   signOutEverywhere: () => Promise<void>;
   syncNow: () => Promise<void>;
@@ -289,7 +298,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
         throw reason;
       }
     },
-    register: async (email, password, displayName) => {
+    register: async (email, password, displayName, options) => {
       setSyncState("connecting");
       setError(null);
       try {
@@ -297,6 +306,9 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
           email,
           password,
           display_name: displayName,
+          invite_code: options.inviteCode,
+          accepted_terms: options.acceptedTerms,
+          accepted_privacy: options.acceptedPrivacy,
         }));
       } catch (reason) {
         const message = reason instanceof Error ? reason.message : "Création du compte impossible.";
@@ -344,4 +356,3 @@ export function useAccount(): AccountContextValue {
   if (!value) throw new Error("useAccount doit être utilisé dans AccountProvider");
   return value;
 }
-

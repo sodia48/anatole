@@ -603,3 +603,52 @@
 .embedded .dangerZone {
   box-shadow: none;
 }
+
+
+/* ========================================================================== */
+/* Anatole v1.0 — inscription bêta et consentement                           */
+/* ========================================================================== */
+
+.legalChecks {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.legalCheck {
+  margin: 0 !important;
+  padding: 12px 13px;
+  display: grid !important;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px !important;
+  border: 1px solid rgba(78, 133, 166, 0.35);
+  border-radius: 13px;
+  color: #a9c0cf;
+  background: rgba(3, 19, 30, 0.76);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.legalCheck input {
+  width: 17px !important;
+  min-height: 17px !important;
+  margin: 2px 0 0;
+  padding: 0 !important;
+  accent-color: #63a2ff;
+}
+
+.legalCheck a {
+  color: #78b5ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.policyNotice {
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 184, 83, 0.42);
+  border-radius: 13px;
+  color: #ffd18b;
+  background: rgba(130, 82, 16, 0.18);
+  font-size: 0.85rem;
+}

@@ -929,7 +929,7 @@ export function AppSidebar({
         <div className="sidebar-footer">
           <AccountStatus />
           <Link href="/roadmap">
-            Anatole v0.9.6
+            Anatole v1.0
           </Link>
           <span>Centre de contrôle · synchronisation active</span>
         </div>

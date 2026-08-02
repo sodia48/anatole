@@ -15,6 +15,13 @@ export type WorkspaceSnapshot = {
   updated_at: string | null;
 };
 
+export type AccountRegistrationPolicy = {
+  enabled: boolean;
+  invite_required: boolean;
+  terms_version: string;
+  privacy_version: string;
+};
+
 export type AccountSession = {
   expires_at: string;
   user: AccountUser;
@@ -73,10 +80,17 @@ async function accountRequest<T>(
   return await response.json() as T;
 }
 
+export function getRegistrationPolicy(): Promise<AccountRegistrationPolicy> {
+  return accountRequest<AccountRegistrationPolicy>("/registration");
+}
+
 export function registerAccount(input: {
   email: string;
   password: string;
   display_name?: string;
+  invite_code?: string;
+  accepted_terms: boolean;
+  accepted_privacy: boolean;
 }): Promise<AccountSession> {
   return accountRequest<AccountSession>("/register", {
     method: "POST",
@@ -163,5 +177,4 @@ export function deleteAccount(input: {
     body: JSON.stringify(input),
   });
 }
-
 

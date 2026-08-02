@@ -24,6 +24,8 @@ import { useAccount } from "@/components/providers/AccountProvider";
 import {
   changeAccountPassword,
   exportAccountData,
+  getRegistrationPolicy,
+  type AccountRegistrationPolicy,
   updateAccountProfile,
 } from "@/lib/account";
 import { readLocalWorkspace } from "@/lib/workspace-sync";
@@ -60,6 +62,11 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
+  const [registrationPolicy, setRegistrationPolicy] =
+    useState<AccountRegistrationPolicy | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
@@ -75,6 +82,29 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     setProfileName(account.user?.display_name ?? "");
   }, [account.user?.display_name]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void getRegistrationPolicy()
+      .then((policy) => {
+        if (!cancelled) setRegistrationPolicy(policy);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRegistrationPolicy({
+            enabled: true,
+            invite_required: false,
+            terms_version: "2026-08-01",
+            privacy_version: "2026-08-01",
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const counts = useMemo(() => {
     if (!account.hydrated) return null;
@@ -93,7 +123,16 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     setFormError(null);
     try {
       if (mode === "register") {
-        await account.register(email, password, displayName || undefined);
+        await account.register(
+          email,
+          password,
+          displayName || undefined,
+          {
+            inviteCode: inviteCode || undefined,
+            acceptedTerms,
+            acceptedPrivacy,
+          },
+        );
       } else {
         await account.signIn(email, password);
       }
@@ -132,7 +171,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
       <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
         <header className={styles.hero}>
           <div>
-            <span className={styles.eyebrow}>ANATOLE v0.9.3</span>
+            <span className={styles.eyebrow}>ANATOLE v1.0.0</span>
             <h1>Retrouve ton espace sur tous tes appareils</h1>
             <p>Watchlist, Portefeuille, Alertes, préférences et profil Anatole Conseil restent utilisables sans compte. La connexion ajoute uniquement la synchronisation.</p>
           </div>
@@ -169,8 +208,63 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
               <input type="password" required minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder="10 caractères, une lettre et un chiffre" />
             </label>
 
+            {mode === "register" && registrationPolicy?.invite_required ? (
+              <label>
+                <span>Code d’invitation</span>
+                <input
+                  required
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value)}
+                  autoComplete="off"
+                  placeholder="ANATOLE-BETA-…"
+                />
+              </label>
+            ) : null}
+
+            {mode === "register" ? (
+              <div className={styles.legalChecks}>
+                <label className={styles.legalCheck}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(event) => setAcceptedTerms(event.target.checked)}
+                    required
+                  />
+                  <span>
+                    J’accepte les <a href="/conditions" target="_blank" rel="noreferrer">Conditions d’utilisation</a>.
+                  </span>
+                </label>
+                <label className={styles.legalCheck}>
+                  <input
+                    type="checkbox"
+                    checked={acceptedPrivacy}
+                    onChange={(event) => setAcceptedPrivacy(event.target.checked)}
+                    required
+                  />
+                  <span>
+                    J’ai lu la <a href="/confidentialite" target="_blank" rel="noreferrer">Politique de confidentialité</a> et l’<a href="/avis-financier" target="_blank" rel="noreferrer">Avis financier</a>.
+                  </span>
+                </label>
+              </div>
+            ) : null}
+
+            {mode === "register" && registrationPolicy && !registrationPolicy.enabled ? (
+              <div className={styles.policyNotice}>
+                Les nouvelles inscriptions sont temporairement fermées.
+              </div>
+            ) : null}
+
             {formError || account.error ? <div className={styles.error}>{formError ?? account.error}</div> : null}
-            <button className={styles.primaryButton} type="submit" disabled={submitting}>
+            <button
+              className={styles.primaryButton}
+              type="submit"
+              disabled={
+                submitting ||
+                (mode === "register" &&
+                  (!registrationPolicy ||
+                    registrationPolicy.enabled === false))
+              }
+            >
               {submitting ? <RefreshCw size={18} className="is-spinning" /> : <LockKeyhole size={18} />}
               {mode === "login" ? "Me connecter" : "Créer et synchroniser"}
             </button>
@@ -191,7 +285,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <header className={styles.hero}>
         <div>
-          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v0.9.3</span>
+          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v1.0.0</span>
           <h1>{account.user.display_name ? `Bonjour ${account.user.display_name}` : "Compte synchronisé"}</h1>
           <p>{account.user.email}</p>
         </div>
