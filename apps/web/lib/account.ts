@@ -126,3 +126,42 @@ export function putRemoteWorkspace(
     },
   );
 }
+
+export type AccountExport = {
+  exported_at: string;
+  user: AccountUser;
+  workspace: WorkspaceSnapshot;
+};
+
+export function updateAccountProfile(displayName: string | null): Promise<AccountUser> {
+  return accountRequest<AccountUser>("/profile", {
+    method: "PUT",
+    body: JSON.stringify({ display_name: displayName }),
+  });
+}
+
+export function changeAccountPassword(input: {
+  current_password: string;
+  new_password: string;
+}): Promise<void> {
+  return accountRequest<void>("/change-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function exportAccountData(): Promise<AccountExport> {
+  return accountRequest<AccountExport>("/export");
+}
+
+export function deleteAccount(input: {
+  password: string;
+  confirmation: "SUPPRIMER";
+}): Promise<void> {
+  return accountRequest<void>("/delete", {
+    method: "DELETE",
+    body: JSON.stringify(input),
+  });
+}
+
+
