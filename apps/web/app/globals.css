@@ -733,3 +733,233 @@ html[data-density="compact"] .watchlist-page { gap: 11px; }
     display: none;
   }
 }
+
+/* ========================================================================== */
+/* Anatole v0.9.4 — sidebar repliable et largeur sans débordement             */
+/* ========================================================================== */
+
+:root {
+  --anatole-sidebar-expanded: 248px;
+  --anatole-sidebar-collapsed: 82px;
+  --anatole-sidebar-current: var(--anatole-sidebar-expanded);
+}
+
+html[data-sidebar-state="collapsed"] {
+  --anatole-sidebar-current: var(--anatole-sidebar-collapsed);
+}
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.app-shell {
+  width: 100%;
+  max-width: 100%;
+}
+
+.app-main {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.sidebar {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.desktop-sidebar-header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.desktop-sidebar-header .brand {
+  min-width: 0;
+  margin: 0;
+  padding: 0 2px;
+  overflow: hidden;
+}
+
+.desktop-sidebar-toggle {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: none;
+  place-items: center;
+  border: 1px solid rgba(61, 111, 143, 0.52);
+  border-radius: 10px;
+  background: rgba(8, 28, 42, 0.92);
+  color: #89a9bd;
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.desktop-sidebar-toggle:hover,
+.desktop-sidebar-toggle:focus-visible {
+  border-color: #5792f4;
+  outline: none;
+  color: #f2f8fc;
+  background: rgba(34, 83, 122, 0.46);
+  transform: translateY(-1px);
+}
+
+.desktop-nav {
+  min-width: 0;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color:
+    rgba(118, 144, 160, 0.72)
+    transparent;
+}
+
+.desktop-nav::-webkit-scrollbar {
+  width: 7px;
+}
+
+.desktop-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.desktop-nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(118, 144, 160, 0.62);
+}
+
+.nav-group,
+.nav-item,
+.sidebar-search,
+.sidebar-account-shortcut,
+.sidebar-footer {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (min-width: 1181px) {
+  .app-shell {
+    grid-template-columns:
+      var(--anatole-sidebar-current)
+      minmax(0, 1fr);
+    transition:
+      grid-template-columns 220ms
+      cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .desktop-sidebar-toggle {
+    display: grid;
+  }
+
+  .sidebar {
+    transition:
+      padding 220ms ease,
+      width 220ms ease;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .desktop-sidebar-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 9px;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .desktop-sidebar-header .brand {
+    width: 48px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .desktop-sidebar-header .brand
+  > span:not(.brand-mark),
+  html[data-sidebar-state="collapsed"]
+  .desktop-sidebar-header .brand small,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-search span,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-search kbd,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-account-shortcut span,
+  html[data-sidebar-state="collapsed"]
+  .nav-group-label,
+  html[data-sidebar-state="collapsed"]
+  .nav-item span,
+  html[data-sidebar-state="collapsed"]
+  .nav-item em,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-footer > a,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-footer > span {
+    display: none !important;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .sidebar {
+    padding-inline: 12px;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .sidebar-search,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-account-shortcut,
+  html[data-sidebar-state="collapsed"]
+  .nav-item,
+  html[data-sidebar-state="collapsed"]
+  .sidebar-footer .account-status {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    margin-inline: auto;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .sidebar-account-shortcut {
+    grid-template-columns: 1fr;
+    place-items: center;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .nav-group {
+    display: grid;
+    justify-items: center;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .sidebar-footer {
+    justify-items: center;
+    padding-inline: 0;
+  }
+
+  html[data-sidebar-state="collapsed"]
+  .sidebar-footer .account-status span {
+    display: none !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .desktop-sidebar-toggle {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .sidebar,
+  .desktop-sidebar-toggle {
+    transition: none !important;
+  }
+}

@@ -38,7 +38,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body data-anatole-version="0.9.3">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{document.documentElement.dataset.sidebarState=localStorage.getItem("anatole-sidebar-collapsed")==="true"?"collapsed":"expanded"}catch(e){document.documentElement.dataset.sidebarState="expanded"}`,
+          }}
+        />
+      </head>
+      <body data-anatole-version="0.9.4">
         <AppProviders>
           <div className="app-shell">
             <AppSidebar />
