@@ -1,43 +1,51 @@
-# Anatole v0.9.1.1 — récupération complète du frontend Compte
+# Anatole v0.9.3 — Centre de contrôle
 
-## Cause du build failed
+Cette version regroupe dans une seule section :
 
-`AppSidebar.tsx` importait :
+- Compte et synchronisation;
+- Préférences;
+- Qualité des données et fiabilité.
 
-`@/components/account/AccountStatus`
+## Nouvelle adresse
 
-mais le dépôt déployé ne contenait pas toute la couche frontend v0.9.
-Le correctif v0.9.1 de visibilité supposait que ces fichiers étaient déjà
-présents.
+`/parametres`
 
-Ce paquet ajoute toute la chaîne nécessaire :
+L'interface reprend les conventions des grands services numériques :
 
-- page `/compte`;
-- composants de connexion et d'état;
-- `AccountProvider`;
-- client API du compte;
-- route relais Next.js;
-- synchronisation locale/multiappareil;
-- intégration Watchlist, Portefeuille, Alertes, préférences et Comparateur;
-- raccourci Compte toujours visible.
+- en-tête de compte clair;
+- navigation secondaire permanente;
+- catégories distinctes;
+- état du compte visible;
+- résumé des préférences;
+- contenu principal spacieux;
+- navigation mobile compacte;
+- hiérarchie visuelle cohérente.
+
+## Compatibilité
+
+Les anciennes adresses continuent de fonctionner :
+
+- `/compte` redirige vers Compte;
+- `/preferences` redirige vers Préférences;
+- `/qualite` redirige vers Qualité des données.
+
+Les liens depuis le Portefeuille, Anatole Conseil, la recherche et la barre
+supérieure ont aussi été mis à jour.
+
+## Sidebar
+
+Les trois anciennes entrées séparées sont remplacées par :
+
+`Compte & paramètres`
+
+Le raccourci sous la recherche ouvre le même Centre de contrôle.
 
 ## Installation
 
-1. Décompressez le PATCH à la racine du dépôt.
-2. Acceptez tous les remplacements et ajouts.
-3. Vérifiez dans GitHub que ce fichier existe réellement :
+1. Décompresser le PATCH à la racine du dépôt.
+2. Accepter les ajouts et remplacements.
+3. Commit et push sur `main`.
+4. Redéployer uniquement Vercel.
+5. Désactiver `Use existing Build Cache` pour ce déploiement.
 
-   `apps/web/components/account/AccountStatus.tsx`
-
-4. Committez et poussez sur `main`.
-5. Redéployez uniquement Vercel.
-6. Désactivez `Use existing Build Cache` pour ce déploiement.
-
-Aucun redéploiement Render ou PostgreSQL n'est nécessaire.
-
-## Test attendu
-
-- le build Vercel réussit;
-- le bouton Compte apparaît sous la recherche;
-- `/compte` s'ouvre;
-- création de compte et connexion utilisent la base PostgreSQL déjà active.
+Aucun changement Render ou PostgreSQL n'est nécessaire.

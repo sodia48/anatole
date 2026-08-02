@@ -50,7 +50,7 @@ function ageLabel(seconds: number | null): string {
   return `${(seconds / 3600).toFixed(1)} h`;
 }
 
-export function DataQualityClient() {
+export function DataQualityClient({ embedded = false }: { embedded?: boolean }) {
   const [snapshot, setSnapshot] = useState<DataQualitySnapshot | null>(null);
   const [reliability, setReliability] = useState<ReliabilitySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,7 +96,7 @@ export function DataQualityClient() {
   const degradedCount = snapshot?.sources.filter((item) => ["degraded", "stale", "unavailable"].includes(item.status)).length ?? 0;
 
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <section className={`panel ${styles.hero}`}>
         <div className={styles.heroCopy}>
           <span className="eyebrow">INTELLIGENCE · V0.8</span>

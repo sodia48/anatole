@@ -1,5 +1,5 @@
-import { AccountClient } from "@/components/account/AccountClient";
+import { redirect } from "next/navigation";
 
-export default function AccountPage() {
-  return <AccountClient />;
+export default function LegacyComptePage() {
+  redirect("/parametres?section=account");
 }

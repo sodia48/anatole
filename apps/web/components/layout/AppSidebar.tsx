@@ -151,9 +151,9 @@ const groups: Array<{
         available: true,
       },
       {
-        href: "/compte",
-        label: "Compte & synchronisation",
-        icon: UserRound,
+        href: "/parametres",
+        label: "Compte & paramètres",
+        icon: Settings2,
         available: true,
       },
     ],
@@ -165,18 +165,6 @@ const groups: Array<{
         href: "/assistant",
         label: "Anatole Conseil",
         icon: Bot,
-        available: true,
-      },
-      {
-        href: "/qualite",
-        label: "Qualité des données",
-        icon: ShieldCheck,
-        available: true,
-      },
-      {
-        href: "/preferences",
-        label: "Préférences",
-        icon: Settings2,
         available: true,
       },
     ],
@@ -776,17 +764,17 @@ export function AppSidebar({
         </button>
 
         <Link
-          href="/compte"
+          href="/parametres?section=account"
           className={`sidebar-account-shortcut ${
-            pathname === "/compte" ? "is-active" : ""
+            pathname.startsWith("/parametres") ? "is-active" : ""
           }`}
-          aria-current={pathname === "/compte" ? "page" : undefined}
+          aria-current={pathname.startsWith("/parametres") ? "page" : undefined}
           onClick={() => setDrawerOpen(false)}
         >
           <UserRound size={19} />
           <span>
-            <strong>Compte</strong>
-            <small>Connexion & synchronisation</small>
+            <strong>Compte & paramètres</strong>
+            <small>Compte · préférences · données</small>
           </span>
         </Link>
 
@@ -845,9 +833,9 @@ export function AppSidebar({
         <div className="sidebar-footer">
           <AccountStatus />
           <Link href="/roadmap">
-            Anatole v0.9.0
+            Anatole v0.9.3
           </Link>
-          <span>Compte optionnel · synchronisation active</span>
+          <span>Centre de contrôle · synchronisation active</span>
         </div>
       </aside>
 

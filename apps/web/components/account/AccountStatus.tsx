@@ -28,7 +28,7 @@ export function AccountStatus({ compact = false }: { compact?: boolean }) {
 
   return (
     <Link
-      href="/compte"
+      href="/parametres?section=account"
       className={`account-status${compact ? " is-compact" : ""}`}
       aria-label={user ? `Compte ${user.email} · ${label}` : "Ouvrir le compte Anatole"}
     >

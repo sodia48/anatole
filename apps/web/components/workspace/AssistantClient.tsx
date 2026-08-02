@@ -970,7 +970,7 @@ export function AssistantClient() {
             <span className="eyebrow">AUTRES OUTILS</span>
             <div className={styles.assistantLinks}>
               <Link href="/portefeuille"><BriefcaseBusiness size={13} /> Portefeuille</Link>
-              <Link href="/qualite"><Database size={13} /> Qualité des données</Link>
+              <Link href="/parametres?section=quality"><Database size={13} /> Qualité des données</Link>
             </div>
           </section>
         </aside>

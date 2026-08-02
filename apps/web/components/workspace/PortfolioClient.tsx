@@ -437,7 +437,7 @@ export function PortfolioClient() {
       )}
 
       <div className={styles.notice}>Portefeuille de suivi uniquement. Les quantités et coûts moyens restent sur cet appareil en mode anonyme et sont synchronisés uniquement lorsqu’un compte Anatole est connecté.</div>
-      <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}>{snapshot ? <>Dernière analyse {new Date(snapshot.generated_at).toLocaleString("fr-CA")} · <Link href="/qualite">Vérifier les sources</Link></> : null}</div>
+      <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}>{snapshot ? <>Dernière analyse {new Date(snapshot.generated_at).toLocaleString("fr-CA")} · <Link href="/parametres?section=quality">Vérifier les sources</Link></> : null}</div>
     </main>
   );
 }

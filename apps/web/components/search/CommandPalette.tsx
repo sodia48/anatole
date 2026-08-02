@@ -39,9 +39,7 @@ const routes = [
   { label: "Terminal Pro", description: "Régime, rotation et dislocations", href: "/terminal", icon: Gauge, available: true },
   { label: "Alertes", description: "Prix, RSI, momentum et score", href: "/alertes", icon: Bell, available: true },
   { label: "Anatole Conseil", description: "Planification, scénarios et risques sans recommandation de placement", href: "/assistant", icon: Bot, available: true },
-  { label: "Qualité des données", description: "Couverture, fraîcheur et sources", href: "/qualite", icon: ShieldCheck, available: true },
-  { label: "Préférences", description: "Thème, densité et affichage", href: "/preferences", icon: Settings2, available: true },
-  { label: "Compte & synchronisation", description: "Retrouver Watchlist, Portefeuille et Alertes sur tous les appareils", href: "/compte", icon: UserRound, available: true },
+  { label: "Compte & paramètres", description: "Compte, synchronisation, préférences et qualité des données", href: "/parametres", icon: Settings2, available: true },
 ];
 
 function normalizeTicker(value: string): string {

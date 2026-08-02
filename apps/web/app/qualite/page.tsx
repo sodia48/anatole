@@ -1,5 +1,5 @@
-import { DataQualityClient } from "@/components/workspace/DataQualityClient";
+import { redirect } from "next/navigation";
 
-export default function QualitePage() {
-  return <DataQualityClient />;
+export default function LegacyQualitePage() {
+  redirect("/parametres?section=quality");
 }

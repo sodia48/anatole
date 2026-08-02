@@ -16,8 +16,7 @@ const titles: Array<[string, string]> = [
   ["/comparateur", "Comparateur"],
   ["/terminal", "Terminal Pro"],
   ["/watchlist", "Watchlist"],
-  ["/compte", "Compte & synchronisation"],
-  ["/preferences", "Préférences"],
+  ["/parametres", "Compte & paramètres"],
   ["/roadmap", "Migration Anatole"],
 ];
 
@@ -39,7 +38,7 @@ export function AppTopbar({ onOpenSearch }: { onOpenSearch: () => void }) {
           <span>Rechercher un titre ou une section</span>
           <kbd>Ctrl K</kbd>
         </button>
-        <Link href="/preferences" className="topbar-icon-button" aria-label="Préférences">
+        <Link href="/parametres?section=preferences" className="topbar-icon-button" aria-label="Compte et paramètres">
           <Settings2 size={18} />
         </Link>
       </div>

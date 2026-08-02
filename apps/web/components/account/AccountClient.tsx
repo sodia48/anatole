@@ -54,7 +54,7 @@ function downloadJson(filename: string, payload: unknown): void {
   URL.revokeObjectURL(url);
 }
 
-export function AccountClient() {
+export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const account = useAccount();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
@@ -129,10 +129,10 @@ export function AccountClient() {
 
   if (!account.user) {
     return (
-      <div className={styles.page}>
+      <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
         <header className={styles.hero}>
           <div>
-            <span className={styles.eyebrow}>ANATOLE v0.9.2.2</span>
+            <span className={styles.eyebrow}>ANATOLE v0.9.3</span>
             <h1>Retrouve ton espace sur tous tes appareils</h1>
             <p>Watchlist, Portefeuille, Alertes, préférences et profil Anatole Conseil restent utilisables sans compte. La connexion ajoute uniquement la synchronisation.</p>
           </div>
@@ -188,10 +188,10 @@ export function AccountClient() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <header className={styles.hero}>
         <div>
-          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v0.9.2.2</span>
+          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v0.9.3</span>
           <h1>{account.user.display_name ? `Bonjour ${account.user.display_name}` : "Compte synchronisé"}</h1>
           <p>{account.user.email}</p>
         </div>
@@ -335,4 +335,3 @@ export function AccountClient() {
     </div>
   );
 }
-
