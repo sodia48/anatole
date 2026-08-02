@@ -26,6 +26,8 @@ def register(client: TestClient, email: str = "beta@example.com") -> dict:
             "email": email,
             "password": "Anatole2026!",
             "display_name": "Beta Test",
+            "accepted_terms": True,
+            "accepted_privacy": True,
         },
     )
     assert response.status_code == 201, response.text
@@ -70,7 +72,7 @@ def test_duplicate_account_and_invalid_password(account_client: TestClient):
     register(account_client)
     duplicate = account_client.post(
         "/api/v1/account/register",
-        json={"email": "beta@example.com", "password": "Anatole2026!"},
+        json={"email": "beta@example.com", "password": "Anatole2026!", "accepted_terms": True, "accepted_privacy": True},
     )
     assert duplicate.status_code == 409
 
@@ -228,3 +230,53 @@ def test_profile_password_export_and_delete(account_client: TestClient):
         json={"email": "control@example.com", "password": "Nouveau2027!"},
     ).status_code == 401
 
+
+
+def test_registration_policy_and_invite_code(account_client: TestClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(account_routes.settings, "account_invite_codes", "BETA-ALPHA,BETA-BRAVO")
+    monkeypatch.setattr(account_routes.settings, "account_terms_version", "2026-08-01")
+    monkeypatch.setattr(account_routes.settings, "account_privacy_version", "2026-08-01")
+
+    policy = account_client.get("/api/v1/account/registration")
+    assert policy.status_code == 200
+    assert policy.json() == {
+        "enabled": True,
+        "invite_required": True,
+        "terms_version": "2026-08-01",
+        "privacy_version": "2026-08-01",
+    }
+
+    missing_consent = account_client.post(
+        "/api/v1/account/register",
+        json={
+            "email": "consent@example.com",
+            "password": "Anatole2026!",
+            "invite_code": "BETA-ALPHA",
+        },
+    )
+    assert missing_consent.status_code == 422
+
+    invalid = account_client.post(
+        "/api/v1/account/register",
+        json={
+            "email": "invalid-code@example.com",
+            "password": "Anatole2026!",
+            "invite_code": "INCORRECT",
+            "accepted_terms": True,
+            "accepted_privacy": True,
+        },
+    )
+    assert invalid.status_code == 403
+
+    valid = account_client.post(
+        "/api/v1/account/register",
+        json={
+            "email": "invited@example.com",
+            "password": "Anatole2026!",
+            "display_name": "Invité",
+            "invite_code": "BETA-BRAVO",
+            "accepted_terms": True,
+            "accepted_privacy": True,
+        },
+    )
+    assert valid.status_code == 201, valid.text

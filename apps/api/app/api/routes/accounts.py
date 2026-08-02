@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import threading
 import time
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ from app.schemas.accounts import (
     AccountPasswordChangeRequest,
     AccountProfileUpdateRequest,
     AccountRegisterRequest,
+    AccountRegistrationPolicy,
     AccountSession,
     AccountStatus,
     AccountUser,
@@ -85,6 +87,21 @@ async def current_user(token: str = Depends(_credentials)) -> AccountUser:
     return user
 
 
+
+@router.get(
+    "/registration",
+    response_model=AccountRegistrationPolicy,
+    summary="Retourne la politique d'inscription de la bêta",
+)
+async def registration_policy() -> AccountRegistrationPolicy:
+    return AccountRegistrationPolicy(
+        enabled=settings.account_registration_enabled,
+        invite_required=bool(settings.account_invite_code_set),
+        terms_version=settings.account_terms_version,
+        privacy_version=settings.account_privacy_version,
+    )
+
+
 @router.post(
     "/register",
     response_model=AccountSession,
@@ -95,6 +112,19 @@ async def register(payload: AccountRegisterRequest, request: Request) -> Account
     auth_throttle.check(request, payload.email)
     if not settings.account_registration_enabled:
         raise HTTPException(status_code=403, detail="Les inscriptions sont temporairement fermées.")
+    if not payload.accepted_terms or not payload.accepted_privacy:
+        raise HTTPException(
+            status_code=422,
+            detail="Les Conditions d’utilisation et la Politique de confidentialité doivent être acceptées.",
+        )
+
+    invite_codes = settings.account_invite_code_set
+    if invite_codes:
+        supplied = payload.invite_code or ""
+        if not any(hmac.compare_digest(supplied, code) for code in invite_codes):
+            auth_throttle.failure(request, payload.email)
+            raise HTTPException(status_code=403, detail="Code d’invitation invalide.")
+
     try:
         session = await account_service.register(
             email=payload.email,

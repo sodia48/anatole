@@ -36,6 +36,9 @@ class AccountCredentials(BaseModel):
 
 class AccountRegisterRequest(AccountCredentials):
     display_name: str | None = Field(default=None, max_length=60)
+    invite_code: str | None = Field(default=None, max_length=80)
+    accepted_terms: bool = False
+    accepted_privacy: bool = False
 
     @field_validator("display_name")
     @classmethod
@@ -44,6 +47,21 @@ class AccountRegisterRequest(AccountCredentials):
             return None
         clean = " ".join(value.strip().split())
         return clean or None
+
+    @field_validator("invite_code")
+    @classmethod
+    def clean_invite_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        clean = value.strip()
+        return clean or None
+
+
+class AccountRegistrationPolicy(BaseModel):
+    enabled: bool
+    invite_required: bool
+    terms_version: str
+    privacy_version: str
 
 
 class AccountLoginRequest(AccountCredentials):
