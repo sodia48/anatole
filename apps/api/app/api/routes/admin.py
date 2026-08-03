@@ -115,3 +115,4 @@ async def update_report(
 ) -> None:
     if not await account_service.update_feedback_status(report_id, payload.status):
         raise HTTPException(status_code=404, detail="Signalement introuvable.")
+
