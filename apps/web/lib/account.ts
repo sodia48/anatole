@@ -7,6 +7,13 @@ export type AccountUser = {
   display_name: string | null;
   created_at: string;
   last_login_at: string | null;
+
+  /**
+   * Présent avec le backend Admin v1.1+.
+   * Une ancienne réponse de l’API peut ne pas encore fournir ce champ;
+   * dans ce cas, l’utilisateur est traité comme non-administrateur.
+   */
+  is_admin?: boolean;
 };
 
 export type WorkspaceSnapshot = {
@@ -177,4 +184,3 @@ export function deleteAccount(input: {
     body: JSON.stringify(input),
   });
 }
-
