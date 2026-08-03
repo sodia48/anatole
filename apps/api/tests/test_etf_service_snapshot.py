@@ -5,7 +5,11 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from app.services.etf import etf_service
+from app.services.etf import (
+    COLD_START_RETRY_SECONDS,
+    EtfDirectoryService,
+    etf_service,
+)
 
 
 class EtfDirectoryItem(BaseModel):
@@ -48,3 +52,42 @@ def test_snapshot_is_valid_against_current_schema() -> None:
 
     assert len(validated.items) == 172
     assert validated.categories
+
+
+
+def test_failed_cold_start_can_retry(
+    monkeypatch,
+) -> None:
+    service = EtfDirectoryService()
+    calls = 0
+
+    async def no_quotes(
+        tickers: list[str],
+    ) -> None:
+        nonlocal calls
+        calls += 1
+
+    monkeypatch.setattr(
+        service,
+        "_refresh_batch",
+        no_quotes,
+    )
+
+    asyncio.run(
+        service._prime_cold_start()
+    )
+    assert calls == 1
+
+    asyncio.run(
+        service._prime_cold_start()
+    )
+    assert calls == 1
+
+    service._last_cold_start_attempt -= (
+        COLD_START_RETRY_SECONDS + 1
+    )
+
+    asyncio.run(
+        service._prime_cold_start()
+    )
+    assert calls == 2

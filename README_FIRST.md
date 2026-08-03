@@ -1,15 +1,28 @@
-# Anatole v1.3.2 — Initiés plus rapides
+# Anatole v1.3.3 — stabilité de la carte ETF
 
-## Nouveau chargement
+## Cause de l’écran gris/blanc
 
-- seul l’onglet visible est chargé;
-- un aperçu rapide sonde 8 titres canadiens ou 10 titres américains;
-- les premières transactions sont affichées dès leur arrivée;
-- le balayage complet de 24 à 40 titres continue en arrière-plan;
-- la dernière donnée valide est conservée six heures dans le navigateur;
-- pendant la première collecte, Anatole affiche `Analyse…`, jamais un `N/D`
-  transitoire;
-- `Indisponible` apparaît uniquement après la fin du balayage complet.
+Les cotations ETF sont conservées en mémoire dans le processus Render. Après
+une mise en veille, un redémarrage, un déploiement ou une réponse partielle du
+fournisseur, cette mémoire peut être vide ou incomplète.
+
+Le frontend remplaçait alors toutes les anciennes cotations valides par le
+nouvel instantané partiel. Les éléments sans prix recevaient `price = 0`,
+`change = 0` et `source = unavailable`, ce qui les rendait gris et parfois
+visuellement vides dans les petites cases.
+
+## Correction
+
+- conservation des dernières cotations valides pendant les réponses partielles;
+- cache navigateur de douze heures;
+- aucune régression d’une cotation valide vers `0 / unavailable`;
+- annulation correcte des anciennes requêtes;
+- actualisation suspendue lorsque l’onglet est masqué;
+- nouvelle collecte immédiate au retour sur l’onglet;
+- nouvelle tentative de démarrage API après 60 secondes en cas d’échec;
+- nouvelle tentative rapide après une collecte entièrement vide;
+- cases indisponibles plus sombres et hachurées;
+- groupes sans aucune cotation affichés `N/D`, et non `+0,00 %`.
 
 ## Déploiement
 
@@ -18,4 +31,4 @@
 3. déployer Render en premier;
 4. déployer Vercel sans réutiliser le Build Cache.
 
-Aucune migration PostgreSQL n’est requise.
+Aucune migration PostgreSQL n’est nécessaire.
