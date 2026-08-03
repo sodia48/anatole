@@ -82,6 +82,51 @@ function formatPercent(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)} %`;
 }
 
+/**
+ * Normalise la participation haussière dans l'intervalle 0–1.
+ *
+ * Le backend historique a pu fournir `advance_ratio` sous trois formes :
+ * 0.3729, 37.29 ou 3729. Les comptes progressions/baisses restent la
+ * source prioritaire et évitent toute double multiplication par 100.
+ */
+function normalizeAdvanceRatio(
+  breadth: CockpitSnapshot["breadth"] | null | undefined,
+): number {
+  if (!breadth) return 0;
+
+  const advancers = Number.isFinite(breadth.advancers)
+    ? Math.max(0, breadth.advancers)
+    : 0;
+  const decliners = Number.isFinite(breadth.decliners)
+    ? Math.max(0, breadth.decliners)
+    : 0;
+  const directionalTotal = advancers + decliners;
+
+  if (directionalTotal > 0) {
+    return Math.min(1, Math.max(0, advancers / directionalTotal));
+  }
+
+  const raw = Number(breadth.advance_ratio);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+
+  const normalized =
+    raw <= 1
+      ? raw
+      : raw <= 100
+        ? raw / 100
+        : raw / 10_000;
+
+  return Math.min(1, Math.max(0, normalized));
+}
+
+function formatParticipation(
+  ratio: number,
+): string {
+  return `${Math.round(
+    Math.min(1, Math.max(0, ratio)) * 100,
+  )} %`;
+}
+
 function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return "N/D";
@@ -439,7 +484,7 @@ export default function TodayPage() {
   const marketReading = useMemo(() => {
     if (!cockpit) return "La lecture du marché sera disponible dès la première synchronisation.";
     const direction = cockpit.weighted_change_percent >= 0 ? "progresse" : "recule";
-    const participation = Math.round(cockpit.breadth.advance_ratio * 100);
+    const participation = Math.round(normalizeAdvanceRatio(cockpit.breadth) * 100);
     const sectorSentence = topSector && weakSector
       ? `${topSector.sector} mène (${formatPercent(topSector.change_percent)}), tandis que ${weakSector.sector} ferme la marche (${formatPercent(weakSector.change_percent)}).`
       : "Les données sectorielles se mettent à jour.";
@@ -450,7 +495,7 @@ export default function TodayPage() {
   const displayName = firstName(user?.display_name);
   const hasPersonalData = Boolean(workspace.watchlist.length || workspace.portfolio.length || workspace.alerts.length);
   const marketChange = cockpit?.weighted_change_percent ?? 0;
-  const advanceRatio = cockpit?.breadth.advance_ratio ?? 0;
+  const advanceRatio = normalizeAdvanceRatio(cockpit?.breadth);
   const marketState = cockpit ? marketLabel(marketChange, advanceRatio) : "Synchronisation du marché";
   const sourceCount = [cockpit, watchlist, portfolio, alerts, terminal, psychology, news, calendar].filter(Boolean).length;
 
@@ -458,7 +503,7 @@ export default function TodayPage() {
     <main className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.2.1</span>
+          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.2.3</span>
           <h1>{displayName ? `Bonjour ${displayName}` : "Aujourd’hui sur les marchés"}</h1>
           <p>Une lecture quotidienne claire du marché canadien et de ton espace, sans recommandation de placement.</p>
         </div>
@@ -503,7 +548,7 @@ export default function TodayPage() {
             <dl>
               <div><dt>Progressions</dt><dd>{cockpit?.breadth.advancers ?? "—"}</dd></div>
               <div><dt>Baisses</dt><dd>{cockpit?.breadth.decliners ?? "—"}</dd></div>
-              <div><dt>Ratio de hausse</dt><dd>{cockpit ? `${Math.round(advanceRatio * 100)} %` : "—"}</dd></div>
+              <div><dt>Ratio de hausse</dt><dd>{cockpit ? formatParticipation(advanceRatio) : "—"}</dd></div>
             </dl>
           </article>
 
