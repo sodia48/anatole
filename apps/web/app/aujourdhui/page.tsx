@@ -285,10 +285,12 @@ export default function TodayPage() {
       tasks.push(
         getWatchlistSnapshot(workspace.watchlist, controller.signal)
           .then((value) => { if (mounted.current) setWatchlist(value); })
-          .catch((reason) => nextIssues.push({
-            source: "Watchlist",
-            message: reason instanceof Error ? reason.message : "Données indisponibles",
-          })),
+          .catch((reason) => {
+            nextIssues.push({
+              source: "Watchlist",
+              message: reason instanceof Error ? reason.message : "Données indisponibles",
+            });
+          }),
       );
     } else if (mounted.current) {
       setWatchlist(null);
@@ -298,10 +300,12 @@ export default function TodayPage() {
       tasks.push(
         analyzePortfolio(workspace.portfolio, controller.signal)
           .then((value) => { if (mounted.current) setPortfolio(value); })
-          .catch((reason) => nextIssues.push({
-            source: "Portefeuille",
-            message: reason instanceof Error ? reason.message : "Données indisponibles",
-          })),
+          .catch((reason) => {
+            nextIssues.push({
+              source: "Portefeuille",
+              message: reason instanceof Error ? reason.message : "Données indisponibles",
+            });
+          }),
       );
     } else if (mounted.current) {
       setPortfolio(null);
@@ -311,10 +315,12 @@ export default function TodayPage() {
       tasks.push(
         evaluateAlerts(workspace.alerts, controller.signal)
           .then((value) => { if (mounted.current) setAlerts(value); })
-          .catch((reason) => nextIssues.push({
-            source: "Alertes",
-            message: reason instanceof Error ? reason.message : "Données indisponibles",
-          })),
+          .catch((reason) => {
+            nextIssues.push({
+              source: "Alertes",
+              message: reason instanceof Error ? reason.message : "Données indisponibles",
+            });
+          }),
       );
     } else if (mounted.current) {
       setAlerts(null);
@@ -452,7 +458,7 @@ export default function TodayPage() {
     <main className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.2</span>
+          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.2.1</span>
           <h1>{displayName ? `Bonjour ${displayName}` : "Aujourd’hui sur les marchés"}</h1>
           <p>Une lecture quotidienne claire du marché canadien et de ton espace, sans recommandation de placement.</p>
         </div>
