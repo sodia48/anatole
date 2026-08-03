@@ -1,6 +1,9 @@
+import pytest
 import pandas as pd
 
+from app.schemas.ipo_insiders import InsiderTrade
 from app.services.insiders import (
+    InsiderService,
     infer_transaction_type,
     parse_sec_ownership_xml,
     parse_yahoo_insider_frame,
@@ -106,3 +109,75 @@ def test_yahoo_frame_accepts_alternate_columns() -> None:
     assert trades[0].transaction_type == "sell"
     assert trades[0].shares == 1250
     assert trades[0].value == 125000
+
+
+
+@pytest.mark.asyncio
+async def test_preview_scan_does_not_expand_to_full_directory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = InsiderService()
+    calls: list[str] = []
+
+    async def empty_ticker(
+        ticker: str,
+        company: str,
+        *,
+        force_refresh: bool = False,
+    ) -> list[InsiderTrade]:
+        calls.append(ticker)
+        return []
+
+    monkeypatch.setattr(
+        service,
+        "canadian_ticker",
+        empty_ticker,
+    )
+
+    snapshot = await service.snapshot(
+        market="canada",
+        ticker=None,
+        days=30,
+        scan_limit=8,
+        result_limit=220,
+        force_refresh=True,
+    )
+
+    assert snapshot.scanned_symbols == 8
+    assert len(calls) == 8
+    assert snapshot.trades == []
+
+
+@pytest.mark.asyncio
+async def test_full_scan_can_expand_when_initial_group_is_empty(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = InsiderService()
+    calls: list[str] = []
+
+    async def empty_ticker(
+        ticker: str,
+        company: str,
+        *,
+        force_refresh: bool = False,
+    ) -> list[InsiderTrade]:
+        calls.append(ticker)
+        return []
+
+    monkeypatch.setattr(
+        service,
+        "canadian_ticker",
+        empty_ticker,
+    )
+
+    snapshot = await service.snapshot(
+        market="canada",
+        ticker=None,
+        days=30,
+        scan_limit=24,
+        result_limit=220,
+        force_refresh=True,
+    )
+
+    assert snapshot.scanned_symbols == 40
+    assert len(calls) == 40

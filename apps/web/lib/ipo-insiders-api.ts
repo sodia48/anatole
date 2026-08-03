@@ -227,6 +227,8 @@ export function getInsiderSnapshot(
   return apiGet<InsiderSnapshot>(
     `/api/v1/discovery/insiders?${query.toString()}`,
     signal,
-    70_000,
+    (options.scanLimit ?? 16) <= 10
+      ? 20_000
+      : 70_000,
   );
 }

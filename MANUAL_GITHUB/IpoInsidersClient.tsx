@@ -31,6 +31,11 @@ type IpoTypeFilter =
   | "all"
   | IpoInstrumentType;
 type InsiderMarket = "canada" | "us";
+type InsiderLoadStage =
+  | "idle"
+  | "preview"
+  | "enriching"
+  | "ready";
 type InsiderTypeFilter =
   | "all"
   | InsiderTransactionType;
@@ -208,6 +213,78 @@ function sourceClass(
   return styles.sourceUnavailable;
 }
 
+const IPO_CACHE_KEY =
+  "anatole:ipo-insiders:ipo:v1";
+
+function insiderCacheKey({
+  market,
+  days,
+  ticker,
+}: {
+  market: InsiderMarket;
+  days: number;
+  ticker: string;
+}): string {
+  return [
+    "anatole:ipo-insiders:insiders:v2",
+    market,
+    days,
+    ticker || "radar",
+  ].join(":");
+}
+
+function readCachedSnapshot<T>(
+  key: string,
+): T | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as {
+      saved_at?: number;
+      value?: T;
+    };
+
+    if (
+      !parsed.value ||
+      !parsed.saved_at ||
+      Date.now() - parsed.saved_at >
+        6 * 60 * 60 * 1000
+    ) {
+      return null;
+    }
+
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSnapshot<T>(
+  key: string,
+  value: T,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        saved_at: Date.now(),
+        value,
+      }),
+    );
+  } catch {
+    // Le cache navigateur est facultatif.
+  }
+}
+
 function isAbortError(value: unknown): boolean {
   return (
     value instanceof DOMException &&
@@ -269,6 +346,16 @@ export function IpoInsidersClient({
     setInsidersError,
   ] = useState<string | null>(null);
   const [
+    insidersLoadStage,
+    setInsidersLoadStage,
+  ] =
+    useState<InsiderLoadStage>("idle");
+  const [
+    insidersRefreshing,
+    setInsidersRefreshing,
+  ] = useState(false);
+
+  const [
     insiderMarket,
     setInsiderMarket,
   ] =
@@ -302,7 +389,17 @@ export function IpoInsidersClient({
       const controller =
         new AbortController();
       ipoAbortRef.current = controller;
-      setIpoLoading(true);
+      const cached =
+        readCachedSnapshot<IpoSnapshot>(
+          IPO_CACHE_KEY,
+        );
+
+      if (cached) {
+        setIpo(cached);
+      }
+
+      setIpoLoading(!cached);
+      setIpoError(null);
 
       try {
         const snapshot =
@@ -313,7 +410,10 @@ export function IpoInsidersClient({
 
         if (!controller.signal.aborted) {
           setIpo(snapshot);
-          setIpoError(null);
+          writeCachedSnapshot(
+            IPO_CACHE_KEY,
+            snapshot,
+          );
         }
       } catch (caught) {
         if (
@@ -350,10 +450,30 @@ export function IpoInsidersClient({
         new AbortController();
       insidersAbortRef.current =
         controller;
-      setInsidersLoading(true);
+
+      const cacheKey = insiderCacheKey({
+        market: insiderMarket,
+        days: insiderDays,
+        ticker: activeTicker,
+      });
+      const cached =
+        readCachedSnapshot<InsiderSnapshot>(
+          cacheKey,
+        );
+      const hasCachedData =
+        Boolean(cached?.trades.length);
+
+      if (cached) {
+        setInsiders(cached);
+      }
+
+      setInsidersError(null);
+      setInsidersLoading(!hasCachedData);
+      setInsidersRefreshing(hasCachedData);
+      setInsidersLoadStage("preview");
 
       try {
-        const snapshot =
+        const preview =
           await getInsiderSnapshot(
             {
               market: insiderMarket,
@@ -364,15 +484,67 @@ export function IpoInsidersClient({
               scanLimit:
                 activeTicker
                   ? 1
-                  : 24,
+                  : insiderMarket === "canada"
+                    ? 8
+                    : 10,
+            },
+            controller.signal,
+            forceRefresh,
+          );
+
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const previewHasData =
+          preview.trades.length > 0;
+
+        if (previewHasData) {
+          setInsiders(preview);
+          writeCachedSnapshot(
+            cacheKey,
+            preview,
+          );
+          setInsidersLoading(false);
+          setInsidersRefreshing(
+            !activeTicker,
+          );
+        }
+
+        if (activeTicker) {
+          if (!previewHasData) {
+            setInsiders(preview);
+            writeCachedSnapshot(
+              cacheKey,
+              preview,
+            );
+          }
+          setInsidersLoadStage("ready");
+          return;
+        }
+
+        setInsidersLoadStage(
+          "enriching",
+        );
+
+        const enriched =
+          await getInsiderSnapshot(
+            {
+              market: insiderMarket,
+              days: insiderDays,
+              scanLimit: 24,
             },
             controller.signal,
             forceRefresh,
           );
 
         if (!controller.signal.aborted) {
-          setInsiders(snapshot);
-          setInsidersError(null);
+          setInsiders(enriched);
+          writeCachedSnapshot(
+            cacheKey,
+            enriched,
+          );
+          setInsidersLoadStage("ready");
         }
       } catch (caught) {
         if (
@@ -391,6 +563,8 @@ export function IpoInsidersClient({
           controller
         ) {
           setInsidersLoading(false);
+          setInsidersRefreshing(false);
+          setInsidersLoadStage("ready");
         }
       }
     },
@@ -405,23 +579,33 @@ export function IpoInsidersClient({
     setTab(initialTab);
   }, [initialTab]);
 
+  /*
+   * Charger uniquement l’onglet visible. Le montage précédent lançait IPO et
+   * un balayage de 24 à 40 titres en même temps.
+   */
   useEffect(() => {
-    void loadIpo();
+    if (tab === "ipo") {
+      void loadIpo();
 
-    return () => {
-      ipoAbortRef.current?.abort();
-    };
-  }, [loadIpo]);
+      return () => {
+        ipoAbortRef.current?.abort();
+      };
+    }
 
-  useEffect(() => {
     void loadInsiders();
 
     return () => {
       insidersAbortRef.current?.abort();
     };
-  }, [loadInsiders]);
+  }, [
+    tab,
+    loadInsiders,
+    loadIpo,
+  ]);
 
   useEffect(() => {
+    if (tab !== "ipo") return;
+
     const interval =
       window.setInterval(
         () => void loadIpo(),
@@ -434,11 +618,14 @@ export function IpoInsidersClient({
     return () =>
       window.clearInterval(interval);
   }, [
+    tab,
     ipo.refresh_after_seconds,
     loadIpo,
   ]);
 
   useEffect(() => {
+    if (tab !== "insiders") return;
+
     const interval =
       window.setInterval(
         () => void loadInsiders(),
@@ -451,6 +638,7 @@ export function IpoInsidersClient({
     return () =>
       window.clearInterval(interval);
   }, [
+    tab,
     insiders.refresh_after_seconds,
     loadInsiders,
   ]);
@@ -521,46 +709,39 @@ export function IpoInsidersClient({
       ],
     );
 
+  const insidersAwaitingFirstResult =
+    insidersLoading &&
+    insiders.summary.transactions === 0 &&
+    insiders.trades.length === 0;
+
   const insiderCoverageUnavailable =
     !insidersLoading &&
+    insidersLoadStage === "ready" &&
     insiders.summary.transactions === 0 &&
+    insiders.sources.length > 0 &&
     insiders.sources.every(
       (source) => source.count === 0,
     );
+
+  const insiderProgressLabel =
+    insidersLoadStage === "preview"
+      ? "Aperçu rapide…"
+      : insidersLoadStage === "enriching"
+        ? "Analyse étendue en cours…"
+        : insidersRefreshing
+          ? "Actualisation en arrière-plan…"
+          : null;
 
   function activateTab(
     nextTab: MainTab,
   ): void {
     setTab(nextTab);
-
-    if (
-      nextTab === "ipo" &&
-      (ipoError ||
-        (!ipoLoading &&
-          ipo.items.length === 0))
-    ) {
-      void loadIpo({
-        forceRefresh: Boolean(ipoError),
-      });
-    }
-
-    if (
-      nextTab === "insiders" &&
-      (insidersError ||
-        (!insidersLoading &&
-          insiders.trades.length === 0))
-    ) {
-      void loadInsiders({
-        forceRefresh: true,
-      });
-    }
   }
 
   function submitTicker(
     event: FormEvent<HTMLFormElement>,
   ): void {
     event.preventDefault();
-    setInsidersLoading(true);
     setActiveTicker(
       insiderInput
         .trim()
@@ -611,10 +792,12 @@ export function IpoInsidersClient({
           </div>
           <div>
             <strong>
-              {insiderCoverageUnavailable
-                ? "N/D"
-                : insiders.summary
-                    .transactions}
+              {insidersAwaitingFirstResult
+                ? "…"
+                : insiderCoverageUnavailable
+                  ? "Indisponible"
+                  : insiders.summary
+                      .transactions}
             </strong>
             <span>
               transactions détectées
@@ -1115,10 +1298,12 @@ export function IpoInsidersClient({
             <article>
               <span>Transactions</span>
               <strong>
-                {insiderCoverageUnavailable
-                  ? "N/D"
-                  : insiders.summary
-                      .transactions}
+                {insidersAwaitingFirstResult
+                  ? "Analyse…"
+                  : insiderCoverageUnavailable
+                    ? "Indisponible"
+                    : insiders.summary
+                        .transactions}
               </strong>
             </article>
             <article>
@@ -1128,10 +1313,12 @@ export function IpoInsidersClient({
                   styles.positive
                 }
               >
-                {insiderCoverageUnavailable
-                  ? "—"
-                  : insiders.summary
-                      .buys}
+                {insidersAwaitingFirstResult
+                  ? "…"
+                  : insiderCoverageUnavailable
+                    ? "—"
+                    : insiders.summary
+                        .buys}
               </strong>
             </article>
             <article>
@@ -1141,10 +1328,12 @@ export function IpoInsidersClient({
                   styles.negative
                 }
               >
-                {insiderCoverageUnavailable
-                  ? "—"
-                  : insiders.summary
-                      .sells}
+                {insidersAwaitingFirstResult
+                  ? "…"
+                  : insiderCoverageUnavailable
+                    ? "—"
+                    : insiders.summary
+                        .sells}
               </strong>
             </article>
             <article>
@@ -1152,11 +1341,13 @@ export function IpoInsidersClient({
                 Ratio d’achats
               </span>
               <strong>
-                {insiderCoverageUnavailable
-                  ? "N/D"
-                  : `${insiders.summary.buy_ratio_percent.toFixed(
-                      0,
-                    )}%`}
+                {insidersAwaitingFirstResult
+                  ? "…"
+                  : insiderCoverageUnavailable
+                    ? "Indisponible"
+                    : `${insiders.summary.buy_ratio_percent.toFixed(
+                        0,
+                      )}%`}
               </strong>
             </article>
             <article>
@@ -1171,12 +1362,14 @@ export function IpoInsidersClient({
                     : styles.negative
                 }
               >
-                {insiderCoverageUnavailable
-                  ? "N/D"
-                  : formatMoney(
-                      insiders.summary
-                        .net_value,
-                    )}
+                {insidersAwaitingFirstResult
+                  ? "…"
+                  : insiderCoverageUnavailable
+                    ? "Indisponible"
+                    : formatMoney(
+                        insiders.summary
+                          .net_value,
+                      )}
               </strong>
             </article>
           </section>
@@ -1219,9 +1412,6 @@ export function IpoInsidersClient({
                   onClick={() => {
                     setActiveTicker("");
                     setInsiderInput("");
-                    setInsidersLoading(
-                      true,
-                    );
                   }}
                 >
                   Retour au radar
@@ -1244,9 +1434,6 @@ export function IpoInsidersClient({
                   );
                   setActiveTicker("");
                   setInsiderInput("");
-                  setInsidersLoading(
-                    true,
-                  );
                 }}
               >
                 <option value="canada">
@@ -1272,9 +1459,6 @@ export function IpoInsidersClient({
                       event.target
                         .value,
                     ),
-                  );
-                  setInsidersLoading(
-                    true,
                   );
                 }}
               >
@@ -1348,6 +1532,34 @@ export function IpoInsidersClient({
               >
                 Réessayer
               </button>
+            </div>
+          ) : null}
+
+          {insiderProgressLabel ? (
+            <div
+              className={
+                styles.collectionProgress
+              }
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className={
+                  styles.collectionSpinner
+                }
+                aria-hidden="true"
+              />
+              <div>
+                <strong>
+                  {insiderProgressLabel}
+                </strong>
+                <small>
+                  Les premières données sont
+                  affichées dès qu’elles arrivent;
+                  le radar complet continue sans
+                  bloquer la page.
+                </small>
+              </div>
             </div>
           ) : null}
 
@@ -1525,6 +1737,19 @@ export function IpoInsidersClient({
                     </div>
                   ),
                 )}
+              </div>
+            ) : insidersAwaitingFirstResult ? (
+              <div
+                className={
+                  styles.loadingRows
+                }
+                aria-hidden="true"
+              >
+                {Array.from({
+                  length: 4,
+                }).map((_, index) => (
+                  <span key={index} />
+                ))}
               </div>
             ) : (
               <div

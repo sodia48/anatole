@@ -958,6 +958,7 @@ class InsiderService:
                 )
                 if (
                     not trades
+                    and requested_scan >= 12
                     and scanned < max_directory_scan
                 ):
                     additional = directory[
@@ -1068,9 +1069,9 @@ class InsiderService:
                 if deduplicated
                 else (
                     "Aucune transaction normalisée n’a été obtenue "
-                    "de la couverture automatisée. Ce résultat est "
-                    "affiché comme N/D dans l’interface et ne signifie "
-                    "pas qu’aucune déclaration officielle n’existe."
+                    "de la couverture automatisée. L’interface présente "
+                    "cet état comme indisponible et ne l’interprète pas "
+                    "comme une absence certaine de déclarations officielles."
                 )
             ),
         )
