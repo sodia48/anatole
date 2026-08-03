@@ -1,71 +1,37 @@
-# Anatole Admin Routes Recovery v1.1.6
+# Anatole v1.2.0 — Aujourd’hui
 
-## Ce que confirme `/ready`
+## Nouvelle porte d’entrée
 
-- `configured_admins: 1` : le courriel administrateur est correctement lu.
-- `routes_enabled: false` : le routeur Admin n'a pas pu être importé.
-- Les quatre routes manquantes signifient généralement que `admin.py` ou
-  `schemas/admin.py` manque dans GitHub, ou qu'un fichier a été ajouté sous
-  un nom numéroté au mauvais endroit.
+`/aujourdhui` réunit en une lecture quotidienne :
 
-## Chemins obligatoires
+- marché TSX 60 ou Composite;
+- largeur, psychologie et régime Terminal;
+- Watchlist, Portefeuille, Alertes et Comparateur;
+- éléments à surveiller;
+- calendrier économique;
+- lecture Anatole descriptive, sans recommandation de placement.
 
-Les fichiers doivent exister exactement ici :
+## Actualisation
 
-1. `apps/api/app/api/router.py`
-2. `apps/api/app/main.py`
-3. `apps/api/app/api/routes/admin.py`
-4. `apps/api/app/api/routes/health.py`
-5. `apps/api/app/schemas/admin.py`
-6. `apps/api/app/schemas/accounts.py`
-7. `apps/api/app/services/accounts.py`
-8. `apps/api/app/core/config.py`
+- marché : 15 secondes;
+- espace personnel : 30 secondes;
+- Terminal, psychologie, actualités et calendrier : 120 secondes;
+- pause automatique lorsque l’onglet est masqué;
+- conservation des dernières données valides grâce à la couche résiliente existante.
 
-Ne créez pas des fichiers comme `03_admin.py` directement dans le dépôt.
-Les noms numérotés du dossier `MANUAL_GITHUB` servent uniquement à les
-identifier avant de copier leur contenu au chemin exact.
+## Navigation
 
-## Méthode la plus fiable
-
-Pour chaque chemin :
-
-1. Ouvrez le fichier correspondant dans GitHub.
-2. S'il n'existe pas, utilisez **Add file → Create new file**.
-3. Collez le chemin exact complet.
-4. Copiez tout le contenu du fichier numéroté correspondant.
-5. Committez directement dans `main`.
-
-## Vérification de `router.py`
-
-Le fichier doit contenir :
-
-- `from app.api.routes import admin`
-- `admin.router`
-- `prefix="/api/v1/admin"`
-
-## Vérification de `admin.py`
-
-Le fichier doit contenir les routes :
-
-- `@router.get("/overview"`
-- `@router.get("/users"`
-- `@router.get("/invites"`
-- `@router.get("/reports"`
+- `/` redirige désormais vers `/aujourdhui`;
+- Aujourd’hui apparaît en premier dans la sidebar;
+- le dock mobile devient : Aujourd’hui, Cockpit, Screener, ETF, Menu;
+- le Cockpit et toutes les autres pages restent inchangés.
 
 ## Déploiement
 
-1. Commit et push sur `main`.
-2. Redéployez uniquement Render.
-3. Ne redéployez pas Vercel pour cette correction.
-4. Rechargez `/ready`.
+1. Décompresser le PATCH à la racine du dépôt.
+2. Accepter les six ajouts/remplacements.
+3. Commit et push sur `main`.
+4. Redéployer uniquement Vercel.
+5. Désactiver `Use existing Build Cache`.
 
-Résultat attendu :
-
-```json
-"admin_console": {
-  "status": "ready",
-  "routes_enabled": true,
-  "configured_admins": 1,
-  "missing_routes": []
-}
-```
+Aucun redéploiement Render ou PostgreSQL n’est requis.

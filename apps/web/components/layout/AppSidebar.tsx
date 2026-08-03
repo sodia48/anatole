@@ -41,12 +41,14 @@ import {
 
 import guardStyles from "./AppSidebarGuard.module.css";
 import { AccountStatus } from "@/components/account/AccountStatus";
+import { useAccount } from "@/components/providers/AccountProvider";
 
 type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   available: boolean;
+  adminOnly?: boolean;
 };
 
 type SearchResult = {
@@ -64,6 +66,12 @@ const groups: Array<{
   {
     label: "Marchés",
     items: [
+      {
+        href: "/aujourdhui",
+        label: "Aujourd’hui",
+        icon: LayoutDashboard,
+        available: true,
+      },
       {
         href: "/cockpit",
         label: "Cockpit",
@@ -171,12 +179,24 @@ const groups: Array<{
       },
     ],
   },
+  {
+    label: "Administration",
+    items: [
+      {
+        href: "/admin",
+        label: "Console bêta",
+        icon: ShieldCheck,
+        available: true,
+        adminOnly: true,
+      },
+    ],
+  },
 ];
 
 const searchablePages: SearchResult[] =
   groups.flatMap((group) =>
     group.items
-      .filter((item) => item.available)
+      .filter((item) => item.available && !item.adminOnly)
       .map((item) => ({
         key: `page:${item.href}`,
         href: item.href,
@@ -291,6 +311,7 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAccount();
   const searchInputRef =
     useRef<HTMLInputElement | null>(null);
   const [drawerOpen, setDrawerOpen] =
@@ -602,7 +623,7 @@ export function AppSidebar({
         </button>
 
         <Link
-          href="/cockpit"
+          href="/aujourdhui"
           className="mobile-appbar-brand"
           aria-label="Accueil Anatole"
         >
@@ -775,7 +796,7 @@ export function AppSidebar({
           className={`mobile-drawer-heading ${guardStyles.mobileDrawerHeading}`}
         >
           <Link
-            href="/cockpit"
+            href="/aujourdhui"
             className="mobile-drawer-brand"
             onClick={() => setDrawerOpen(false)}
           >
@@ -798,7 +819,7 @@ export function AppSidebar({
 
         <div className="desktop-sidebar-header">
           <Link
-            href="/cockpit"
+            href="/aujourdhui"
             className="brand desktop-brand"
             aria-label="Anatole"
             title={
@@ -873,7 +894,13 @@ export function AppSidebar({
           className="sidebar-nav desktop-nav"
           aria-label="Navigation principale"
         >
-          {groups.map((group) => (
+          {groups
+            .filter((group) =>
+              group.items.some(
+                (item) => !item.adminOnly || user?.is_admin,
+              ),
+            )
+            .map((group) => (
             <section
               className="nav-group"
               key={group.label}
@@ -882,7 +909,9 @@ export function AppSidebar({
                 {group.label}
               </span>
 
-              {group.items.map((item) => {
+              {group.items
+                .filter((item) => !item.adminOnly || user?.is_admin)
+                .map((item) => {
                 const Icon = item.icon;
                 const active = isActive(
                   pathname,
@@ -929,7 +958,7 @@ export function AppSidebar({
         <div className="sidebar-footer">
           <AccountStatus />
           <Link href="/roadmap">
-            Anatole v1.0
+            Anatole v1.2
           </Link>
           <span>Centre de contrôle · synchronisation active</span>
         </div>
@@ -940,11 +969,19 @@ export function AppSidebar({
         aria-label="Accès rapide Anatole"
       >
         <Link
+          href="/aujourdhui"
+          className={pathname === "/aujourdhui" ? "is-active" : ""}
+          aria-current={pathname === "/aujourdhui" ? "page" : undefined}
+        >
+          <LayoutDashboard size={20} />
+          <span>Aujourd’hui</span>
+        </Link>
+        <Link
           href="/cockpit"
           className={pathname === "/cockpit" ? "is-active" : ""}
           aria-current={pathname === "/cockpit" ? "page" : undefined}
         >
-          <LayoutDashboard size={20} />
+          <Activity size={20} />
           <span>Cockpit</span>
         </Link>
         <Link
@@ -963,21 +1000,13 @@ export function AppSidebar({
           <CircleDollarSign size={20} />
           <span>ETF</span>
         </Link>
-        <Link
-          href="/terminal"
-          className={pathname === "/terminal" ? "is-active" : ""}
-          aria-current={pathname === "/terminal" ? "page" : undefined}
-        >
-          <Gauge size={20} />
-          <span>Terminal</span>
-        </Link>
         <button
           type="button"
           className={
+            pathname !== "/aujourdhui" &&
             pathname !== "/cockpit" &&
             pathname !== "/screener" &&
-            !pathname.startsWith("/etf") &&
-            pathname !== "/terminal"
+            !pathname.startsWith("/etf")
               ? "is-active"
               : ""
           }
