@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import threading
 import time
 from datetime import UTC, datetime
@@ -31,6 +32,9 @@ from app.services.accounts import (
     WorkspaceConflictError,
     account_service,
 )
+from app.services.notifications import notification_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -302,10 +306,15 @@ async def export_account(
     if snapshot is None:
         raise HTTPException(status_code=404, detail="Compte introuvable.")
     fresh_user, workspace = snapshot
+    notification_service.account_service = account_service
+    preferences = await notification_service.get_preferences(user.id)
+    feed = await notification_service.list_feed(user.id, limit=200)
     return AccountExport(
         exported_at=datetime.now(UTC),
         user=fresh_user,
         workspace=workspace,
+        notification_preferences=preferences,
+        notifications=feed.items,
     )
 
 
@@ -325,4 +334,10 @@ async def delete_account(
         )
     except InvalidCredentialsError as error:
         raise HTTPException(status_code=401, detail="Mot de passe incorrect.") from error
+
+    notification_service.account_service = account_service
+    try:
+        await notification_service.delete_user_data(user.id)
+    except Exception:
+        logger.exception("notification_cleanup_failed user_id=%s", user.id)
 

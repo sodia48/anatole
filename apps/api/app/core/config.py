@@ -21,6 +21,17 @@ class Settings(BaseSettings):
     account_privacy_version: str = "2026-08-01"
     account_admin_emails: str = ""
 
+    notification_email_enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Anatole"
+    smtp_use_tls: bool = True
+    smtp_use_ssl: bool = False
+    notification_app_url: str = "https://anatole-mu.vercel.app/aujourdhui"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
@@ -54,4 +65,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

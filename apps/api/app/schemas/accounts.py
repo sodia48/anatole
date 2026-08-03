@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, SecretStr, ValidationInfo, field_validator
 
+from app.schemas.notifications import NotificationItem, NotificationPreferences
 from app.schemas.workspace import AdvisorProfile, AlertRule, PortfolioPositionInput
 
 
@@ -169,5 +170,6 @@ class AccountExport(BaseModel):
     exported_at: datetime
     user: AccountUser
     workspace: WorkspaceSnapshot
-
+    notification_preferences: NotificationPreferences | None = None
+    notifications: list[NotificationItem] = Field(default_factory=list)
 
