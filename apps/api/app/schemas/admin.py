@@ -96,3 +96,4 @@ class AdminReportList(BaseModel):
 
 class AdminReportUpdateRequest(BaseModel):
     status: Literal["new", "reviewing", "resolved"]
+
