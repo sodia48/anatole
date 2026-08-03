@@ -1,37 +1,44 @@
-# Anatole v1.2.0 — Aujourd’hui
+# Anatole v1.3.1 — IPO et transactions d’initiés
 
-## Nouvelle porte d’entrée
+## IPO
 
-`/aujourdhui` réunit en une lecture quotidienne :
+Le chargement initial est maintenant déterministe :
 
-- marché TSX 60 ou Composite;
-- largeur, psychologie et régime Terminal;
-- Watchlist, Portefeuille, Alertes et Comparateur;
-- éléments à surveiller;
-- calendrier économique;
-- lecture Anatole descriptive, sans recommandation de placement.
+- les requêtes précédentes sont annulées proprement;
+- l’état de chargement est réinitialisé à chaque collecte;
+- la prop `initialTab` est resynchronisée;
+- l’ouverture de l’onglet IPO relance immédiatement une collecte lorsque la
+  première tentative a échoué ou n’a rien chargé;
+- un bouton Réessayer force un rafraîchissement backend;
+- les réponses lentes disposent d’un délai adapté.
 
-## Actualisation
+## Initiés
 
-- marché : 15 secondes;
-- espace personnel : 30 secondes;
-- Terminal, psychologie, actualités et calendrier : 120 secondes;
-- pause automatique lorsque l’onglet est masqué;
-- conservation des dernières données valides grâce à la couche résiliente existante.
+Le radar canadien est renforcé :
 
-## Navigation
+- utilisation prioritaire de `get_insider_transactions()`;
+- compatibilité avec plusieurs noms de colonnes yfinance;
+- sondage initial de 24 titres, puis jusqu’à 40 si le premier groupe est vide;
+- concurrence contrôlée et délai par titre réduit;
+- cache vide limité à 90 secondes au lieu de 15 minutes;
+- relance forcée depuis l’interface;
+- état détaillé de chaque source.
 
-- `/` redirige désormais vers `/aujourdhui`;
-- Aujourd’hui apparaît en premier dans la sidebar;
-- le dock mobile devient : Aujourd’hui, Cockpit, Screener, ETF, Menu;
-- le Cockpit et toutes les autres pages restent inchangés.
+Un résultat non couvert n’est plus présenté comme « 0 transaction ». Anatole
+affiche `N/D`, explique que la couverture automatisée n’a rien normalisé et
+conserve un lien direct vers SEDI ou EDGAR.
 
 ## Déploiement
 
-1. Décompresser le PATCH à la racine du dépôt.
-2. Accepter les six ajouts/remplacements.
-3. Commit et push sur `main`.
-4. Redéployer uniquement Vercel.
-5. Désactiver `Use existing Build Cache`.
+Cette correction touche le frontend et le backend :
 
-Aucun redéploiement Render ou PostgreSQL n’est requis.
+1. installer le PATCH à la racine du dépôt;
+2. commit et push sur `main`;
+3. déployer Render en premier;
+4. déployer ensuite Vercel sans réutiliser le Build Cache;
+5. tester IPO dès la première ouverture;
+6. tester Initiés Canada puis États-Unis;
+7. utiliser « Relancer la collecte » si une source externe a temporairement
+   refusé une requête.
+
+Aucune modification PostgreSQL n’est requise.

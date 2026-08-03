@@ -83,3 +83,26 @@ def test_sec_form_4_and_summary() -> None:
 def test_inference() -> None:
     assert infer_transaction_type(code="S")[0] == "sell"
     assert infer_transaction_type("Option Exercise")[0] == "exercise"
+
+
+
+def test_yahoo_frame_accepts_alternate_columns() -> None:
+    frame = pd.DataFrame([{
+        "Latest Transaction": "2026-07-24",
+        "Insider Trading": "Alex Smith",
+        "Insider Position": "Officer",
+        "Transaction Type": "Sale",
+        "Shares Traded": 1250,
+        "Total Value": 125000,
+        "Ownership": "Direct",
+    }])
+    trades = parse_yahoo_insider_frame(
+        frame,
+        ticker="TD",
+        company="Toronto-Dominion Bank",
+    )
+    assert len(trades) == 1
+    assert trades[0].insider_name == "Alex Smith"
+    assert trades[0].transaction_type == "sell"
+    assert trades[0].shares == 1250
+    assert trades[0].value == 125000
