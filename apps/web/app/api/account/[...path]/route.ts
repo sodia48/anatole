@@ -12,26 +12,22 @@ const API_URL = (
 ).replace(/\/+$/, "");
 
 const COOKIE_NAME = "anatole_session";
-const PUBLIC_ACTIONS = new Set(["registration", "register", "login"]);
-const ALLOWED_ACTIONS = new Set([
-  "registration",
-  "register",
-  "login",
-  "logout",
-  "logout-all",
-  "me",
-  "workspace",
-  "profile",
-  "change-password",
-  "export",
-  "delete",
+const ROOTS = new Set([
+  "preferences",
+  "feed",
+  "refresh",
+  "read-all",
+  "preview",
+  "send-test",
 ]);
 
 type Context = {
   params: Promise<{ path: string[] }> | { path: string[] };
 };
 
-function noStoreHeaders(contentType = "application/json; charset=utf-8"): Headers {
+function noStoreHeaders(
+  contentType = "application/json; charset=utf-8",
+): Headers {
   return new Headers({
     "Content-Type": contentType,
     "Cache-Control": "no-store, max-age=0",
@@ -39,95 +35,105 @@ function noStoreHeaders(contentType = "application/json; charset=utf-8"): Header
   });
 }
 
-function clearSession(response: NextResponse): void {
-  response.cookies.set(COOKIE_NAME, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+function validSegments(segments: string[]): boolean {
+  if (segments.length < 1 || segments.length > 3) return false;
+  if (!ROOTS.has(segments[0])) return false;
+  if (!segments.every((segment) => /^[a-zA-Z0-9_-]+$/.test(segment))) {
+    return false;
+  }
+  if (segments[0] === "feed" && segments.length > 1) {
+    return segments.length === 3 && segments[2] === "read";
+  }
+  return segments.length === 1;
 }
 
-async function proxy(request: NextRequest, context: Context): Promise<NextResponse> {
+async function proxy(
+  request: NextRequest,
+  context: Context,
+): Promise<NextResponse> {
   const params = await context.params;
   const segments = params.path ?? [];
-  if (segments.length !== 1 || !ALLOWED_ACTIONS.has(segments[0])) {
-    return NextResponse.json({ detail: "Route de compte invalide." }, { status: 404 });
+
+  if (!validSegments(segments)) {
+    return NextResponse.json(
+      { detail: "Route de notifications invalide." },
+      { status: 404, headers: noStoreHeaders() },
+    );
   }
 
-  const action = segments[0];
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!PUBLIC_ACTIONS.has(action) && !token) {
-    return NextResponse.json({ detail: "Connexion requise." }, { status: 401 });
+  if (!token) {
+    return NextResponse.json(
+      { detail: "Connexion requise pour les notifications." },
+      { status: 401, headers: noStoreHeaders() },
+    );
   }
 
-  const headers = new Headers({ Accept: "application/json" });
+  const headers = new Headers({
+    Accept: "application/json",
+    Authorization: `Bearer ${token}`,
+  });
   const requestId = request.headers.get("X-Request-ID");
   if (requestId) headers.set("X-Request-ID", requestId);
-  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   let body: ArrayBuffer | undefined;
-  if (!['GET', 'HEAD'].includes(request.method)) {
-    body = await request.arrayBuffer();
-    if (body.byteLength) headers.set("Content-Type", request.headers.get("content-type") ?? "application/json");
+  if (!["GET", "HEAD"].includes(request.method)) {
+    const requestBody = await request.arrayBuffer();
+    if (requestBody.byteLength) {
+      body = requestBody;
+      headers.set(
+        "Content-Type",
+        request.headers.get("content-type") ?? "application/json",
+      );
+    }
   }
 
+  const upstreamUrl = new URL(
+    `${API_URL}/api/v1/notifications/${segments.join("/")}`,
+  );
+  request.nextUrl.searchParams.forEach((value: string, key: string) => {
+    upstreamUrl.searchParams.append(key, value);
+  });
+
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25_000);
+  const timer = setTimeout(() => controller.abort(), 35_000);
 
   try {
-    const upstream = await fetch(`${API_URL}/api/v1/account/${action}`, {
+    const upstream = await fetch(upstreamUrl, {
       method: request.method,
       headers,
       body: body?.byteLength ? body : undefined,
       cache: "no-store",
-      redirect: "manual",
       signal: controller.signal,
     });
-
-    const contentType = upstream.headers.get("content-type") ?? "application/json; charset=utf-8";
+    const contentType =
+      upstream.headers.get("content-type") ??
+      "application/json; charset=utf-8";
     const raw = await upstream.arrayBuffer();
-
-    if (PUBLIC_ACTIONS.has(action) && upstream.ok) {
-      const payload = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
-      const sessionToken = typeof payload.token === "string" ? payload.token : null;
-      const expiresAt = typeof payload.expires_at === "string" ? new Date(payload.expires_at) : null;
-      delete payload.token;
-      delete payload.token_type;
-      const response = NextResponse.json(payload, { status: upstream.status, headers: noStoreHeaders() });
-      if (sessionToken) {
-        response.cookies.set(COOKIE_NAME, sessionToken, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: "lax",
-          path: "/",
-          expires: expiresAt && Number.isFinite(expiresAt.getTime()) ? expiresAt : undefined,
-        });
-      }
-      return response;
-    }
-
-    const response = upstream.status === 204
-      ? new NextResponse(null, {
-          status: 204,
-          headers: noStoreHeaders(contentType),
-        })
-      : new NextResponse(raw, {
-          status: upstream.status,
-          headers: noStoreHeaders(contentType),
-        });
+    const response =
+      upstream.status === 204
+        ? new NextResponse(null, {
+            status: 204,
+            headers: noStoreHeaders(contentType),
+          })
+        : new NextResponse(raw, {
+            status: upstream.status,
+            headers: noStoreHeaders(contentType),
+          });
     const upstreamRequestId = upstream.headers.get("X-Request-ID");
-    if (upstreamRequestId) response.headers.set("X-Request-ID", upstreamRequestId);
-    if (action === "logout" || action === "logout-all" || action === "delete" || upstream.status === 401) {
-      clearSession(response);
+    if (upstreamRequestId) {
+      response.headers.set("X-Request-ID", upstreamRequestId);
     }
     return response;
   } catch (error) {
-    const detail = error instanceof Error && error.name === "AbortError"
-      ? "Délai dépassé lors de la connexion au compte Anatole."
-      : "Le service de compte Anatole est temporairement indisponible.";
-    return NextResponse.json({ detail }, { status: 502, headers: noStoreHeaders() });
+    const detail =
+      error instanceof Error && error.name === "AbortError"
+        ? "Délai dépassé lors de l’actualisation des notifications."
+        : "Le centre de notifications est temporairement indisponible.";
+    return NextResponse.json(
+      { detail },
+      { status: 502, headers: noStoreHeaders() },
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -136,4 +142,4 @@ async function proxy(request: NextRequest, context: Context): Promise<NextRespon
 export const GET = proxy;
 export const POST = proxy;
 export const PUT = proxy;
-export const DELETE = proxy;
+
