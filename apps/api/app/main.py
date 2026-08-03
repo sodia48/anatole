@@ -6,10 +6,14 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
+try:
+    from app.api.routes import admin as admin_routes
+except ImportError:  # Keep the public API alive during a partial deployment.
+    admin_routes = None
 from app.core.config import settings
 from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
@@ -21,36 +25,56 @@ logging.basicConfig(
 )
 logger = logging.getLogger("anatole.api")
 
+ADMIN_PREFIX = "/api/v1/admin"
+REQUIRED_ADMIN_ROUTES = {
+    f"{ADMIN_PREFIX}/overview",
+    f"{ADMIN_PREFIX}/users",
+    f"{ADMIN_PREFIX}/invites",
+    f"{ADMIN_PREFIX}/reports",
+}
+
+
+def route_paths(application: FastAPI) -> set[str]:
+    return {
+        getattr(route, "path", "")
+        for route in application.routes
+        if getattr(route, "path", "")
+    }
+
+
+def ensure_admin_routes(application: FastAPI) -> None:
+    """Register the admin router once, even after a partially applied patch."""
+    if REQUIRED_ADMIN_ROUTES.issubset(route_paths(application)):
+        return
+
+    if admin_routes is None:
+        logger.error("admin_module_unavailable")
+        return
+
+    application.include_router(
+        admin_routes.router,
+        prefix=ADMIN_PREFIX,
+        tags=["admin"],
+    )
+
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     await shared_http_client.start()
     await account_service.start()
 
-    required_admin_routes = {
-        "/api/v1/admin/overview",
-        "/api/v1/admin/users",
-        "/api/v1/admin/invites",
-        "/api/v1/admin/reports",
-    }
-    available_routes = {
-        getattr(route, "path", "")
-        for route in application.routes
-    }
-    missing_admin_routes = sorted(
-        required_admin_routes - available_routes
-    )
-    if missing_admin_routes:
-        raise RuntimeError(
-            "Admin routes missing: "
-            + ", ".join(missing_admin_routes)
+    missing = sorted(REQUIRED_ADMIN_ROUTES - route_paths(application))
+    if missing:
+        # Never take the market API offline because an optional admin module is
+        # incomplete. The /ready diagnostic reports the exact missing routes.
+        logger.error("admin_routes_missing routes=%s", ",".join(missing))
+    else:
+        logger.info(
+            "admin_console_ready configured_admins=%s",
+            len(settings.account_admin_email_set),
         )
 
-    logger.info(
-        "anatole_api_started shared_http_pool=true "
-        "admin_routes=true configured_admins=%s",
-        len(settings.account_admin_email_set),
-    )
+    logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
@@ -61,7 +85,7 @@ async def lifespan(application: FastAPI):
 
 app = FastAPI(
     title="Anatole API",
-    version="1.1.4",
+    version="1.1.5",
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
@@ -128,7 +152,7 @@ async def request_observability(
         request_id=request_id,
     )
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Anatole-Version"] = "1.1.4"
+    response.headers["X-Anatole-Version"] = "1.1.5"
     response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
 
     logger.info(
@@ -143,3 +167,4 @@ async def request_observability(
 
 
 app.include_router(api_router)
+ensure_admin_routes(app)

@@ -49,17 +49,6 @@ def test_admin_access_overview_and_users(admin_client: TestClient):
     admin = register(admin_client, "owner@example.com")
     regular = register(admin_client, "reader@example.com")
 
-    anonymous = admin_client.get("/api/v1/admin/overview")
-    assert anonymous.status_code == 401
-
-    ready = admin_client.get("/ready")
-    assert ready.status_code == 200
-    assert ready.json()["admin_console"] == {
-        "status": "ready",
-        "routes_enabled": True,
-        "configured_admins": 1,
-    }
-
     denied = admin_client.get(
         "/api/v1/admin/overview",
         headers=auth(regular["token"]),

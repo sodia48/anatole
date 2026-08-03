@@ -1,62 +1,68 @@
-# Anatole v1.1.4 — correction définitive du 404 Admin
+# Anatole Admin Backend v1.1.5
 
-## Cause
+## Cause exacte de la panne
 
-Le frontend `/admin` est bien déployé, mais Render exécute encore un backend
-sans les routes `/api/v1/admin/*`. Un courriel correct dans
-`ACCOUNT_ADMIN_EMAILS` ne peut pas corriger une route absente : FastAPI répond
-404 avant même de vérifier le rôle administrateur.
+Le fichier `main.py` v1.1.4 contenait un garde qui arrêtait FastAPI lorsque
+les routes Admin n'étaient pas enregistrées. Dans le dépôt déployé, `main.py`
+avait été remplacé, mais `router.py` et/ou les fichiers Admin n'avaient pas
+tous été appliqués. Le garde a donc volontairement arrêté toute l'API.
 
-## Correction
+## Correction v1.1.5
 
-Ce paquet installe toute la couche backend Admin :
+- les routes Admin sont enregistrées dans `router.py`;
+- `main.py` vérifie les routes et les ajoute une seconde fois seulement si
+  elles manquent;
+- aucun doublon n'est créé;
+- une installation partielle ne coupe plus l'API publique;
+- `/ready` indique précisément si la console Admin est prête;
+- la configuration `ACCOUNT_ADMIN_EMAILS` est comptée dans `/ready`;
+- la version de l'API devient `1.1.5`.
 
-- routeur `/api/v1/admin`;
-- endpoints overview, users, invites et reports;
-- schémas et stockage PostgreSQL;
-- rôle administrateur calculé depuis `ACCOUNT_ADMIN_EMAILS`;
-- signalements persistants;
-- garde de démarrage qui empêche Render de démarrer si les routes Admin sont absentes;
-- diagnostic Admin ajouté à `/ready`.
+## Installation recommandée
 
-## Installation
+Décompressez le PATCH à la racine du dépôt et acceptez tous les remplacements.
 
-1. Décompresser le PATCH à la racine du dépôt.
-2. Remplacer tous les fichiers proposés.
-3. Commit et push sur `main`.
-4. Déployer **Render uniquement**.
-5. Ne pas redéployer Vercel pour ce correctif.
+Vérifiez surtout que ces fichiers existent dans GitHub :
+
+- `apps/api/app/main.py`
+- `apps/api/app/api/router.py`
+- `apps/api/app/api/routes/admin.py`
+- `apps/api/app/schemas/admin.py`
+- `apps/api/app/services/accounts.py`
+
+Puis committez dans `main` et déployez Render.
 
 ## Variable Render
 
-Utiliser l'adresse exacte du compte Anatole :
+Conservez l'adresse exacte du compte Anatole :
 
 `ACCOUNT_ADMIN_EMAILS=solo0112@live.fr`
 
-Puis cliquer sur **Save, rebuild and deploy**.
+La comparaison n'est pas sensible aux majuscules, mais les espaces inutiles
+doivent être évités.
 
-## Vérifications
+## Vérification
 
-Après le déploiement, ouvrir :
+Après le déploiement, ouvrez :
 
 `https://anatole-api.onrender.com/ready`
 
-Le JSON doit contenir :
+Le bloc attendu est :
 
 ```json
 "admin_console": {
   "status": "ready",
   "routes_enabled": true,
-  "configured_admins": 1
+  "configured_admins": 1,
+  "missing_routes": []
 }
 ```
 
-Puis ouvrir directement :
+Ouvrez ensuite :
 
 `https://anatole-api.onrender.com/api/v1/admin/overview`
 
-Dans un navigateur sans jeton, la réponse correcte est **401** avec
-`Connexion administrateur requise.` Une réponse **404** signifie que Render
-n'a pas déployé ce commit.
+Sans jeton, la réponse correcte est HTTP 401 avec
+`Connexion administrateur requise.` Ce résultat confirme que la route existe.
 
-Enfin, se déconnecter/reconnecter dans Anatole et ouvrir `/admin`.
+Enfin, reconnectez-vous dans Anatole et ouvrez `/admin`.

@@ -2,7 +2,6 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     accounts,
-    admin,
     analysis,
     discovery,
     etf_holdings,
@@ -16,6 +15,12 @@ from app.api.routes import (
     ws,
     workspace,
 )
+
+try:
+    from app.api.routes import admin
+except ImportError:  # Admin is optional during partial/rollback deployments.
+    admin = None
+
 
 
 api_router = APIRouter()
@@ -97,12 +102,14 @@ api_router.include_router(
     tags=["account"],
 )
 
-# Console privée de pilotage de la bêta
-api_router.include_router(
-    admin.router,
-    prefix="/api/v1/admin",
-    tags=["admin"],
-)
+# Console privée de pilotage de la bêta. Une installation partielle ne doit
+# jamais rendre indisponibles les routes de marché.
+if admin is not None:
+    api_router.include_router(
+        admin.router,
+        prefix="/api/v1/admin",
+        tags=["admin"],
+    )
 
 # Observabilité, incidents clients et signalements bêta
 api_router.include_router(
