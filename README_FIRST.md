@@ -1,53 +1,65 @@
-# Anatole Admin Backend v1.1.5
+# Anatole Admin Routes Recovery v1.1.6
 
-## Cause exacte de la panne
+## Ce que confirme `/ready`
 
-Le fichier `main.py` v1.1.4 contenait un garde qui arrêtait FastAPI lorsque
-les routes Admin n'étaient pas enregistrées. Dans le dépôt déployé, `main.py`
-avait été remplacé, mais `router.py` et/ou les fichiers Admin n'avaient pas
-tous été appliqués. Le garde a donc volontairement arrêté toute l'API.
+- `configured_admins: 1` : le courriel administrateur est correctement lu.
+- `routes_enabled: false` : le routeur Admin n'a pas pu être importé.
+- Les quatre routes manquantes signifient généralement que `admin.py` ou
+  `schemas/admin.py` manque dans GitHub, ou qu'un fichier a été ajouté sous
+  un nom numéroté au mauvais endroit.
 
-## Correction v1.1.5
+## Chemins obligatoires
 
-- les routes Admin sont enregistrées dans `router.py`;
-- `main.py` vérifie les routes et les ajoute une seconde fois seulement si
-  elles manquent;
-- aucun doublon n'est créé;
-- une installation partielle ne coupe plus l'API publique;
-- `/ready` indique précisément si la console Admin est prête;
-- la configuration `ACCOUNT_ADMIN_EMAILS` est comptée dans `/ready`;
-- la version de l'API devient `1.1.5`.
+Les fichiers doivent exister exactement ici :
 
-## Installation recommandée
+1. `apps/api/app/api/router.py`
+2. `apps/api/app/main.py`
+3. `apps/api/app/api/routes/admin.py`
+4. `apps/api/app/api/routes/health.py`
+5. `apps/api/app/schemas/admin.py`
+6. `apps/api/app/schemas/accounts.py`
+7. `apps/api/app/services/accounts.py`
+8. `apps/api/app/core/config.py`
 
-Décompressez le PATCH à la racine du dépôt et acceptez tous les remplacements.
+Ne créez pas des fichiers comme `03_admin.py` directement dans le dépôt.
+Les noms numérotés du dossier `MANUAL_GITHUB` servent uniquement à les
+identifier avant de copier leur contenu au chemin exact.
 
-Vérifiez surtout que ces fichiers existent dans GitHub :
+## Méthode la plus fiable
 
-- `apps/api/app/main.py`
-- `apps/api/app/api/router.py`
-- `apps/api/app/api/routes/admin.py`
-- `apps/api/app/schemas/admin.py`
-- `apps/api/app/services/accounts.py`
+Pour chaque chemin :
 
-Puis committez dans `main` et déployez Render.
+1. Ouvrez le fichier correspondant dans GitHub.
+2. S'il n'existe pas, utilisez **Add file → Create new file**.
+3. Collez le chemin exact complet.
+4. Copiez tout le contenu du fichier numéroté correspondant.
+5. Committez directement dans `main`.
 
-## Variable Render
+## Vérification de `router.py`
 
-Conservez l'adresse exacte du compte Anatole :
+Le fichier doit contenir :
 
-`ACCOUNT_ADMIN_EMAILS=solo0112@live.fr`
+- `from app.api.routes import admin`
+- `admin.router`
+- `prefix="/api/v1/admin"`
 
-La comparaison n'est pas sensible aux majuscules, mais les espaces inutiles
-doivent être évités.
+## Vérification de `admin.py`
 
-## Vérification
+Le fichier doit contenir les routes :
 
-Après le déploiement, ouvrez :
+- `@router.get("/overview"`
+- `@router.get("/users"`
+- `@router.get("/invites"`
+- `@router.get("/reports"`
 
-`https://anatole-api.onrender.com/ready`
+## Déploiement
 
-Le bloc attendu est :
+1. Commit et push sur `main`.
+2. Redéployez uniquement Render.
+3. Ne redéployez pas Vercel pour cette correction.
+4. Rechargez `/ready`.
+
+Résultat attendu :
 
 ```json
 "admin_console": {
@@ -57,12 +69,3 @@ Le bloc attendu est :
   "missing_routes": []
 }
 ```
-
-Ouvrez ensuite :
-
-`https://anatole-api.onrender.com/api/v1/admin/overview`
-
-Sans jeton, la réponse correcte est HTTP 401 avec
-`Connexion administrateur requise.` Ce résultat confirme que la route existe.
-
-Enfin, reconnectez-vous dans Anatole et ouvrez `/admin`.
