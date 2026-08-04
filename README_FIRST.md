@@ -1,34 +1,45 @@
-# Anatole v1.3.3 — stabilité de la carte ETF
+# Anatole v1.3.4 — Screener TSX Composite
 
-## Cause de l’écran gris/blanc
+## Nouveau comportement
 
-Les cotations ETF sont conservées en mémoire dans le processus Render. Après
-une mise en veille, un redémarrage, un déploiement ou une réponse partielle du
-fournisseur, cette mémoire peut être vide ou incomplète.
+Le Screener utilise désormais le S&P/TSX Composite par défaut.
 
-Le frontend remplaçait alors toutes les anciennes cotations valides par le
-nouvel instantané partiel. Les éléments sans prix recevaient `price = 0`,
-`change = 0` et `source = unavailable`, ce qui les rendait gris et parfois
-visuellement vides dans les petites cases.
+L’utilisateur peut choisir :
 
-## Correction
+- TSX Composite : univers canadien élargi;
+- TSX 60 : vue rapide des grandes capitalisations.
 
-- conservation des dernières cotations valides pendant les réponses partielles;
-- cache navigateur de douze heures;
-- aucune régression d’une cotation valide vers `0 / unavailable`;
-- annulation correcte des anciennes requêtes;
-- actualisation suspendue lorsque l’onglet est masqué;
-- nouvelle collecte immédiate au retour sur l’onglet;
-- nouvelle tentative de démarrage API après 60 secondes en cas d’échec;
-- nouvelle tentative rapide après une collecte entièrement vide;
-- cases indisponibles plus sombres et hachurées;
-- groupes sans aucune cotation affichés `N/D`, et non `+0,00 %`.
+Le score Anatole conserve les mêmes composantes :
+
+- variation de la séance;
+- momentum sur 20 séances;
+- volume relatif;
+- RSI;
+- tendance technique.
+
+## Univers Composite
+
+La liste opérationnelle provient des positions publiées pour XIC, qui réplique
+le S&P/TSX Capped Composite. Les espèces et dérivés sont exclus. Le service
+utilise jusqu’à 260 sociétés et conserve la dernière liste valide lorsque la
+source est momentanément indisponible.
+
+## Performance
+
+- cache TSX 60 : 45 secondes;
+- cache Composite : 180 secondes;
+- délai frontend Composite : 120 secondes;
+- calcul des historiques Composite avec concurrence contrôlée;
+- changement d’univers sans perdre les filtres généraux.
+
+Le premier calcul Composite peut être plus long que le TSX 60. Les visites
+suivantes bénéficient du cache backend.
 
 ## Déploiement
 
-1. installer le PATCH à la racine du dépôt;
-2. commit et push sur `main`;
-3. déployer Render en premier;
-4. déployer Vercel sans réutiliser le Build Cache.
+1. Installer le PATCH à la racine du dépôt.
+2. Commit et push sur `main`.
+3. Déployer Render en premier.
+4. Déployer Vercel sans réutiliser le Build Cache.
 
-Aucune migration PostgreSQL n’est nécessaire.
+Aucune migration PostgreSQL n’est requise.
