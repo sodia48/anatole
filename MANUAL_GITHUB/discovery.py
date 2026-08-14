@@ -35,8 +35,15 @@ async def screener(
 
 
 @router.get("/news", response_model=NewsSnapshot)
-async def news() -> NewsSnapshot:
-    return await news_service.get_snapshot()
+async def news(
+    lang: str = Query(
+        "fr",
+        pattern="^(fr|en)$",
+    ),
+) -> NewsSnapshot:
+    return await news_service.get_snapshot(
+        lang
+    )
 
 
 @router.get("/calendar", response_model=CalendarSnapshot)

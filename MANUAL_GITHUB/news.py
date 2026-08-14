@@ -19,21 +19,40 @@ from app.schemas.discovery import FeedStatus, NewsItem, NewsSnapshot
 
 logger = logging.getLogger(__name__)
 
-BANK_FEEDS = (
-    (
-        "Banque du Canada",
-        "Politique monétaire",
-        "https://www.bankofcanada.ca/utility/news/feed/",
+NEWS_LANGUAGES = ("fr", "en")
+
+BANK_FEEDS = {
+    "fr": (
+        (
+            "Banque du Canada",
+            "Politique monétaire",
+            "https://www.banqueducanada.ca/utility/nouvelles/feed/",
+        ),
+        (
+            "Banque du Canada",
+            "Communiqués",
+            "https://www.banqueducanada.ca/content_type/communiques/feed/",
+        ),
     ),
-    (
-        "Banque du Canada",
-        "Communiqués",
-        "https://www.bankofcanada.ca/content_type/press-releases/feed/",
+    "en": (
+        (
+            "Banque du Canada",
+            "Politique monétaire",
+            "https://www.bankofcanada.ca/utility/news/feed/",
+        ),
+        (
+            "Banque du Canada",
+            "Communiqués",
+            "https://www.bankofcanada.ca/content_type/press-releases/feed/",
+        ),
     ),
-)
+}
 
 STATCAN_SOURCE = "Statistique Canada"
-STATCAN_URL = "https://www150.statcan.gc.ca/n1/rss/dai-quo/0-eng.atom"
+STATCAN_URLS = {
+    "fr": "https://www150.statcan.gc.ca/n1/rss/dai-quo/0-fra.atom",
+    "en": "https://www150.statcan.gc.ca/n1/rss/dai-quo/0-eng.atom",
+}
 STATCAN_CATEGORIES = (
     "Comptes économiques",
     "Travail",
@@ -42,13 +61,19 @@ STATCAN_CATEGORIES = (
 )
 
 
-def _statcan_proxy_url(resource: str) -> str | None:
-    """Return the whitelisted Vercel relay URL when configured on Render."""
+def _statcan_proxy_url(
+    resource: str,
+    language: str,
+) -> str | None:
+    """Return the whitelisted StatCan relay URL when configured."""
     base = os.getenv("STATCAN_PROXY_URL", "").strip()
     if not base:
         return None
     separator = "&" if "?" in base else "?"
-    return f"{base}{separator}{urlencode({'resource': resource})}"
+    return (
+        f"{base}{separator}"
+        f"{urlencode({'resource': resource, 'lang': language})}"
+    )
 
 CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
     "Comptes économiques": (
@@ -61,6 +86,14 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         "input-output",
         "income and expenditure accounts",
         "economic and social reports",
+        "comptes économiques",
+        "comptes nationaux",
+        "produit intérieur brut",
+        "pib",
+        "productivité",
+        "bilan national",
+        "comptes des revenus et dépenses",
+        "entrées-sorties",
     ),
     "Travail": (
         "labour",
@@ -74,6 +107,16 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         "wages",
         "earnings",
         "work hours",
+        "travail",
+        "emploi",
+        "chômage",
+        "population active",
+        "enquête sur la population active",
+        "postes vacants",
+        "rémunération",
+        "salaires",
+        "gains",
+        "heures travaillées",
     ),
     "Commerce international": (
         "international trade",
@@ -83,6 +126,13 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         "imports",
         "export",
         "import",
+        "commerce international",
+        "commerce de marchandises",
+        "balance commerciale",
+        "exportations",
+        "importations",
+        "exportation",
+        "importation",
     ),
     "Énergie": (
         "energy",
@@ -94,6 +144,15 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         "coal",
         "renewable",
         "refined petroleum",
+        "énergie",
+        "électricité",
+        "gaz naturel",
+        "pétrole brut",
+        "produits pétroliers",
+        "oléoduc",
+        "pipeline",
+        "charbon",
+        "renouvelable",
     ),
 }
 
@@ -441,16 +500,51 @@ class NewsService:
     retry_delays = (0.75, 1.5)
 
     def __init__(self) -> None:
-        self._cached: NewsSnapshot | None = None
-        self._cached_at = 0.0
-        self._last_good: NewsSnapshot | None = None
-        self._lock = asyncio.Lock()
+        self._cached: dict[
+            str,
+            NewsSnapshot,
+        ] = {}
+        self._cached_at: dict[
+            str,
+            float,
+        ] = {}
+        self._last_good: dict[
+            str,
+            NewsSnapshot,
+        ] = {}
+        self._locks = {
+            language: asyncio.Lock()
+            for language in NEWS_LANGUAGES
+        }
 
-    def _cache_is_fresh(self, now: float) -> bool:
-        if self._cached is None:
+    @staticmethod
+    def _normalize_language(
+        language: str,
+    ) -> str:
+        return (
+            "en"
+            if language.strip().lower() == "en"
+            else "fr"
+        )
+
+    def _cache_is_fresh(
+        self,
+        language: str,
+        now: float,
+    ) -> bool:
+        cached = self._cached.get(language)
+        cached_at = self._cached_at.get(
+            language,
+            0.0,
+        )
+        if cached is None:
             return False
-        ttl = self.cache_ttl_seconds if self._cached.items else self.failure_cache_ttl_seconds
-        return now - self._cached_at < ttl
+        ttl = (
+            self.cache_ttl_seconds
+            if cached.items
+            else self.failure_cache_ttl_seconds
+        )
+        return now - cached_at < ttl
 
     async def _download(
         self,
@@ -592,9 +686,14 @@ class NewsService:
     async def _fetch_statcan(
         self,
         client: httpx.AsyncClient,
+        language: str,
     ) -> tuple[list[NewsItem], list[FeedStatus]]:
         source_label = f"{STATCAN_SOURCE} — Tous les sujets"
-        proxy_url = _statcan_proxy_url("news")
+        statcan_url = STATCAN_URLS[language]
+        proxy_url = _statcan_proxy_url(
+            "news",
+            language,
+        )
         channel = "direct"
 
         if proxy_url:
@@ -614,13 +713,13 @@ class NewsService:
                 entries, error = await self._download(
                     client,
                     source_label=source_label,
-                    url=STATCAN_URL,
+                    url=statcan_url,
                 )
         else:
             entries, error = await self._download(
                 client,
                 source_label=source_label,
-                url=STATCAN_URL,
+                url=statcan_url,
             )
 
         if error:
@@ -685,10 +784,14 @@ class NewsService:
 
     def _merge_last_good_for_failed_sources(
         self,
+        language: str,
         items: list[NewsItem],
         statuses: list[FeedStatus],
     ) -> tuple[list[NewsItem], list[FeedStatus]]:
-        if self._last_good is None:
+        last_good = self._last_good.get(
+            language
+        )
+        if last_good is None:
             return items, statuses
 
         failed_keys = {
@@ -703,7 +806,7 @@ class NewsService:
 
         cached_items = [
             item
-            for item in self._last_good.items
+            for item in last_good.items
             if (item.source, item.category) in failed_keys
         ]
         if not cached_items:
@@ -725,31 +828,55 @@ class NewsService:
 
         return items + cached_items, merged_statuses
 
-    async def get_snapshot(self) -> NewsSnapshot:
+    async def get_snapshot(
+        self,
+        language: str = "fr",
+    ) -> NewsSnapshot:
+        language = self._normalize_language(
+            language
+        )
         now = monotonic()
-        if self._cache_is_fresh(now):
-            assert self._cached is not None
-            return self._cached
 
-        async with self._lock:
+        if self._cache_is_fresh(
+            language,
+            now,
+        ):
+            return self._cached[language]
+
+        async with self._locks[language]:
             now = monotonic()
-            if self._cache_is_fresh(now):
-                assert self._cached is not None
-                return self._cached
+
+            if self._cache_is_fresh(
+                language,
+                now,
+            ):
+                return self._cached[
+                    language
+                ]
 
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/150.0 Safari/537.36 Anatole/0.5"
+                    "Chrome/150.0 Safari/537.36 Anatole/1.3.7"
                 ),
                 "Accept": (
                     "application/rss+xml, application/atom+xml, application/xml, "
                     "text/xml;q=0.9, */*;q=0.1"
                 ),
-                "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.8,fr;q=0.7",
+                "Accept-Language": (
+                    "fr-CA,fr;q=1.0,en-CA;q=0.5,en;q=0.4"
+                    if language == "fr"
+                    else
+                    "en-CA,en;q=1.0,fr-CA;q=0.5,fr;q=0.4"
+                ),
             }
-            timeout = httpx.Timeout(connect=25.0, read=30.0, write=10.0, pool=10.0)
+            timeout = httpx.Timeout(
+                connect=25.0,
+                read=30.0,
+                write=10.0,
+                pool=10.0,
+            )
 
             async with httpx.AsyncClient(
                 timeout=timeout,
@@ -757,37 +884,76 @@ class NewsService:
                 follow_redirects=True,
             ) as client:
                 bank_tasks = [
-                    self._fetch_bank_feed(client, source, category, url)
-                    for source, category, url in BANK_FEEDS
+                    self._fetch_bank_feed(
+                        client,
+                        source,
+                        category,
+                        url,
+                    )
+                    for (
+                        source,
+                        category,
+                        url,
+                    ) in BANK_FEEDS[language]
                 ]
                 results = await asyncio.gather(
                     *bank_tasks,
-                    self._fetch_statcan(client),
+                    self._fetch_statcan(
+                        client,
+                        language,
+                    ),
                 )
 
             items: list[NewsItem] = []
             statuses: list[FeedStatus] = []
-            for feed_items, feed_statuses in results:
-                items.extend(feed_items)
-                statuses.extend(feed_statuses)
 
-            items, statuses = self._merge_last_good_for_failed_sources(items, statuses)
+            for (
+                feed_items,
+                feed_statuses,
+            ) in results:
+                items.extend(feed_items)
+                statuses.extend(
+                    feed_statuses
+                )
+
+            items, statuses = (
+                self._merge_last_good_for_failed_sources(
+                    language,
+                    items,
+                    statuses,
+                )
+            )
             items = _deduplicate(items)
-            items.sort(key=lambda item: item.published_at, reverse=True)
+            items.sort(
+                key=lambda item:
+                    item.published_at,
+                reverse=True,
+            )
 
             snapshot = NewsSnapshot(
                 items=items[:80],
                 source_statuses=statuses,
-                generated_at=datetime.now(UTC),
-                refresh_after_seconds=900 if items else 60,
+                generated_at=datetime.now(
+                    UTC
+                ),
+                refresh_after_seconds=(
+                    900
+                    if items
+                    else 60
+                ),
             )
-            self._cached = snapshot
-            self._cached_at = monotonic()
+            self._cached[language] = snapshot
+            self._cached_at[
+                language
+            ] = monotonic()
 
             if snapshot.items:
-                self._last_good = snapshot
+                self._last_good[
+                    language
+                ] = snapshot
 
             return snapshot
+
 
 
 news_service = NewsService()

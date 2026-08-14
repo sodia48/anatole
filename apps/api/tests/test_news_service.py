@@ -4,6 +4,8 @@ import httpx
 import pytest
 
 from app.services.news import (
+    BANK_FEEDS,
+    STATCAN_URLS,
     FeedFormatError,
     NewsService,
     _classify_statcan,
@@ -128,3 +130,88 @@ def test_statcan_classification(title: str, subject: str, expected: str) -> None
         source="Statistique Canada",
     )[0]
     assert _classify_statcan(entry) == expected
+
+
+
+@pytest.mark.parametrize(
+    ("title", "subject", "expected"),
+    [
+        (
+            "Produit intérieur brut par industrie",
+            "Comptes économiques",
+            "Comptes économiques",
+        ),
+        (
+            "Enquête sur la population active, juillet 2026",
+            "Travail",
+            "Travail",
+        ),
+        (
+            "Commerce international de marchandises du Canada",
+            "Commerce international",
+            "Commerce international",
+        ),
+        (
+            "Pétrole brut et gaz naturel",
+            "Énergie",
+            "Énergie",
+        ),
+    ],
+)
+def test_french_statcan_classification(
+    title: str,
+    subject: str,
+    expected: str,
+) -> None:
+    xml = f"""<feed xmlns='http://www.w3.org/2005/Atom'><entry>
+    <title>{title}</title><summary>Communiqué officiel.</summary>
+    <link rel='alternate' href='https://example.test/item'/>
+    <published>2026-08-13T12:30:00Z</published><category term='{subject}'/>
+    </entry></feed>""".encode()
+
+    entry = _parse_entries(
+        xml,
+        content_type="application/atom+xml",
+        source="Statistique Canada",
+    )[0]
+
+    assert (
+        _classify_statcan(entry)
+        == expected
+    )
+
+
+def test_official_language_feed_maps() -> None:
+    assert STATCAN_URLS["fr"].endswith(
+        "/0-fra.atom"
+    )
+    assert STATCAN_URLS["en"].endswith(
+        "/0-eng.atom"
+    )
+    assert "banqueducanada.ca" in (
+        BANK_FEEDS["fr"][0][2]
+    )
+    assert "bankofcanada.ca" in (
+        BANK_FEEDS["en"][0][2]
+    )
+
+
+def test_language_cache_is_separate() -> None:
+    service = NewsService()
+
+    assert (
+        service._normalize_language("fr")
+        == "fr"
+    )
+    assert (
+        service._normalize_language("en")
+        == "en"
+    )
+    assert (
+        service._normalize_language("FR")
+        == "fr"
+    )
+    assert (
+        service._normalize_language("xx")
+        == "fr"
+    )

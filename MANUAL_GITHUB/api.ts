@@ -159,11 +159,16 @@ export function getScreenerSnapshot(
   );
 }
 
+export type NewsLanguage =
+  | "fr"
+  | "en";
+
 export function getNewsSnapshot(
+  language: NewsLanguage = "fr",
   signal?: AbortSignal,
 ): Promise<NewsSnapshot> {
   return apiRequest<NewsSnapshot>(
-    "/api/v1/discovery/news",
+    `/api/v1/discovery/news?lang=${language}`,
     {},
     signal,
     30_000,

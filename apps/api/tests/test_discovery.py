@@ -77,19 +77,21 @@ def test_psychology_with_demo_provider() -> None:
 
 def test_news_endpoint_uses_cached_snapshot() -> None:
     published = datetime.now(UTC)
-    news_service._cached = NewsSnapshot(
-        items=[NewsItem(id="test", title="Official release", summary="", url="https://example.com", source="Test", category="Macro", published_at=published, sentiment="Neutre", sentiment_score=0)],
-        source_statuses=[FeedStatus(source="Test", status="ok")],
-        generated_at=published,
-    )
-    news_service._cached_at = monotonic()
+    news_service._cached = {
+        "fr": NewsSnapshot(
+            items=[NewsItem(id="test", title="Official release", summary="", url="https://example.com", source="Test", category="Macro", published_at=published, sentiment="Neutre", sentiment_score=0)],
+            source_statuses=[FeedStatus(source="Test", status="ok")],
+            generated_at=published,
+        )
+    }
+    news_service._cached_at = {"fr": monotonic()}
     try:
         response = client.get("/api/v1/discovery/news")
         assert response.status_code == 200
         assert response.json()["items"][0]["id"] == "test"
     finally:
-        news_service._cached = None
-        news_service._cached_at = 0
+        news_service._cached = {}
+        news_service._cached_at = {}
 
 
 def test_calendar_endpoint_uses_cached_snapshot() -> None:

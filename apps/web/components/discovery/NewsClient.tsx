@@ -69,18 +69,41 @@ export function NewsClient() {
 
   useEffect(() => {
     let active = true;
+    let controller =
+      new AbortController();
+
+    /*
+     * Lors d’un changement de langue, ne jamais laisser l’ancien
+     * contenu anglais/français à l’écran en attendant la nouvelle
+     * édition officielle.
+     */
+    setData(null);
+    setError(null);
 
     const load = async () => {
+      controller.abort();
+      controller =
+        new AbortController();
+
       try {
         const snapshot =
-          await getNewsSnapshot();
+          await getNewsSnapshot(
+            language,
+            controller.signal,
+          );
 
-        if (active) {
+        if (
+          active &&
+          !controller.signal.aborted
+        ) {
           setData(snapshot);
           setError(null);
         }
       } catch {
-        if (active) {
+        if (
+          active &&
+          !controller.signal.aborted
+        ) {
           setError(
             pick(
               language,
@@ -102,6 +125,7 @@ export function NewsClient() {
 
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(timer);
     };
   }, [language]);

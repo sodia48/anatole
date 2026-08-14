@@ -1,0 +1,8 @@
+apps/api/app/services/news.py
+apps/api/app/api/routes/discovery.py
+apps/api/tests/test_news_service.py
+apps/api/tests/test_discovery.py
+apps/web/app/api/statcan/route.ts
+apps/web/lib/api.ts
+apps/web/components/discovery/NewsClient.tsx
+apps/web/app/aujourdhui/page.tsx
