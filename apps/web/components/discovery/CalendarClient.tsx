@@ -80,18 +80,36 @@ export function CalendarClient() {
 
   useEffect(() => {
     let active = true;
+    let controller =
+      new AbortController();
+
+    setData(null);
+    setError(null);
 
     const load = async () => {
+      controller.abort();
+      controller =
+        new AbortController();
+
       try {
         const snapshot =
-          await getCalendarSnapshot();
+          await getCalendarSnapshot(
+            language,
+            controller.signal,
+          );
 
-        if (active) {
+        if (
+          active &&
+          !controller.signal.aborted
+        ) {
           setData(snapshot);
           setError(null);
         }
       } catch {
-        if (active) {
+        if (
+          active &&
+          !controller.signal.aborted
+        ) {
           setError(
             pick(
               language,
@@ -113,6 +131,7 @@ export function CalendarClient() {
 
     return () => {
       active = false;
+      controller.abort();
       window.clearInterval(timer);
     };
   }, [language]);

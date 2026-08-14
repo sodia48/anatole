@@ -96,16 +96,22 @@ def test_news_endpoint_uses_cached_snapshot() -> None:
 
 def test_calendar_endpoint_uses_cached_snapshot() -> None:
     starts_at = datetime.now(UTC) + timedelta(days=2)
-    calendar_service._cached = CalendarSnapshot(
-        events=[EconomicEvent(id="event", title="Policy rate", category="Banque centrale", importance="Très élevée", starts_at=starts_at, source="Test")],
-        source_statuses=[FeedStatus(source="Test", status="ok")],
-        generated_at=datetime.now(UTC),
-    )
-    calendar_service._cached_at = monotonic()
+    calendar_service._cached = {
+        "fr": CalendarSnapshot(
+            events=[EconomicEvent(id="event", title="Taux directeur", category="Banque centrale", importance="Très élevée", starts_at=starts_at, source="Test")],
+            source_statuses=[FeedStatus(source="Test", status="ok")],
+            generated_at=datetime.now(UTC),
+        )
+    }
+    calendar_service._cached_at = {
+        "fr": monotonic(),
+    }
     try:
-        response = client.get("/api/v1/discovery/calendar")
+        response = client.get(
+            "/api/v1/discovery/calendar?lang=fr"
+        )
         assert response.status_code == 200
         assert response.json()["events"][0]["id"] == "event"
     finally:
-        calendar_service._cached = None
-        calendar_service._cached_at = 0
+        calendar_service._cached = {}
+        calendar_service._cached_at = {}

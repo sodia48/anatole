@@ -175,11 +175,16 @@ export function getNewsSnapshot(
   );
 }
 
+export type CalendarLanguage =
+  | "fr"
+  | "en";
+
 export function getCalendarSnapshot(
+  language: CalendarLanguage = "fr",
   signal?: AbortSignal,
 ): Promise<CalendarSnapshot> {
   return apiRequest<CalendarSnapshot>(
-    "/api/v1/discovery/calendar",
+    `/api/v1/discovery/calendar?lang=${language}`,
     {},
     signal,
     35_000,

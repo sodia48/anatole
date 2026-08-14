@@ -342,6 +342,7 @@ export default function TodayPage() {
      * l’ancienne édition est retirée avant le rechargement officiel.
      */
     setNews(null);
+    setCalendar(null);
   }, [language]);
 
   const recordIssues = useCallback((next: SourceIssue[]) => {
@@ -471,7 +472,10 @@ export default function TodayPage() {
       getTerminalSnapshot(controller.signal),
       getPsychologySnapshot(controller.signal),
       getNewsSnapshot(language, controller.signal),
-      getCalendarSnapshot(controller.signal),
+      getCalendarSnapshot(
+        language,
+        controller.signal,
+      ),
     ]);
     const setters = [
       (value: TerminalSnapshot) => setTerminal(value),

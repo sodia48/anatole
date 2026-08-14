@@ -19,8 +19,16 @@ from app.schemas.discovery import CalendarSnapshot, EconomicEvent, FeedStatus
 
 logger = logging.getLogger(__name__)
 
-STATCAN_URL = "https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm"
-BOC_URL = "https://www.bankofcanada.ca/press/upcoming-events/"
+CALENDAR_LANGUAGES = ("fr", "en")
+
+STATCAN_URLS = {
+    "fr": "https://www150.statcan.gc.ca/n1/dai-quo/cal2-fra.htm",
+    "en": "https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm",
+}
+BOC_URLS = {
+    "fr": "https://www.banqueducanada.ca/medias/evenements-a-venir/",
+    "en": "https://www.bankofcanada.ca/press/upcoming-events/",
+}
 TORONTO = ZoneInfo("America/Toronto")
 
 _MONTHS = {
@@ -36,18 +44,50 @@ _MONTHS = {
     "october": 10,
     "november": 11,
     "december": 12,
+    "janvier": 1,
+    "février": 2,
+    "fevrier": 2,
+    "mars": 3,
+    "avril": 4,
+    "mai": 5,
+    "juin": 6,
+    "juillet": 7,
+    "août": 8,
+    "aout": 8,
+    "septembre": 9,
+    "octobre": 10,
+    "novembre": 11,
+    "décembre": 12,
+    "decembre": 12,
 }
-_MONTH_PATTERN = "|".join(name.title() for name in _MONTHS)
-_FULL_DATE_RE = re.compile(
-    rf"^({_MONTH_PATTERN})\s+(\d{{1,2}}),\s+(\d{{4}})$",
+_MONTH_PATTERN = "|".join(
+    sorted(
+        (re.escape(name) for name in _MONTHS),
+        key=len,
+        reverse=True,
+    )
+)
+_FULL_DATE_MONTH_FIRST_RE = re.compile(
+    rf"^({_MONTH_PATTERN})\s+(\d{{1,2}}),?\s+(\d{{4}})$",
     re.IGNORECASE,
 )
-_SHORT_DATE_RE = re.compile(
+_FULL_DATE_DAY_FIRST_RE = re.compile(
+    rf"^(\d{{1,2}})\s+({_MONTH_PATTERN})\s+(\d{{4}})$",
+    re.IGNORECASE,
+)
+_SHORT_DATE_MONTH_FIRST_RE = re.compile(
     rf"^({_MONTH_PATTERN})\s+(\d{{1,2}})$",
     re.IGNORECASE,
 )
+_SHORT_DATE_DAY_FIRST_RE = re.compile(
+    rf"^(\d{{1,2}})\s+({_MONTH_PATTERN})$",
+    re.IGNORECASE,
+)
 _YEAR_RE = re.compile(r"\b(20\d{2})\b")
-_TIME_RE = re.compile(r"\b([01]?\d|2[0-3]):([0-5]\d)\b")
+_TIME_RE = re.compile(
+    r"\b([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)\b",
+    re.IGNORECASE,
+)
 _PHONE_RE = re.compile(r"\([A-Za-zÀ-ÿ .'-]+,\s*(?:\+?1[-.\s]?)?\d{3}[-.\s]\d{3}[-.\s]\d{4}\)\s*$")
 _NUMBER_PREFIX_RE = re.compile(r"^\s*\d+\.\s*")
 
@@ -86,6 +126,16 @@ _HIGH_KEYWORDS = (
     "monetary policy report",
     "employment",
     "unemployment",
+    "indice des prix à la consommation",
+    "produit intérieur brut",
+    "enquête sur la population active",
+    "emploi salarié",
+    "commerce de détail",
+    "commerce international de marchandises",
+    "annonce du taux directeur",
+    "rapport sur la politique monétaire",
+    "emploi",
+    "chômage",
 )
 _MEDIUM_KEYWORDS = (
     "industrial product",
@@ -100,20 +150,32 @@ _MEDIUM_KEYWORDS = (
     "senior loan officer survey",
     "summary of deliberations",
     "financial stability report",
+    "indice des prix des produits industriels",
+    "indice des prix des matières brutes",
+    "fabrication",
+    "commerce de gros",
+    "logement",
+    "construction de bâtiments",
+    "enquête sur les perspectives des entreprises",
+    "enquête sur les attentes des consommateurs",
+    "enquête auprès des participants au marché",
+    "enquête auprès des responsables du crédit",
+    "résumé des délibérations",
+    "rapport sur la stabilité financière",
 )
 
 _CATEGORY_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Inflation", ("consumer price", "price index", "inflation")),
-    ("Travail", ("labour", "employment", "unemployment", "payroll", "earnings", "job vacanc")),
-    ("Croissance", ("gross domestic product", "gdp", "economic accounts", "business openings", "productivity")),
-    ("Commerce", ("international trade", "merchandise trade", "retail trade", "wholesale trade", "exports", "imports")),
-    ("Logement", ("housing", "building construction", "condominium", "new home", "mortgage")),
-    ("Énergie", ("energy", "petroleum", "natural gas", "crude oil", "pipeline", "electricity")),
-    ("Industrie", ("manufacturing", "mineral production", "industrial product", "machinery and equipment")),
-    ("Transport", ("transport", "railway", "airport", "aircraft", "transit", "freight rail")),
-    ("Politique monétaire", ("interest rate", "monetary policy", "summary of deliberations")),
-    ("Enquêtes", ("survey", "consumer expectations", "market participants", "loan officer")),
-    ("Stabilité financière", ("financial stability",)),
+    ("Inflation", ("consumer price", "price index", "inflation", "indice des prix", "prix à la consommation")),
+    ("Travail", ("labour", "employment", "unemployment", "payroll", "earnings", "job vacanc", "travail", "emploi", "chômage", "rémunération", "salaire", "postes vacants", "population active")),
+    ("Croissance", ("gross domestic product", "gdp", "economic accounts", "business openings", "productivity", "produit intérieur brut", "pib", "comptes économiques", "productivité")),
+    ("Commerce", ("international trade", "merchandise trade", "retail trade", "wholesale trade", "exports", "imports", "commerce international", "commerce de marchandises", "commerce de détail", "commerce de gros", "exportations", "importations")),
+    ("Logement", ("housing", "building construction", "condominium", "new home", "mortgage", "logement", "construction de bâtiments", "résidentiel", "hypothécaire")),
+    ("Énergie", ("energy", "petroleum", "natural gas", "crude oil", "pipeline", "electricity", "énergie", "pétrole", "gaz naturel", "électricité", "oléoduc")),
+    ("Industrie", ("manufacturing", "mineral production", "industrial product", "machinery and equipment", "fabrication", "production minérale", "produits industriels", "machines et matériel", "industries manufacturières", "industrie manufacturière")),
+    ("Transport", ("transport", "railway", "airport", "aircraft", "transit", "freight rail", "ferroviaire", "aéroport", "aéronef")),
+    ("Politique monétaire", ("interest rate", "monetary policy", "summary of deliberations", "taux directeur", "politique monétaire", "résumé des délibérations")),
+    ("Enquêtes", ("survey", "consumer expectations", "market participants", "loan officer", "enquête", "attentes des consommateurs", "participants au marché", "responsables du crédit")),
+    ("Stabilité financière", ("financial stability", "stabilité financière")),
 )
 
 
@@ -202,19 +264,51 @@ def _extract_blocks(content: str) -> list[HtmlBlock]:
 
 
 def _parse_full_date(value: str) -> date | None:
-    match = _FULL_DATE_RE.match(_clean_text(value))
-    if not match:
-        return None
-    month_name, day_value, year_value = match.groups()
-    return date(int(year_value), _MONTHS[month_name.casefold()], int(day_value))
+    cleaned = _clean_text(value)
+
+    match = _FULL_DATE_MONTH_FIRST_RE.match(cleaned)
+    if match:
+        month_name, day_value, year_value = match.groups()
+        return date(
+            int(year_value),
+            _MONTHS[month_name.casefold()],
+            int(day_value),
+        )
+
+    match = _FULL_DATE_DAY_FIRST_RE.match(cleaned)
+    if match:
+        day_value, month_name, year_value = match.groups()
+        return date(
+            int(year_value),
+            _MONTHS[month_name.casefold()],
+            int(day_value),
+        )
+
+    return None
 
 
 def _parse_short_date(value: str, year: int) -> date | None:
-    match = _SHORT_DATE_RE.match(_clean_text(value))
-    if not match:
-        return None
-    month_name, day_value = match.groups()
-    return date(year, _MONTHS[month_name.casefold()], int(day_value))
+    cleaned = _clean_text(value)
+
+    match = _SHORT_DATE_MONTH_FIRST_RE.match(cleaned)
+    if match:
+        month_name, day_value = match.groups()
+        return date(
+            year,
+            _MONTHS[month_name.casefold()],
+            int(day_value),
+        )
+
+    match = _SHORT_DATE_DAY_FIRST_RE.match(cleaned)
+    if match:
+        day_value, month_name = match.groups()
+        return date(
+            year,
+            _MONTHS[month_name.casefold()],
+            int(day_value),
+        )
+
+    return None
 
 
 def _importance(title: str) -> str:
@@ -270,8 +364,15 @@ def _strip_statcan_item(value: str) -> str:
     return text
 
 
-def _parse_statcan_html(content: str, *, now: datetime) -> list[EconomicEvent]:
+def _parse_statcan_html(
+    content: str,
+    *,
+    now: datetime,
+    language: str = "en",
+    url: str | None = None,
+) -> list[EconomicEvent]:
     blocks = _extract_blocks(content)
+    source_url = url or STATCAN_URLS[language]
     year = now.astimezone(TORONTO).year
     for block in blocks:
         if block.tag in {"h1", "h2"} and "upcoming releases" not in block.text.casefold():
@@ -302,8 +403,12 @@ def _parse_statcan_html(content: str, *, now: datetime) -> list[EconomicEvent]:
                 title=title,
                 day=current_day,
                 event_time=time(8, 30),
-                url=STATCAN_URL,
-                description="Publication prévue dans Le Quotidien à 8 h 30 (heure de l’Est).",
+                url=source_url,
+                description=(
+                    "Publication prévue dans Le Quotidien à 8 h 30 (heure de l’Est)."
+                    if language == "fr"
+                    else "Scheduled for release in The Daily at 8:30 a.m. Eastern Time."
+                ),
             )
         )
 
@@ -324,12 +429,25 @@ def _is_boc_holiday(title: str) -> bool:
             "christmas day",
             "boxing day",
             "truth and reconciliation",
+            "jour férié",
+            "fête du travail",
+            "action de grâce",
+            "jour du souvenir",
+            "noël",
+            "lendemain de noël",
+            "vérité et réconciliation",
         )
     )
 
 
-def _parse_boc_html(content: str, *, now: datetime) -> list[EconomicEvent]:
+def _parse_boc_html(
+    content: str,
+    *,
+    now: datetime,
+    url: str | None = None,
+) -> list[EconomicEvent]:
     blocks = _extract_blocks(content)
+    source_url = url or BOC_URLS["en"]
     events: list[EconomicEvent] = []
     for index, block in enumerate(blocks):
         day = _parse_full_date(block.text)
@@ -360,19 +478,24 @@ def _parse_boc_html(content: str, *, now: datetime) -> list[EconomicEvent]:
             if time_match:
                 parsed_time = time(int(time_match.group(1)), int(time_match.group(2)))
                 continue
-            if candidate.tag == "p" and len(candidate.text) > 25 and "content type" not in candidate.text.casefold():
+            if (
+                candidate.tag == "p"
+                and len(candidate.text) > 25
+                and "content type" not in candidate.text.casefold()
+                and "type(s) de contenu" not in candidate.text.casefold()
+            ):
                 description = candidate.text[:500]
                 break
 
         href = title_block.href
-        url = urljoin(BOC_URL, href) if href else BOC_URL
+        event_url = urljoin(source_url, href) if href else source_url
         events.append(
             _event(
                 source="Banque du Canada",
                 title=title,
                 day=day,
                 event_time=parsed_time,
-                url=url,
+                url=event_url,
                 description=description,
             )
         )
@@ -385,12 +508,18 @@ def _parse_boc_html(content: str, *, now: datetime) -> list[EconomicEvent]:
     return list(deduped.values())
 
 
-def _proxy_url(resource: str) -> str | None:
+def _proxy_url(
+    resource: str,
+    language: str,
+) -> str | None:
     base = os.getenv("STATCAN_PROXY_URL", "").strip()
     if not base:
         return None
     separator = "&" if "?" in base else "?"
-    return f"{base}{separator}{urlencode({'resource': resource})}"
+    return (
+        f"{base}{separator}"
+        f"{urlencode({'resource': resource, 'lang': language})}"
+    )
 
 
 class CalendarService:
@@ -400,16 +529,51 @@ class CalendarService:
     retry_delays = (0.75, 1.5)
 
     def __init__(self) -> None:
-        self._cached: CalendarSnapshot | None = None
-        self._cached_at = 0.0
-        self._last_good_by_source: dict[str, list[EconomicEvent]] = {}
-        self._lock = asyncio.Lock()
+        self._cached: dict[
+            str,
+            CalendarSnapshot,
+        ] = {}
+        self._cached_at: dict[
+            str,
+            float,
+        ] = {}
+        self._last_good_by_source: dict[
+            str,
+            list[EconomicEvent],
+        ] = {}
+        self._locks = {
+            language: asyncio.Lock()
+            for language in CALENDAR_LANGUAGES
+        }
 
-    def _cache_is_fresh(self, now: float) -> bool:
-        if self._cached is None:
+    @staticmethod
+    def _normalize_language(
+        language: str,
+    ) -> str:
+        return (
+            "en"
+            if language.strip().lower() == "en"
+            else "fr"
+        )
+
+    def _cache_is_fresh(
+        self,
+        language: str,
+        now: float,
+    ) -> bool:
+        cached = self._cached.get(language)
+        cached_at = self._cached_at.get(
+            language,
+            0.0,
+        )
+        if cached is None:
             return False
-        ttl = self.cache_ttl_seconds if self._cached.events else self.failure_cache_ttl_seconds
-        return now - self._cached_at < ttl
+        ttl = (
+            self.cache_ttl_seconds
+            if cached.events
+            else self.failure_cache_ttl_seconds
+        )
+        return now - cached_at < ttl
 
     async def _download_text(
         self,
@@ -418,10 +582,11 @@ class CalendarService:
         source: str,
         url: str,
         proxy_resource: str | None = None,
+        language: str = "fr",
     ) -> tuple[str, str, str | None]:
         candidates: list[tuple[str, str]] = []
         if proxy_resource:
-            proxy = _proxy_url(proxy_resource)
+            proxy = _proxy_url(proxy_resource, language)
             if proxy:
                 candidates.append(("proxy", proxy))
         candidates.append(("direct", url))
@@ -495,18 +660,28 @@ class CalendarService:
         return "", "none", "Source indisponible"
 
     async def _fetch_statcan(
-        self, client: httpx.AsyncClient, now: datetime
+        self,
+        client: httpx.AsyncClient,
+        now: datetime,
+        language: str,
     ) -> tuple[list[EconomicEvent], FeedStatus]:
         source = "Statistique Canada — Indicateurs clés"
+        statcan_url = STATCAN_URLS[language]
         content, channel, error = await self._download_text(
             client,
             source=source,
-            url=STATCAN_URL,
+            url=statcan_url,
             proxy_resource="calendar",
+            language=language,
         )
         if error:
             return [], FeedStatus(source=source, status="unavailable", detail=error)
-        events = _parse_statcan_html(content, now=now)
+        events = _parse_statcan_html(
+            content,
+            now=now,
+            language=language,
+            url=statcan_url,
+        )
         if not events:
             return [], FeedStatus(
                 source=source,
@@ -517,17 +692,26 @@ class CalendarService:
         return events, FeedStatus(source=source, status="ok", detail=detail)
 
     async def _fetch_boc(
-        self, client: httpx.AsyncClient, now: datetime
+        self,
+        client: httpx.AsyncClient,
+        now: datetime,
+        language: str,
     ) -> tuple[list[EconomicEvent], FeedStatus]:
         source = "Banque du Canada — événements"
+        boc_url = BOC_URLS[language]
         content, _channel, error = await self._download_text(
             client,
             source=source,
-            url=BOC_URL,
+            url=boc_url,
+            language=language,
         )
         if error:
             return [], FeedStatus(source=source, status="unavailable", detail=error)
-        events = _parse_boc_html(content, now=now)
+        events = _parse_boc_html(
+            content,
+            now=now,
+            url=boc_url,
+        )
         if not events:
             return [], FeedStatus(
                 source=source,
@@ -559,28 +743,47 @@ class CalendarService:
             detail += f" ({status.detail})"
         return cached, FeedStatus(source=status.source, status="unavailable", detail=detail)
 
-    async def get_snapshot(self) -> CalendarSnapshot:
+    async def get_snapshot(
+        self,
+        language: str = "fr",
+    ) -> CalendarSnapshot:
+        language = self._normalize_language(
+            language
+        )
         cache_now = monotonic()
-        if self._cache_is_fresh(cache_now):
-            assert self._cached is not None
-            return self._cached
+        if self._cache_is_fresh(
+            language,
+            cache_now,
+        ):
+            return self._cached[language]
 
-        async with self._lock:
+        async with self._locks[language]:
             cache_now = monotonic()
-            if self._cache_is_fresh(cache_now):
-                assert self._cached is not None
-                return self._cached
+            if self._cache_is_fresh(
+                language,
+                cache_now,
+            ):
+                return self._cached[language]
 
             now = datetime.now(UTC)
-            timeout = httpx.Timeout(connect=25.0, read=35.0, write=10.0, pool=10.0)
+            timeout = httpx.Timeout(
+                connect=25.0,
+                read=35.0,
+                write=10.0,
+                pool=10.0,
+            )
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/150.0 Safari/537.36 Anatole/0.6"
+                    "Chrome/150.0 Safari/537.36 Anatole/1.3.8"
                 ),
                 "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
-                "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.8,fr;q=0.7",
+                "Accept-Language": (
+                    "fr-CA,fr;q=1.0,en-CA;q=0.5,en;q=0.4"
+                    if language == "fr"
+                    else "en-CA,en;q=1.0,fr-CA;q=0.5,fr;q=0.4"
+                ),
             }
             async with httpx.AsyncClient(
                 timeout=timeout,
@@ -588,33 +791,62 @@ class CalendarService:
                 follow_redirects=True,
             ) as client:
                 statcan_result, boc_result = await asyncio.gather(
-                    self._fetch_statcan(client, now),
-                    self._fetch_boc(client, now),
+                    self._fetch_statcan(
+                        client,
+                        now,
+                        language,
+                    ),
+                    self._fetch_boc(
+                        client,
+                        now,
+                        language,
+                    ),
                 )
 
             statcan_events, statcan_status = self._restore_last_good(
-                "statcan", *statcan_result, now=now
+                f"{language}:statcan",
+                *statcan_result,
+                now=now,
             )
             boc_events, boc_status = self._restore_last_good(
-                "boc", *boc_result, now=now
+                f"{language}:boc",
+                *boc_result,
+                now=now,
             )
 
             events = statcan_events + boc_events
-            deduped: dict[tuple[str, str, datetime], EconomicEvent] = {}
+            deduped: dict[
+                tuple[str, str, datetime],
+                EconomicEvent,
+            ] = {}
             for event in events:
-                key = (event.source.casefold(), event.title.casefold(), event.starts_at)
+                key = (
+                    event.source.casefold(),
+                    event.title.casefold(),
+                    event.starts_at,
+                )
                 deduped[key] = event
-            events = sorted(deduped.values(), key=lambda event: event.starts_at)
+            events = sorted(
+                deduped.values(),
+                key=lambda event:
+                    event.starts_at,
+            )
 
             snapshot = CalendarSnapshot(
                 events=events[:120],
-                source_statuses=[statcan_status, boc_status],
+                source_statuses=[
+                    statcan_status,
+                    boc_status,
+                ],
                 generated_at=now,
-                refresh_after_seconds=1800 if events else 90,
+                refresh_after_seconds=(
+                    1800 if events else 90
+                ),
             )
-            self._cached = snapshot
-            self._cached_at = monotonic()
+            self._cached[language] = snapshot
+            self._cached_at[language] = monotonic()
             return snapshot
+
 
 
 calendar_service = CalendarService()

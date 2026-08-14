@@ -47,8 +47,15 @@ async def news(
 
 
 @router.get("/calendar", response_model=CalendarSnapshot)
-async def calendar() -> CalendarSnapshot:
-    return await calendar_service.get_snapshot()
+async def calendar(
+    lang: str = Query(
+        "fr",
+        pattern="^(fr|en)$",
+    ),
+) -> CalendarSnapshot:
+    return await calendar_service.get_snapshot(
+        lang
+    )
 
 
 @router.get("/etfs", response_model=EtfDirectorySnapshot)

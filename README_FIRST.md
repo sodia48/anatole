@@ -1,63 +1,56 @@
-# Anatole v1.3.7 — Actualités officielles FR / EN
+# Anatole v1.3.8 — Calendrier officiel FR / EN
 
-## Résultat
+## Problème corrigé
 
-Quand Anatole est en français, les cartes d'actualités utilisent maintenant
-les publications officielles françaises plutôt que de conserver le contenu
-anglais.
+Dans `Aujourd’hui`, la langue de l’utilisateur était déjà utilisée pour les
+Actualités, mais `getCalendarSnapshot()` était encore appelé sans langue.
+Le backend Calendrier utilisait également les pages anglaises comme sources
+fixes. Résultat : l’interface était française, mais les titres d’événements de
+la Banque du Canada restaient en anglais.
 
-Le changement FR ↔ EN provoque un nouveau chargement immédiatement. L'ancienne
-édition est retirée pendant la requête afin qu'un utilisateur en mode français
-ne continue pas à voir des nouvelles anglaises jusqu'au prochain cycle.
+## Nouveau comportement
 
-## Sources en français
+### Français
 
-- Statistique Canada :
-  `https://www150.statcan.gc.ca/n1/rss/dai-quo/0-fra.atom`
-- Banque du Canada — nouvelles :
-  `https://www.banqueducanada.ca/utility/nouvelles/feed/`
-- Banque du Canada — communiqués :
-  `https://www.banqueducanada.ca/content_type/communiques/feed/`
+Anatole récupère directement :
 
-## Sources en anglais
+- Statistique Canada : `cal2-fra.htm`
+- Banque du Canada : `/medias/evenements-a-venir/`
 
-Les flux officiels anglais existants sont conservés.
+Exemples attendus :
 
-## Architecture
+- `Publication : Enquête auprès des responsables du crédit`
+- `Annonce du taux directeur`
+- `Publication : Résumé des délibérations`
 
-- `GET /api/v1/discovery/news?lang=fr`
-- `GET /api/v1/discovery/news?lang=en`
-- cache backend séparé pour FR et EN;
-- dernier instantané valide séparé pour FR et EN;
-- relais Statistique Canada sensible au paramètre `lang`;
-- classification StatCan compatible avec les termes français;
-- Actualités recharge immédiatement au changement de langue;
-- Aujourd'hui recharge immédiatement son bloc Actualités au changement de
-  langue.
+### English
 
-Il ne s'agit pas d'une traduction automatique des articles : lorsque la source
-publique fournit une version française officielle, Anatole récupère directement
-cette version.
+Anatole conserve :
+
+- Statistics Canada : `cal2-eng.htm`
+- Bank of Canada : `/press/upcoming-events/`
+
+## Changements techniques
+
+- `/api/v1/discovery/calendar?lang=fr`
+- `/api/v1/discovery/calendar?lang=en`
+- caches backend français et anglais séparés;
+- derniers événements valides séparés par langue et par source;
+- parseur compatible avec `21 août 2026`, `14 août`, `10 h 30`, etc.;
+- catégories et niveaux d’importance compatibles avec les titres français;
+- jours fériés français de la Banque du Canada exclus du radar;
+- la section Calendrier recharge immédiatement au changement de langue;
+- `Aujourd’hui` transmet désormais la langue active au calendrier;
+- l’ancien snapshot dans l’autre langue est retiré immédiatement au changement
+  FR ↔ EN.
 
 ## Déploiement
 
-Ce correctif touche Render et Vercel.
+Ce PATCH touche Render et Vercel :
 
-1. Décompresser le PATCH à la racine du dépôt.
-2. Commit et push sur `main`.
-3. Déployer Render en premier.
-4. Déployer Vercel ensuite.
-5. Sur Vercel, désactiver `Use existing Build Cache`.
+1. décompresser à la racine du dépôt;
+2. commit et push sur `main`;
+3. déployer Render en premier;
+4. déployer Vercel ensuite avec `Use existing Build Cache` désactivé.
 
-Aucune migration PostgreSQL n'est nécessaire.
-
-## Test manuel conseillé
-
-1. Ouvrir Anatole en English.
-2. Aller dans Actualités et confirmer que les publications sont anglaises.
-3. Passer dans `Compte & paramètres → Préférences → Français`.
-4. Revenir dans Actualités.
-5. Les anciennes cartes anglaises doivent disparaître immédiatement pendant le
-   chargement, puis être remplacées par les publications officielles françaises.
-6. Vérifier aussi `Aujourd'hui` : les actualités de la zone
-   `Ce qui mérite l'attention` doivent provenir de l'édition française.
+Aucune migration PostgreSQL n’est nécessaire.
