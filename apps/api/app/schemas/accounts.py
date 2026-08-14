@@ -84,6 +84,7 @@ class SyncedPreferences(BaseModel):
     decimals: Literal[2, 3] = 2
     default_range: Literal["1m", "3m", "6m", "1y", "5y"] = "1y"
     default_universe: Literal["tsx60", "composite"] = "tsx60"
+    language: Literal["fr", "en"] = "fr"
 
 
 class SyncedWorkspaceData(BaseModel):

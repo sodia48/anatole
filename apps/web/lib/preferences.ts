@@ -4,6 +4,7 @@ export type AnatoleTheme = "dark" | "blue";
 export type AnatoleDensity = "comfortable" | "compact";
 export type AnatoleDecimals = 2 | 3;
 export type AnatoleTimeRange = "1m" | "3m" | "6m" | "1y" | "5y";
+export type AnatoleLanguage = "fr" | "en";
 
 export type AnatolePreferences = {
   theme: AnatoleTheme;
@@ -11,6 +12,7 @@ export type AnatolePreferences = {
   decimals: AnatoleDecimals;
   defaultRange: AnatoleTimeRange;
   defaultUniverse: "tsx60" | "composite";
+  language: AnatoleLanguage;
 };
 
 export const DEFAULT_PREFERENCES: AnatolePreferences = {
@@ -19,6 +21,7 @@ export const DEFAULT_PREFERENCES: AnatolePreferences = {
   decimals: 2,
   defaultRange: "1y",
   defaultUniverse: "tsx60",
+  language: "fr",
 };
 
 export function readPreferences(): AnatolePreferences {
@@ -35,6 +38,7 @@ export function readPreferences(): AnatolePreferences {
         ? (parsed.defaultRange as AnatoleTimeRange)
         : "1y",
       defaultUniverse: parsed.defaultUniverse === "composite" ? "composite" : "tsx60",
+      language: parsed.language === "en" ? "en" : "fr",
     };
   } catch {
     return DEFAULT_PREFERENCES;

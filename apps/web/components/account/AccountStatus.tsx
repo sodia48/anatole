@@ -4,9 +4,13 @@ import Link from "next/link";
 import { Cloud, CloudOff, LoaderCircle, UserRound } from "lucide-react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { pick } from "@/lib/i18n";
 
 export function AccountStatus({ compact = false }: { compact?: boolean }) {
   const { user, hydrated, syncState } = useAccount();
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const Icon = !hydrated || syncState === "connecting" || syncState === "syncing"
     ? LoaderCircle
     : syncState === "offline" || syncState === "error"
@@ -15,22 +19,22 @@ export function AccountStatus({ compact = false }: { compact?: boolean }) {
         ? Cloud
         : UserRound;
   const label = !hydrated
-    ? "Compte"
+    ? pick(language, "Compte", "Account")
     : user
       ? syncState === "synced"
-        ? "Synchronisé"
+        ? pick(language, "Synchronisé", "Synced")
         : syncState === "offline"
-          ? "Hors ligne"
+          ? pick(language, "Hors ligne", "Offline")
           : syncState === "error"
-            ? "À vérifier"
-            : "Synchronisation"
-      : "Se connecter";
+            ? pick(language, "À vérifier", "Check")
+            : pick(language, "Synchronisation", "Syncing")
+      : pick(language, "Se connecter", "Sign in");
 
   return (
     <Link
       href="/parametres?section=account"
       className={`account-status${compact ? " is-compact" : ""}`}
-      aria-label={user ? `Compte ${user.email} · ${label}` : "Ouvrir le compte Anatole"}
+      aria-label={user ? `${pick(language, "Compte", "Account")} ${user.email} · ${label}` : pick(language, "Ouvrir le compte Anatole", "Open Anatole account")}
     >
       <Icon size={17} className={syncState === "syncing" || syncState === "connecting" ? "is-spinning" : ""} />
       <span>{label}</span>

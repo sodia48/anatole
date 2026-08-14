@@ -17,6 +17,7 @@ import { AccountClient } from "@/components/account/AccountClient";
 import { useAccount } from "@/components/providers/AccountProvider";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { PreferencesForm } from "@/components/settings/PreferencesForm";
+import { pick } from "@/lib/i18n";
 import { DataQualityClient } from "@/components/workspace/DataQualityClient";
 
 import styles from "./SettingsHub.module.css";
@@ -31,32 +32,70 @@ type SectionDefinition = {
   icon: typeof UserRound;
 };
 
-const sections: SectionDefinition[] = [
-  {
-    id: "account",
-    label: "Compte & synchronisation",
-    title: "Compte et sécurité",
-    description:
-      "Gère ton profil, tes sessions, l’export de tes données et la synchronisation multiappareil.",
-    icon: UserRound,
-  },
-  {
-    id: "preferences",
-    label: "Préférences",
-    title: "Expérience Anatole",
-    description:
-      "Personnalise l’apparence, la densité, l’univers de marché et les réglages d’affichage.",
-    icon: SlidersHorizontal,
-  },
-  {
-    id: "quality",
-    label: "Qualité des données",
-    title: "Données et fiabilité",
-    description:
-      "Contrôle la fraîcheur des sources, la couverture, les erreurs et la santé du pipeline Anatole.",
-    icon: ShieldCheck,
-  },
-];
+function settingsSections(
+  language: "fr" | "en",
+): SectionDefinition[] {
+  return [
+    {
+      id: "account",
+      label: pick(
+        language,
+        "Compte & synchronisation",
+        "Account & sync",
+      ),
+      title: pick(
+        language,
+        "Compte et sécurité",
+        "Account & security",
+      ),
+      description: pick(
+        language,
+        "Gère ton profil, tes sessions, l’export de tes données et la synchronisation multiappareil.",
+        "Manage your profile, sessions, data export and multi-device synchronization.",
+      ),
+      icon: UserRound,
+    },
+    {
+      id: "preferences",
+      label: pick(
+        language,
+        "Préférences",
+        "Preferences",
+      ),
+      title: pick(
+        language,
+        "Expérience Anatole",
+        "Anatole experience",
+      ),
+      description: pick(
+        language,
+        "Personnalise l’apparence, la densité, l’univers de marché, la langue et les réglages d’affichage.",
+        "Customize appearance, density, market universe, language and display settings.",
+      ),
+      icon: SlidersHorizontal,
+    },
+    {
+      id: "quality",
+      label: pick(
+        language,
+        "Qualité des données",
+        "Data quality",
+      ),
+      title: pick(
+        language,
+        "Données et fiabilité",
+        "Data & reliability",
+      ),
+      description: pick(
+        language,
+        "Contrôle la fraîcheur des sources, la couverture, les erreurs et la santé du pipeline Anatole.",
+        "Review source freshness, coverage, errors and the health of the Anatole data pipeline.",
+      ),
+      icon: ShieldCheck,
+    },
+  ];
+}
+
 
 function normalizeSection(value: string | null): SettingsSection {
   if (value === "preferences" || value === "quality") {
@@ -71,19 +110,24 @@ export function SettingsHubClient() {
   const searchParams = useSearchParams();
   const account = useAccount();
   const { preferences } = usePreferences();
+  const language = preferences.language;
+  const sections = useMemo(
+    () => settingsSections(language),
+    [language],
+  );
   const activeSection = normalizeSection(searchParams.get("section"));
   const activeDefinition = sections.find((item) => item.id === activeSection) ?? sections[0];
 
   const accountStatus = useMemo(() => {
-    if (!account.hydrated) return "Chargement";
-    if (!account.user) return "Mode local";
-    if (account.syncState === "offline") return "Hors ligne";
-    if (account.syncState === "error") return "À vérifier";
+    if (!account.hydrated) return pick(language, "Chargement", "Loading");
+    if (!account.user) return pick(language, "Mode local", "Local mode");
+    if (account.syncState === "offline") return pick(language, "Hors ligne", "Offline");
+    if (account.syncState === "error") return pick(language, "À vérifier", "Check required");
     if (account.syncState === "syncing" || account.syncState === "connecting") {
-      return "Synchronisation";
+      return pick(language, "Synchronisation", "Synchronizing");
     }
-    return "Synchronisé";
-  }, [account.hydrated, account.syncState, account.user]);
+    return pick(language, "Synchronisé", "Synced");
+  }, [account.hydrated, account.syncState, account.user, language]);
 
   function selectSection(section: SettingsSection): void {
     router.replace(`/parametres?section=${section}`, { scroll: false });
@@ -99,11 +143,14 @@ export function SettingsHubClient() {
     <div className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>CENTRE DE CONTRÔLE · v0.9.3</span>
-          <h1>Compte et paramètres</h1>
+          <span className={styles.eyebrow}>{pick(language, "CENTRE DE CONTRÔLE", "CONTROL CENTER")} · v1.3.6</span>
+          <h1>{pick(language, "Compte et paramètres", "Account & settings")}</h1>
           <p>
-            Un espace unique pour ton compte, la synchronisation, les préférences
-            et la qualité des données Anatole.
+            {pick(
+              language,
+              "Un espace unique pour ton compte, la synchronisation, les préférences et la qualité des données Anatole.",
+              "One place for your account, synchronization, preferences and Anatole data quality.",
+            )}
           </p>
         </div>
         <div className={styles.heroStatus}>
@@ -111,22 +158,22 @@ export function SettingsHubClient() {
             <SyncIcon size={22} />
           </span>
           <div>
-            <small>État du compte</small>
+            <small>{pick(language, "État du compte", "Account status")}</small>
             <strong>{accountStatus}</strong>
-            <span>{account.user?.email ?? "Données conservées sur cet appareil"}</span>
+            <span>{account.user?.email ?? pick(language, "Données conservées sur cet appareil", "Data stored on this device")}</span>
           </div>
         </div>
       </header>
 
       <div className={styles.shell}>
-        <aside className={styles.navigation} aria-label="Paramètres Anatole">
+        <aside className={styles.navigation} aria-label={pick(language, "Paramètres Anatole", "Anatole settings")}>
           <div className={styles.navigationHeading}>
             <span className={styles.navigationMark}>
               <Settings2 size={20} />
             </span>
             <div>
-              <strong>Paramètres</strong>
-              <small>Gestion centralisée</small>
+              <strong>{pick(language, "Paramètres", "Settings")}</strong>
+              <small>{pick(language, "Gestion centralisée", "Centralized management")}</small>
             </div>
           </div>
 
@@ -161,7 +208,7 @@ export function SettingsHubClient() {
             <div>
               <strong>{preferences.defaultUniverse === "composite" ? "TSX Composite" : "TSX 60"}</strong>
               <span>
-                {preferences.theme === "blue" ? "Thème bleu" : "Thème sombre"} · {preferences.density === "compact" ? "Compact" : "Confortable"}
+                {preferences.theme === "blue" ? pick(language, "Thème bleu", "Blue theme") : pick(language, "Thème sombre", "Dark theme")} · {preferences.density === "compact" ? "Compact" : pick(language, "Confortable", "Comfortable")} · {language === "en" ? "EN" : "FR"}
               </span>
             </div>
           </div>

@@ -22,6 +22,8 @@ function applyPreferences(preferences: AnatolePreferences): void {
   const root = document.documentElement;
   root.dataset.theme = preferences.theme;
   root.dataset.density = preferences.density;
+  root.dataset.language = preferences.language;
+  root.lang = preferences.language === "en" ? "en-CA" : "fr-CA";
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {

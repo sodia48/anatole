@@ -12,6 +12,7 @@ export type SyncedPreferences = {
   decimals: 2 | 3;
   default_range: "1m" | "3m" | "6m" | "1y" | "5y";
   default_universe: "tsx60" | "composite";
+  language: "fr" | "en";
 };
 
 export type SyncedWorkspaceData = {
@@ -45,6 +46,7 @@ const DEFAULT_PREFERENCES: SyncedPreferences = {
   decimals: 2,
   default_range: "1y",
   default_universe: "tsx60",
+  language: "fr",
 };
 
 function parseJson<T>(raw: string | null, fallback: T): T {
@@ -107,6 +109,7 @@ function preferences(value: unknown): SyncedPreferences {
     default_range: string;
     defaultUniverse: string;
     default_universe: string;
+    language: string;
   }>;
   const range = raw.default_range ?? raw.defaultRange;
   const universe = raw.default_universe ?? raw.defaultUniverse;
@@ -118,6 +121,7 @@ function preferences(value: unknown): SyncedPreferences {
       ? (range as SyncedPreferences["default_range"])
       : "1y",
     default_universe: universe === "composite" ? "composite" : "tsx60",
+    language: raw.language === "en" ? "en" : "fr",
   };
 }
 
@@ -219,6 +223,7 @@ export function writeLocalWorkspace(data: SyncedWorkspaceData): void {
     decimals: data.preferences.decimals,
     defaultRange: data.preferences.default_range,
     defaultUniverse: data.preferences.default_universe,
+    language: data.preferences.language,
   }));
   if (data.advisor_profile) {
     window.localStorage.setItem(KEYS.advisor_profile, JSON.stringify(data.advisor_profile));

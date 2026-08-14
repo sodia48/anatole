@@ -1,0 +1,13 @@
+apps/web/lib/i18n.ts
+apps/web/lib/preferences.ts
+apps/web/lib/workspace-sync.ts
+apps/web/components/providers/PreferencesProvider.tsx
+apps/web/components/settings/PreferencesForm.tsx
+apps/web/components/settings/SettingsHubClient.tsx
+apps/web/components/account/AccountStatus.tsx
+apps/web/components/layout/AppSidebar.tsx
+apps/web/components/discovery/NewsClient.tsx
+apps/web/components/discovery/CalendarClient.tsx
+apps/api/app/schemas/accounts.py
+apps/api/app/services/news.py
+apps/api/app/services/calendar.py

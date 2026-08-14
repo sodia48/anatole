@@ -1,30 +1,42 @@
-# Anatole v1.3.5 — Aujourd’hui centré sur le TSX Composite
+# Anatole v1.3.6 — Français / English
 
-La section Aujourd’hui utilise maintenant le S&P/TSX Composite comme univers
-principal dès l’ouverture.
+## Changements
 
-Un sélecteur permet de choisir :
-- Composite — marché canadien élargi;
-- TSX 60 — grandes capitalisations.
+- Suppression de la mention « relayé(s) par Vercel » dans Actualités et Calendrier.
+- Nouvelle préférence globale `Français / English`.
+- La langue est conservée dans le navigateur.
+- La langue est incluse dans la synchronisation du compte Anatole.
+- `html lang` et `data-language` suivent automatiquement la préférence.
+- Navigation desktop et mobile bilingue.
+- Recherche Anatole bilingue.
+- Centre Compte & paramètres bilingue.
+- Écran Préférences bilingue.
+- Actualités bilingues.
+- Calendrier bilingue.
+- Formats de dates français-canadien / anglais-canadien.
 
-Les données suivantes changent réellement avec l’univers :
-- variation pondérée;
-- progressions et baisses;
-- ratio de hausse;
-- état de marché;
-- secteurs en tête et sous pression;
-- lecture automatique Anatole.
+## Contenu officiel
 
-Cadence :
-- Composite : 45 secondes;
-- TSX 60 : 15 secondes.
+Les titres, résumés et descriptions provenant directement d’une institution
+publique restent dans la langue publiée par la source. Anatole traduit son
+interface, pas le contenu éditorial officiel.
 
-Le bouton « Ouvrir le Cockpit » transmet le même univers au Cockpit.
+## Où changer la langue
 
-Déploiement :
-1. remplacer les deux fichiers;
-2. commit dans `main`;
-3. redéployer uniquement Vercel;
-4. désactiver `Use existing Build Cache`.
+`Compte & paramètres → Préférences → Langue d’Anatole`
 
-Aucun changement Render ou PostgreSQL.
+Choix :
+- Français (FR)
+- English (EN)
+
+## Déploiement
+
+Cette version touche le frontend et le backend :
+
+1. Installer le PATCH à la racine du dépôt.
+2. Commit et push sur `main`.
+3. Déployer Render en premier.
+4. Déployer Vercel ensuite, sans réutiliser le Build Cache.
+
+Aucune migration PostgreSQL n’est requise. Le nouveau champ de préférence
+utilise `fr` par défaut pour les comptes existants.

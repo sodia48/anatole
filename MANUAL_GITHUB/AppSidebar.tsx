@@ -41,12 +41,16 @@ import {
 
 import guardStyles from "./AppSidebarGuard.module.css";
 import { AccountStatus } from "@/components/account/AccountStatus";
+import { useAccount } from "@/components/providers/AccountProvider";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { navLabel, pick } from "@/lib/i18n";
 
 type NavItem = {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
   available: boolean;
+  adminOnly?: boolean;
 };
 
 type SearchResult = {
@@ -64,6 +68,12 @@ const groups: Array<{
   {
     label: "Marchés",
     items: [
+      {
+        href: "/aujourdhui",
+        label: "Aujourd’hui",
+        icon: LayoutDashboard,
+        available: true,
+      },
       {
         href: "/cockpit",
         label: "Cockpit",
@@ -153,6 +163,12 @@ const groups: Array<{
         available: true,
       },
       {
+        href: "/notifications",
+        label: "Notifications",
+        icon: Bell,
+        available: true,
+      },
+      {
         href: "/parametres",
         label: "Compte & paramètres",
         icon: Settings2,
@@ -171,20 +187,19 @@ const groups: Array<{
       },
     ],
   },
+  {
+    label: "Administration",
+    items: [
+      {
+        href: "/admin",
+        label: "Console bêta",
+        icon: ShieldCheck,
+        available: true,
+        adminOnly: true,
+      },
+    ],
+  },
 ];
-
-const searchablePages: SearchResult[] =
-  groups.flatMap((group) =>
-    group.items
-      .filter((item) => item.available)
-      .map((item) => ({
-        key: `page:${item.href}`,
-        href: item.href,
-        label: item.label,
-        description: group.label,
-        icon: item.icon,
-      })),
-  );
 
 function isActive(
   pathname: string,
@@ -291,6 +306,34 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAccount();
+  const { preferences } = usePreferences();
+  const language = preferences.language;
+  const localizedGroups = useMemo(
+    () => groups.map((group) => ({
+      ...group,
+      label: navLabel(language, group.label),
+      items: group.items.map((item) => ({
+        ...item,
+        label: navLabel(language, item.label),
+      })),
+    })),
+    [language],
+  );
+  const searchablePages = useMemo<SearchResult[]>(
+    () => localizedGroups.flatMap((group) =>
+      group.items
+        .filter((item) => item.available && !item.adminOnly)
+        .map((item) => ({
+          key: `page:${item.href}`,
+          href: item.href,
+          label: item.label,
+          description: group.label,
+          icon: item.icon,
+        })),
+    ),
+    [localizedGroups],
+  );
   const searchInputRef =
     useRef<HTMLInputElement | null>(null);
   const [drawerOpen, setDrawerOpen] =
@@ -310,7 +353,7 @@ export function AppSidebar({
   );
 
   const activeLabel = useMemo(() => {
-    for (const group of groups) {
+    for (const group of localizedGroups) {
       const active = group.items.find(
         (item) => isActive(pathname, item),
       );
@@ -321,7 +364,7 @@ export function AppSidebar({
     }
 
     return "Anatole";
-  }, [pathname]);
+  }, [localizedGroups, pathname]);
 
   const searchResults = useMemo(() => {
     const normalizedQuery =
@@ -343,8 +386,8 @@ export function AppSidebar({
             href: `/focus/${encodeURIComponent(
               ticker,
             )}`,
-            label: `Analyser ${ticker}`,
-            description: "Ouvrir la fiche Focus",
+            label: pick(language, `Analyser ${ticker}`, `Analyze ${ticker}`),
+            description: pick(language, "Ouvrir la fiche Focus", "Open Focus view"),
             icon: BarChart3,
           },
         ]
@@ -359,8 +402,8 @@ export function AppSidebar({
               href: `/comparateur?symbols=${encodeURIComponent(
                 comparisonSymbols.join(","),
               )}`,
-              label: `Comparer ${comparisonSymbols.join(" · ")}`,
-              description: "Ouvrir le Comparateur",
+              label: pick(language, `Comparer ${comparisonSymbols.join(" · ")}`, `Compare ${comparisonSymbols.join(" · ")}`),
+              description: pick(language, "Ouvrir le Comparateur", "Open Comparator"),
               icon: GitCompareArrows,
             },
           ]
@@ -371,7 +414,7 @@ export function AppSidebar({
       ...directResult,
       ...pages,
     ].slice(0, 12);
-  }, [searchQuery]);
+  }, [language, searchQuery, searchablePages]);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -593,7 +636,7 @@ export function AppSidebar({
         <button
           type="button"
           className="mobile-appbar-button"
-          aria-label="Ouvrir le menu Anatole"
+          aria-label={pick(language, "Ouvrir le menu Anatole", "Open Anatole menu")}
           aria-controls="anatole-sidebar"
           aria-expanded={drawerOpen}
           onClick={() => setDrawerOpen(true)}
@@ -602,9 +645,9 @@ export function AppSidebar({
         </button>
 
         <Link
-          href="/cockpit"
+          href="/aujourdhui"
           className="mobile-appbar-brand"
-          aria-label="Accueil Anatole"
+          aria-label={pick(language, "Accueil Anatole", "Anatole home")}
         >
           <span className="mobile-brand-mark">
             A
@@ -618,13 +661,13 @@ export function AppSidebar({
         <button
           type="button"
           className="mobile-appbar-button"
-          aria-label="Rechercher dans Anatole"
+          aria-label={pick(language, "Rechercher dans Anatole", "Search Anatole")}
           aria-haspopup="dialog"
           aria-expanded={searchOpen}
           onClick={openSearch}
           title={
             sidebarCollapsed
-              ? "Rechercher"
+              ? pick(language, "Rechercher", "Search")
               : undefined
           }
         >
@@ -635,7 +678,7 @@ export function AppSidebar({
       <button
         type="button"
         className={`mobile-sidebar-backdrop ${guardStyles.mobileBackdrop}`}
-        aria-label="Fermer le menu"
+        aria-label={pick(language, "Fermer le menu", "Close menu")}
         hidden={!drawerOpen}
         onClick={() => setDrawerOpen(false)}
       />
@@ -658,15 +701,15 @@ export function AppSidebar({
           >
             <div className={guardStyles.searchHeader}>
               <div>
-                <span>RECHERCHE ANATOLE</span>
+                <span>{pick(language, "RECHERCHE ANATOLE", "ANATOLE SEARCH")}</span>
                 <h2 id="anatole-search-title">
-                  Trouver une section ou un titre
+                  {pick(language, "Trouver une section ou un titre", "Find a section or security")}
                 </h2>
               </div>
               <button
                 type="button"
                 className={guardStyles.searchClose}
-                aria-label="Fermer la recherche"
+                aria-label={pick(language, "Fermer la recherche", "Close search")}
                 onClick={closeSearch}
               >
                 <X size={20} />
@@ -681,7 +724,7 @@ export function AppSidebar({
                 ref={searchInputRef}
                 type="search"
                 value={searchQuery}
-                placeholder="Ex. RY, SHOP, ETF, Psychologie…"
+                placeholder={pick(language, "Ex. RY, SHOP, ETF, Psychologie…", "E.g. RY, SHOP, ETF, Psychology…")}
                 autoComplete="off"
                 spellCheck={false}
                 onChange={(event: ReactChangeEvent<HTMLInputElement>) =>
@@ -695,7 +738,7 @@ export function AppSidebar({
             <div
               className={guardStyles.searchResults}
               role="listbox"
-              aria-label="Résultats de recherche"
+              aria-label={pick(language, "Résultats de recherche", "Search results")}
             >
               {searchResults.length ? (
                 searchResults.map((result, index) => {
@@ -747,15 +790,21 @@ export function AppSidebar({
                 })
               ) : (
                 <p className={guardStyles.searchEmpty}>
-                  Aucun résultat. Saisis un symbole TSX,
-                  par exemple RY ou SHOP.
+                  {pick(
+                    language,
+                    "Aucun résultat. Saisis un symbole TSX, par exemple RY ou SHOP.",
+                    "No result. Enter a TSX symbol, for example RY or SHOP.",
+                  )}
                 </p>
               )}
             </div>
 
             <p className={guardStyles.searchHelp}>
-              ↑↓ pour naviguer · Entrée pour ouvrir ·
-              Ctrl/⌘ K pour rechercher
+              {pick(
+                language,
+                "↑↓ pour naviguer · Entrée pour ouvrir · Ctrl/⌘ K pour rechercher",
+                "↑↓ to navigate · Enter to open · Ctrl/⌘ K to search",
+              )}
             </p>
           </section>
         </div>
@@ -775,21 +824,21 @@ export function AppSidebar({
           className={`mobile-drawer-heading ${guardStyles.mobileDrawerHeading}`}
         >
           <Link
-            href="/cockpit"
+            href="/aujourdhui"
             className="mobile-drawer-brand"
             onClick={() => setDrawerOpen(false)}
           >
             <span className="brand-mark">A</span>
             <span>
               <strong>anatole</strong>
-              <small>Intelligence de marché</small>
+              <small>{pick(language, "Intelligence de marché", "Market intelligence")}</small>
             </span>
           </Link>
 
           <button
             type="button"
             className="mobile-drawer-close"
-            aria-label="Fermer le menu Anatole"
+            aria-label={pick(language, "Fermer le menu Anatole", "Close Anatole menu")}
             onClick={() => setDrawerOpen(false)}
           >
             <X size={21} />
@@ -798,12 +847,12 @@ export function AppSidebar({
 
         <div className="desktop-sidebar-header">
           <Link
-            href="/cockpit"
+            href="/aujourdhui"
             className="brand desktop-brand"
             aria-label="Anatole"
             title={
               sidebarCollapsed
-                ? "Accueil Anatole"
+                ? pick(language, "Accueil Anatole", "Anatole home")
                 : undefined
             }
           >
@@ -818,15 +867,15 @@ export function AppSidebar({
           className="desktop-sidebar-edge-toggle"
           aria-label={
             sidebarCollapsed
-              ? "Déplier la navigation"
-              : "Replier la navigation"
+              ? pick(language, "Déplier la navigation", "Expand navigation")
+              : pick(language, "Replier la navigation", "Collapse navigation")
           }
           aria-controls="anatole-sidebar"
           aria-pressed={sidebarCollapsed}
           title={
             sidebarCollapsed
-              ? "Déplier le menu"
-              : "Replier le menu"
+              ? pick(language, "Déplier le menu", "Expand menu")
+              : pick(language, "Replier le menu", "Collapse menu")
           }
           onClick={toggleDesktopSidebar}
         >
@@ -845,7 +894,7 @@ export function AppSidebar({
           onClick={openSearch}
         >
           <Search size={17} />
-          <span>Rechercher</span>
+          <span>{pick(language, "Rechercher", "Search")}</span>
           <kbd>⌘K</kbd>
         </button>
 
@@ -858,22 +907,28 @@ export function AppSidebar({
           onClick={() => setDrawerOpen(false)}
           title={
             sidebarCollapsed
-              ? "Compte & paramètres"
+              ? pick(language, "Compte & paramètres", "Account & settings")
               : undefined
           }
         >
           <UserRound size={19} />
           <span>
-            <strong>Compte & paramètres</strong>
-            <small>Compte · préférences · données</small>
+            <strong>{pick(language, "Compte & paramètres", "Account & settings")}</strong>
+            <small>{pick(language, "Compte · préférences · données", "Account · preferences · data")}</small>
           </span>
         </Link>
 
         <nav
           className="sidebar-nav desktop-nav"
-          aria-label="Navigation principale"
+          aria-label={pick(language, "Navigation principale", "Main navigation")}
         >
-          {groups.map((group) => (
+          {localizedGroups
+            .filter((group) =>
+              group.items.some(
+                (item) => !item.adminOnly || user?.is_admin,
+              ),
+            )
+            .map((group) => (
             <section
               className="nav-group"
               key={group.label}
@@ -882,7 +937,9 @@ export function AppSidebar({
                 {group.label}
               </span>
 
-              {group.items.map((item) => {
+              {group.items
+                .filter((item) => !item.adminOnly || user?.is_admin)
+                .map((item) => {
                 const Icon = item.icon;
                 const active = isActive(
                   pathname,
@@ -912,7 +969,7 @@ export function AppSidebar({
                     <Icon size={18} />
                     <span>{item.label}</span>
                     {!item.available ? (
-                      <em>Bientôt</em>
+                      <em>{pick(language, "Bientôt", "Soon")}</em>
                     ) : null}
                   </Link>
                 );
@@ -929,22 +986,30 @@ export function AppSidebar({
         <div className="sidebar-footer">
           <AccountStatus />
           <Link href="/roadmap">
-            Anatole v0.9.6
+            Anatole v1.3
           </Link>
-          <span>Centre de contrôle · synchronisation active</span>
+          <span>{pick(language, "Centre de contrôle · synchronisation active", "Control center · synchronization active")}</span>
         </div>
       </aside>
 
       <nav
         className={`mobile-bottom-nav ${guardStyles.mobileBottomNav}`}
-        aria-label="Accès rapide Anatole"
+        aria-label={pick(language, "Accès rapide Anatole", "Anatole quick access")}
       >
+        <Link
+          href="/aujourdhui"
+          className={pathname === "/aujourdhui" ? "is-active" : ""}
+          aria-current={pathname === "/aujourdhui" ? "page" : undefined}
+        >
+          <LayoutDashboard size={20} />
+          <span>{pick(language, "Aujourd’hui", "Today")}</span>
+        </Link>
         <Link
           href="/cockpit"
           className={pathname === "/cockpit" ? "is-active" : ""}
           aria-current={pathname === "/cockpit" ? "page" : undefined}
         >
-          <LayoutDashboard size={20} />
+          <Activity size={20} />
           <span>Cockpit</span>
         </Link>
         <Link
@@ -963,25 +1028,17 @@ export function AppSidebar({
           <CircleDollarSign size={20} />
           <span>ETF</span>
         </Link>
-        <Link
-          href="/terminal"
-          className={pathname === "/terminal" ? "is-active" : ""}
-          aria-current={pathname === "/terminal" ? "page" : undefined}
-        >
-          <Gauge size={20} />
-          <span>Terminal</span>
-        </Link>
         <button
           type="button"
           className={
+            pathname !== "/aujourdhui" &&
             pathname !== "/cockpit" &&
             pathname !== "/screener" &&
-            !pathname.startsWith("/etf") &&
-            pathname !== "/terminal"
+            !pathname.startsWith("/etf")
               ? "is-active"
               : ""
           }
-          aria-label="Ouvrir toutes les sections"
+          aria-label={pick(language, "Ouvrir toutes les sections", "Open all sections")}
           aria-controls="anatole-sidebar"
           aria-expanded={drawerOpen}
           onClick={() => setDrawerOpen(true)}
