@@ -1,45 +1,30 @@
-# Anatole v1.3.4 — Screener TSX Composite
+# Anatole v1.3.5 — Aujourd’hui centré sur le TSX Composite
 
-## Nouveau comportement
+La section Aujourd’hui utilise maintenant le S&P/TSX Composite comme univers
+principal dès l’ouverture.
 
-Le Screener utilise désormais le S&P/TSX Composite par défaut.
+Un sélecteur permet de choisir :
+- Composite — marché canadien élargi;
+- TSX 60 — grandes capitalisations.
 
-L’utilisateur peut choisir :
+Les données suivantes changent réellement avec l’univers :
+- variation pondérée;
+- progressions et baisses;
+- ratio de hausse;
+- état de marché;
+- secteurs en tête et sous pression;
+- lecture automatique Anatole.
 
-- TSX Composite : univers canadien élargi;
-- TSX 60 : vue rapide des grandes capitalisations.
+Cadence :
+- Composite : 45 secondes;
+- TSX 60 : 15 secondes.
 
-Le score Anatole conserve les mêmes composantes :
+Le bouton « Ouvrir le Cockpit » transmet le même univers au Cockpit.
 
-- variation de la séance;
-- momentum sur 20 séances;
-- volume relatif;
-- RSI;
-- tendance technique.
+Déploiement :
+1. remplacer les deux fichiers;
+2. commit dans `main`;
+3. redéployer uniquement Vercel;
+4. désactiver `Use existing Build Cache`.
 
-## Univers Composite
-
-La liste opérationnelle provient des positions publiées pour XIC, qui réplique
-le S&P/TSX Capped Composite. Les espèces et dérivés sont exclus. Le service
-utilise jusqu’à 260 sociétés et conserve la dernière liste valide lorsque la
-source est momentanément indisponible.
-
-## Performance
-
-- cache TSX 60 : 45 secondes;
-- cache Composite : 180 secondes;
-- délai frontend Composite : 120 secondes;
-- calcul des historiques Composite avec concurrence contrôlée;
-- changement d’univers sans perdre les filtres généraux.
-
-Le premier calcul Composite peut être plus long que le TSX 60. Les visites
-suivantes bénéficient du cache backend.
-
-## Déploiement
-
-1. Installer le PATCH à la racine du dépôt.
-2. Commit et push sur `main`.
-3. Déployer Render en premier.
-4. Déployer Vercel sans réutiliser le Build Cache.
-
-Aucune migration PostgreSQL n’est requise.
+Aucun changement Render ou PostgreSQL.

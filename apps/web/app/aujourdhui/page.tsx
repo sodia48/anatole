@@ -269,11 +269,46 @@ export default function TodayPage() {
   const mounted = useRef(true);
   const loadingRef = useRef(false);
 
-  const universe: CockpitUniverse = workspace.cockpit_universe === "composite"
-    ? "composite"
-    : workspace.preferences.default_universe === "composite"
-      ? "composite"
-      : "tsx60";
+  const [universe, setUniverse] =
+    useState<CockpitUniverse>(
+      "composite",
+    );
+  const [
+    marketSwitching,
+    setMarketSwitching,
+  ] = useState(false);
+
+  const selectUniverse =
+    useCallback(
+      (next: CockpitUniverse) => {
+        if (next === universe) {
+          return;
+        }
+
+        setUniverse(next);
+        setCockpit(null);
+        setMarketSwitching(true);
+        setIssues((current) =>
+          current.filter(
+            (item) =>
+              item.source !== "Marché",
+          ),
+        );
+      },
+      [universe],
+    );
+
+  const prepareCockpitLink =
+    useCallback(() => {
+      try {
+        window.localStorage.setItem(
+          "anatole-cockpit-universe",
+          universe,
+        );
+      } catch {
+        // La préférence Cockpit reste facultative.
+      }
+    }, [universe]);
 
   const reloadWorkspace = useCallback(() => {
     setWorkspace(readLocalWorkspace().data);
@@ -302,20 +337,52 @@ export default function TodayPage() {
   }, []);
 
   const loadMarket = useCallback(async () => {
-    if (document.visibilityState === "hidden") return;
-    const controller = new AbortController();
+    if (
+      document.visibilityState ===
+      "hidden"
+    ) {
+      return;
+    }
+
+    const controller =
+      new AbortController();
     const nextIssues: SourceIssue[] = [];
+
     try {
-      const value = await getCockpitSnapshot(universe, controller.signal);
-      if (mounted.current) setCockpit(value);
+      const value =
+        await getCockpitSnapshot(
+          universe,
+          controller.signal,
+        );
+
+      if (mounted.current) {
+        setCockpit(value);
+      }
     } catch (reason) {
       nextIssues.push({
         source: "Marché",
-        message: reason instanceof Error ? reason.message : "Données indisponibles",
+        message:
+          reason instanceof Error
+            ? reason.message
+            : "Données indisponibles",
       });
+    } finally {
+      if (mounted.current) {
+        setMarketSwitching(false);
+      }
     }
-    if (nextIssues.length && mounted.current) {
-      setIssues((current) => [...current.filter((item) => item.source !== "Marché"), ...nextIssues]);
+
+    if (
+      nextIssues.length &&
+      mounted.current
+    ) {
+      setIssues((current) => [
+        ...current.filter(
+          (item) =>
+            item.source !== "Marché",
+        ),
+        ...nextIssues,
+      ]);
       setState("partial");
     }
   }, [universe]);
@@ -430,15 +497,38 @@ export default function TodayPage() {
   }, [loadAll]);
 
   useEffect(() => {
-    const fast = window.setInterval(() => void loadMarket(), 15_000);
-    const personal = window.setInterval(() => void loadPersonal(), 30_000);
-    const context = window.setInterval(() => void loadContext(), 120_000);
+    const marketInterval =
+      universe === "composite"
+        ? 45_000
+        : 15_000;
+
+    const fast =
+      window.setInterval(
+        () => void loadMarket(),
+        marketInterval,
+      );
+    const personal =
+      window.setInterval(
+        () => void loadPersonal(),
+        30_000,
+      );
+    const context =
+      window.setInterval(
+        () => void loadContext(),
+        120_000,
+      );
+
     return () => {
       window.clearInterval(fast);
       window.clearInterval(personal);
       window.clearInterval(context);
     };
-  }, [loadContext, loadMarket, loadPersonal]);
+  }, [
+    loadContext,
+    loadMarket,
+    loadPersonal,
+    universe,
+  ]);
 
   const upcomingEvents = useMemo(() => {
     const now = Date.now() - 30 * 60 * 1000;
@@ -503,7 +593,7 @@ export default function TodayPage() {
     <main className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.2.3</span>
+          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.3.5</span>
           <h1>{displayName ? `Bonjour ${displayName}` : "Aujourd’hui sur les marchés"}</h1>
           <p>Une lecture quotidienne claire du marché canadien et de ton espace, sans recommandation de placement.</p>
         </div>
@@ -532,10 +622,89 @@ export default function TodayPage() {
       <section className={styles.marketSection}>
         <div className={styles.sectionHeading}>
           <div>
-            <span className={styles.eyebrow}>LE MARCHÉ EN 30 SECONDES</span>
-            <h2>{universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"}</h2>
+            <span className={styles.eyebrow}>
+              LE MARCHÉ EN 30 SECONDES
+            </span>
+            <h2>
+              {universe === "composite"
+                ? "S&P/TSX Composite"
+                : "S&P/TSX 60"}
+            </h2>
+            <span
+              className={
+                styles.universeCaption
+              }
+            >
+              {universe === "composite"
+                ? "Vue principale · marché canadien élargi"
+                : "Vue concentrée · grandes capitalisations"}
+              {marketSwitching
+                ? " · actualisation…"
+                : ""}
+            </span>
           </div>
-          <Link href="/cockpit">Ouvrir le Cockpit <span>→</span></Link>
+
+          <div
+            className={
+              styles.marketHeadingActions
+            }
+          >
+            <div
+              className={
+                styles.universeSwitch
+              }
+              role="group"
+              aria-label="Univers de marché"
+            >
+              <button
+                type="button"
+                className={
+                  universe === "composite"
+                    ? styles.universeActive
+                    : undefined
+                }
+                aria-pressed={
+                  universe === "composite"
+                }
+                onClick={() =>
+                  selectUniverse(
+                    "composite",
+                  )
+                }
+              >
+                Composite
+              </button>
+
+              <button
+                type="button"
+                className={
+                  universe === "tsx60"
+                    ? styles.universeActive
+                    : undefined
+                }
+                aria-pressed={
+                  universe === "tsx60"
+                }
+                onClick={() =>
+                  selectUniverse(
+                    "tsx60",
+                  )
+                }
+              >
+                TSX 60
+              </button>
+            </div>
+
+            <Link
+              href="/cockpit"
+              onClick={
+                prepareCockpitLink
+              }
+            >
+              Ouvrir le Cockpit
+              <span>→</span>
+            </Link>
+          </div>
         </div>
 
         <div className={styles.marketGrid}>
@@ -543,7 +712,14 @@ export default function TodayPage() {
             <div>
               <span>Variation pondérée</span>
               <strong>{cockpit ? formatPercent(marketChange) : "—"}</strong>
-              <small>{marketState}</small>
+              <small>
+                {marketSwitching
+                  ? universe ===
+                    "composite"
+                    ? "Chargement du marché canadien élargi…"
+                    : "Chargement du TSX 60…"
+                  : marketState}
+              </small>
             </div>
             <dl>
               <div><dt>Progressions</dt><dd>{cockpit?.breadth.advancers ?? "—"}</dd></div>

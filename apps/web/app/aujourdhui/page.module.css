@@ -728,3 +728,109 @@
     transition: none;
   }
 }
+
+/* Anatole v1.3.5 — Aujourd’hui centré sur le TSX Composite. */
+.universeCaption {
+  display: block;
+  margin-top: 7px;
+  color: #7195aa;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.marketHeadingActions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.universeSwitch {
+  min-width: 0;
+  padding: 4px;
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid
+    rgba(67, 128, 164, 0.43);
+  border-radius: 13px;
+  background: rgba(3, 20, 31, 0.72);
+}
+
+.universeSwitch button {
+  min-width: 96px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #83a6ba;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.universeSwitch button:hover {
+  color: #e9f5fc;
+  background: rgba(32, 79, 110, 0.38);
+}
+
+.universeSwitch button.universeActive {
+  border-color:
+    rgba(92, 151, 255, 0.72);
+  background:
+    linear-gradient(
+      145deg,
+      rgba(33, 83, 144, 0.82),
+      rgba(18, 53, 92, 0.88)
+    );
+  color: #ffffff;
+  box-shadow:
+    0 8px 20px
+    rgba(24, 78, 143, 0.18);
+}
+
+@media (max-width: 900px) {
+  .marketHeadingActions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .universeSwitch {
+    width: 100%;
+  }
+
+  .universeSwitch button {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .marketHeadingActions > a {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 520px) {
+  .universeSwitch button {
+    min-height: 42px;
+    padding: 0 8px;
+    font-size: 0.76rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .universeSwitch button {
+    transition: none;
+  }
+}
