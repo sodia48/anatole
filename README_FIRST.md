@@ -1,56 +1,116 @@
-# Anatole v1.3.8 — Calendrier officiel FR / EN
+# Anatole v1.3.9 — Économie des provinces canadiennes
 
-## Problème corrigé
+## Objectif
 
-Dans `Aujourd’hui`, la langue de l’utilisateur était déjà utilisée pour les
-Actualités, mais `getCalendarSnapshot()` était encore appelé sans langue.
-Le backend Calendrier utilisait également les pages anglaises comme sources
-fixes. Résultat : l’interface était française, mais les titres d’événements de
-la Banque du Canada restaient en anglais.
+Actualités et Calendrier deviennent réellement régionaux, tout en conservant
+le contexte national canadien.
 
-## Nouveau comportement
+## Nouveau filtre Région
 
-### Français
+Les deux sections proposent désormais :
 
-Anatole récupère directement :
+- Toutes
+- Canada
+- Québec
+- Ontario
+- Colombie-Britannique
+- Alberta
+- Saskatchewan
+- Manitoba
+- Nouveau-Brunswick
+- Nouvelle-Écosse
+- Île-du-Prince-Édouard
+- Terre-Neuve-et-Labrador
 
-- Statistique Canada : `cal2-fra.htm`
-- Banque du Canada : `/medias/evenements-a-venir/`
+Quand une province est sélectionnée, Anatole affiche :
 
-Exemples attendus :
+1. les publications explicitement liées à cette province;
+2. les indicateurs nationaux qui contiennent normalement une ventilation
+   provinciale;
+3. les publications nationales communes utiles au contexte canadien.
 
-- `Publication : Enquête auprès des responsables du crédit`
-- `Annonce du taux directeur`
-- `Publication : Résumé des délibérations`
+## Actualités
 
-### English
+La couverture existante de Statistique Canada et de la Banque du Canada est
+conservée.
 
-Anatole conserve :
+Anatole ajoute aussi des fils gouvernementaux provinciaux officiels lorsque
+des flux RSS stables sont disponibles dans la langue active.
 
-- Statistics Canada : `cal2-eng.htm`
-- Bank of Canada : `/press/upcoming-events/`
+Dans cette version, des flux directs sont intégrés pour :
 
-## Changements techniques
+- Québec;
+- Saskatchewan;
+- Nouvelle-Écosse;
+- Île-du-Prince-Édouard;
+- Colombie-Britannique;
+- Terre-Neuve-et-Labrador.
 
-- `/api/v1/discovery/calendar?lang=fr`
-- `/api/v1/discovery/calendar?lang=en`
-- caches backend français et anglais séparés;
-- derniers événements valides séparés par langue et par source;
-- parseur compatible avec `21 août 2026`, `14 août`, `10 h 30`, etc.;
-- catégories et niveaux d’importance compatibles avec les titres français;
-- jours fériés français de la Banque du Canada exclus du radar;
-- la section Calendrier recharge immédiatement au changement de langue;
-- `Aujourd’hui` transmet désormais la langue active au calendrier;
-- l’ancien snapshot dans l’autre langue est retiré immédiatement au changement
-  FR ↔ EN.
+Pour préserver la règle bilingue d'Anatole, un flux provincial anglais n'est
+pas injecté dans l'édition française. En français, Statistique Canada fournit
+la couverture régionale commune aux dix provinces, complétée par les sources
+provinciales françaises disponibles.
+
+Les fils provinciaux sont filtrés afin de conserver les thèmes économiques :
+finances publiques, investissement, travail, commerce, énergie et ressources,
+logement/construction et comptes économiques.
+
+Chaque source provinciale directe est limitée aux 12 publications économiques
+les plus récentes et dispose d'un délai maximal de 8 secondes, afin qu'une
+source provinciale lente ne bloque pas les nouvelles fédérales.
+
+## Calendrier
+
+Le calendrier s'appuie sur les publications officielles déjà utilisées par
+Anatole.
+
+Les événements sont maintenant associés aux régions concernées.
+
+Exemples :
+
+- « Enquête sur la population active » -> Canada + les 10 provinces;
+- « IPC » / commerce de détail / commerce de gros / permis de bâtir ->
+  Canada + les 10 provinces;
+- « PIB du Québec » -> Québec;
+- annonce du taux directeur de la Banque du Canada -> Canada.
+
+Ainsi, sélectionner Québec, Ontario ou Alberta garde les événements communs
+au Canada tout en faisant ressortir ceux qui concernent la province.
+
+## Interface
+
+Chaque carte possède une indication régionale :
+
+- Canada
+- Québec
+- Ontario
+- Canada + provinces
+- etc.
+
+Les libellés suivent la préférence Français / English d'Anatole.
 
 ## Déploiement
 
-Ce PATCH touche Render et Vercel :
+Cette version touche Render et Vercel.
 
-1. décompresser à la racine du dépôt;
-2. commit et push sur `main`;
-3. déployer Render en premier;
-4. déployer Vercel ensuite avec `Use existing Build Cache` désactivé.
+1. Décompresser le PATCH à la racine du dépôt.
+2. Commit et push sur `main`.
+3. Déployer Render en premier.
+4. Vérifier `/ready`.
+5. Déployer Vercel ensuite.
+6. Désactiver `Use existing Build Cache` pour ce déploiement.
 
-Aucune migration PostgreSQL n’est nécessaire.
+Aucune migration PostgreSQL n'est nécessaire.
+
+## Vérification rapide
+
+Actualités :
+1. choisir `Région -> Québec`;
+2. vérifier que les publications Québec apparaissent avec les nouvelles
+   canadiennes communes;
+3. essayer Ontario, Alberta et Colombie-Britannique.
+
+Calendrier :
+1. choisir une province;
+2. vérifier que les indicateurs à ventilation provinciale restent visibles;
+3. revenir à `Toutes` pour retrouver l'ensemble du calendrier.

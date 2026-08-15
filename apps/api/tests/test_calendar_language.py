@@ -118,3 +118,25 @@ def test_french_classification_keywords() -> None:
     assert _category("Annonce du taux directeur") == "Politique monétaire"
     assert _category("Enquête sur la population active") == "Travail"
     assert _importance("Annonce du taux directeur") == "Élevée"
+
+
+def test_calendar_regions() -> None:
+    html = """
+    <html><body>
+      <h1>Calendrier de diffusion - août 2026</h1>
+      <h2>14 août</h2>
+      <ul>
+        <li>Enquête sur la population active, juillet 2026</li>
+        <li>Produit intérieur brut du Québec, 2025</li>
+      </ul>
+    </body></html>
+    """
+    events = _parse_statcan_html(
+        html,
+        now=datetime(2026, 8, 13, 12, 0, tzinfo=UTC),
+        language="fr",
+        url=STATCAN_URLS["fr"],
+    )
+    assert "QC" in events[0].regions
+    assert "ON" in events[0].regions
+    assert events[1].regions == ["QC"]

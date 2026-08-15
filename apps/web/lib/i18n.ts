@@ -56,6 +56,16 @@ export function navLabel(
 const SOURCE_ENGLISH: Record<string, string> = {
   "Banque du Canada": "Bank of Canada",
   "Statistique Canada": "Statistics Canada",
+  "Gouvernement du Québec": "Government of Quebec",
+  "Gouvernement de la Saskatchewan": "Government of Saskatchewan",
+  "Nouvelle-Écosse": "Nova Scotia",
+  "Finances": "Finance",
+  "Île-du-Prince-Édouard": "Prince Edward Island",
+  "Développement économique": "Economic development",
+  "Colombie-Britannique": "British Columbia",
+  "Économie": "Economy",
+  "Emploi et croissance": "Jobs and growth",
+  "Terre-Neuve-et-Labrador": "Newfoundland and Labrador",
 };
 
 const CATEGORY_ENGLISH: Record<string, string> = {
@@ -69,6 +79,12 @@ const CATEGORY_ENGLISH: Record<string, string> = {
   "Indicateurs clés": "Key indicators",
   "événements": "events",
   "Tous les sujets": "All topics",
+  "Économie provinciale": "Provincial economy",
+  "Finances publiques": "Public finances",
+  "Investissement": "Investment",
+  "Commerce": "Trade",
+  "Énergie et ressources": "Energy & resources",
+  "Logement et construction": "Housing & construction",
 };
 
 export function localizeSource(

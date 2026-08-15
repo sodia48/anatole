@@ -28,6 +28,13 @@ import {
 import {
   REFRESH_INTERVALS,
 } from "@/lib/refresh";
+import {
+  REGION_CODES,
+  matchesRegion,
+  regionLabel,
+  regionSummary,
+  type RegionCode,
+} from "@/lib/regions";
 import type {
   NewsSnapshot,
 } from "@/lib/types";
@@ -66,6 +73,8 @@ export function NewsClient() {
     useState("Toutes");
   const [sentiment, setSentiment] =
     useState("Tous");
+  const [region, setRegion] =
+    useState<RegionCode>("ALL");
 
   useEffect(() => {
     let active = true;
@@ -175,6 +184,10 @@ export function NewsClient() {
         (category === "Toutes" ||
           item.category ===
             category) &&
+        matchesRegion(
+          item.regions,
+          region,
+        ) &&
         (sentiment === "Tous" ||
           item.sentiment ===
             sentiment)
@@ -184,6 +197,7 @@ export function NewsClient() {
     category,
     data,
     query,
+    region,
     sentiment,
     source,
   ]);
@@ -203,8 +217,8 @@ export function NewsClient() {
           <p>
             {pick(
               language,
-              "Connexion aux publications de la Banque du Canada et de Statistique Canada.",
-              "Connecting to Bank of Canada and Statistics Canada publications.",
+              "Connexion aux publications fédérales et aux sources économiques provinciales officielles.",
+              "Connecting to federal publications and official provincial economic sources.",
             )}
           </p>
         </div>
@@ -233,8 +247,8 @@ export function NewsClient() {
           <p>
             {pick(
               language,
-              "Publications officielles, catégorisées et accompagnées d’une lecture de sentiment simple et explicable.",
-              "Official publications, categorized and paired with a simple, explainable sentiment reading.",
+              "Publications économiques officielles du Canada et des provinces, catégorisées et accompagnées d’une lecture de sentiment simple et explicable.",
+              "Official economic publications from Canada and the provinces, categorized and paired with a simple, explainable sentiment reading.",
             )}
           </p>
         </div>
@@ -254,8 +268,8 @@ export function NewsClient() {
           <small>
             {pick(
               language,
-              "Mise à jour automatique toutes les 15 minutes",
-              "Automatic refresh every 15 minutes",
+              "Canada + 10 provinces · mise à jour toutes les 15 minutes",
+              "Canada + 10 provinces · refresh every 15 minutes",
             )}
           </small>
         </div>
@@ -268,7 +282,12 @@ export function NewsClient() {
       ) : null}
 
       <section className="source-status-grid">
-        {data?.source_statuses.map(
+        {data?.source_statuses
+          .filter((item) =>
+            item.source.startsWith("Statistique Canada") ||
+            item.source.startsWith("Banque du Canada"),
+          )
+          .map(
           (item) => (
             <article
               className={`panel source-status source-${item.status}`}
@@ -320,6 +339,36 @@ export function NewsClient() {
               "Search inflation, jobs, rates…",
             )}
           />
+        </label>
+
+        <label>
+          <span>
+            {pick(
+              language,
+              "Région",
+              "Region",
+            )}
+          </span>
+          <select
+            value={region}
+            onChange={(event) =>
+              setRegion(
+                event.target.value as RegionCode,
+              )
+            }
+          >
+            {REGION_CODES.map((code) => (
+              <option
+                key={code}
+                value={code}
+              >
+                {regionLabel(
+                  code,
+                  language,
+                )}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
@@ -454,6 +503,12 @@ export function NewsClient() {
               <span>
                 {localizeSource(
                   item.source,
+                  language,
+                )}
+              </span>
+              <span>
+                {regionSummary(
+                  item.regions,
                   language,
                 )}
               </span>

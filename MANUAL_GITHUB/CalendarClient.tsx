@@ -28,6 +28,13 @@ import {
 import type {
   CalendarSnapshot,
 } from "@/lib/types";
+import {
+  REGION_CODES,
+  matchesRegion,
+  regionLabel,
+  regionSummary,
+  type RegionCode,
+} from "@/lib/regions";
 
 export function CalendarClient() {
   const { preferences } =
@@ -77,6 +84,8 @@ export function CalendarClient() {
     useState("Toutes");
   const [category, setCategory] =
     useState("Toutes");
+  const [region, setRegion] =
+    useState<RegionCode>("ALL");
 
   useEffect(() => {
     let active = true;
@@ -168,6 +177,10 @@ export function CalendarClient() {
         (importance === "Toutes" ||
           item.importance ===
             importance) &&
+        matchesRegion(
+          item.regions,
+          region,
+        ) &&
         (category === "Toutes" ||
           item.category ===
             category)
@@ -178,6 +191,7 @@ export function CalendarClient() {
     data,
     importance,
     query,
+    region,
   ]);
 
   const grouped = useMemo(() => {
@@ -224,8 +238,8 @@ export function CalendarClient() {
           <p>
             {pick(
               language,
-              "Synchronisation des dates de Statistique Canada et de la Banque du Canada.",
-              "Synchronizing Statistics Canada and Bank of Canada dates.",
+              "Synchronisation des dates nationales et des indicateurs offrant une lecture provinciale.",
+              "Synchronizing national dates and indicators with provincial coverage.",
             )}
           </p>
         </div>
@@ -254,8 +268,8 @@ export function CalendarClient() {
           <p>
             {pick(
               language,
-              "Dates futures des principaux indicateurs canadiens et événements de politique monétaire.",
-              "Upcoming Canadian economic indicators and monetary policy events.",
+              "Dates futures des principaux indicateurs canadiens, avec une lecture par province lorsque les données régionales sont publiées.",
+              "Upcoming Canadian economic indicators, with province-level coverage when regional data are published.",
             )}
           </p>
         </div>
@@ -275,8 +289,8 @@ export function CalendarClient() {
           <small>
             {pick(
               language,
-              "Heure de Toronto",
-              "Toronto time",
+              "Canada + 10 provinces · heure de Toronto",
+              "Canada + 10 provinces · Toronto time",
             )}
           </small>
         </div>
@@ -341,6 +355,36 @@ export function CalendarClient() {
               "CPI, jobs, GDP, rates…",
             )}
           />
+        </label>
+
+        <label>
+          <span>
+            {pick(
+              language,
+              "Région",
+              "Region",
+            )}
+          </span>
+          <select
+            value={region}
+            onChange={(event) =>
+              setRegion(
+                event.target.value as RegionCode,
+              )
+            }
+          >
+            {REGION_CODES.map((code) => (
+              <option
+                key={code}
+                value={code}
+              >
+                {regionLabel(
+                  code,
+                  language,
+                )}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
@@ -470,6 +514,11 @@ export function CalendarClient() {
                         {event.title}
                       </strong>
                       <small>
+                        {regionSummary(
+                          event.regions,
+                          language,
+                        )}{" "}
+                        ·{" "}
                         {localizeCategory(
                           event.category,
                           language,

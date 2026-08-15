@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 import httpx
 
 from app.schemas.discovery import CalendarSnapshot, EconomicEvent, FeedStatus
+from app.services.regions import economic_regions
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +344,7 @@ def _event(
     description: str | None = None,
 ) -> EconomicEvent:
     starts_at = datetime.combine(day, event_time, tzinfo=TORONTO)
+    region_text = f"{title} {description or ''}"
     return EconomicEvent(
         id=_event_id(source, title, starts_at),
         title=title,
@@ -354,6 +356,11 @@ def _event(
         source=source,
         url=url,
         description=description,
+        regions=(
+            ["CA"]
+            if source == "Banque du Canada"
+            else economic_regions(region_text)
+        ),
     )
 
 
@@ -776,7 +783,7 @@ class CalendarService:
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/150.0 Safari/537.36 Anatole/1.3.8"
+                    "Chrome/150.0 Safari/537.36 Anatole/1.3.9"
                 ),
                 "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.1",
                 "Accept-Language": (

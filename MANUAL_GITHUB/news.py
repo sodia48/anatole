@@ -16,6 +16,7 @@ from xml.etree import ElementTree
 import httpx
 
 from app.schemas.discovery import FeedStatus, NewsItem, NewsSnapshot
+from app.services.regions import economic_regions, province_region
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,103 @@ CATEGORY_KEYWORDS: dict[str, tuple[str, ...]] = {
         "renouvelable",
     ),
 }
+
+# Public, official provincial feeds. These are additive to the federal feeds.
+# Feeds that are already economic/finance-specific still pass through the
+# economic classifier so Anatole does not flood the page with unrelated news.
+PROVINCIAL_RSS_FEEDS = (
+    (
+        "QC",
+        "Gouvernement du Québec",
+        "https://www.quebec.ca/fil-de-presse.rss",
+        ("fr",),
+    ),
+    (
+        "SK",
+        "Gouvernement de la Saskatchewan",
+        "https://www.saskatchewan.ca/Feeds/NewsFeed.ashx",
+        ("en",),
+    ),
+    (
+        "NS",
+        "Nouvelle-Écosse — Économie",
+        "https://novascotia.ca/news/rss/rss.asp?dept=135",
+        ("en",),
+    ),
+    (
+        "NS",
+        "Nouvelle-Écosse — Finances",
+        "https://novascotia.ca/news/rss/rss.asp?dept=10",
+        ("en",),
+    ),
+    (
+        "PE",
+        "Île-du-Prince-Édouard — Développement économique",
+        "https://www.princeedwardisland.ca/en/department/news/1656/rss.xml",
+        ("en",),
+    ),
+    (
+        "PE",
+        "Île-du-Prince-Édouard — Finances",
+        "https://www.princeedwardisland.ca/en/department/news/1607/rss.xml",
+        ("en",),
+    ),
+    (
+        "BC",
+        "Colombie-Britannique — Économie",
+        "https://news.gov.bc.ca/sectors/economy/feed",
+        ("en",),
+    ),
+    (
+        "BC",
+        "Colombie-Britannique — Finances",
+        "https://news.gov.bc.ca/ministries/finance/feed",
+        ("en",),
+    ),
+    (
+        "BC",
+        "Colombie-Britannique — Emploi et croissance",
+        "https://news.gov.bc.ca/ministries/jobs-and-economic-growth/feed",
+        ("en",),
+    ),
+    (
+        "NL",
+        "Terre-Neuve-et-Labrador",
+        "https://www.releases.gov.nl.ca/rss/all-gnl-releases.xml",
+        ("en",),
+    ),
+)
+
+PROVINCIAL_ECONOMIC_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "Finances publiques": (
+        "budget", "fiscal", "tax", "taxes", "public accounts", "deficit",
+        "surplus", "revenues", "revenue", "finances", "impot", "impôt",
+        "comptes publics", "déficit", "excédent", "recettes",
+    ),
+    "Investissement": (
+        "investment", "investing", "funding", "economic development",
+        "business", "businesses", "productivity", "innovation", "trade mission",
+        "investissement", "financement", "développement économique",
+        "entreprise", "entreprises", "productivité", "innovation",
+    ),
+    "Travail": CATEGORY_KEYWORDS["Travail"],
+    "Commerce": CATEGORY_KEYWORDS["Commerce international"] + (
+        "interprovincial trade", "commerce interprovincial", "tariff", "tariffs",
+        "tarif", "tarifs", "retail", "wholesale", "commerce de détail",
+        "commerce de gros",
+    ),
+    "Énergie et ressources": CATEGORY_KEYWORDS["Énergie"] + (
+        "mining", "mine", "critical mineral", "minerals", "forestry", "forest",
+        "agriculture", "fishery", "fisheries", "aquaculture", "mines",
+        "minier", "minéraux critiques", "foresterie", "forêt", "pêches",
+    ),
+    "Logement et construction": (
+        "housing", "homebuilding", "home building", "construction", "infrastructure",
+        "building", "logement", "habitation", "construction", "infrastructure",
+    ),
+    "Comptes économiques": CATEGORY_KEYWORDS["Comptes économiques"],
+}
+
 
 POSITIVE_WORDS = {
     "growth",
@@ -456,7 +554,28 @@ def _classify_statcan(entry: ParsedEntry) -> str | None:
     return best if scores[best] > 0 else None
 
 
-def _to_news_item(entry: ParsedEntry, *, source: str, category: str) -> NewsItem:
+def _classify_provincial(entry: ParsedEntry) -> str | None:
+    haystack = _normalise_text(
+        f"{' '.join(entry.subjects)} {entry.title} {entry.summary}"
+    )
+    scores: dict[str, int] = {}
+    for category, keywords in PROVINCIAL_ECONOMIC_KEYWORDS.items():
+        scores[category] = sum(
+            1
+            for keyword in keywords
+            if _normalise_text(keyword) in haystack
+        )
+    best = max(scores, key=scores.get)
+    return best if scores[best] > 0 else None
+
+
+def _to_news_item(
+    entry: ParsedEntry,
+    *,
+    source: str,
+    category: str,
+    regions: list[str] | None = None,
+) -> NewsItem:
     sentiment, score = _sentiment(entry.title, entry.summary)
     normalised_url = _normalise_url(entry.url)
     identifier = hashlib.sha1(
@@ -472,6 +591,13 @@ def _to_news_item(entry: ParsedEntry, *, source: str, category: str) -> NewsItem
         published_at=entry.published_at,
         sentiment=sentiment,
         sentiment_score=score,
+        regions=(
+            regions
+            if regions is not None
+            else economic_regions(
+                f"{entry.title} {entry.summary} {' '.join(entry.subjects)}"
+            )
+        ),
     )
 
 
@@ -683,6 +809,87 @@ class NewsService:
             FeedStatus(source=source_label, status="ok", detail=f"{len(items)} éléments")
         ]
 
+    async def _fetch_provincial_feed(
+        self,
+        client: httpx.AsyncClient,
+        province: str,
+        source: str,
+        url: str,
+    ) -> tuple[list[NewsItem], list[FeedStatus]]:
+        source_label = f"{source} — Économie provinciale"
+        entries, error = await self._download(
+            client,
+            source_label=source_label,
+            url=url,
+        )
+        if error:
+            return [], [
+                FeedStatus(
+                    source=source_label,
+                    status="unavailable",
+                    detail=error,
+                )
+            ]
+
+        items: list[NewsItem] = []
+        for entry in entries:
+            category = _classify_provincial(entry)
+            if category is None:
+                continue
+            items.append(
+                _to_news_item(
+                    entry,
+                    source=source,
+                    category=category,
+                    regions=province_region(province),
+                )
+            )
+
+        items = items[:12]
+        return items, [
+            FeedStatus(
+                source=source_label,
+                status="ok" if items else "unavailable",
+                detail=(
+                    f"{len(items)} éléments économiques"
+                    if items
+                    else "Aucune publication économique récente dans le flux"
+                ),
+            )
+        ]
+
+    async def _fetch_provincial_feed_safe(
+        self,
+        client: httpx.AsyncClient,
+        province: str,
+        source: str,
+        url: str,
+    ) -> tuple[list[NewsItem], list[FeedStatus]]:
+        source_label = f"{source} — Économie provinciale"
+        try:
+            return await asyncio.wait_for(
+                self._fetch_provincial_feed(
+                    client,
+                    province,
+                    source,
+                    url,
+                ),
+                timeout=8.0,
+            )
+        except TimeoutError:
+            logger.warning(
+                "news_provincial_timeout source=%r url=%r",
+                source_label,
+                url,
+            )
+            return [], [
+                FeedStatus(
+                    source=source_label,
+                    status="unavailable",
+                    detail="Délai dépassé — la couverture Statistique Canada reste active",
+                )
+            ]
+
     async def _fetch_statcan(
         self,
         client: httpx.AsyncClient,
@@ -777,10 +984,8 @@ class NewsService:
     def _status_item_key(status_source: str) -> tuple[str, str] | None:
         if " — " not in status_source:
             return None
-        source, category = status_source.split(" — ", 1)
-        if source == STATCAN_SOURCE or source == "Banque du Canada":
-            return source, category
-        return None
+        source, category = status_source.rsplit(" — ", 1)
+        return source, category
 
     def _merge_last_good_for_failed_sources(
         self,
@@ -804,19 +1009,22 @@ class NewsService:
         if not failed_keys:
             return items, statuses
 
+        failed_sources = {source for source, _category in failed_keys}
         cached_items = [
             item
             for item in last_good.items
             if (item.source, item.category) in failed_keys
+            or item.source in failed_sources
         ]
         if not cached_items:
             return items, statuses
 
         merged_statuses: list[FeedStatus] = []
         cached_keys = {(item.source, item.category) for item in cached_items}
+        cached_sources = {item.source for item in cached_items}
         for status in statuses:
             key = self._status_item_key(status.source)
-            if status.status != "ok" and key in cached_keys:
+            if status.status != "ok" and key is not None and (key in cached_keys or key[0] in cached_sources):
                 detail = "Données en cache — source temporairement indisponible"
                 if status.detail:
                     detail = f"{detail} ({status.detail})"
@@ -858,7 +1066,7 @@ class NewsService:
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/150.0 Safari/537.36 Anatole/1.3.7"
+                    "Chrome/150.0 Safari/537.36 Anatole/1.3.9"
                 ),
                 "Accept": (
                     "application/rss+xml, application/atom+xml, application/xml, "
@@ -896,12 +1104,28 @@ class NewsService:
                         url,
                     ) in BANK_FEEDS[language]
                 ]
+                provincial_tasks = [
+                    self._fetch_provincial_feed_safe(
+                        client,
+                        province,
+                        source,
+                        url,
+                    )
+                    for (
+                        province,
+                        source,
+                        url,
+                        languages,
+                    ) in PROVINCIAL_RSS_FEEDS
+                    if language in languages
+                ]
                 results = await asyncio.gather(
                     *bank_tasks,
                     self._fetch_statcan(
                         client,
                         language,
                     ),
+                    *provincial_tasks,
                 )
 
             items: list[NewsItem] = []

@@ -8,6 +8,8 @@ from app.services.news import (
     STATCAN_URLS,
     FeedFormatError,
     NewsService,
+    PROVINCIAL_RSS_FEEDS,
+    _classify_provincial,
     _classify_statcan,
     _parse_entries,
 )
@@ -215,3 +217,45 @@ def test_language_cache_is_separate() -> None:
         service._normalize_language("xx")
         == "fr"
     )
+
+
+def test_provincial_economic_feed_classification() -> None:
+    xml = b"""<rss version='2.0'><channel><item>
+    <title>Province invests $25 million in critical minerals</title>
+    <link>https://example.test/mining</link>
+    <description>New investment supports jobs and mining development.</description>
+    <pubDate>Thu, 13 Aug 2026 15:00:00 GMT</pubDate>
+    </item></channel></rss>"""
+    entry = _parse_entries(
+        xml,
+        content_type="application/rss+xml",
+        source="Province",
+    )[0]
+    assert _classify_provincial(entry) in {
+        "Investissement",
+        "Énergie et ressources",
+    }
+
+
+def test_direct_provincial_feed_registry_covers_multiple_provinces() -> None:
+    provinces = {item[0] for item in PROVINCIAL_RSS_FEEDS}
+    assert {"QC", "BC", "SK", "NS", "PE", "NL"}.issubset(provinces)
+
+
+def test_provincial_feed_language_is_respected() -> None:
+    french_provinces = {
+        province
+        for province, _source, _url, languages in PROVINCIAL_RSS_FEEDS
+        if "fr" in languages
+    }
+    english_provinces = {
+        province
+        for province, _source, _url, languages in PROVINCIAL_RSS_FEEDS
+        if "en" in languages
+    }
+
+    # Quebec's official feed is French. English-only provincial feeds are not
+    # mixed into the French edition; French StatCan coverage remains available
+    # for all ten provinces through regional tagging.
+    assert "QC" in french_provinces
+    assert {"BC", "SK", "NS", "PE", "NL"}.issubset(english_provinces)

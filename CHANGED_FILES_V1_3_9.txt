@@ -1,0 +1,12 @@
+apps/api/app/schemas/discovery.py
+apps/api/app/services/regions.py
+apps/api/app/services/news.py
+apps/api/app/services/calendar.py
+apps/api/tests/test_regions.py
+apps/api/tests/test_news_service.py
+apps/api/tests/test_calendar_language.py
+apps/web/lib/types.ts
+apps/web/lib/regions.ts
+apps/web/lib/i18n.ts
+apps/web/components/discovery/NewsClient.tsx
+apps/web/components/discovery/CalendarClient.tsx
