@@ -64,6 +64,7 @@ class ProvincialMacroEvent(BaseModel):
     importance: Literal["Élevée", "Moyenne", "Faible"]
     importance_score: int = Field(ge=0, le=100)
     starts_at: datetime
+    time_is_estimated: bool = False
     source: str
     source_kind: SourceKind
     source_url: str

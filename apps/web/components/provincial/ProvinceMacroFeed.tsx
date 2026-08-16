@@ -191,7 +191,7 @@ export default function ProvinceMacroFeed({
           {calendarItems.map((item) => (
             <article className={styles.eventCard} key={item.id}>
               <div className={styles.eventWhen}>
-                <strong>{dateTimeLabel(item.starts_at, language)}</strong>
+                <strong>{item.time_is_estimated ? dateLabel(item.starts_at, language) : dateTimeLabel(item.starts_at, language)}</strong>
                 <span>{item.importance}</span>
               </div>
               <div className={styles.eventBody}>

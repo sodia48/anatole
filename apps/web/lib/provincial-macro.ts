@@ -43,6 +43,7 @@ export type ProvincialMacroEvent = {
   importance: "Élevée" | "Moyenne" | "Faible";
   importance_score: number;
   starts_at: string;
+  time_is_estimated: boolean;
   source: string;
   source_kind: string;
   source_url: string;
@@ -85,6 +86,7 @@ const REGION_ALIASES: Record<string, ProvinceCode> = {
   "new brunswick": "NB",
   ns: "NS",
   "nouvelle-écosse": "NS",
+  "nouvelle-ecosse": "NS",
   "nouvelle ecosse": "NS",
   "nova scotia": "NS",
   pe: "PE",
@@ -127,6 +129,45 @@ function apiBaseUrl(): string {
 
   return configured.replace(/\/+$/, "");
 }
+
+export async function getProvincialCalendarSnapshot(
+  region: string,
+  language: AnatoleLanguage = "fr",
+  signal?: AbortSignal,
+): Promise<ProvincialMacroSnapshot> {
+  const code = provinceCode(region);
+  if (!code) {
+    throw new Error(`Province Anatole non reconnue: ${region}`);
+  }
+
+  const query = new URLSearchParams({
+    region: code,
+    lang: language,
+  });
+
+  const paths = [
+    `/api/v1/discovery/provincial-calendar?${query.toString()}`,
+    `/api/v1/discovery/provincial-macro?${query.toString()}`,
+  ];
+
+  let lastStatus = 0;
+  for (const path of paths) {
+    const response = await fetch(`${apiBaseUrl()}${path}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal,
+    });
+    if (response.ok) {
+      return response.json() as Promise<ProvincialMacroSnapshot>;
+    }
+    lastStatus = response.status;
+    if (response.status !== 404 && response.status !== 405) break;
+  }
+
+  throw new Error(`Provincial calendar HTTP ${lastStatus || "error"}`);
+}
+
 
 export async function getProvincialMacroSnapshot(
   region: string,

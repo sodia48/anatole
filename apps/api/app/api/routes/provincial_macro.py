@@ -8,6 +8,32 @@ from app.services.provincial_macro import PROVINCES, normalize_region, provincia
 router = APIRouter()
 
 
+def _validated_region(region: str) -> str:
+    code = normalize_region(region)
+    if code not in PROVINCES:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Province non reconnue. Utiliser QC, ON, BC, AB, SK, MB, NB, NS, PE ou NL."
+            ),
+        )
+    return code
+
+
+@router.get(
+    "/provincial-calendar",
+    response_model=ProvincialMacroSnapshot,
+    summary="Calendrier économique province-first",
+)
+async def get_provincial_calendar(
+    region: str = Query(..., min_length=2, max_length=40),
+    lang: str = Query("fr", pattern="^(fr|en)$"),
+) -> ProvincialMacroSnapshot:
+    return await provincial_macro_service.get_calendar_snapshot(
+        _validated_region(region), lang
+    )
+
+
 @router.get(
     "/provincial-macro",
     response_model=ProvincialMacroSnapshot,
@@ -17,12 +43,4 @@ async def get_provincial_macro(
     region: str = Query(..., min_length=2, max_length=40),
     lang: str = Query("fr", pattern="^(fr|en)$"),
 ) -> ProvincialMacroSnapshot:
-    code = normalize_region(region)
-    if code not in PROVINCES:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "Province non reconnue. Utiliser QC, ON, BC, AB, SK, MB, NB, NS, PE ou NL."
-            ),
-        )
-    return await provincial_macro_service.get_snapshot(code, lang)
+    return await provincial_macro_service.get_snapshot(_validated_region(region), lang)

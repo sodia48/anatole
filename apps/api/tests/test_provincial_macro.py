@@ -146,3 +146,131 @@ def test_statcan_provincialization_removes_generic_noise() -> None:
     assert len(output) == 1
     assert output[0].title.startswith("Québec —")
     assert output[0].specificity == "province-normalized"
+
+
+def test_quebec_official_snapshot_fallback_has_immediate_releases() -> None:
+    from app.services.provincial_macro import _quebec_calendar_snapshot_fallback
+
+    events = _quebec_calendar_snapshot_fallback(
+        now=datetime(2026, 8, 16, 20, tzinfo=UTC),
+        lang="fr",
+        source_url="https://statistique.quebec.ca/calendar",
+    )
+    dates = {event.starts_at.date().isoformat() for event in events}
+    assert "2026-08-17" in dates
+    assert "2026-08-18" in dates
+    assert "2026-08-21" in dates
+    assert "2026-09-04" in dates
+    assert "2026-09-23" in dates
+    assert all(event.source == "Statistique Québec" for event in events)
+
+
+def test_statcan_provincialization_translates_and_cleans_contacts() -> None:
+    events = [
+        SimpleNamespace(
+            title="(huis clos) Consumer Price Index, July 2026 (Taylor Mitchell, 613-294-3496)",
+            source="Statistique Canada",
+            starts_at=datetime(2026, 8, 17, 12, 30, tzinfo=UTC),
+            url="https://example.test/cpi",
+        )
+    ]
+    output = provincialize_statcan_events(
+        events,
+        region="QC",
+        lang="fr",
+        now=datetime(2026, 8, 16, 0, tzinfo=UTC),
+    )
+    assert len(output) == 1
+    assert "Indice des prix à la consommation" in output[0].title
+    assert "Taylor Mitchell" not in output[0].title
+    assert "huis clos" not in output[0].title.lower()
+
+
+def test_wholesale_trade_is_valid_provincial_fallback() -> None:
+    events = [
+        SimpleNamespace(
+            title="Wholesale trade, June 2026",
+            source="Statistics Canada",
+            starts_at=datetime(2026, 9, 15, 12, 30, tzinfo=UTC),
+            url="https://example.test/wholesale",
+        )
+    ]
+    output = provincialize_statcan_events(
+        events,
+        region="ON",
+        lang="fr",
+        now=datetime(2026, 8, 16, 0, tzinfo=UTC),
+    )
+    assert len(output) == 1
+    assert output[0].region == "ON"
+    assert "Commerce de gros" in output[0].title
+
+
+def test_calendar_snapshot_fast_path_combines_direct_and_statcan(monkeypatch) -> None:
+    import asyncio
+    from app.schemas.provincial_macro import ProvincialMacroEvent, ProvincialMacroSource
+    from app.services.provincial_macro import ProvincialMacroService
+
+    service = ProvincialMacroService()
+    direct = ProvincialMacroEvent(
+        id="qc-direct",
+        region="QC",
+        province="Québec",
+        title="Québec — Comptes économiques trimestriels",
+        description="Date provinciale officielle.",
+        category="PIB",
+        importance="Élevée",
+        importance_score=100,
+        starts_at=datetime(2026, 9, 23, 16, tzinfo=UTC),
+        time_is_estimated=True,
+        source="Statistique Québec",
+        source_kind="statistics",
+        source_url="https://example.test/qc",
+        specificity="province-direct",
+    )
+    statcan = ProvincialMacroEvent(
+        id="qc-statcan",
+        region="QC",
+        province="Québec",
+        title="Québec — Indice des prix à la consommation, septembre 2026",
+        description="Volet provincial StatCan.",
+        category="Inflation",
+        importance="Élevée",
+        importance_score=100,
+        starts_at=datetime(2026, 10, 20, 12, 30, tzinfo=UTC),
+        source="Statistique Canada — Québec",
+        source_kind="statcan",
+        source_url="https://example.test/statcan",
+        specificity="province-normalized",
+    )
+
+    async def fake_direct(*args, **kwargs):
+        return [direct], ProvincialMacroSource(
+            key="calendar-qc",
+            label="Statistique Québec — calendrier",
+            region="QC",
+            kind="statistics",
+            url="https://example.test/qc",
+            status="available",
+            count=1,
+        )
+
+    async def fake_statcan(*args, **kwargs):
+        return [statcan], ProvincialMacroSource(
+            key="statcan-qc",
+            label="Statistique Canada — Québec",
+            region="QC",
+            kind="statcan",
+            url="https://example.test/statcan",
+            status="available",
+            count=1,
+        )
+
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    snapshot = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    assert snapshot.region == "QC"
+    assert snapshot.latest_releases == []
+    assert [item.id for item in snapshot.upcoming_events] == ["qc-direct", "qc-statcan"]
+    assert len(snapshot.sources) == 2

@@ -1,116 +1,97 @@
-# Anatole v1.3.9 — Économie des provinces canadiennes
+# Anatole v1.5.1 — Calendrier provincial prioritaire
 
-## Objectif
+## Problème corrigé
 
-Actualités et Calendrier deviennent réellement régionaux, tout en conservant
-le contexte national canadien.
+Lorsque `Région -> Québec` (ou une autre province) était sélectionné dans le Calendrier, la vue pouvait continuer à montrer surtout des publications nationales génériques marquées « Canada + provinces ». Les vraies dates provinciales importantes n'étaient donc pas visibles au bon endroit.
 
-## Nouveau filtre Région
+Cette version ajoute un **bloc Calendrier provincial prioritaire** relié automatiquement au filtre Région du Calendrier Next.js. Il ne remplace pas le contexte national existant : il place les annonces provinciales pertinentes dans un bloc distinct et prioritaire, afin qu'elles ne soient plus noyées dans les événements nationaux.
 
-Les deux sections proposent désormais :
+## Ce qui change
 
-- Toutes
-- Canada
-- Québec
-- Ontario
-- Colombie-Britannique
-- Alberta
-- Saskatchewan
-- Manitoba
-- Nouveau-Brunswick
-- Nouvelle-Écosse
-- Île-du-Prince-Édouard
-- Terre-Neuve-et-Labrador
+### Québec
 
-Quand une province est sélectionnée, Anatole affiche :
+Source principale : calendrier officiel des principaux indicateurs économiques de Statistique Québec.
 
-1. les publications explicitement liées à cette province;
-2. les indicateurs nationaux qui contiennent normalement une ventilation
-   provinciale;
-3. les publications nationales communes utiles au contexte canadien.
+Au 16 août 2026, le correctif doit notamment faire ressortir :
 
-## Actualités
+- 17 août — Indice des prix à la consommation;
+- 18 août — Exportations/importations internationales réelles de marchandises;
+- 18 août — Mises en chantier;
+- 21 août — Ventes au détail;
+- 27 août — Rémunération hebdomadaire moyenne;
+- 4 septembre — Enquête sur la population active;
+- 14 septembre — Ventes de biens fabriqués;
+- 15 septembre — Ventes en gros;
+- 16 septembre — Permis de bâtir;
+- 23 septembre — Comptes économiques trimestriels du Québec.
 
-La couverture existante de Statistique Canada et de la Banque du Canada est
-conservée.
+La lecture live de Statistique Québec est prioritaire. Une copie de secours **datée du 14 août 2026 et expirant le 30 septembre 2026** est incluse uniquement pour éviter un écran vide si la source change temporairement de format ou devient inaccessible. Elle n'est jamais prolongée automatiquement.
 
-Anatole ajoute aussi des fils gouvernementaux provinciaux officiels lorsque
-des flux RSS stables sont disponibles dans la langue active.
+### Ontario
 
-Dans cette version, des flux directs sont intégrés pour :
+Le correctif lit directement le calendrier officiel des Ontario Economic Accounts lorsqu'une échéance trimestrielle est publiée, puis complète avec les diffusions de Statistique Canada qui comportent réellement des données ontariennes.
 
-- Québec;
-- Saskatchewan;
-- Nouvelle-Écosse;
-- Île-du-Prince-Édouard;
-- Colombie-Britannique;
-- Terre-Neuve-et-Labrador.
+### Saskatchewan
 
-Pour préserver la règle bilingue d'Anatole, un flux provincial anglais n'est
-pas injecté dans l'édition française. En français, Statistique Canada fournit
-la couverture régionale commune aux dix provinces, complétée par les sources
-provinciales françaises disponibles.
+Le calendrier officiel 2026-2027 du Saskatchewan Bureau of Statistics est intégré pour les dates d'inflation, d'emploi, de revue statistique et de population.
 
-Les fils provinciaux sont filtrés afin de conserver les thèmes économiques :
-finances publiques, investissement, travail, commerce, énergie et ressources,
-logement/construction et comptes économiques.
+### Colombie-Britannique, Alberta, Manitoba, Nouveau-Brunswick, Nouvelle-Écosse, Île-du-Prince-Édouard et Terre-Neuve-et-Labrador
 
-Chaque source provinciale directe est limitée aux 12 publications économiques
-les plus récentes et dispose d'un délai maximal de 8 secondes, afin qu'une
-source provinciale lente ne bloque pas les nouvelles fédérales.
+Le Calendrier conserve uniquement les diffusions de Statistique Canada pour lesquelles une composante provinciale utile est réellement publiée : IPC, emploi, commerce de détail/gros, fabrication, permis de bâtir, population, rémunération et autres indicateurs explicitement provincialisables.
 
-## Calendrier
+Les événements nationaux génériques sans vraie lecture provinciale — par exemple certaines statistiques de valeurs mobilières — ne sont pas transformés artificiellement en événements provinciaux.
 
-Le calendrier s'appuie sur les publications officielles déjà utilisées par
-Anatole.
+## Installation recommandée
 
-Les événements sont maintenant associés aux régions concernées.
+1. Décompresser ce PATCH **à la racine du dépôt Anatole** en acceptant les remplacements.
+2. Depuis la racine du dépôt, exécuter :
 
-Exemples :
+```bash
+python tools/install_provincial_calendar_v1_5_1.py
+```
 
-- « Enquête sur la population active » -> Canada + les 10 provinces;
-- « IPC » / commerce de détail / commerce de gros / permis de bâtir ->
-  Canada + les 10 provinces;
-- « PIB du Québec » -> Québec;
-- annonce du taux directeur de la Banque du Canada -> Canada.
+Sous Windows, vous pouvez aussi lancer :
 
-Ainsi, sélectionner Québec, Ontario ou Alberta garde les événements communs
-au Canada tout en faisant ressortir ceux qui concernent la province.
+```text
+INSTALL_V1_5_1.bat
+```
 
-## Interface
+3. Le script :
+   - monte automatiquement la route FastAPI `provincial_macro` dans `apps/api/app/api/router.py`;
+   - repère automatiquement le composant Next.js actuel du Calendrier;
+   - détecte sa variable de filtre Région;
+   - y injecte `ProvinceCalendarPriorityPanel`;
+   - crée une sauvegarde dans `.anatole-backups/v1_5_1`;
+   - peut être exécuté plusieurs fois sans doubler l'intégration.
+4. Commit + push sur `main`.
+5. Déployer **Render en premier**.
+6. Vérifier :
 
-Chaque carte possède une indication régionale :
+```text
+https://anatole-api.onrender.com/api/v1/discovery/provincial-calendar?region=QC&lang=fr
+```
 
-- Canada
-- Québec
-- Ontario
-- Canada + provinces
-- etc.
+La réponse doit contenir `upcoming_events` avec des événements Québec.
+7. Déployer **Vercel ensuite**, sans réutiliser l'ancien Build Cache.
+8. Dans Anatole : Calendrier -> Région -> Québec. Vérifier le bloc `CALENDRIER PROVINCIAL PRIORITAIRE`, puis tester Ontario, Saskatchewan et les autres provinces.
 
-Les libellés suivent la préférence Français / English d'Anatole.
+## Important sur les heures
 
-## Déploiement
+Certains calendriers provinciaux officiels publient une **date** sans heure précise. Anatole conserve alors une heure interne uniquement pour le tri, mais l'interface affiche la date seulement (`time_is_estimated=true`). Une heure précise n'est donc pas inventée à l'utilisateur.
 
-Cette version touche Render et Vercel.
+## Fichiers principaux
 
-1. Décompresser le PATCH à la racine du dépôt.
-2. Commit et push sur `main`.
-3. Déployer Render en premier.
-4. Vérifier `/ready`.
-5. Déployer Vercel ensuite.
-6. Désactiver `Use existing Build Cache` pour ce déploiement.
+```text
+apps/api/app/services/provincial_macro.py
+apps/api/app/schemas/provincial_macro.py
+apps/api/app/api/routes/provincial_macro.py
+apps/api/tests/test_provincial_macro.py
+apps/web/lib/provincial-macro.ts
+apps/web/components/provincial/ProvinceCalendarPriorityPanel.tsx
+apps/web/components/provincial/ProvinceCalendarPriorityPanel.module.css
+apps/web/components/provincial/ProvinceMacroFeed.tsx
+apps/web/components/provincial/ProvinceMacroFeed.module.css
+tools/install_provincial_calendar_v1_5_1.py
+```
 
 Aucune migration PostgreSQL n'est nécessaire.
-
-## Vérification rapide
-
-Actualités :
-1. choisir `Région -> Québec`;
-2. vérifier que les publications Québec apparaissent avec les nouvelles
-   canadiennes communes;
-3. essayer Ontario, Alberta et Colombie-Britannique.
-
-Calendrier :
-1. choisir une province;
-2. vérifier que les indicateurs à ventilation provinciale restent visibles;
-3. revenir à `Toutes` pour retrouver l'ensemble du calendrier.

@@ -1,37 +1,76 @@
-# Rapport de validation — Anatole Operational Final v1
+# Validation — Anatole v1.5.1
 
 ## Backend
 
-- Compilation Python de `apps/api/app` et `apps/api/tests` : réussie.
-- Suite complète : **59 tests réussis, 0 échec**.
-- Vérification OpenAPI : les six routes opérationnelles sont enregistrées :
-  Screener, répertoire ETF, participations ETF, historique ETF, IPO et initiés.
-- Smoke test FastAPI en mode de données de secours :
-  - `/health` : 200;
-  - `/api/v1/discovery/screener?universe=tsx60` : 200, 60 titres;
-  - `/api/v1/discovery/etfs` : 200, 172 ETF;
-  - `/api/v1/discovery/psychology` : 200, 5 composantes.
-- Tests de routes avec services isolés : participations ETF, historique ETF,
-  IPO et initiés répondent tous 200.
+Commande exécutée :
 
-## Frontend
+```bash
+cd apps/api
+PYTHONPATH=. pytest -q tests/test_provincial_macro.py
+```
 
-- Vérification statique TypeScript de l’ensemble de `apps/web` avec les modules
-  externes simulés : réussie.
-- Présence vérifiée de tous les exports consommés par les composants :
-  `getHealthStatus`, Cockpit, Watchlist, Focus, Screener, Actualités,
-  Calendrier, Psychologie, ETF, Recherche et WebSocket.
-- Méthode Watchlist restaurée en POST.
-- Relais same-origin `/api/anatole` vérifié dans `next.config.ts`.
+Résultat :
 
-## Limite de l’environnement de validation
+```text
+12 passed
+```
 
-Le build Next.js réel n’a pas pu être exécuté ici, car l’environnement ne
-pouvait pas télécharger `pnpm` et les dépendances npm à cause d’un échec DNS
-vers le registre. Cette limite est distincte du code. La vérification statique
-a néanmoins détecté puis permis de corriger l’export frontend qui cassait le
-build précédent.
+Couverture des tests :
 
-La récupération réelle des compositions ETF dépend de la réponse de la source
-publique au moment du test après déploiement Render. Le service renvoie une
-réponse structurée et conserve les dernières données valides en cas d’échec.
+- les 10 provinces sont enregistrées;
+- alias français/anglais des provinces;
+- rejet du bruit non économique;
+- classification des indicateurs essentiels;
+- lecture du calendrier Statistique Québec;
+- lecture des échéances Ontario Economic Accounts;
+- calendrier Saskatchewan;
+- élimination des événements nationaux non provincialisables;
+- secours Québec daté;
+- nettoyage/traduction des titres StatCan;
+- commerce de gros comme indicateur provincialisable;
+- chemin rapide `/provincial-calendar` combinant source provinciale + volet provincial StatCan.
+
+## Frontend TypeScript
+
+Les nouveaux modules frontend ont été vérifiés avec TypeScript 5.8.3 dans un projet de contrôle avec alias `@/*`, déclarations CSS Modules et DOM :
+
+```text
+tsc --noEmit : réussi
+```
+
+## Installateur automatique
+
+L'installateur a été testé deux fois de suite sur un dépôt Next.js/FastAPI synthétique :
+
+- première exécution : route FastAPI ajoutée + composant Calendrier identifié + panneau injecté;
+- deuxième exécution : aucune duplication; intégration reconnue comme déjà installée.
+
+Le test a aussi vérifié que l'injection se fait dans la racine JSX du composant et non à l'intérieur d'un titre ou d'un contrôle.
+
+## Sources officielles vérifiées le 16 août 2026
+
+### Québec
+
+Calendrier de diffusion des principaux indicateurs économiques :
+
+https://statistique.quebec.ca/fr/produit/tableau/calendrier-de-diffusion-principaux-indicateurs-economiques
+
+### Ontario
+
+Ontario Budget 2026 — Chapter 2, calendrier des Ontario Economic Accounts :
+
+https://budget.ontario.ca/2026/chapter-2.html
+
+### Saskatchewan
+
+Bureau of Statistics — 2026-27 Release Schedule :
+
+https://publications.saskatchewan.ca/api/v1/products/86689/formats/156260/download
+
+### Statistique Canada
+
+Le service de calendrier déjà présent dans Anatole reste utilisé comme filet de sécurité, mais seulement pour les indicateurs pouvant réellement être ventilés par province.
+
+## Limite volontaire
+
+Le correctif ne prétend pas qu'un événement national est provincial simplement parce qu'il a un effet économique général. Une vue provinciale doit montrer une donnée qui vise directement la province ou une diffusion nationale avec une vraie composante provinciale.

@@ -1,10 +1,17 @@
-return_code=0
-[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m.[0m[32m                                                                 [100%][0m
-[32m[32m[1m8 passed[0m[32m in 0.14s[0m[0m
-Spreadsheet runtime warmup failed during python startup
-Traceback (most recent call last):
-  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py", line 26, in warm_spreadsheet_runtime_on_startup
-  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py", line 772, in warm_spreadsheet_runtime
-  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/connection.py", line 37, in get_or_create_client
-  File "/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/daemon.py", line 124, in start_daemon
-TimeoutError: Timed out waiting for artifact tool daemon socket. Set ARTIFACT_TOOL_RPC_DAEMON_STARTUP_TIMEOUT_S=<seconds> to increase the limit.
+Anatole v1.5.1 — Provincial calendar tests
+Date: 2026-08-16
+
+Command:
+cd apps/api && PYTHONPATH=. pytest -q tests/test_provincial_macro.py
+
+Result:
+............                                                             [100%]
+12 passed in 0.16s
+
+Frontend TypeScript check:
+tsc --noEmit -p synthetic-v1.5.1-check/tsconfig.json
+Result: success (TypeScript 5.8.3)
+
+Installer test:
+- first run: backend route + Calendar Next.js panel integrated
+- second run: idempotent; no duplicate integration
