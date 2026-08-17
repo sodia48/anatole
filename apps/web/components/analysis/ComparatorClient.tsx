@@ -33,6 +33,8 @@ import type {
 } from "@/lib/types";
 
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 import styles from "./Analysis.module.css";
 
@@ -72,12 +74,13 @@ function cleanSymbol(value: string): string {
 function formatPercent(
   value: number | null,
   digits = 2,
+  language: AnatoleLanguage = "fr",
 ): string {
   if (value === null || !Number.isFinite(value)) {
     return "—";
   }
 
-  return new Intl.NumberFormat("fr-FR", {
+  return new Intl.NumberFormat(localeFor(language), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
     signDisplay: "exceptZero",
@@ -87,12 +90,13 @@ function formatPercent(
 function formatNumber(
   value: number | null,
   digits = 2,
+  language: AnatoleLanguage = "fr",
 ): string {
   if (value === null || !Number.isFinite(value)) {
     return "—";
   }
 
-  return new Intl.NumberFormat("fr-FR", {
+  return new Intl.NumberFormat(localeFor(language), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
@@ -101,36 +105,38 @@ function formatNumber(
 function formatCurrency(
   value: number,
   currency: string,
+  language: AnatoleLanguage,
 ): string {
   try {
-    return new Intl.NumberFormat("fr-FR", {
+    return new Intl.NumberFormat(localeFor(language), {
       style: "currency",
       currency: currency || "CAD",
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value);
   } catch {
-    return `${formatNumber(value)} ${currency}`;
+    return `${formatNumber(value, 2, language)} ${currency}`;
   }
 }
 
 function formatCompactCurrency(
   value: number | null,
   currency: string,
+  language: AnatoleLanguage,
 ): string {
   if (value === null || !Number.isFinite(value)) {
     return "—";
   }
 
   try {
-    return new Intl.NumberFormat("fr-FR", {
+    return new Intl.NumberFormat(localeFor(language), {
       style: "currency",
       currency: currency || "CAD",
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(value);
   } catch {
-    return new Intl.NumberFormat("fr-FR", {
+    return new Intl.NumberFormat(localeFor(language), {
       notation: "compact",
       maximumFractionDigits: 1,
     }).format(value);
@@ -147,8 +153,10 @@ function valueClass(value: number | null): string {
 
 function PerformanceChart({
   series,
+  language,
 }: {
   series: ComparisonSeries[];
+  language: AnatoleLanguage;
 }) {
   const chart = useMemo(() => {
     const points = series.flatMap((item) => item.points);
@@ -199,7 +207,7 @@ function PerformanceChart({
   if (!chart) {
     return (
       <div className={styles.emptyInline}>
-        Historique insuffisant pour tracer la comparaison.
+        {pick(language, "Historique insuffisant pour tracer la comparaison.", "Insufficient history to chart the comparison.")}
       </div>
     );
   }
@@ -214,7 +222,7 @@ function PerformanceChart({
     chart.minTime + (chart.maxTime - chart.minTime) / 2,
     chart.maxTime,
   ];
-  const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
+  const dateFormatter = new Intl.DateTimeFormat(localeFor(language), {
     month: "short",
     year: "2-digit",
   });
@@ -238,7 +246,7 @@ function PerformanceChart({
           className={styles.chart}
           viewBox={`0 0 ${chart.width} ${chart.height}`}
           role="img"
-          aria-label="Performance normalisée des titres comparés"
+          aria-label={pick(language, "Performance normalisée des titres comparés", "Normalized performance of compared securities")}
           preserveAspectRatio="none"
         >
           {yTicks.map((tick) => {
@@ -366,9 +374,33 @@ function CorrelationGrid({
 
 function InstrumentProfile({
   instrument,
+  language,
 }: {
   instrument: ComparisonInstrument;
+  language: AnatoleLanguage;
 }) {
+  const translatePoint = (value: string): string => {
+    if (language === "fr") return value;
+    return ({
+      "Performance de période solide": "Strong period performance",
+      "Performance de période négative": "Negative period performance",
+      "Rendement ajusté au risque favorable": "Favourable risk-adjusted return",
+      "Rendement ajusté au risque négatif": "Negative risk-adjusted return",
+      "Volatilité contenue": "Contained volatility",
+      "Volatilité élevée": "High volatility",
+      "Momentum 20 jours positif": "Positive 20-day momentum",
+      "Momentum 20 jours sous pression": "20-day momentum under pressure",
+      "Tendance technique haussière": "Bullish technical trend",
+      "Tendance technique baissière": "Bearish technical trend",
+      "RSI en zone de surachat": "RSI in overbought territory",
+      "RSI dans une zone constructive": "RSI in a constructive range",
+      "Valorisation prospective modérée": "Moderate forward valuation",
+      "Valorisation prospective exigeante": "Demanding forward valuation",
+      "Rendement du dividende notable": "Notable dividend yield",
+      "Profil équilibré sans avantage dominant": "Balanced profile with no dominant advantage",
+      "Aucune faiblesse majeure détectée dans les données disponibles": "No major weakness detected in available data",
+    } as Record<string, string>)[value] ?? value;
+  };
   return (
     <article className={`panel ${styles.profileCard}`}>
       <div className={styles.profileHeader}>
@@ -380,18 +412,18 @@ function InstrumentProfile({
       </div>
       <div className={styles.prosCons}>
         <div className={styles.pros}>
-          <h4>Forces</h4>
+          <h4>{pick(language, "Forces", "Strengths")}</h4>
           <ul>
             {instrument.strengths.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{translatePoint(item)}</li>
             ))}
           </ul>
         </div>
         <div className={styles.cons}>
-          <h4>Points de vigilance</h4>
+          <h4>{pick(language, "Points de vigilance", "Watch points")}</h4>
           <ul>
             {instrument.weaknesses.map((item) => (
-              <li key={item}>{item}</li>
+              <li key={item}>{translatePoint(item)}</li>
             ))}
           </ul>
         </div>
@@ -401,7 +433,7 @@ function InstrumentProfile({
           <BarChart3 size={14} /> Focus
         </Link>
         <Link className={styles.secondaryLink} href={`/watchlist?add=${instrument.symbol}`}>
-          Ajouter à la Watchlist <ArrowRight size={13} />
+          {pick(language, "Ajouter à la Watchlist", "Add to Watchlist")} <ArrowRight size={13} />
         </Link>
       </div>
     </article>
@@ -409,6 +441,8 @@ function InstrumentProfile({
 }
 
 export function ComparatorClient() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [symbols, setSymbols] = useState<string[]>(DEFAULT_SYMBOLS);
   const [range, setRange] = useState<ComparisonRange>("1y");
   const [query, setQuery] = useState("");
@@ -435,33 +469,36 @@ export function ComparatorClient() {
   }, []);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = (params.get("symbols") ?? "")
-        .split(",")
-        .map(cleanSymbol)
-        .filter(Boolean);
-      const uniqueFromUrl = [...new Set(fromUrl)].slice(0, 5);
+    const timer = window.setTimeout(() => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const fromUrl = (params.get("symbols") ?? "")
+          .split(",")
+          .map(cleanSymbol)
+          .filter(Boolean);
+        const uniqueFromUrl = [...new Set(fromUrl)].slice(0, 5);
 
-      if (uniqueFromUrl.length >= 2) {
-        setSymbols(uniqueFromUrl);
-        return;
-      }
+        if (uniqueFromUrl.length >= 2) {
+          setSymbols(uniqueFromUrl);
+          return;
+        }
 
-      const stored = JSON.parse(
-        window.localStorage.getItem(STORAGE_KEY) ?? "null",
-      ) as unknown;
-      if (
-        Array.isArray(stored) &&
-        stored.length >= 2 &&
-        stored.length <= 5 &&
-        stored.every((value) => typeof value === "string")
-      ) {
-        setSymbols(stored.map(cleanSymbol).filter(Boolean));
+        const stored = JSON.parse(
+          window.localStorage.getItem(STORAGE_KEY) ?? "null",
+        ) as unknown;
+        if (
+          Array.isArray(stored) &&
+          stored.length >= 2 &&
+          stored.length <= 5 &&
+          stored.every((value) => typeof value === "string")
+        ) {
+          setSymbols(stored.map(cleanSymbol).filter(Boolean));
+        }
+      } catch {
+        // Les valeurs par défaut restent actives.
       }
-    } catch {
-      // Les valeurs par défaut restent actives.
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -475,8 +512,8 @@ export function ComparatorClient() {
   useEffect(() => {
     const clean = query.trim();
     if (clean.length < 1) {
-      setSuggestions([]);
-      return;
+      const timer = window.setTimeout(() => setSuggestions([]), 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
@@ -504,7 +541,7 @@ export function ComparatorClient() {
     selectedRange = range,
   ): Promise<void> {
     if (selectedSymbols.length < 2) {
-      setError("Sélectionne au moins deux titres.");
+      setError(pick(language, "Sélectionne au moins deux titres.", "Select at least two securities."));
       return;
     }
 
@@ -531,7 +568,7 @@ export function ComparatorClient() {
         setError(
           reason instanceof Error
             ? reason.message
-            : "Le comparateur est temporairement indisponible.",
+            : pick(language, "Le comparateur est temporairement indisponible.", "The comparator is temporarily unavailable."),
         );
       }
     } finally {
@@ -566,7 +603,7 @@ export function ComparatorClient() {
 
   function removeSymbol(symbol: string): void {
     if (symbols.length <= 2) {
-      setError("Le Comparateur doit conserver au moins deux titres.");
+      setError(pick(language, "Le Comparateur doit conserver au moins deux titres.", "The Comparator must keep at least two securities."));
       return;
     }
     setSymbols((current) => current.filter((item) => item !== symbol));
@@ -588,29 +625,28 @@ export function ComparatorClient() {
     <div className={styles.page}>
       <header className={`panel ${styles.hero}`}>
         <div className={styles.heroCopy}>
-          <span className="eyebrow">ANALYSE PROFESSIONNELLE · V0.6</span>
-          <h1>Comparateur</h1>
+          <span className="eyebrow">{pick(language, "ANALYSE PROFESSIONNELLE", "PROFESSIONAL ANALYSIS")} · V0.6</span>
+          <h1>{pick(language, "Comparateur", "Comparator")}</h1>
           <p>
-            Mets jusqu’à cinq actions ou ETF sur la même base et compare rendement,
-            risque, momentum, valorisation et corrélations sans multiplier les écrans.
+            {pick(language, "Mets jusqu’à cinq actions ou ETF sur la même base et compare rendement, risque, momentum, valorisation et corrélations sans multiplier les écrans.", "Place up to five stocks or ETFs on the same basis and compare return, risk, momentum, valuation, and correlations in one screen.")}
           </p>
         </div>
         <div className={styles.heroScore}>
           <GitCompareArrows size={24} color="#27d5ae" />
           <strong>{snapshot?.instruments.length ?? symbols.length}</strong>
-          <span>titres analysés</span>
-          <small>{snapshot?.range_label ?? "Préparation des données"}</small>
+          <span>{pick(language, "titres analysés", "securities analyzed")}</span>
+          <small>{snapshot?.range_label ?? pick(language, "Préparation des données", "Preparing data")}</small>
         </div>
       </header>
 
       <section className={`panel ${styles.controlPanel}`}>
         <div className={styles.controlTop}>
           <div className={styles.controlTitle}>
-            <span className="eyebrow">UNIVERS DE COMPARAISON</span>
-            <h2>Construis ton groupe</h2>
-            <p>Deux titres minimum, cinq maximum. Actions et ETF canadiens acceptés.</p>
+            <span className="eyebrow">{pick(language, "UNIVERS DE COMPARAISON", "COMPARISON UNIVERSE")}</span>
+            <h2>{pick(language, "Construis ton groupe", "Build your group")}</h2>
+            <p>{pick(language, "Deux titres minimum, cinq maximum. Actions et ETF canadiens acceptés.", "Minimum two, maximum five securities. Canadian stocks and ETFs are supported.")}</p>
           </div>
-          <div className={styles.rangeRow} aria-label="Période de comparaison">
+          <div className={styles.rangeRow} aria-label={pick(language, "Période de comparaison", "Comparison period")}>
             {RANGE_OPTIONS.map((option) => (
               <button
                 type="button"
@@ -633,7 +669,8 @@ export function ComparatorClient() {
               <Search size={18} />
               <input
                 value={query}
-                placeholder="Ajouter un ticker — ex. ENB, XIU, MDA"
+                placeholder={pick(language, "Ajouter un ticker — ex. ENB, XIU, MDA", "Add a ticker — e.g. ENB, XIU, MDA")}
+                aria-label={pick(language, "Ajouter un titre à la comparaison", "Add a security to the comparison")}
                 spellCheck={false}
                 autoComplete="off"
                 disabled={symbols.length >= 5}
@@ -673,7 +710,7 @@ export function ComparatorClient() {
             onClick={() => void loadComparison()}
           >
             {loading ? <RefreshCw size={17} className={styles.spinIcon} /> : <Sparkles size={17} />}
-            {loading ? "Analyse…" : "Actualiser"}
+            {loading ? pick(language, "Analyse…", "Analyzing…") : pick(language, "Actualiser", "Refresh")}
           </button>
         </div>
 
@@ -683,7 +720,7 @@ export function ComparatorClient() {
               {symbol}
               <button
                 type="button"
-                aria-label={`Retirer ${symbol}`}
+                aria-label={pick(language, `Retirer ${symbol}`, `Remove ${symbol}`)}
                 onClick={() => removeSymbol(symbol)}
               >
                 <X size={13} />
@@ -692,19 +729,19 @@ export function ComparatorClient() {
           ))}
           {symbols.length < 5 ? (
             <span className="muted small-copy">
-              <Plus size={12} /> Ajoute encore {5 - symbols.length} titre(s)
+              <Plus size={12} /> {pick(language, `Ajoute encore ${5 - symbols.length} titre(s)`, `Add ${5 - symbols.length} more securities`)}
             </span>
           ) : null}
         </div>
-        {error ? <div className={styles.errorNotice}>{error}</div> : null}
+        {error ? <div className={styles.errorNotice}>{language === "fr" ? error : "The comparison could not be updated."}</div> : null}
       </section>
 
       {loading && !snapshot ? (
         <section className={`panel ${styles.loadingPanel}`}>
           <div className={styles.loadingCopy}>
             <span className={styles.spinner} />
-            <strong>Construction de la comparaison</strong>
-            <span>Historique, risque, momentum et valorisation sont calculés ensemble.</span>
+            <strong>{pick(language, "Construction de la comparaison", "Building comparison")}</strong>
+            <span>{pick(language, "Historique, risque, momentum et valorisation sont calculés ensemble.", "History, risk, momentum, and valuation are calculated together.")}</span>
           </div>
         </section>
       ) : null}
@@ -713,22 +750,22 @@ export function ComparatorClient() {
         <>
           <section className={styles.kpiGrid}>
             <article className={`panel ${styles.kpiCard}`}>
-              <span>Meilleure performance</span>
+              <span>{pick(language, "Meilleure performance", "Best performance")}</span>
               <strong>{bestPerformance?.symbol ?? "—"}</strong>
-              <small>{formatPercent(bestPerformance?.total_return_percent ?? null)}</small>
+              <small>{formatPercent(bestPerformance?.total_return_percent ?? null, 2, language)}</small>
             </article>
             <article className={`panel ${styles.kpiCard}`}>
-              <span>Meilleur Sharpe</span>
+              <span>{pick(language, "Meilleur Sharpe", "Best Sharpe")}</span>
               <strong>{bestSharpe?.symbol ?? "—"}</strong>
-              <small>{formatNumber(bestSharpe?.sharpe_ratio ?? null)}</small>
+              <small>{formatNumber(bestSharpe?.sharpe_ratio ?? null, 2, language)}</small>
             </article>
             <article className={`panel ${styles.kpiCard}`}>
-              <span>Volatilité la plus basse</span>
+              <span>{pick(language, "Volatilité la plus basse", "Lowest volatility")}</span>
               <strong>{lowestRisk?.symbol ?? "—"}</strong>
-              <small>{formatPercent(lowestRisk?.volatility_percent ?? null)}</small>
+              <small>{formatPercent(lowestRisk?.volatility_percent ?? null, 2, language)}</small>
             </article>
             <article className={`panel ${styles.kpiCard}`}>
-              <span>Référence bêta</span>
+              <span>{pick(language, "Référence bêta", "Beta benchmark")}</span>
               <strong>TSX</strong>
               <small>{snapshot.benchmark_name}</small>
             </article>
@@ -738,23 +775,23 @@ export function ComparatorClient() {
             <div className={styles.sectionHeading}>
               <div>
                 <span className="eyebrow">BASE 100</span>
-                <h2>Performance normalisée</h2>
-                <p>Chaque série débute à 100 pour rendre les trajectoires comparables.</p>
+                <h2>{pick(language, "Performance normalisée", "Normalized performance")}</h2>
+                <p>{pick(language, "Chaque série débute à 100 pour rendre les trajectoires comparables.", "Each series begins at 100 to make paths comparable.")}</p>
               </div>
               <span className={styles.sectionHeadingMeta}>
-                Période : {snapshot.range_label}<br />
-                Données différées selon la source
+                {pick(language, "Période", "Period")}: {snapshot.range_label}<br />
+                {pick(language, "Données différées selon la source", "Data delayed depending on source")}
               </span>
             </div>
-            <PerformanceChart series={snapshot.series} />
+            <PerformanceChart series={snapshot.series} language={language} />
           </section>
 
           <section className={`panel ${styles.sectionPanel}`}>
             <div className={styles.sectionHeading}>
               <div>
-                <span className="eyebrow">CLASSEMENT ANATOLE</span>
-                <h2>Rendement, risque et valorisation</h2>
-                <p>Le rang résume plusieurs dimensions; les métriques restent visibles séparément.</p>
+                <span className="eyebrow">{pick(language, "CLASSEMENT ANATOLE", "ANATOLE RANKING")}</span>
+                <h2>{pick(language, "Rendement, risque et valorisation", "Return, risk, and valuation")}</h2>
+                <p>{pick(language, "Le rang résume plusieurs dimensions; les métriques restent visibles séparément.", "The rank summarizes several dimensions; each metric remains visible separately.")}</p>
               </div>
               <Trophy size={21} color="#f2b84b" />
             </div>
@@ -762,26 +799,26 @@ export function ComparatorClient() {
               <table className={styles.compareTable} data-mobile-cards="compare">
                 <thead>
                   <tr>
-                    <th>Titre</th>
-                    <th>Type</th>
-                    <th>Prix</th>
-                    <th>Période</th>
-                    <th>Annualisé</th>
-                    <th>Volatilité</th>
+                    <th>{pick(language, "Titre", "Security")}</th>
+                    <th>{pick(language, "Type", "Type")}</th>
+                    <th>{pick(language, "Prix", "Price")}</th>
+                    <th>{pick(language, "Période", "Period")}</th>
+                    <th>{pick(language, "Annualisé", "Annualized")}</th>
+                    <th>{pick(language, "Volatilité", "Volatility")}</th>
                     <th>Sharpe</th>
-                    <th>Bêta</th>
+                    <th>{pick(language, "Bêta", "Beta")}</th>
                     <th>Drawdown</th>
                     <th>Momentum 20j</th>
                     <th>RSI</th>
-                    <th>P/E prév.</th>
-                    <th>Dividende</th>
+                    <th>{pick(language, "P/E prév.", "Fwd P/E")}</th>
+                    <th>{pick(language, "Dividende", "Dividend")}</th>
                     <th>Score</th>
                   </tr>
                 </thead>
                 <tbody>
                   {snapshot.instruments.map((instrument) => (
                     <tr key={instrument.symbol}>
-                      <td data-label="Titre">
+                      <td data-label={pick(language, "Titre", "Security")}>
                         <div className={styles.instrumentCell}>
                           <span className={styles.rankBadge}>{instrument.rank}</span>
                           <span>
@@ -790,18 +827,18 @@ export function ComparatorClient() {
                           </span>
                         </div>
                       </td>
-                      <td data-label="Type"><span className={styles.typePill}>{instrument.instrument_type}</span></td>
-                      <td data-label="Prix">{formatCurrency(instrument.price, instrument.currency)}</td>
-                      <td data-label="Période" className={valueClass(instrument.total_return_percent)}>{formatPercent(instrument.total_return_percent)}</td>
-                      <td data-label="Annualisé" className={valueClass(instrument.annualized_return_percent)}>{formatPercent(instrument.annualized_return_percent)}</td>
-                      <td data-label="Volatilité">{formatPercent(instrument.volatility_percent)}</td>
-                      <td data-label="Sharpe">{formatNumber(instrument.sharpe_ratio)}</td>
-                      <td data-label="Bêta">{formatNumber(instrument.beta)}</td>
-                      <td data-label="Drawdown" className="negative">{formatPercent(instrument.max_drawdown_percent)}</td>
-                      <td data-label="Momentum 20j" className={valueClass(instrument.momentum_20d)}>{formatPercent(instrument.momentum_20d)}</td>
-                      <td data-label="RSI">{formatNumber(instrument.rsi_14, 1)}</td>
-                      <td data-label="P/E prévu">{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1)}×`}</td>
-                      <td data-label="Dividende">{formatPercent(instrument.dividend_yield_percent)}</td>
+                      <td data-label={pick(language, "Type", "Type")}><span className={styles.typePill}>{language === "en" ? ({ Action: "Stock", ETF: "ETF", Indice: "Index" } as Record<string, string>)[instrument.instrument_type] ?? instrument.instrument_type : instrument.instrument_type}</span></td>
+                      <td data-label={pick(language, "Prix", "Price")}>{formatCurrency(instrument.price, instrument.currency, language)}</td>
+                      <td data-label={pick(language, "Période", "Period")} className={valueClass(instrument.total_return_percent)}>{formatPercent(instrument.total_return_percent, 2, language)}</td>
+                      <td data-label={pick(language, "Annualisé", "Annualized")} className={valueClass(instrument.annualized_return_percent)}>{formatPercent(instrument.annualized_return_percent, 2, language)}</td>
+                      <td data-label={pick(language, "Volatilité", "Volatility")}>{formatPercent(instrument.volatility_percent, 2, language)}</td>
+                      <td data-label="Sharpe">{formatNumber(instrument.sharpe_ratio, 2, language)}</td>
+                      <td data-label={pick(language, "Bêta", "Beta")}>{formatNumber(instrument.beta, 2, language)}</td>
+                      <td data-label="Drawdown" className="negative">{formatPercent(instrument.max_drawdown_percent, 2, language)}</td>
+                      <td data-label="Momentum 20d" className={valueClass(instrument.momentum_20d)}>{formatPercent(instrument.momentum_20d, 2, language)}</td>
+                      <td data-label="RSI">{formatNumber(instrument.rsi_14, 1, language)}</td>
+                      <td data-label={pick(language, "P/E prévu", "Forward P/E")}>{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1, language)}×`}</td>
+                      <td data-label={pick(language, "Dividende", "Dividend")}>{formatPercent(instrument.dividend_yield_percent, 2, language)}</td>
                       <td data-label="Score"><span className={styles.scorePill}>{instrument.score}</span></td>
                     </tr>
                   ))}
@@ -815,8 +852,8 @@ export function ComparatorClient() {
               <div className={styles.sectionHeading}>
                 <div>
                   <span className="eyebrow">DIVERSIFICATION</span>
-                  <h2>Matrice de corrélation</h2>
-                  <p>+1 évolue ensemble, 0 indique peu de lien, −1 évolue en sens opposé.</p>
+                  <h2>{pick(language, "Matrice de corrélation", "Correlation matrix")}</h2>
+                  <p>{pick(language, "+1 évolue ensemble, 0 indique peu de lien, −1 évolue en sens opposé.", "+1 moves together, 0 indicates little relationship, and −1 moves in opposite directions.")}</p>
                 </div>
                 <ShieldCheck size={20} color="#27d5ae" />
               </div>
@@ -825,13 +862,12 @@ export function ComparatorClient() {
             <article className={`panel ${styles.sectionPanel}`}>
               <div className={styles.sectionHeading}>
                 <div>
-                  <span className="eyebrow">REPÈRES</span>
-                  <h2>Lecture du risque</h2>
+                  <span className="eyebrow">{pick(language, "REPÈRES", "GUIDANCE")}</span>
+                  <h2>{pick(language, "Lecture du risque", "Risk interpretation")}</h2>
                 </div>
               </div>
               <div className={styles.notice}>
-                Le ratio de Sharpe utilise un taux sans risque technique de {snapshot.risk_free_rate_percent.toFixed(1)} %.
-                Le bêta est estimé contre le S&amp;P/TSX Composite. Les données manquantes restent marquées « — » plutôt que remplacées par des estimations.
+                {pick(language, `Le ratio de Sharpe utilise un taux sans risque technique de ${snapshot.risk_free_rate_percent.toFixed(1)} %. Le bêta est estimé contre le S&P/TSX Composite. Les données manquantes restent marquées « — » plutôt que remplacées par des estimations.`, `The Sharpe ratio uses a technical risk-free rate of ${snapshot.risk_free_rate_percent.toFixed(1)}%. Beta is estimated against the S&P/TSX Composite. Missing data remains marked “—” instead of being replaced with estimates.`)}
               </div>
             </article>
           </section>
@@ -839,19 +875,19 @@ export function ComparatorClient() {
           <section>
             <div className={styles.sectionHeading}>
               <div>
-                <span className="eyebrow">LECTURE TITRE PAR TITRE</span>
-                <h2>Forces et points de vigilance</h2>
+                <span className="eyebrow">{pick(language, "LECTURE TITRE PAR TITRE", "SECURITY-BY-SECURITY REVIEW")}</span>
+                <h2>{pick(language, "Forces et points de vigilance", "Strengths and watch points")}</h2>
               </div>
             </div>
             <div className={styles.profileGrid}>
               {snapshot.instruments.map((instrument) => (
-                <InstrumentProfile instrument={instrument} key={instrument.symbol} />
+                <InstrumentProfile instrument={instrument} language={language} key={instrument.symbol} />
               ))}
             </div>
           </section>
 
           <footer className={`panel ${styles.methodology}`}>
-            {snapshot.methodology} Capitalisations : {snapshot.instruments.map((item) => `${item.symbol} ${formatCompactCurrency(item.market_cap, item.currency)}`).join(" · ")}.
+            {language === "fr" ? snapshot.methodology : "The composite score uses performance, risk-adjusted return, volatility, momentum, RSI, trend, and available valuation data. It is an analysis tool, not a recommendation."} {pick(language, "Capitalisations", "Market capitalizations")}: {snapshot.instruments.map((item) => `${item.symbol} ${formatCompactCurrency(item.market_cap, item.currency, language)}`).join(" · ")}.
           </footer>
         </>
       ) : null}

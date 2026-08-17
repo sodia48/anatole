@@ -25,6 +25,8 @@ async def quote_stream(websocket: WebSocket, ticker: str) -> None:
                 await asyncio.sleep(15)
             except asyncio.CancelledError:
                 raise
+            except WebSocketDisconnect:
+                return
             except Exception as error:  # noqa: BLE001
                 failures += 1
                 logger.warning(

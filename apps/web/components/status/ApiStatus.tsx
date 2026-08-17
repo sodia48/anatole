@@ -20,9 +20,12 @@ export function ApiStatus() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void check(controller.signal);
-    const interval = window.setInterval(() => void check(), REFRESH_INTERVALS.apiHealth);
+    const timer = window.setTimeout(() => void check(controller.signal), 0);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void check();
+    }, REFRESH_INTERVALS.apiHealth);
     return () => {
+      window.clearTimeout(timer);
       controller.abort();
       window.clearInterval(interval);
     };

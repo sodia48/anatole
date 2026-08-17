@@ -31,10 +31,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = readPreferences();
-    setPreferences(stored);
-    applyPreferences(stored);
-    setHydrated(true);
+    const timer = window.setTimeout(() => {
+      const stored = readPreferences();
+      setPreferences(stored);
+      applyPreferences(stored);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {

@@ -125,6 +125,32 @@ def test_composite_cockpit_returns_all_constituents(monkeypatch) -> None:
         reset_cockpit_caches()
 
 
+def test_composite_cockpit_uses_honest_tsx60_bootstrap(monkeypatch) -> None:
+    async def unavailable_constituents():
+        raise RuntimeError("BlackRock unavailable")
+
+    monkeypatch.setattr(
+        tsx_composite_universe_service,
+        "get_constituents",
+        unavailable_constituents,
+    )
+    original = settings.market_data_provider
+    settings.market_data_provider = "demo"
+    reset_cockpit_caches()
+    try:
+        response = TestClient(app).get(
+            "/api/v1/market/cockpit?universe=composite"
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["universe"] == "S&P/TSX Composite — repli TSX 60"
+        assert "repli temporaire" in payload["universe_source"]
+        assert len(payload["constituents"]) == 60
+    finally:
+        settings.market_data_provider = original
+        reset_cockpit_caches()
+
+
 def test_cockpit_rejects_unknown_universe() -> None:
     response = TestClient(app).get(
         "/api/v1/market/cockpit?universe=unknown"

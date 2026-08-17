@@ -180,7 +180,9 @@ export function CalendarClient() {
 
     const timer =
       window.setInterval(
-        () => void load(),
+        () => {
+          if (!document.hidden) void load();
+        },
         30 * 60_000,
       );
 

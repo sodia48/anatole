@@ -5,6 +5,11 @@
   gap: 16px;
 }
 
+.page > *,
+.panel {
+  min-width: 0;
+}
+
 .hero {
   min-height: 174px;
   padding: 24px 26px;

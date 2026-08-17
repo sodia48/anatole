@@ -16,9 +16,7 @@ import {
   Activity,
   Search,
   Settings2,
-  ShieldCheck,
   Star,
-  UserRound,
   TableProperties,
   X,
 } from "lucide-react";
@@ -101,9 +99,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
 
   useEffect(() => {
     if (!open || query.trim().length < 1) {
-      setSymbols([]);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setSymbols([]);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {

@@ -232,14 +232,17 @@ export function EtfPerformanceChart({
   }, [selectedRange, ticker]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   useEffect(() => {
     const seconds =
       snapshot?.refresh_after_seconds ?? 300;
     const interval = window.setInterval(
-      () => void load(),
+      () => {
+        if (!document.hidden) void load();
+      },
       Math.max(seconds, 30) * 1000,
     );
 

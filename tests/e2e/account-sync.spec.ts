@@ -1,9 +1,29 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Compte Anatole", () => {
+  test("ferme les inscriptions si la politique est indisponible", async ({ page }) => {
+    await page.route("**/api/account/registration", (route) => route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "Politique indisponible." }),
+    }));
+    await page.route("**/api/account/me", (route) => route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "Connexion requise." }),
+    }));
+
+    await page.goto("/parametres?section=account");
+    await page.getByRole("button", { name: /Créer un compte/i }).click();
+    await expect(page.getByText(/La politique d’inscription est indisponible/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Créer et synchroniser/i })).toBeDisabled();
+    await page.getByRole("button", { name: /Connexion/i }).click();
+    await expect(page.getByRole("button", { name: /Me connecter/i })).toBeEnabled();
+  });
+
   test("reste optionnel et lisible sur mobile", async ({ page }) => {
     await page.goto("/compte");
-    await expect(page.getByRole("heading", { name: /Retrouve ton espace/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Compte et paramètres/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Créer un compte/i })).toBeVisible();
     await expect(page.getByText(/Continue sans compte/i)).toBeVisible();
 
@@ -78,13 +98,17 @@ test.describe("Compte Anatole", () => {
       await route.continue();
     });
 
-    await page.goto("/compte");
+    await page.goto("/parametres?section=account");
+    await expect(page.getByRole("button", { name: /Créer un compte/i })).toBeVisible();
     await page.getByRole("button", { name: /Créer un compte/i }).click();
     await page.getByLabel(/Courriel/i).fill("beta@example.com");
     await page.getByLabel(/Mot de passe/i).fill("Anatole2026!");
+    for (const checkbox of await page.getByRole("checkbox").all()) {
+      await checkbox.check();
+    }
     await page.getByRole("button", { name: /Créer et synchroniser/i }).click();
 
-    await expect(page.getByText(/Bonjour Beta/i)).toBeVisible();
+    await expect(page.getByLabel(/Nom affiché/i)).toHaveValue("Beta");
     await expect(page.getByText("2", { exact: true }).first()).toBeVisible();
   });
 });

@@ -183,32 +183,47 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
     const restore = async () => {
       setSyncState("connecting");
       try {
-        const [status, remote] = await Promise.all([
-          getAccountStatus(),
-          getRemoteWorkspace(),
-        ]);
+        let status;
+        try {
+          status = await getAccountStatus();
+        } catch (reason) {
+          if (cancelled) return;
+          const message = reason instanceof Error ? reason.message : "";
+          setUser(null);
+          setWorkspaceRevision(0);
+          setLastSyncedAt(null);
+          setError(message.includes("Connexion requise") ? null : message || null);
+          setSyncState("anonymous");
+          return;
+        }
+
         if (cancelled) return;
         setUser(status.user);
-        revisionRef.current = remote.revision;
-        setWorkspaceRevision(remote.revision);
+        setError(null);
 
-        const local = readLocalWorkspace();
-        const merged = mergeWorkspace(remote.data, local);
-        writeLocalWorkspace(merged);
-        const saved = workspaceFingerprint(merged) === workspaceFingerprint(remote.data)
-          ? remote
-          : await saveWorkspace(remote.revision, merged);
-        if (cancelled) return;
-        rememberWorkspace(saved);
-        setSyncState("synced");
-      } catch (reason) {
-        if (cancelled) return;
-        const status = reason instanceof Error ? reason.message : "";
-        setUser(null);
-        setWorkspaceRevision(0);
-        setLastSyncedAt(null);
-        setError(status.includes("Connexion requise") ? null : status || null);
-        setSyncState("anonymous");
+        try {
+          const remote = await getRemoteWorkspace();
+          if (cancelled) return;
+          revisionRef.current = remote.revision;
+          setWorkspaceRevision(remote.revision);
+
+          const local = readLocalWorkspace();
+          const merged = mergeWorkspace(remote.data, local);
+          writeLocalWorkspace(merged);
+          const saved = workspaceFingerprint(merged) === workspaceFingerprint(remote.data)
+            ? remote
+            : await saveWorkspace(remote.revision, merged);
+          if (cancelled) return;
+          rememberWorkspace(saved);
+          setSyncState("synced");
+        } catch (reason) {
+          if (cancelled) return;
+          const message = reason instanceof Error
+            ? reason.message
+            : "Compte connecté, synchronisation indisponible.";
+          setError(message);
+          setSyncState(online() ? "error" : "offline");
+        }
       } finally {
         if (!cancelled) setHydrated(true);
       }

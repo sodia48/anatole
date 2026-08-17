@@ -15,6 +15,8 @@ import {
 import type { CockpitSnapshot } from "@/lib/types";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 const STORAGE_KEY = "anatole-cockpit-universe";
 
@@ -45,15 +47,17 @@ function isCockpitUniverse(value: string | null): value is CockpitUniverse {
   return value === "tsx60" || value === "composite";
 }
 
-function refreshDescription(seconds: number): string {
+function refreshDescription(seconds: number, language: AnatoleLanguage): string {
   if (seconds < 120) {
-    return `actualisation environ toutes les ${seconds} secondes`;
+    return pick(language, `actualisation environ toutes les ${seconds} secondes`, `refreshes about every ${seconds} seconds`);
   }
   const minutes = Math.max(2, Math.round(seconds / 60));
-  return `actualisation environ toutes les ${minutes} minutes`;
+  return pick(language, `actualisation environ toutes les ${minutes} minutes`, `refreshes about every ${minutes} minutes`);
 }
 
 export function CockpitClient() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [universe, setUniverse] = useState<CockpitUniverse>("tsx60");
   const [ready, setReady] = useState(false);
   const [snapshots, setSnapshots] = useState<
@@ -63,17 +67,21 @@ export function CockpitClient() {
   const [refreshing, setRefreshing] = useState(false);
   const requestIdRef = useRef(0);
   const universeRef = useRef<CockpitUniverse>(universe);
-  universeRef.current = universe;
+
+  useEffect(() => {
+    universeRef.current = universe;
+  }, [universe]);
 
   const snapshot = snapshots[universe] ?? null;
   const selectedUniverse = UNIVERSES[universe];
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (isCockpitUniverse(stored)) {
-      setUniverse(stored);
-    }
-    setReady(true);
+    const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (isCockpitUniverse(stored)) setUniverse(stored);
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -106,8 +114,8 @@ export function CockpitClient() {
         ) {
           setError(
             target === "composite"
-              ? "Le TSX Composite n’a pas pu être chargé. La dernière carte valide sera conservée et une nouvelle tentative sera faite automatiquement."
-              : "Le cockpit n’a pas pu récupérer les données. Une nouvelle tentative sera faite automatiquement.",
+              ? pick(language, "Le TSX Composite n’a pas pu être chargé. La dernière carte valide sera conservée et une nouvelle tentative sera faite automatiquement.", "The TSX Composite could not be loaded. The last valid map will be kept and Anatole will retry automatically.")
+              : pick(language, "Le cockpit n’a pas pu récupérer les données. Une nouvelle tentative sera faite automatiquement.", "The Cockpit could not retrieve data. Anatole will retry automatically."),
           );
         }
       } finally {
@@ -119,7 +127,7 @@ export function CockpitClient() {
         }
       }
     },
-    [],
+    [language],
   );
 
   useEffect(() => {
@@ -128,15 +136,18 @@ export function CockpitClient() {
     }
 
     const controller = new AbortController();
-    void load(universe, controller.signal);
+    const timer = window.setTimeout(() => void load(universe, controller.signal), 0);
 
     const interval = window.setInterval(
-      () => void load(universe),
+      () => {
+        if (!document.hidden) void load(universe);
+      },
       UNIVERSES[universe].interval,
     );
 
     return () => {
       controller.abort();
+      window.clearTimeout(timer);
       window.clearInterval(interval);
     };
   }, [load, ready, universe]);
@@ -153,11 +164,11 @@ export function CockpitClient() {
   const universeSelector = (
     <fieldset className="cockpit-universe-switcher">
       <legend>
-        Univers de marché
+        {pick(language, "Univers de marché", "Market universe")}
         <span
           className="cockpit-universe-help"
-          title="Change uniquement les sociétés affichées dans le Cockpit."
-          aria-label="Aide sur l’univers de marché"
+          title={pick(language, "Change uniquement les sociétés affichées dans le Cockpit.", "Only changes the companies displayed in the Cockpit.")}
+          aria-label={pick(language, "Aide sur l’univers de marché", "Market universe help")}
         >
           ?
         </span>
@@ -183,7 +194,11 @@ export function CockpitClient() {
               <span>
                 <strong>{item.shortLabel}</strong>
                 <small>
-                  {count ? `${count} titres chargés` : item.description}
+                  {count
+                    ? pick(language, `${count} titres chargés`, `${count} securities loaded`)
+                    : value === "tsx60"
+                      ? pick(language, item.description, "Canada’s 60 large-cap companies.")
+                      : pick(language, item.description, "The broader Canadian market based on XIC holdings.")}
                 </small>
               </span>
             </label>
@@ -200,19 +215,19 @@ export function CockpitClient() {
           <div className="cockpit-header-copy">
             <span className="eyebrow">ANATOLE COCKPIT</span>
             <h1>{selectedUniverse.label}</h1>
-            <p>Choisis l’univers que tu souhaites lire dans la carte du marché.</p>
+            <p>{pick(language, "Choisis l’univers que tu souhaites lire dans la carte du marché.", "Choose the universe you want to explore in the market map.")}</p>
           </div>
           {universeSelector}
         </header>
         <section className="panel cockpit-loading">
           <span className="live-dot" />
           <div>
-            <h1>Préparation du Cockpit {selectedUniverse.shortLabel}</h1>
+            <h1>{pick(language, "Préparation du Cockpit", "Preparing the Cockpit")} {selectedUniverse.shortLabel}</h1>
             <p>
               {error ??
                 (universe === "composite"
-                  ? "Chargement des sociétés du marché canadien élargi. Le premier affichage peut prendre quelques secondes."
-                  : "Connexion aux données de marché…")}
+                  ? pick(language, "Chargement des sociétés du marché canadien élargi. Le premier affichage peut prendre quelques secondes.", "Loading the broader Canadian market. The initial view may take a few seconds.")
+                  : pick(language, "Connexion aux données de marché…", "Connecting to market data…"))}
             </p>
           </div>
         </section>
@@ -229,17 +244,17 @@ export function CockpitClient() {
           <span className="eyebrow">ANATOLE COCKPIT</span>
           <h1>{snapshot.universe}</h1>
           <p>
-            Lecture automatique du marché canadien · {refreshDescription(snapshot.refresh_after_seconds)}
+            {pick(language, "Lecture automatique du marché canadien", "Automated Canadian market overview")} · {refreshDescription(snapshot.refresh_after_seconds, language)}
           </p>
         </div>
         <div className="cockpit-market-score">
-          <span>Variation pondérée</span>
+          <span>{pick(language, "Variation pondérée", "Weighted change")}</span>
           <strong className={marketPositive ? "positive" : "negative"}>
             {marketPositive ? "+" : ""}
             {snapshot.weighted_change_percent.toFixed(2)}%
           </strong>
           <small className={refreshing ? "is-refreshing" : ""}>
-            {refreshing ? "Actualisation…" : "Flux actif"}
+            {refreshing ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Flux actif", "Live feed")}
           </small>
         </div>
         {universeSelector}
@@ -249,19 +264,19 @@ export function CockpitClient() {
 
       <section className="cockpit-kpis">
         <article className="panel cockpit-kpi">
-          <span>Progressions</span>
+          <span>{pick(language, "Progressions", "Advancers")}</span>
           <strong className="positive">{snapshot.breadth.advancers}</strong>
         </article>
         <article className="panel cockpit-kpi">
-          <span>Baisses</span>
+          <span>{pick(language, "Baisses", "Decliners")}</span>
           <strong className="negative">{snapshot.breadth.decliners}</strong>
         </article>
         <article className="panel cockpit-kpi">
-          <span>Inchangées</span>
+          <span>{pick(language, "Inchangées", "Unchanged")}</span>
           <strong>{snapshot.breadth.unchanged}</strong>
         </article>
         <article className="panel cockpit-kpi">
-          <span>Ratio de hausse</span>
+          <span>{pick(language, "Ratio de hausse", "Advance ratio")}</span>
           <strong>{snapshot.breadth.advance_ratio.toFixed(0)}%</strong>
         </article>
       </section>
@@ -273,19 +288,19 @@ export function CockpitClient() {
 
       <section className="cockpit-lower-grid">
         <div className="cockpit-movers-grid">
-          <MoversList title="Meilleures variations" items={snapshot.top_gainers} />
-          <MoversList title="Plus fortes baisses" items={snapshot.top_losers} />
+          <MoversList title={pick(language, "Meilleures variations", "Top gainers")} items={snapshot.top_gainers} />
+          <MoversList title={pick(language, "Plus fortes baisses", "Top losers")} items={snapshot.top_losers} />
         </div>
         <section className="panel sectors-panel">
           <div className="cockpit-section-heading">
-            <h2>Contribution sectorielle</h2>
+            <h2>{pick(language, "Contribution sectorielle", "Sector contribution")}</h2>
           </div>
           <div className="sector-list">
             {snapshot.sectors.map((sector) => (
               <div className="sector-row" key={sector.sector}>
                 <div>
                   <strong>{sector.sector}</strong>
-                  <span>{sector.weight.toFixed(1)}% du panier</span>
+                  <span>{sector.weight.toFixed(1)}% {pick(language, "du panier", "of basket")}</span>
                 </div>
                 <div className={sector.change_percent >= 0 ? "positive" : "negative"}>
                   <strong>
@@ -303,7 +318,7 @@ export function CockpitClient() {
       </section>
 
       <footer className="status-footer">
-        Mis à jour {new Date(snapshot.generated_at).toLocaleTimeString("fr-CA")} · {snapshot.constituents.length} titres · Univers au {snapshot.universe_as_of} ({snapshot.universe_source}) · Cotations publiques potentiellement différées
+        {pick(language, "Mis à jour", "Updated")} {new Date(snapshot.generated_at).toLocaleTimeString(localeFor(language))} · {snapshot.constituents.length} {pick(language, "titres", "securities")} · {pick(language, "Univers au", "Universe as of")} {snapshot.universe_as_of} ({snapshot.universe_source}) · {pick(language, "Cotations publiques potentiellement différées", "Public quotes may be delayed")}
       </footer>
     </div>
   );

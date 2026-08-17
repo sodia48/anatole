@@ -44,6 +44,7 @@ import { AccountStatus } from "@/components/account/AccountStatus";
 import { useAccount } from "@/components/providers/AccountProvider";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { navLabel, pick } from "@/lib/i18n";
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 
 type NavItem = {
   href: string;
@@ -417,29 +418,29 @@ export function AppSidebar({
   }, [language, searchQuery, searchablePages]);
 
   useEffect(() => {
-    setDrawerOpen(false);
-    setSearchOpen(false);
-    setSearchQuery("");
+    const timer = window.setTimeout(() => {
+      setDrawerOpen(false);
+      setSearchOpen(false);
+      setSearchQuery("");
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [pathname]);
 
   useEffect(() => {
-    try {
-      const collapsed =
-        document.documentElement.dataset
-          .sidebarState === "collapsed" ||
-        window.localStorage.getItem(
-          "anatole-sidebar-collapsed",
-        ) === "true";
-
-      setSidebarCollapsed(collapsed);
-      document.documentElement.dataset
-        .sidebarState = collapsed
+    const timer = window.setTimeout(() => {
+      try {
+        const collapsed =
+          document.documentElement.dataset.sidebarState === "collapsed" ||
+          window.localStorage.getItem("anatole-sidebar-collapsed") === "true";
+        setSidebarCollapsed(collapsed);
+        document.documentElement.dataset.sidebarState = collapsed
           ? "collapsed"
           : "expanded";
-    } catch {
-      document.documentElement.dataset
-        .sidebarState = "expanded";
-    }
+      } catch {
+        document.documentElement.dataset.sidebarState = "expanded";
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function toggleDesktopSidebar(): void {
@@ -566,7 +567,8 @@ export function AppSidebar({
   }, [searchOpen]);
 
   useEffect(() => {
-    setActiveResult(0);
+    const timer = window.setTimeout(() => setActiveResult(0), 0);
+    return () => window.clearTimeout(timer);
   }, [searchQuery]);
 
   function openSearch(): void {
@@ -986,7 +988,7 @@ export function AppSidebar({
         <div className="sidebar-footer">
           <AccountStatus />
           <Link href="/roadmap">
-            Anatole v1.3
+            Anatole {ANATOLE_VERSION_LABEL}
           </Link>
           <span>{pick(language, "Centre de contrôle · synchronisation active", "Control center · synchronization active")}</span>
         </div>

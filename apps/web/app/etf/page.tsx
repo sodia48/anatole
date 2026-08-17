@@ -13,6 +13,8 @@ import {
   type EtfHeatmapItem,
 } from "../../components/etf/EtfHeatmap";
 import { getEtfDirectory } from "../../lib/api";
+import { usePreferences } from "../../components/providers/PreferencesProvider";
+import { localeFor, pick } from "../../lib/i18n";
 
 import styles from "./page.module.css";
 
@@ -359,6 +361,8 @@ function normalizeSnapshot(
 }
 
 export default function EtfPage() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const requestRef =
     useRef<AbortController | null>(
       null,
@@ -424,7 +428,7 @@ export default function EtfPage() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Le répertoire ETF est temporairement indisponible.",
+            : pick(language, "Le répertoire ETF est temporairement indisponible.", "The ETF directory is temporarily unavailable."),
         );
       } finally {
         if (
@@ -434,20 +438,22 @@ export default function EtfPage() {
           setLoading(false);
         }
       }
-    }, []);
+    }, [language]);
 
   useEffect(() => {
     const cached =
       readCachedDirectory();
 
-    if (cached?.items.length) {
-      setDirectory(cached);
-      setLoading(false);
-    }
-
-    void loadDirectory();
+    const timer = window.setTimeout(() => {
+      if (cached?.items.length) {
+        setDirectory(cached);
+        setLoading(false);
+      }
+      void loadDirectory();
+    }, 0);
 
     return () => {
+      window.clearTimeout(timer);
       requestRef.current?.abort();
     };
   }, [loadDirectory]);
@@ -573,17 +579,13 @@ export default function EtfPage() {
           <span
             className={styles.eyebrow}
           >
-            RÉPERTOIRE ETF
+            {pick(language, "RÉPERTOIRE ETF", "ETF DIRECTORY")}
           </span>
           <h1>
-            Carte des ETF canadiens
+            {pick(language, "Carte des ETF canadiens", "Canadian ETF map")}
           </h1>
           <p>
-            Regroupement sectoriel,
-            cotations de séance,
-            liquidité et accès rapide
-            aux principaux ETF suivis
-            par Anatole.
+            {pick(language, "Regroupement sectoriel, cotations de séance, liquidité et accès rapide aux principaux ETF suivis par Anatole.", "Sector groups, session quotes, liquidity, and quick access to the main ETFs tracked by Anatole.")}
           </p>
         </div>
 
@@ -599,14 +601,14 @@ export default function EtfPage() {
                 ? "—"
                 : directory.items.length}
             </strong>
-            <span>ETF suivis</span>
+            <span>{pick(language, "ETF suivis", "ETFs tracked")}</span>
           </div>
           <div>
             <strong>
               {quotedCount}
             </strong>
             <span>
-              cotations actives
+              {pick(language, "cotations actives", "active quotes")}
             </span>
           </div>
         </div>
@@ -623,18 +625,16 @@ export default function EtfPage() {
           />
           <strong>LIVE</strong>
           <span>
-            actualisation automatique
-            toutes les{" "}
+            {pick(language, "actualisation automatique toutes les", "automatic refresh every")}{" "}
             {
               directory.refreshAfterSeconds
             }{" "}
-            secondes
+            {pick(language, "secondes", "seconds")}
           </span>
         </div>
 
         <span>
-          Données potentiellement
-          différées
+          {pick(language, "Données potentiellement différées", "Data may be delayed")}
         </span>
       </section>
 
@@ -654,8 +654,8 @@ export default function EtfPage() {
                 event.target.value,
               )
             }
-            placeholder="Ticker, secteur, fournisseur ou exposition"
-            aria-label="Rechercher un ETF"
+            placeholder={pick(language, "Ticker, secteur, fournisseur ou exposition", "Ticker, sector, provider, or exposure")}
+            aria-label={pick(language, "Rechercher un ETF", "Search ETFs")}
           />
         </label>
 
@@ -664,7 +664,7 @@ export default function EtfPage() {
             styles.selectField
           }
         >
-          <span>SECTEUR</span>
+          <span>{pick(language, "SECTEUR", "SECTOR")}</span>
           <select
             value={selectedSector}
             onChange={(event) =>
@@ -674,7 +674,7 @@ export default function EtfPage() {
             }
           >
             <option value="Tous">
-              Tous les secteurs
+              {pick(language, "Tous les secteurs", "All sectors")}
             </option>
             {sectors.map(
               (sector) => (
@@ -694,7 +694,7 @@ export default function EtfPage() {
             styles.selectField
           }
         >
-          <span>FOURNISSEUR</span>
+          <span>{pick(language, "FOURNISSEUR", "PROVIDER")}</span>
           <select
             value={
               selectedProvider
@@ -706,7 +706,7 @@ export default function EtfPage() {
             }
           >
             <option value="Tous">
-              Tous
+              {pick(language, "Tous", "All")}
             </option>
             {providers.map(
               (provider) => (
@@ -728,9 +728,7 @@ export default function EtfPage() {
             styles.errorBanner
           }
         >
-          {error} Les dernières
-          données chargées restent
-          affichées.
+          {error} {pick(language, "Les dernières données chargées restent affichées.", "The latest loaded data remains visible.")}
         </div>
       ) : null}
 
@@ -741,14 +739,10 @@ export default function EtfPage() {
       <footer
         className={styles.footer}
       >
-        Répertoire éditorial
-        Anatole et cotations
-        publiques potentiellement
-        différées. Dernière
-        synchronisation :{" "}
+        {pick(language, "Répertoire éditorial Anatole et cotations publiques potentiellement différées. Dernière synchronisation :", "Anatole editorial directory and potentially delayed public quotes. Last synchronization:")}{" "}
         {directory.generatedAt
           ? new Intl.DateTimeFormat(
-              "fr-CA",
+              localeFor(language),
               {
                 dateStyle: "medium",
                 timeStyle: "medium",
@@ -758,7 +752,7 @@ export default function EtfPage() {
                 directory.generatedAt,
               ),
             )
-          : "en cours"}
+          : pick(language, "en cours", "in progress")}
         .
       </footer>
     </main>

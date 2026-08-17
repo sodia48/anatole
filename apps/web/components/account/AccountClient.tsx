@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Cloud,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import {
   changeAccountPassword,
   exportAccountData,
@@ -29,14 +31,15 @@ import {
   updateAccountProfile,
 } from "@/lib/account";
 import { readLocalWorkspace } from "@/lib/workspace-sync";
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 
 import styles from "./Account.module.css";
 
 type Mode = "login" | "register";
 
-function dateLabel(value: string | null): string {
-  if (!value) return "Jamais";
-  return new Intl.DateTimeFormat("fr-CA", {
+function dateLabel(value: string | null, language: AnatoleLanguage): string {
+  if (!value) return pick(language, "Jamais", "Never");
+  return new Intl.DateTimeFormat(localeFor(language), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
@@ -58,6 +61,9 @@ function downloadJson(filename: string, payload: unknown): void {
 
 export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const account = useAccount();
+  const { preferences } = usePreferences();
+  const language = preferences.language;
+  const deleteKeyword = pick(language, "SUPPRIMER", "DELETE");
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,6 +73,8 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [registrationPolicy, setRegistrationPolicy] =
     useState<AccountRegistrationPolicy | null>(null);
+  const [registrationPolicyError, setRegistrationPolicyError] =
+    useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
@@ -80,7 +88,11 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const [accountError, setAccountError] = useState<string | null>(null);
 
   useEffect(() => {
-    setProfileName(account.user?.display_name ?? "");
+    const timer = window.setTimeout(
+      () => setProfileName(account.user?.display_name ?? ""),
+      0,
+    );
+    return () => window.clearTimeout(timer);
   }, [account.user?.display_name]);
 
   useEffect(() => {
@@ -88,34 +100,32 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
 
     void getRegistrationPolicy()
       .then((policy) => {
-        if (!cancelled) setRegistrationPolicy(policy);
+        if (!cancelled) {
+          setRegistrationPolicy(policy);
+          setRegistrationPolicyError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setRegistrationPolicy({
-            enabled: true,
-            invite_required: false,
-            terms_version: "2026-08-01",
-            privacy_version: "2026-08-01",
-          });
+          setRegistrationPolicy(null);
+          setRegistrationPolicyError(
+            pick(language, "La politique d’inscription est indisponible. La connexion reste accessible, mais aucune inscription ne peut être acceptée pour le moment.", "The registration policy is unavailable. Sign-in remains available, but registration cannot be accepted right now."),
+          );
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [language]);
 
-  const counts = useMemo(() => {
-    if (!account.hydrated) return null;
-    const data = readLocalWorkspace().data;
-    return {
-      watchlist: data.watchlist.length,
-      portfolio: data.portfolio.length,
-      alerts: data.alerts.length,
-      comparator: data.comparator_symbols.length,
-    };
-  }, [account.hydrated, account.lastSyncedAt, account.workspaceRevision]);
+  const localData = account.hydrated ? readLocalWorkspace().data : null;
+  const counts = localData ? {
+    watchlist: localData.watchlist.length,
+    portfolio: localData.portfolio.length,
+    alerts: localData.alerts.length,
+    comparator: localData.comparator_symbols.length,
+  } : null;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -123,6 +133,11 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     setFormError(null);
     try {
       if (mode === "register") {
+        if (!registrationPolicy?.enabled) {
+          throw new Error(
+            registrationPolicyError ?? pick(language, "Les nouvelles inscriptions sont temporairement fermées.", "New registrations are temporarily closed."),
+          );
+        }
         await account.register(
           email,
           password,
@@ -138,7 +153,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
       }
       setPassword("");
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : "Opération impossible.");
+      setFormError(language === "fr" && reason instanceof Error ? reason.message : pick(language, "Opération impossible.", "Unable to complete the operation."));
     } finally {
       setSubmitting(false);
     }
@@ -151,7 +166,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     try {
       await action();
     } catch (reason) {
-      setAccountError(reason instanceof Error ? reason.message : "Opération impossible.");
+      setAccountError(language === "fr" && reason instanceof Error ? reason.message : pick(language, "Opération impossible.", "Unable to complete the operation."));
     } finally {
       setBusyAction(null);
     }
@@ -161,7 +176,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     return (
       <section className={styles.loading}>
         <RefreshCw size={22} className="is-spinning" />
-        <div><strong>Préparation du compte</strong><span>Lecture des données de cet appareil…</span></div>
+        <div><strong>{pick(language, "Préparation du compte", "Preparing account")}</strong><span>{pick(language, "Lecture des données de cet appareil…", "Reading data from this device…")}</span></div>
       </section>
     );
   }
@@ -171,9 +186,9 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
       <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
         <header className={styles.hero}>
           <div>
-            <span className={styles.eyebrow}>ANATOLE v1.0.0</span>
-            <h1>Retrouve ton espace sur tous tes appareils</h1>
-            <p>Watchlist, Portefeuille, Alertes, préférences et profil Anatole Conseil restent utilisables sans compte. La connexion ajoute uniquement la synchronisation.</p>
+            <span className={styles.eyebrow}>ANATOLE {ANATOLE_VERSION_LABEL}</span>
+            <h1>{pick(language, "Retrouve ton espace sur tous tes appareils", "Access your workspace on every device")}</h1>
+            <p>{pick(language, "Watchlist, Portefeuille, Alertes, préférences et profil Anatole Conseil restent utilisables sans compte. La connexion ajoute uniquement la synchronisation.", "Watchlist, Portfolio, Alerts, preferences, and your Anatole Advice profile remain available without an account. Signing in only adds synchronization.")}</p>
           </div>
           <div className={styles.heroIcon}><Cloud size={42} /></div>
         </header>
@@ -181,36 +196,36 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
         <section className={styles.authGrid}>
           <form className={styles.authCard} onSubmit={submit}>
             <div className={styles.modeSwitch}>
-              <button type="button" className={mode === "login" ? styles.active : ""} onClick={() => setMode("login")}>Connexion</button>
-              <button type="button" className={mode === "register" ? styles.active : ""} onClick={() => setMode("register")}>Créer un compte</button>
+              <button type="button" className={mode === "login" ? styles.active : ""} onClick={() => setMode("login")}>{pick(language, "Connexion", "Sign in")}</button>
+              <button type="button" className={mode === "register" ? styles.active : ""} onClick={() => setMode("register")}>{pick(language, "Créer un compte", "Create account")}</button>
             </div>
 
             <div className={styles.formHeading}>
               <UserRound size={22} />
               <div>
-                <h2>{mode === "login" ? "Ouvrir mon espace" : "Créer mon espace Anatole"}</h2>
-                <p>{mode === "login" ? "Tes données locales seront fusionnées avec le compte." : "Les données présentes sur cet appareil seront importées automatiquement."}</p>
+                <h2>{mode === "login" ? pick(language, "Ouvrir mon espace", "Open my workspace") : pick(language, "Créer mon espace Anatole", "Create my Anatole workspace")}</h2>
+                <p>{mode === "login" ? pick(language, "Tes données locales seront fusionnées avec le compte.", "Your local data will be merged with the account.") : pick(language, "Les données présentes sur cet appareil seront importées automatiquement.", "Data on this device will be imported automatically.")}</p>
               </div>
             </div>
 
             {mode === "register" ? (
               <label>
-                <span>Prénom ou nom affiché</span>
-                <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" placeholder="Facultatif" />
+                <span>{pick(language, "Prénom ou nom affiché", "First name or display name")}</span>
+                <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} autoComplete="name" placeholder={pick(language, "Facultatif", "Optional")} />
               </label>
             ) : null}
             <label>
-              <span>Courriel</span>
+              <span>{pick(language, "Courriel", "Email")}</span>
               <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" placeholder="toi@exemple.com" />
             </label>
             <label>
-              <span>Mot de passe</span>
-              <input type="password" required minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder="10 caractères, une lettre et un chiffre" />
+              <span>{pick(language, "Mot de passe", "Password")}</span>
+              <input type="password" required minLength={10} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "register" ? "new-password" : "current-password"} placeholder={pick(language, "10 caractères, une lettre et un chiffre", "10 characters, one letter, and one number")} />
             </label>
 
             {mode === "register" && registrationPolicy?.invite_required ? (
               <label>
-                <span>Code d’invitation</span>
+                <span>{pick(language, "Code d’invitation", "Invitation code")}</span>
                 <input
                   required
                   value={inviteCode}
@@ -231,7 +246,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
                     required
                   />
                   <span>
-                    J’accepte les <a href="/conditions" target="_blank" rel="noreferrer">Conditions d’utilisation</a>.
+                    {pick(language, "J’accepte les", "I accept the")} <a href="/conditions" target="_blank" rel="noreferrer">{pick(language, "Conditions d’utilisation", "Terms of Use")}</a>.
                   </span>
                 </label>
                 <label className={styles.legalCheck}>
@@ -242,7 +257,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
                     required
                   />
                   <span>
-                    J’ai lu la <a href="/confidentialite" target="_blank" rel="noreferrer">Politique de confidentialité</a> et l’<a href="/avis-financier" target="_blank" rel="noreferrer">Avis financier</a>.
+                    {pick(language, "J’ai lu la", "I have read the")} <a href="/confidentialite" target="_blank" rel="noreferrer">{pick(language, "Politique de confidentialité", "Privacy Policy")}</a> {pick(language, "et l’", "and the")}<a href="/avis-financier" target="_blank" rel="noreferrer">{pick(language, "Avis financier", "Financial Notice")}</a>.
                   </span>
                 </label>
               </div>
@@ -250,11 +265,17 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
 
             {mode === "register" && registrationPolicy && !registrationPolicy.enabled ? (
               <div className={styles.policyNotice}>
-                Les nouvelles inscriptions sont temporairement fermées.
+                {pick(language, "Les nouvelles inscriptions sont temporairement fermées.", "New registrations are temporarily closed.")}
               </div>
             ) : null}
 
-            {formError || account.error ? <div className={styles.error}>{formError ?? account.error}</div> : null}
+            {mode === "register" && registrationPolicyError ? (
+              <div className={styles.policyNotice} role="alert">
+                {registrationPolicyError}
+              </div>
+            ) : null}
+
+            {formError || account.error ? <div className={styles.error}>{formError ?? (language === "fr" ? account.error : "The account service is temporarily unavailable.")}</div> : null}
             <button
               className={styles.primaryButton}
               type="submit"
@@ -266,15 +287,15 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
               }
             >
               {submitting ? <RefreshCw size={18} className="is-spinning" /> : <LockKeyhole size={18} />}
-              {mode === "login" ? "Me connecter" : "Créer et synchroniser"}
+              {mode === "login" ? pick(language, "Me connecter", "Sign in") : pick(language, "Créer et synchroniser", "Create and sync")}
             </button>
           </form>
 
           <aside className={styles.explainer}>
-            <article><Laptop size={22} /><div><strong>Continue sans compte</strong><p>Anatole conserve toujours le mode local. Aucun écran n’est bloqué.</p></div></article>
-            <article><Smartphone size={22} /><div><strong>Passe d’un appareil à l’autre</strong><p>Les modifications sont fusionnées puis synchronisées automatiquement.</p></div></article>
-            <article><ShieldCheck size={22} /><div><strong>Aucun identifiant bancaire</strong><p>Le compte ne demande ni numéro de compte, ni accès bancaire, ni pièce d’identité.</p></div></article>
-            <article><Database size={22} /><div><strong>Données synchronisées</strong><p>Watchlist, positions de suivi, alertes, préférences, univers et profil de planification.</p></div></article>
+            <article><Laptop size={22} /><div><strong>{pick(language, "Continue sans compte", "Continue without an account")}</strong><p>{pick(language, "Anatole conserve toujours le mode local. Aucun écran n’est bloqué.", "Anatole always keeps local mode available. No screen is blocked.")}</p></div></article>
+            <article><Smartphone size={22} /><div><strong>{pick(language, "Passe d’un appareil à l’autre", "Move between devices")}</strong><p>{pick(language, "Les modifications sont fusionnées puis synchronisées automatiquement.", "Changes are merged and then synchronized automatically.")}</p></div></article>
+            <article><ShieldCheck size={22} /><div><strong>{pick(language, "Aucun identifiant bancaire", "No banking credentials")}</strong><p>{pick(language, "Le compte ne demande ni numéro de compte, ni accès bancaire, ni pièce d’identité.", "The account requests no account number, banking access, or identity document.")}</p></div></article>
+            <article><Database size={22} /><div><strong>{pick(language, "Données synchronisées", "Synchronized data")}</strong><p>{pick(language, "Watchlist, positions de suivi, alertes, préférences, univers et profil de planification.", "Watchlist, tracking positions, alerts, preferences, universe, and planning profile.")}</p></div></article>
           </aside>
         </section>
       </div>
@@ -285,8 +306,8 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <header className={styles.hero}>
         <div>
-          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v1.0.0</span>
-          <h1>{account.user.display_name ? `Bonjour ${account.user.display_name}` : "Compte synchronisé"}</h1>
+          <span className={styles.eyebrow}>{pick(language, "MON ESPACE ANATOLE", "MY ANATOLE WORKSPACE")} · {ANATOLE_VERSION_LABEL}</span>
+          <h1>{account.user.display_name ? pick(language, `Bonjour ${account.user.display_name}`, `Hello ${account.user.display_name}`) : pick(language, "Compte synchronisé", "Account synchronized")}</h1>
           <p>{account.user.email}</p>
         </div>
         <div className={`${styles.syncOrb} ${
@@ -303,27 +324,27 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
       </header>
 
       <section className={styles.statusGrid}>
-        <article><span>État</span><strong>{account.syncState === "synced" ? "À jour" : account.syncState === "offline" ? "Hors ligne" : account.syncState === "error" ? "À vérifier" : "Synchronisation"}</strong><small>{account.syncState === "offline" ? "Les changements seront envoyés au retour du réseau." : "Synchronisation automatique activée."}</small></article>
-        <article><span>Dernière synchronisation</span><strong>{dateLabel(account.lastSyncedAt)}</strong><small>Révision {account.workspaceRevision}</small></article>
-        <article><span>Contrôle</span><strong>Utilisateur</strong><small>Profil, mot de passe, export et suppression disponibles.</small></article>
+        <article><span>{pick(language, "État", "Status")}</span><strong>{account.syncState === "synced" ? pick(language, "À jour", "Up to date") : account.syncState === "offline" ? pick(language, "Hors ligne", "Offline") : account.syncState === "error" ? pick(language, "À vérifier", "Needs attention") : pick(language, "Synchronisation", "Synchronizing")}</strong><small>{account.syncState === "offline" ? pick(language, "Les changements seront envoyés au retour du réseau.", "Changes will be sent when the network returns.") : pick(language, "Synchronisation automatique activée.", "Automatic synchronization enabled.")}</small></article>
+        <article><span>{pick(language, "Dernière synchronisation", "Last synchronization")}</span><strong>{dateLabel(account.lastSyncedAt, language)}</strong><small>{pick(language, "Révision", "Revision")} {account.workspaceRevision}</small></article>
+        <article><span>{pick(language, "Contrôle", "Control")}</span><strong>{pick(language, "Utilisateur", "User")}</strong><small>{pick(language, "Profil, mot de passe, export et suppression disponibles.", "Profile, password, export, and deletion are available.")}</small></article>
       </section>
 
-      <nav className={styles.accountTools} aria-label="Gestion du compte">
+      <nav className={styles.accountTools} aria-label={pick(language, "Gestion du compte", "Account management")}>
         <a href="#profil-compte">
           <UserCog size={20} />
-          <span><strong>Modifier mon nom</strong><small>Profil du compte</small></span>
+          <span><strong>{pick(language, "Modifier mon nom", "Edit my name")}</strong><small>{pick(language, "Profil du compte", "Account profile")}</small></span>
         </a>
         <a href="#mot-de-passe">
           <KeyRound size={20} />
-          <span><strong>Changer le mot de passe</strong><small>Sécuriser l’accès</small></span>
+          <span><strong>{pick(language, "Changer le mot de passe", "Change password")}</strong><small>{pick(language, "Sécuriser l’accès", "Secure access")}</small></span>
         </a>
         <a href="#donnees-compte">
           <Download size={20} />
-          <span><strong>Exporter mes données</strong><small>Télécharger une copie</small></span>
+          <span><strong>{pick(language, "Exporter mes données", "Export my data")}</strong><small>{pick(language, "Télécharger une copie", "Download a copy")}</small></span>
         </a>
         <a href="#supprimer-compte" className={styles.dangerTool}>
           <Trash2 size={20} />
-          <span><strong>Supprimer le compte</strong><small>Action définitive</small></span>
+          <span><strong>{pick(language, "Supprimer le compte", "Delete account")}</strong><small>{pick(language, "Action définitive", "Permanent action")}</small></span>
         </a>
       </nav>
 
@@ -336,13 +357,13 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
             void runAction("profile", async () => {
               await updateAccountProfile(profileName.trim() || null);
               await account.refreshAccount();
-              setAccountMessage("Nom affiché mis à jour.");
+              setAccountMessage(pick(language, "Nom affiché mis à jour.", "Display name updated."));
             });
           }}
         >
-          <div className={styles.cardHeading}><UserCog size={22} /><div><h2>Profil</h2><p>Le courriel reste l’identifiant de connexion.</p></div></div>
-          <label><span>Nom affiché</span><input value={profileName} maxLength={60} onChange={(event) => setProfileName(event.target.value)} placeholder="Nom affiché" /></label>
-          <button type="submit" disabled={busyAction === "profile"}><Save size={17} /> Enregistrer</button>
+          <div className={styles.cardHeading}><UserCog size={22} /><div><h2>{pick(language, "Profil", "Profile")}</h2><p>{pick(language, "Le courriel reste l’identifiant de connexion.", "Email remains the sign-in identifier.")}</p></div></div>
+          <label><span>{pick(language, "Nom affiché", "Display name")}</span><input value={profileName} maxLength={60} onChange={(event) => setProfileName(event.target.value)} placeholder={pick(language, "Nom affiché", "Display name")} /></label>
+          <button type="submit" disabled={busyAction === "profile"}><Save size={17} /> {pick(language, "Enregistrer", "Save")}</button>
         </form>
 
         <form
@@ -351,7 +372,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
           onSubmit={(event) => {
             event.preventDefault();
             if (newPassword !== confirmPassword) {
-              setAccountError("Les deux nouveaux mots de passe ne correspondent pas.");
+              setAccountError(pick(language, "Les deux nouveaux mots de passe ne correspondent pas.", "The two new passwords do not match."));
               return;
             }
             void runAction("password", async () => {
@@ -362,20 +383,20 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
               setCurrentPassword("");
               setNewPassword("");
               setConfirmPassword("");
-              setAccountMessage("Mot de passe changé. Les autres sessions ont été fermées.");
+              setAccountMessage(pick(language, "Mot de passe changé. Les autres sessions ont été fermées.", "Password changed. Other sessions have been closed."));
             });
           }}
         >
-          <div className={styles.cardHeading}><KeyRound size={22} /><div><h2>Mot de passe</h2><p>Le changement ferme les autres appareils connectés.</p></div></div>
-          <label><span>Mot de passe actuel</span><input type="password" required minLength={10} autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
-          <label><span>Nouveau mot de passe</span><input type="password" required minLength={10} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
-          <label><span>Confirmer</span><input type="password" required minLength={10} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-          <button type="submit" disabled={busyAction === "password"}><LockKeyhole size={17} /> Changer le mot de passe</button>
+          <div className={styles.cardHeading}><KeyRound size={22} /><div><h2>{pick(language, "Mot de passe", "Password")}</h2><p>{pick(language, "Le changement ferme les autres appareils connectés.", "Changing it signs out other connected devices.")}</p></div></div>
+          <label><span>{pick(language, "Mot de passe actuel", "Current password")}</span><input type="password" required minLength={10} autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
+          <label><span>{pick(language, "Nouveau mot de passe", "New password")}</span><input type="password" required minLength={10} autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
+          <label><span>{pick(language, "Confirmer", "Confirm")}</span><input type="password" required minLength={10} autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+          <button type="submit" disabled={busyAction === "password"}><LockKeyhole size={17} /> {pick(language, "Changer le mot de passe", "Change password")}</button>
         </form>
       </section>
 
       <section id="donnees-compte" className={styles.securityCard}>
-        <div><ShieldCheck size={23} /><div><h2>Sessions et données</h2><p>Exporte une copie de tes données ou ferme les sessions ouvertes sur les autres appareils.</p></div></div>
+        <div><ShieldCheck size={23} /><div><h2>{pick(language, "Sessions et données", "Sessions and data")}</h2><p>{pick(language, "Exporte une copie de tes données ou ferme les sessions ouvertes sur les autres appareils.", "Export a copy of your data or close sessions open on other devices.")}</p></div></div>
         <div className={styles.securityActions}>
           <button
             type="button"
@@ -383,44 +404,44 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
             onClick={() => void runAction("export", async () => {
               const exported = await exportAccountData();
               downloadJson(`anatole-export-${new Date().toISOString().slice(0, 10)}.json`, exported);
-              setAccountMessage("Export téléchargé sur cet appareil.");
+              setAccountMessage(pick(language, "Export téléchargé sur cet appareil.", "Export downloaded to this device."));
             })}
-          ><Download size={17} /> Exporter mes données</button>
-          <button type="button" onClick={() => void account.signOut()}><LogOut size={17} /> Se déconnecter ici</button>
-          <button type="button" onClick={() => void account.signOutEverywhere()}><LockKeyhole size={17} /> Fermer toutes les sessions</button>
+          ><Download size={17} /> {pick(language, "Exporter mes données", "Export my data")}</button>
+          <button type="button" onClick={() => void account.signOut()}><LogOut size={17} /> {pick(language, "Se déconnecter ici", "Sign out here")}</button>
+          <button type="button" onClick={() => void account.signOutEverywhere()}><LockKeyhole size={17} /> {pick(language, "Fermer toutes les sessions", "Close all sessions")}</button>
         </div>
       </section>
 
       <section className={styles.dataCard}>
         <div className={styles.sectionHeading}>
-          <div><span className={styles.eyebrow}>CONTENU SYNCHRONISÉ</span><h2>Ton espace actuel</h2></div>
+          <div><span className={styles.eyebrow}>{pick(language, "CONTENU SYNCHRONISÉ", "SYNCHRONIZED CONTENT")}</span><h2>{pick(language, "Ton espace actuel", "Your current workspace")}</h2></div>
           <button type="button" onClick={() => void account.syncNow()} disabled={account.syncState === "syncing"}>
-            <RefreshCw size={17} className={account.syncState === "syncing" ? "is-spinning" : ""} /> Synchroniser maintenant
+            <RefreshCw size={17} className={account.syncState === "syncing" ? "is-spinning" : ""} /> {pick(language, "Synchroniser maintenant", "Synchronize now")}
           </button>
         </div>
         <div className={styles.countGrid}>
-          <article><strong>{counts?.watchlist ?? 0}</strong><span>Titres suivis</span></article>
+          <article><strong>{counts?.watchlist ?? 0}</strong><span>{pick(language, "Titres suivis", "Tracked securities")}</span></article>
           <article><strong>{counts?.portfolio ?? 0}</strong><span>Positions</span></article>
-          <article><strong>{counts?.alerts ?? 0}</strong><span>Alertes</span></article>
-          <article><strong>{counts?.comparator ?? 0}</strong><span>Titres comparés</span></article>
+          <article><strong>{counts?.alerts ?? 0}</strong><span>{pick(language, "Alertes", "Alerts")}</span></article>
+          <article><strong>{counts?.comparator ?? 0}</strong><span>{pick(language, "Titres comparés", "Compared securities")}</span></article>
         </div>
-        <div className={styles.confirmation}><CheckCircle2 size={18} /><span>Les modifications locales sont envoyées automatiquement environ cinq secondes après un changement.</span></div>
-        {account.error ? <div className={styles.error}>{account.error}</div> : null}
+        <div className={styles.confirmation}><CheckCircle2 size={18} /><span>{pick(language, "Les modifications locales sont envoyées automatiquement environ cinq secondes après un changement.", "Local changes are sent automatically about five seconds after an update.")}</span></div>
+        {account.error ? <div className={styles.error}>{language === "fr" ? account.error : "Account synchronization is temporarily unavailable."}</div> : null}
       </section>
 
       <section id="supprimer-compte" className={styles.dangerZone}>
-        <div className={styles.cardHeading}><Trash2 size={23} /><div><h2>Supprimer le compte</h2><p>Cette action efface le compte et l’espace synchronisé. Les données locales de cet appareil restent dans le navigateur.</p></div></div>
+        <div className={styles.cardHeading}><Trash2 size={23} /><div><h2>{pick(language, "Supprimer le compte", "Delete account")}</h2><p>{pick(language, "Cette action efface le compte et l’espace synchronisé. Les données locales de cet appareil restent dans le navigateur.", "This action deletes the account and synchronized workspace. Local data on this device remains in the browser.")}</p></div></div>
         <div className={styles.deleteGrid}>
-          <label><span>Mot de passe</span><input type="password" minLength={10} value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} autoComplete="current-password" /></label>
-          <label><span>Écris SUPPRIMER</span><input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value.toUpperCase())} placeholder="SUPPRIMER" /></label>
+          <label><span>{pick(language, "Mot de passe", "Password")}</span><input type="password" minLength={10} value={deletePassword} onChange={(event) => setDeletePassword(event.target.value)} autoComplete="current-password" /></label>
+          <label><span>{pick(language, "Écris SUPPRIMER", "Type DELETE")}</span><input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value.toUpperCase())} placeholder={deleteKeyword} /></label>
           <button
             type="button"
             className={styles.deleteButton}
-            disabled={deleteConfirmation !== "SUPPRIMER" || deletePassword.length < 10 || busyAction === "delete"}
+            disabled={deleteConfirmation !== deleteKeyword || deletePassword.length < 10 || busyAction === "delete"}
             onClick={() => void runAction("delete", async () => {
               await account.deleteMyAccount(deletePassword);
             })}
-          ><Trash2 size={17} /> Supprimer définitivement</button>
+          ><Trash2 size={17} /> {pick(language, "Supprimer définitivement", "Delete permanently")}</button>
         </div>
       </section>
 

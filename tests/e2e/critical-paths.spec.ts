@@ -17,7 +17,10 @@ for (const route of criticalRoutes) {
   });
 
   test(`${route.path} ne déborde pas horizontalement`, async ({ page }) => {
-    await page.goto(route.path, { waitUntil: "domcontentloaded" });
+    const target = route.path === "/qualite"
+      ? "/parametres?section=quality"
+      : route.path;
+    await page.goto(target, { waitUntil: "domcontentloaded" });
     await page.waitForTimeout(700);
     const dimensions = await page.evaluate(() => ({
       client: document.documentElement.clientWidth,
@@ -35,7 +38,10 @@ test("le Cockpit expose les deux univers", async ({ page }) => {
 
 test("le signalement bêta est accessible", async ({ page }) => {
   await page.goto("/cockpit", { waitUntil: "domcontentloaded" });
-  await page.getByRole("button", { name: "Signaler un problème" }).click();
+  await expect(page.getByText("TSX 60", { exact: true }).first()).toBeVisible();
+  const feedbackButton = page.getByRole("button", { name: "Signaler un problème" });
+  await expect(feedbackButton).toHaveAttribute("data-client-ready", "true");
+  await feedbackButton.click();
   await expect(page.getByRole("dialog")).toContainText("Que s’est-il passé");
   await expect(page.getByText("Aucune donnée financière personnelle")).toBeVisible();
 });

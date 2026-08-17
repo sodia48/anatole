@@ -8,6 +8,11 @@ import {
   useState,
 } from "react";
 
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
+import { resilientFetch } from "@/lib/resilient-fetch";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
+
 type AdminTab =
   | "overview"
   | "users"
@@ -95,69 +100,63 @@ async function adminRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const controller = new AbortController();
-  const timeout = window.setTimeout(
-    () => controller.abort(),
-    25_000,
-  );
+  const response = await resilientFetch(`/api/admin${path}`, {
+    ...options,
+    headers,
+    credentials: "same-origin",
+    cache: "no-store",
+    timeoutMs: 25_000,
+    retries: options.method && options.method !== "GET" ? 0 : 1,
+    allowStale: false,
+  });
 
-  try {
-    const response = await fetch(`/api/admin${path}`, {
-      ...options,
-      headers,
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    });
+  if (!response.ok) {
+    let message = `Erreur administrateur ${response.status}`;
 
-    if (!response.ok) {
-      let message = `Erreur administrateur ${response.status}`;
-
-      try {
-        const body = (await response.json()) as {
-          detail?: string;
-        };
-        if (body.detail) message = body.detail;
-      } catch {
-        // Réponse non JSON.
-      }
-
-      throw new Error(message);
+    try {
+      const body = (await response.json()) as {
+        detail?: string;
+      };
+      if (body.detail) message = body.detail;
+    } catch {
+      // Réponse non JSON.
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
-  } finally {
-    window.clearTimeout(timeout);
+    throw new Error(message);
   }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Jamais";
+function formatDate(value: string | null, language: AnatoleLanguage): string {
+  if (!value) return pick(language, "Jamais", "Never");
 
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  return new Intl.DateTimeFormat("fr-CA", {
+  return new Intl.DateTimeFormat(localeFor(language), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-function formatUptime(seconds: number): string {
+function formatUptime(seconds: number, language: AnatoleLanguage): string {
   const days = Math.floor(seconds / 86_400);
   const hours = Math.floor(
     (seconds % 86_400) / 3_600,
   );
 
-  if (days > 0) return `${days} j ${hours} h`;
-  return `${hours} h`;
+  if (days > 0) return pick(language, `${days} j ${hours} h`, `${days}d ${hours}h`);
+  return pick(language, `${hours} h`, `${hours}h`);
 }
 
 export default function AdminPage() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [tab, setTab] =
     useState<AdminTab>("overview");
   const [overview, setOverview] =
@@ -222,17 +221,18 @@ export default function AdminPage() {
         setError(
           reason instanceof Error
             ? reason.message
-            : "La console administrateur est indisponible.",
+            : pick(language, "La console administrateur est indisponible.", "The administrator console is unavailable."),
         );
       } finally {
         setLoading(false);
       }
     },
-    [query],
+    [language, query],
   );
 
   useEffect(() => {
-    void load("");
+    const timer = window.setTimeout(() => void load(""), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const openReports = useMemo(
@@ -277,7 +277,7 @@ export default function AdminPage() {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Impossible de créer l’invitation.",
+          : pick(language, "Impossible de créer l’invitation.", "Unable to create the invitation."),
       );
     } finally {
       setBusy(false);
@@ -302,7 +302,7 @@ export default function AdminPage() {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Impossible de révoquer l’invitation.",
+          : pick(language, "Impossible de révoquer l’invitation.", "Unable to revoke the invitation."),
       );
     } finally {
       setBusy(false);
@@ -338,7 +338,7 @@ export default function AdminPage() {
       setError(
         reason instanceof Error
           ? reason.message
-          : "Impossible de modifier le signalement.",
+          : pick(language, "Impossible de modifier le signalement.", "Unable to update the report."),
       );
     } finally {
       setBusy(false);
@@ -350,20 +350,20 @@ export default function AdminPage() {
     label: string;
     count?: number;
   }> = [
-    { id: "overview", label: "Vue d’ensemble" },
+    { id: "overview", label: pick(language, "Vue d’ensemble", "Overview") },
     {
       id: "users",
-      label: "Bêta-testeurs",
+      label: pick(language, "Bêta-testeurs", "Beta testers"),
       count: overview?.total_users,
     },
     {
       id: "invites",
-      label: "Invitations",
+      label: pick(language, "Invitations", "Invitations"),
       count: overview?.active_invites,
     },
     {
       id: "reports",
-      label: "Signalements",
+      label: pick(language, "Signalements", "Reports"),
       count: openReports,
     },
   ];
@@ -373,12 +373,11 @@ export default function AdminPage() {
       <header className="hero">
         <div>
           <span className="eyebrow">
-            ANATOLE ADMIN · v1.1.2
+            ANATOLE ADMIN · {ANATOLE_VERSION_LABEL}
           </span>
-          <h1>Console de bêta</h1>
+          <h1>{pick(language, "Console de bêta", "Beta console")}</h1>
           <p>
-            Comptes, invitations, signalements et
-            santé opérationnelle dans un seul espace.
+            {pick(language, "Comptes, invitations, signalements et santé opérationnelle dans un seul espace.", "Accounts, invitations, reports, and operational health in one workspace.")}
           </p>
         </div>
 
@@ -388,13 +387,13 @@ export default function AdminPage() {
           disabled={loading || busy}
           onClick={() => void load("")}
         >
-          ↻ Actualiser
+          ↻ {pick(language, "Actualiser", "Refresh")}
         </button>
       </header>
 
       <nav
         className="tabs"
-        aria-label="Sections administrateur"
+        aria-label={pick(language, "Sections administrateur", "Administrator sections")}
       >
         {tabs.map((item) => (
           <button
@@ -415,19 +414,17 @@ export default function AdminPage() {
 
       {error ? (
         <section className="error" role="alert">
-          <strong>Accès ou chargement impossible</strong>
-          <span>{error}</span>
+          <strong>{pick(language, "Accès ou chargement impossible", "Unable to access or load")}</strong>
+          <span>{language === "fr" ? error : "The administrator console could not be loaded."}</span>
           <small>
-            Vérifie que ton courriel figure exactement
-            dans ACCOUNT_ADMIN_EMAILS, puis
-            déconnecte-toi et reconnecte-toi.
+            {pick(language, "Vérifie que ton courriel figure exactement dans ACCOUNT_ADMIN_EMAILS, puis déconnecte-toi et reconnecte-toi.", "Verify that your email appears exactly in ACCOUNT_ADMIN_EMAILS, then sign out and sign in again.")}
           </small>
         </section>
       ) : null}
 
       {loading ? (
         <section className="loading">
-          Chargement de la console…
+          {pick(language, "Chargement de la console…", "Loading console…")}
         </section>
       ) : null}
 
@@ -438,14 +435,14 @@ export default function AdminPage() {
         <>
           <section className="metrics">
             <article>
-              <span>Comptes</span>
+              <span>{pick(language, "Comptes", "Accounts")}</span>
               <strong>{overview.total_users}</strong>
               <small>
-                +{overview.new_users_7d} cette semaine
+                +{overview.new_users_7d} {pick(language, "cette semaine", "this week")}
               </small>
             </article>
             <article>
-              <span>Actifs sur 7 jours</span>
+              <span>{pick(language, "Actifs sur 7 jours", "Active over 7 days")}</span>
               <strong>
                 {overview.active_users_7d}
               </strong>
@@ -454,21 +451,21 @@ export default function AdminPage() {
               </small>
             </article>
             <article>
-              <span>Synchronisés</span>
+              <span>{pick(language, "Synchronisés", "Synchronized")}</span>
               <strong>
                 {overview.synced_accounts}
               </strong>
               <small>
                 {overview.total_workspace_revisions}{" "}
-                révisions
+                {pick(language, "révisions", "revisions")}
               </small>
             </article>
             <article>
-              <span>Signalements ouverts</span>
+              <span>{pick(language, "Signalements ouverts", "Open reports")}</span>
               <strong>{overview.open_reports}</strong>
               <small>
                 {overview.active_invites} invitations
-                actives
+                {pick(language, "actives", "active")}
               </small>
             </article>
           </section>
@@ -480,33 +477,33 @@ export default function AdminPage() {
                   <span className="eyebrow">
                     PLATEFORME
                   </span>
-                  <h2>Santé opérationnelle</h2>
+                  <h2>{pick(language, "Santé opérationnelle", "Operational health")}</h2>
                 </div>
                 <em
                   className={`health ${overview.reliability.status}`}
                 >
                   {overview.reliability.status ===
                   "healthy"
-                    ? "Saine"
+                    ? pick(language, "Saine", "Healthy")
                     : overview.reliability.status ===
                         "degraded"
-                      ? "Dégradée"
-                      : "Critique"}
+                      ? pick(language, "Dégradée", "Degraded")
+                      : pick(language, "Critique", "Critical")}
                 </em>
               </div>
 
               <dl>
                 <div>
-                  <dt>Disponibilité</dt>
+                  <dt>{pick(language, "Disponibilité", "Availability")}</dt>
                   <dd>
                     {formatUptime(
-                      overview.reliability
-                        .uptime_seconds,
+                      overview.reliability.uptime_seconds,
+                      language,
                     )}
                   </dd>
                 </div>
                 <div>
-                  <dt>Latence p95</dt>
+                  <dt>{pick(language, "Latence p95", "p95 latency")}</dt>
                   <dd>
                     {overview.reliability
                       .p95_duration_ms.toFixed(0)}{" "}
@@ -514,13 +511,13 @@ export default function AdminPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Erreurs 5xx</dt>
+                  <dt>{pick(language, "Erreurs 5xx", "5xx errors")}</dt>
                   <dd>
                     {overview.reliability.total_5xx}
                   </dd>
                 </div>
                 <div>
-                  <dt>Requêtes lentes</dt>
+                  <dt>{pick(language, "Requêtes lentes", "Slow requests")}</dt>
                   <dd>
                     {
                       overview.reliability
@@ -534,19 +531,17 @@ export default function AdminPage() {
             <article className="panel">
               <div className="panelTitle">
                 <div>
-                  <span className="eyebrow">
-                    FOURNISSEURS
-                  </span>
-                  <h2>Flux externes</h2>
+                  <span className="eyebrow">{pick(language, "FOURNISSEURS", "PROVIDERS")}</span>
+                  <h2>{pick(language, "Flux externes", "External flows")}</h2>
                 </div>
                 <em className="health healthy">
-                  Actif
+                  {pick(language, "Actif", "Active")}
                 </em>
               </div>
 
               <dl>
                 <div>
-                  <dt>Requêtes</dt>
+                  <dt>{pick(language, "Requêtes", "Requests")}</dt>
                   <dd>
                     {String(
                       overview.upstream_metrics
@@ -555,7 +550,7 @@ export default function AdminPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Échecs</dt>
+                  <dt>{pick(language, "Échecs", "Failures")}</dt>
                   <dd>
                     {String(
                       overview.upstream_metrics
@@ -573,7 +568,7 @@ export default function AdminPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt>Concurrence max.</dt>
+                  <dt>{pick(language, "Concurrence max.", "Max concurrency")}</dt>
                   <dd>
                     {String(
                       overview.upstream_metrics
@@ -592,9 +587,9 @@ export default function AdminPage() {
           <div className="panelTitle wrap">
             <div>
               <span className="eyebrow">
-                BÊTA-TESTEURS
+                {pick(language, "BÊTA-TESTEURS", "BETA TESTERS")}
               </span>
-              <h2>Comptes inscrits</h2>
+              <h2>{pick(language, "Comptes inscrits", "Registered accounts")}</h2>
             </div>
 
             <form
@@ -606,13 +601,14 @@ export default function AdminPage() {
             >
               <input
                 value={query}
-                placeholder="Nom ou courriel"
+                placeholder={pick(language, "Nom ou courriel", "Name or email")}
+                aria-label={pick(language, "Rechercher un compte", "Search accounts")}
                 onChange={(event) =>
                   setQuery(event.target.value)
                 }
               />
               <button type="submit">
-                Rechercher
+                {pick(language, "Rechercher", "Search")}
               </button>
             </form>
           </div>
@@ -631,7 +627,7 @@ export default function AdminPage() {
                 <div className="identity">
                   <strong>
                     {user.display_name ||
-                      "Sans nom affiché"}
+                      pick(language, "Sans nom affiché", "No display name")}
                     {user.is_admin ? (
                       <em>ADMIN</em>
                     ) : null}
@@ -640,10 +636,11 @@ export default function AdminPage() {
                 </div>
                 <dl>
                   <div>
-                    <dt>Dernière activité</dt>
+                    <dt>{pick(language, "Dernière activité", "Last activity")}</dt>
                     <dd>
                       {formatDate(
                         user.last_login_at,
+                        language,
                       )}
                     </dd>
                   </div>
@@ -654,16 +651,16 @@ export default function AdminPage() {
                     </dd>
                   </div>
                   <div>
-                    <dt>Espace</dt>
+                    <dt>{pick(language, "Espace", "Workspace")}</dt>
                     <dd>
-                      Révision{" "}
+                      {pick(language, "Révision", "Revision")}{" "}
                       {user.workspace_revision}
                     </dd>
                   </div>
                   <div>
-                    <dt>Contenu</dt>
+                    <dt>{pick(language, "Contenu", "Content")}</dt>
                     <dd>
-                      {user.watchlist_count} suivis ·{" "}
+                      {user.watchlist_count} {pick(language, "suivis", "tracked")} ·{" "}
                       {user.portfolio_count} positions
                     </dd>
                   </div>
@@ -672,7 +669,7 @@ export default function AdminPage() {
             ))}
             {!users.length ? (
               <p className="empty">
-                Aucun compte trouvé.
+                {pick(language, "Aucun compte trouvé.", "No account found.")}
               </p>
             ) : null}
           </div>
@@ -690,14 +687,14 @@ export default function AdminPage() {
             <div className="panelTitle">
               <div>
                 <span className="eyebrow">
-                  ACCÈS CONTRÔLÉ
+                  {pick(language, "ACCÈS CONTRÔLÉ", "CONTROLLED ACCESS")}
                 </span>
-                <h2>Créer une invitation</h2>
+                <h2>{pick(language, "Créer une invitation", "Create an invitation")}</h2>
               </div>
             </div>
 
             <label>
-              <span>Libellé</span>
+              <span>{pick(language, "Libellé", "Label")}</span>
               <input
                 value={inviteLabel}
                 minLength={2}
@@ -713,7 +710,7 @@ export default function AdminPage() {
 
             <div className="formGrid">
               <label>
-                <span>Utilisations</span>
+                <span>{pick(language, "Utilisations", "Uses")}</span>
                 <input
                   type="number"
                   min={1}
@@ -728,7 +725,7 @@ export default function AdminPage() {
               </label>
 
               <label>
-                <span>Expiration</span>
+                <span>{pick(language, "Expiration", "Expiration")}</span>
                 <input
                   type="number"
                   min={1}
@@ -748,14 +745,13 @@ export default function AdminPage() {
               type="submit"
               disabled={busy}
             >
-              Générer le code
+              {pick(language, "Générer le code", "Generate code")}
             </button>
 
             {createdCode ? (
               <div className="createdCode">
                 <span>
-                  Copie ce code maintenant. Il ne sera
-                  plus affiché en entier.
+                  {pick(language, "Copie ce code maintenant. Il ne sera plus affiché en entier.", "Copy this code now. It will not be shown in full again.")}
                 </span>
                 <strong>{createdCode}</strong>
                 <button
@@ -766,7 +762,7 @@ export default function AdminPage() {
                     )
                   }
                 >
-                  Copier
+                  {pick(language, "Copier", "Copy")}
                 </button>
               </div>
             ) : null}
@@ -778,7 +774,7 @@ export default function AdminPage() {
                 <span className="eyebrow">
                   INVITATIONS
                 </span>
-                <h2>Codes existants</h2>
+                <h2>{pick(language, "Codes existants", "Existing codes")}</h2>
               </div>
             </div>
 
@@ -793,12 +789,13 @@ export default function AdminPage() {
                     <span>
                       {invite.code_hint} ·{" "}
                       {invite.uses}/{invite.max_uses}{" "}
-                      utilisations
+                      {pick(language, "utilisations", "uses")}
                     </span>
                     <small>
-                      Expiration :{" "}
+                      {pick(language, "Expiration", "Expiration")}: {" "}
                       {formatDate(
                         invite.expires_at,
+                        language,
                       )}
                     </small>
                   </div>
@@ -812,15 +809,15 @@ export default function AdminPage() {
                     }
                   >
                     {invite.active
-                      ? "Révoquer"
-                      : "Inactive"}
+                      ? pick(language, "Révoquer", "Revoke")
+                      : pick(language, "Inactive", "Inactive")}
                   </button>
                 </article>
               ))}
 
               {!invites.length ? (
                 <p className="empty">
-                  Aucune invitation administrée.
+                  {pick(language, "Aucune invitation administrée.", "No managed invitation.")}
                 </p>
               ) : null}
             </div>
@@ -833,9 +830,9 @@ export default function AdminPage() {
           <div className="panelTitle">
             <div>
               <span className="eyebrow">
-                RETOURS BÊTA
+                {pick(language, "RETOURS BÊTA", "BETA FEEDBACK")}
               </span>
-              <h2>Signalements utilisateurs</h2>
+              <h2>{pick(language, "Signalements utilisateurs", "User reports")}</h2>
             </div>
           </div>
 
@@ -853,6 +850,7 @@ export default function AdminPage() {
                     <span>
                       {formatDate(
                         report.created_at,
+                        language,
                       )}{" "}
                       · {report.route}
                     </span>
@@ -870,30 +868,30 @@ export default function AdminPage() {
                     }
                   >
                     <option value="new">
-                      Nouveau
+                      {pick(language, "Nouveau", "New")}
                     </option>
                     <option value="reviewing">
-                      En analyse
+                      {pick(language, "En analyse", "Reviewing")}
                     </option>
                     <option value="resolved">
-                      Résolu
+                      {pick(language, "Résolu", "Resolved")}
                     </option>
                   </select>
                 </div>
 
                 <p>{report.message}</p>
                 <small>
-                  Requête :{" "}
-                  {report.request_id || "Non fournie"} ·
+                  {pick(language, "Requête", "Request")}: {" "}
+                  {report.request_id || pick(language, "Non fournie", "Not provided")} ·
                   Version :{" "}
-                  {report.app_version || "Non fournie"}
+                  {report.app_version || pick(language, "Non fournie", "Not provided")}
                 </small>
               </article>
             ))}
 
             {!reports.length ? (
               <p className="empty">
-                Aucun signalement enregistré.
+                {pick(language, "Aucun signalement enregistré.", "No report recorded.")}
               </p>
             ) : null}
           </div>

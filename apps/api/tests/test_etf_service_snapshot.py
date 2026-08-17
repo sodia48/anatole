@@ -5,6 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+import app.services.etf as etf_module
 from app.services.etf import (
     COLD_START_RETRY_SECONDS,
     EtfDirectoryService,
@@ -58,6 +59,12 @@ def test_snapshot_is_valid_against_current_schema() -> None:
 def test_failed_cold_start_can_retry(
     monkeypatch,
 ) -> None:
+    clock = [0.0]
+    monkeypatch.setattr(
+        etf_module,
+        "monotonic",
+        lambda: clock[0],
+    )
     service = EtfDirectoryService()
     calls = 0
 
@@ -83,9 +90,7 @@ def test_failed_cold_start_can_retry(
     )
     assert calls == 1
 
-    service._last_cold_start_attempt -= (
-        COLD_START_RETRY_SECONDS + 1
-    )
+    clock[0] += COLD_START_RETRY_SECONDS
 
     asyncio.run(
         service._prime_cold_start()

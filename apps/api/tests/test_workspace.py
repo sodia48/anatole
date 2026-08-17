@@ -6,6 +6,8 @@ from app.core.config import settings
 from app.main import app
 from app.services.analysis import analysis_service
 from app.services.cockpit import cockpit_service
+from app.services.calendar import calendar_service
+from app.services.news import news_service
 from app.services.screener import screener_service
 
 
@@ -107,6 +109,20 @@ def test_data_quality_route() -> None:
     assert 0 <= payload["overall_score"] <= 100
     assert len(payload["sources"]) >= 8
     assert any(item["path"] == "/health" for item in payload["endpoints"])
+    sources = {item["key"]: item for item in payload["sources"]}
+    assert sources["screener-tsx60"]["status"] in {
+        "idle", "healthy", "degraded", "stale"
+    }
+    assert sources["screener-composite"]["status"] in {
+        "idle", "healthy", "degraded", "stale"
+    }
+    assert sources["tsx-composite-universe"]["status"] in {
+        "idle", "healthy", "degraded", "stale"
+    }
+    assert sources["news"]["status"] in {"idle", "healthy", "degraded", "stale"}
+    assert sources["calendar"]["status"] in {"idle", "healthy", "degraded", "stale"}
+    assert isinstance(news_service._cached, dict)
+    assert isinstance(calendar_service._cached, dict)
 
 
 def test_assistant_market_and_portfolio_demo() -> None:

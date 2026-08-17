@@ -13,6 +13,7 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
+from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
 from app.services.notifications import notification_service
 
@@ -40,7 +41,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="Anatole API",
-    version="1.3.0",
+    version=ANATOLE_VERSION,
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
@@ -48,6 +49,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_origin_regex=settings.cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -107,7 +109,7 @@ async def request_observability(
         request_id=request_id,
     )
     response.headers["X-Request-ID"] = request_id
-    response.headers["X-Anatole-Version"] = "1.3.0"
+    response.headers["X-Anatole-Version"] = ANATOLE_VERSION
     response.headers["Server-Timing"] = f"app;dur={elapsed_ms:.1f}"
 
     logger.info(

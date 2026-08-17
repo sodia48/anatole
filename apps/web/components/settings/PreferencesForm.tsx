@@ -2,7 +2,6 @@
 
 import {
   Check,
-  Languages,
   RotateCcw,
 } from "lucide-react";
 
