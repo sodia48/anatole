@@ -12,6 +12,8 @@ import {
 } from "react";
 
 import styles from "./MarketHeatmap.module.css";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 type GroupingMode = "sector" | "flat" | "direction";
 
@@ -70,10 +72,10 @@ type PositionedItem<T> = {
   rect: Rect;
 };
 
-const MODE_LABELS: Record<GroupingMode, string> = {
-  sector: "Secteurs",
-  flat: "Vue globale",
-  direction: "Sens du marché",
+const MODE_LABELS: Record<GroupingMode, readonly [string, string]> = {
+  sector: ["Secteurs", "Sectors"],
+  flat: ["Vue globale", "Full market"],
+  direction: ["Sens du marché", "Market direction"],
 };
 
 const UNKNOWN_SECTOR = "Autres";
@@ -198,30 +200,30 @@ function buildGroup(
   };
 }
 
-function groupTiles(tiles: NormalizedTile[], mode: GroupingMode): TileGroup[] {
+function groupTiles(tiles: NormalizedTile[], mode: GroupingMode, language: AnatoleLanguage): TileGroup[] {
   const totalTiles = tiles.length;
 
   if (mode === "flat") {
-    return [buildGroup("market", "Marché complet", tiles, totalTiles)];
+    return [buildGroup("market", pick(language, "Marché complet", "Full market"), tiles, totalTiles)];
   }
 
   if (mode === "direction") {
     return [
       {
         key: "gainers",
-        label: "Hausses",
+        label: pick(language, "Hausses", "Gainers"),
         tiles: tiles.filter((tile) => tile.changePercent > 0.005),
       },
       {
         key: "unchanged",
-        label: "Inchangées",
+        label: pick(language, "Inchangées", "Unchanged"),
         tiles: tiles.filter(
           (tile) => tile.changePercent >= -0.005 && tile.changePercent <= 0.005,
         ),
       },
       {
         key: "losers",
-        label: "Baisses",
+        label: pick(language, "Baisses", "Decliners"),
         tiles: tiles.filter((tile) => tile.changePercent < -0.005),
       },
     ]
@@ -368,8 +370,8 @@ function formatChange(value: number, available = true): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
 }
 
-function formatPrice(value: number): string {
-  return value.toLocaleString("fr-CA", {
+function formatPrice(value: number, language: AnatoleLanguage): string {
+  return value.toLocaleString(localeFor(language), {
     style: "currency",
     currency: "CAD",
     minimumFractionDigits: 2,
@@ -410,17 +412,17 @@ function tileDetailLevel(
   return 3;
 }
 
-function directionLabel(tile: NormalizedTile): string {
+function directionLabel(tile: NormalizedTile, language: AnatoleLanguage): string {
   if (!tile.available) {
-    return "cotation indisponible";
+    return pick(language, "cotation indisponible", "quote unavailable");
   }
   if (tile.changePercent > 0.005) {
-    return "en hausse";
+    return pick(language, "en hausse", "up");
   }
   if (tile.changePercent < -0.005) {
-    return "en baisse";
+    return pick(language, "en baisse", "down");
   }
-  return "inchangé";
+  return pick(language, "inchangé", "unchanged");
 }
 
 export function MarketHeatmap({
@@ -430,6 +432,8 @@ export function MarketHeatmap({
   tiles: readonly unknown[];
   universeLabel?: string;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [mode, setMode] = useState<GroupingMode>("sector");
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
@@ -451,8 +455,8 @@ export function MarketHeatmap({
   );
 
   const groups = useMemo(
-    () => groupTiles(normalizedTiles, mode),
-    [mode, normalizedTiles],
+    () => groupTiles(normalizedTiles, mode, language),
+    [language, mode, normalizedTiles],
   );
 
   const selectedTile = useMemo(
@@ -646,11 +650,11 @@ export function MarketHeatmap({
       <section className={`panel ${styles.panel}`}>
         <div className={styles.heading}>
           <div>
-            <span className="eyebrow">CARTE DU MARCHÉ</span>
+            <span className="eyebrow">{pick(language, "CARTE DU MARCHÉ", "MARKET MAP")}</span>
             <h2>{universeLabel}</h2>
           </div>
         </div>
-        <p className={styles.empty}>Aucun titre n’est disponible pour la carte.</p>
+        <p className={styles.empty}>{pick(language, "Aucun titre n’est disponible pour la carte.", "No securities are available for the map.")}</p>
       </section>
     );
   }
@@ -664,21 +668,20 @@ export function MarketHeatmap({
     >
       <div className={styles.heading}>
         <div className={styles.headingCopy}>
-          <span className="eyebrow">CARTE DU MARCHÉ</span>
+          <span className="eyebrow">{pick(language, "CARTE DU MARCHÉ", "MARKET MAP")}</span>
           <h2>{universeLabel}</h2>
           <p>
-            Tous les titres restent dans la carte. Touchez une case pour lire ses
-            détails, puis ouvrez Focus au besoin.
+            {pick(language, "Tous les titres restent dans la carte. Touchez une case pour lire ses détails, puis ouvrez Focus au besoin.", "Every security remains on the map. Select a tile to read its details, then open Focus if needed.")}
           </p>
         </div>
         <div className={styles.countBadge}>
           <strong>{normalizedTiles.length}</strong>
-          <span>titres inclus</span>
+          <span>{pick(language, "titres inclus", "securities included")}</span>
         </div>
       </div>
 
       <div className={styles.toolbar}>
-        <div className={styles.modeButtons} role="group" aria-label="Regroupement de la carte">
+        <div className={styles.modeButtons} role="group" aria-label={pick(language, "Regroupement de la carte", "Map grouping")}>
           {(Object.keys(MODE_LABELS) as GroupingMode[]).map((value) => (
             <button
               type="button"
@@ -687,13 +690,13 @@ export function MarketHeatmap({
               aria-pressed={mode === value}
               onClick={() => setMode(value)}
             >
-              {MODE_LABELS[value]}
+              {pick(language, MODE_LABELS[value][0], MODE_LABELS[value][1])}
             </button>
           ))}
         </div>
 
         <form className={styles.searchForm} onSubmit={runSearch}>
-          <label htmlFor="heatmap-symbol-search">Trouver dans la carte</label>
+          <label htmlFor="heatmap-symbol-search">{pick(language, "Trouver dans la carte", "Find on the map")}</label>
           <div>
             <input
               id="heatmap-symbol-search"
@@ -702,7 +705,7 @@ export function MarketHeatmap({
               placeholder="RY, SHOP, MDA…"
               autoComplete="off"
             />
-            <button type="submit">Trouver</button>
+            <button type="submit">{pick(language, "Trouver", "Find")}</button>
           </div>
         </form>
 
@@ -713,30 +716,30 @@ export function MarketHeatmap({
             aria-pressed={highContrast}
             onClick={() => setHighContrast((current) => !current)}
           >
-            {highContrast ? "Contraste actif" : "Contraste"}
+            {highContrast ? pick(language, "Contraste actif", "Contrast on") : pick(language, "Contraste", "Contrast")}
           </button>
           <button type="button" className={styles.utilityButton} onClick={() => void toggleFullscreen()}>
-            {fullscreen || focusMode ? "Quitter plein écran" : "Plein écran"}
+            {fullscreen || focusMode ? pick(language, "Quitter plein écran", "Exit full screen") : pick(language, "Plein écran", "Full screen")}
           </button>
           {expandedGroup || selectedTile || searchQuery ? (
             <button type="button" className={styles.resetButton} onClick={resetView}>
-              Vue complète
+              {pick(language, "Vue complète", "Full view")}
             </button>
           ) : null}
         </div>
       </div>
 
-      <div className={styles.legend} aria-label="Légende de la carte">
-        <span><i className={styles.legendPositive} /> + Hausse</span>
-        <span><i className={styles.legendNegative} /> − Baisse</span>
-        <span><i className={styles.legendNeutral} /> N/D ou inchangé</span>
-        <span className={styles.legendHint}>Touchez un secteur pour l’agrandir</span>
+      <div className={styles.legend} aria-label={pick(language, "Légende de la carte", "Map legend")}>
+        <span><i className={styles.legendPositive} /> + {pick(language, "Hausse", "Up")}</span>
+        <span><i className={styles.legendNegative} /> − {pick(language, "Baisse", "Down")}</span>
+        <span><i className={styles.legendNeutral} /> {pick(language, "N/D ou inchangé", "N/A or unchanged")}</span>
+        <span className={styles.legendHint}>{pick(language, "Touchez un secteur pour l’agrandir", "Select a sector to expand it")}</span>
       </div>
 
       <div
         ref={canvasRef}
         className={styles.treemap}
-        aria-label={`Carte du marché ${universeLabel}, ${normalizedTiles.length} titres`}
+        aria-label={pick(language, `Carte du marché ${universeLabel}, ${normalizedTiles.length} titres`, `${universeLabel} market map, ${normalizedTiles.length} securities`)}
       >
         {positionedGroups.map(({ group, rect, headerHeight, mobile, tiles: positionedTiles }) => {
           const compactHeader = rect.width < 112 || rect.height < 70;
@@ -763,7 +766,7 @@ export function MarketHeatmap({
                   setExpandedGroup((current) => (current === group.key ? null : group.key))
                 }
                 aria-pressed={expandedGroup === group.key}
-                aria-label={`${group.label}, ${group.tiles.length} titres, ${formatChange(group.changePercent)}`}
+                aria-label={pick(language, `${group.label}, ${group.tiles.length} titres, ${formatChange(group.changePercent)}`, `${group.label}, ${group.tiles.length} securities, ${formatChange(group.changePercent)}`)}
               >
                 <strong>{shortGroupLabel(group.label)}</strong>
                 <span className={group.changePercent >= 0 ? styles.groupPositive : styles.groupNegative}>
@@ -781,7 +784,7 @@ export function MarketHeatmap({
                   height: tileRect.height,
                   background: tileBackground(tile.changePercent, tile.available, highContrast),
                 };
-                const ariaLabel = `${tile.symbol}, ${tile.name}, ${directionLabel(tile)}, ${formatChange(tile.changePercent, tile.available)}, ${formatPrice(tile.price)}`;
+                const ariaLabel = `${tile.symbol}, ${tile.name}, ${directionLabel(tile, language)}, ${formatChange(tile.changePercent, tile.available)}, ${formatPrice(tile.price, language)}`;
 
                 return (
                   <Link
@@ -812,12 +815,12 @@ export function MarketHeatmap({
                     ) : null}
                     {detail >= 3 ? (
                       <>
-                        <small>{formatPrice(tile.price)}</small>
+                        <small>{formatPrice(tile.price, language)}</small>
                         <span className={styles.tileName}>{tile.name}</span>
                       </>
                     ) : null}
                     {tile.delayed && detail >= 3 ? (
-                      <span className={styles.delayed}>Différé</span>
+                      <span className={styles.delayed}>{pick(language, "Différé", "Delayed")}</span>
                     ) : null}
                   </Link>
                 );
@@ -827,32 +830,32 @@ export function MarketHeatmap({
         })}
 
         {positionedGroups.length === 0 ? (
-          <div className={styles.loadingCanvas}>Construction de la carte…</div>
+          <div className={styles.loadingCanvas}>{pick(language, "Construction de la carte…", "Building the map…")}</div>
         ) : null}
       </div>
 
       {selectedTile ? (
         <aside className={styles.inspector} aria-live="polite">
           <div className={styles.inspectorIdentity}>
-            <span>Titre sélectionné</span>
+            <span>{pick(language, "Titre sélectionné", "Selected security")}</span>
             <strong>{selectedTile.symbol}</strong>
             <p>{selectedTile.name} · {selectedTile.sector}</p>
           </div>
           <div className={styles.inspectorMetrics}>
             <div>
-              <span>Prix</span>
-              <strong>{formatPrice(selectedTile.price)}</strong>
+              <span>{pick(language, "Prix", "Price")}</span>
+              <strong>{formatPrice(selectedTile.price, language)}</strong>
             </div>
             <div>
-              <span>Séance</span>
+              <span>{pick(language, "Séance", "Session")}</span>
               <strong className={selectedTile.changePercent >= 0 ? styles.inspectorPositive : styles.inspectorNegative}>
                 {formatChange(selectedTile.changePercent, selectedTile.available)}
               </strong>
             </div>
           </div>
           <div className={styles.inspectorActions}>
-            <Link href={stockPath(selectedTile)}>Ouvrir Focus</Link>
-            <button type="button" onClick={() => setSelectedTicker(null)}>Fermer</button>
+            <Link href={stockPath(selectedTile)}>{pick(language, "Ouvrir Focus", "Open Focus")}</Link>
+            <button type="button" onClick={() => setSelectedTicker(null)}>{pick(language, "Fermer", "Close")}</button>
           </div>
         </aside>
       ) : null}

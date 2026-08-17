@@ -21,6 +21,8 @@ import {
 } from "../../lib/ipo-insiders-api";
 
 import styles from "./IpoInsiders.module.css";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 type MainTab = "ipo" | "insiders";
 type IpoCountryFilter =
@@ -81,8 +83,9 @@ const EMPTY_INSIDERS: InsiderSnapshot = {
 
 function formatDate(
   value: string | null,
+  language: AnatoleLanguage,
 ): string {
-  if (!value) return "À confirmer";
+  if (!value) return pick(language, "À confirmer", "To be confirmed");
 
   const date = new Date(value);
 
@@ -90,7 +93,7 @@ function formatDate(
     return value;
   }
 
-  return new Intl.DateTimeFormat("fr-CA", {
+  return new Intl.DateTimeFormat(localeFor(language), {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -100,6 +103,7 @@ function formatDate(
 
 function formatNumber(
   value: number | null,
+  language: AnatoleLanguage,
 ): string {
   if (
     value === null ||
@@ -108,13 +112,14 @@ function formatNumber(
     return "N/D";
   }
 
-  return new Intl.NumberFormat("fr-CA", {
+  return new Intl.NumberFormat(localeFor(language), {
     maximumFractionDigits: 0,
   }).format(value);
 }
 
 function formatMoney(
   value: number | null,
+  language: AnatoleLanguage,
 ): string {
   if (
     value === null ||
@@ -123,7 +128,7 @@ function formatMoney(
     return "N/D";
   }
 
-  return new Intl.NumberFormat("fr-CA", {
+  return new Intl.NumberFormat(localeFor(language), {
     style: "currency",
     currency: "CAD",
     notation:
@@ -139,6 +144,7 @@ function formatMoney(
 
 function formatIpoPrice(
   item: IpoItem,
+  language: AnatoleLanguage,
 ): string {
   const currency =
     item.offer_currency ||
@@ -147,7 +153,7 @@ function formatIpoPrice(
       : "USD");
 
   const format = (value: number): string =>
-    new Intl.NumberFormat("fr-CA", {
+    new Intl.NumberFormat(localeFor(language), {
       style: "currency",
       currency,
       currencyDisplay: "narrowSymbol",
@@ -177,20 +183,20 @@ function formatIpoPrice(
     return `${prefix}${format(item.offer_price)}`;
   }
 
-  return "Non publié";
+  return pick(language, "Non publié", "Not published");
 }
 
-function ipoPriceCaption(item: IpoItem): string {
+function ipoPriceCaption(item: IpoItem, language: AnatoleLanguage): string {
   if (item.offer_price_status === "range") {
-    return "Fourchette indicative";
+    return pick(language, "Fourchette indicative", "Indicative range");
   }
 
   if (item.offer_price_status === "reference") {
-    return "Prix de référence";
+    return pick(language, "Prix de référence", "Reference price");
   }
 
   if (item.offer_price_status === "final") {
-    return "Prix IPO final";
+    return pick(language, "Prix IPO final", "Final IPO price");
   }
 
   return "Prix IPO";
@@ -312,6 +318,8 @@ export function IpoInsidersClient({
   initialTab?: MainTab;
 }) {
   const router = useRouter();
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const ipoAbortRef =
     useRef<AbortController | null>(null);
   const insidersAbortRef =
@@ -421,9 +429,9 @@ export function IpoInsidersClient({
           !isAbortError(caught)
         ) {
           setIpoError(
-            caught instanceof Error
+            language === "fr" && caught instanceof Error
               ? caught.message
-              : "Le radar IPO est indisponible.",
+              : pick(language, "Le radar IPO est indisponible.", "The IPO radar is unavailable."),
           );
         }
       } finally {
@@ -435,7 +443,7 @@ export function IpoInsidersClient({
         }
       }
     },
-    [],
+    [language],
   );
 
   const loadInsiders = useCallback(
@@ -552,9 +560,9 @@ export function IpoInsidersClient({
           !isAbortError(caught)
         ) {
           setInsidersError(
-            caught instanceof Error
+            language === "fr" && caught instanceof Error
               ? caught.message
-              : "Le radar d’initiés est indisponible.",
+              : pick(language, "Le radar d’initiés est indisponible.", "The insider radar is unavailable."),
           );
         }
       } finally {
@@ -572,6 +580,7 @@ export function IpoInsidersClient({
       activeTicker,
       insiderDays,
       insiderMarket,
+      language,
     ],
   );
 
@@ -730,11 +739,11 @@ export function IpoInsidersClient({
 
   const insiderProgressLabel =
     insidersLoadStage === "preview"
-      ? "Aperçu rapide…"
+      ? pick(language, "Aperçu rapide…", "Quick preview…")
       : insidersLoadStage === "enriching"
-        ? "Analyse étendue en cours…"
+        ? pick(language, "Analyse étendue en cours…", "Extended analysis in progress…")
         : insidersRefreshing
-          ? "Actualisation en arrière-plan…"
+          ? pick(language, "Actualisation en arrière-plan…", "Refreshing in the background…")
           : null;
 
   function activateTab(
@@ -761,20 +770,13 @@ export function IpoInsidersClient({
           <span
             className={styles.eyebrow}
           >
-            MARCHÉS PRIMAIRES &
-            GOUVERNANCE
+            {pick(language, "MARCHÉS PRIMAIRES & GOUVERNANCE", "PRIMARY MARKETS & GOVERNANCE")}
           </span>
           <h1>
-            IPO & transactions
-            d’initiés
+            {pick(language, "IPO & transactions d’initiés", "IPOs & insider transactions")}
           </h1>
           <p>
-            Nouvelles inscriptions
-            canadiennes, dépôts
-            réglementaires américains
-            et mouvements d’initiés à
-            vérifier dans les registres
-            officiels.
+            {pick(language, "Nouvelles inscriptions canadiennes, dépôts réglementaires américains et mouvements d’initiés à vérifier dans les registres officiels.", "Canadian new listings, U.S. regulatory filings, and insider activity to verify in official registries.")}
           </p>
         </div>
 
@@ -791,8 +793,7 @@ export function IpoInsidersClient({
               }
             </strong>
             <span>
-              sociétés dans le radar
-              IPO
+              {pick(language, "sociétés dans le radar IPO", "companies in the IPO radar")}
             </span>
           </div>
           <div>
@@ -800,12 +801,12 @@ export function IpoInsidersClient({
               {insidersAwaitingFirstResult
                 ? "…"
                 : insiderCoverageUnavailable
-                  ? "Indisponible"
+                  ? pick(language, "Indisponible", "Unavailable")
                   : insiders.summary
                       .transactions}
             </strong>
             <span>
-              transactions détectées
+              {pick(language, "transactions détectées", "transactions detected")}
             </span>
           </div>
         </div>
@@ -813,7 +814,7 @@ export function IpoInsidersClient({
 
       <nav
         className={styles.mainTabs}
-        aria-label="Sections IPO et initiés"
+        aria-label={pick(language, "Sections IPO et initiés", "IPO and insider sections")}
       >
         <button
           type="button"
@@ -828,7 +829,7 @@ export function IpoInsidersClient({
         >
           <span>IPO</span>
           <small>
-            Inscriptions et pipeline
+            {pick(language, "Inscriptions et pipeline", "Listings and pipeline")}
           </small>
         </button>
 
@@ -843,10 +844,9 @@ export function IpoInsidersClient({
             activateTab("insiders")
           }
         >
-          <span>Initiés</span>
+          <span>{pick(language, "Initiés", "Insiders")}</span>
           <small>
-            Achats, ventes et
-            attributions
+            {pick(language, "Achats, ventes et attributions", "Purchases, sales, and grants")}
           </small>
         </button>
       </nav>
@@ -859,7 +859,7 @@ export function IpoInsidersClient({
             }
           >
             <article>
-              <span>Événements</span>
+              <span>{pick(language, "Événements", "Events")}</span>
               <strong>
                 {ipo.summary.total}
               </strong>
@@ -872,7 +872,7 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                États-Unis
+                {pick(language, "États-Unis", "United States")}
               </span>
               <strong>
                 {
@@ -883,7 +883,7 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                Nouvelles inscriptions
+                {pick(language, "Nouvelles inscriptions", "New listings")}
               </span>
               <strong>
                 {
@@ -894,7 +894,7 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                Dépôts réglementaires
+                {pick(language, "Dépôts réglementaires", "Regulatory filings")}
               </span>
               <strong>
                 {
@@ -926,8 +926,8 @@ export function IpoInsidersClient({
                       .value,
                   )
                 }
-                placeholder="Société, symbole, bourse ou statut"
-                aria-label="Rechercher dans le radar IPO"
+                placeholder={pick(language, "Société, symbole, bourse ou statut", "Company, symbol, exchange, or status")}
+                aria-label={pick(language, "Rechercher dans le radar IPO", "Search the IPO radar")}
               />
             </label>
 
@@ -936,7 +936,7 @@ export function IpoInsidersClient({
                 styles.selectField
               }
             >
-              <span>PAYS</span>
+              <span>{pick(language, "PAYS", "COUNTRY")}</span>
               <select
                 value={ipoCountry}
                 onChange={(event) =>
@@ -947,13 +947,13 @@ export function IpoInsidersClient({
                 }
               >
                 <option value="all">
-                  Canada + États-Unis
+                  {pick(language, "Canada + États-Unis", "Canada + United States")}
                 </option>
                 <option value="Canada">
                   Canada
                 </option>
                 <option value="États-Unis">
-                  États-Unis
+                  {pick(language, "États-Unis", "United States")}
                 </option>
               </select>
             </label>
@@ -974,10 +974,10 @@ export function IpoInsidersClient({
                 }
               >
                 <option value="company">
-                  Sociétés seulement
+                  {pick(language, "Sociétés seulement", "Companies only")}
                 </option>
                 <option value="all">
-                  Tous les instruments
+                  {pick(language, "Tous les instruments", "All instruments")}
                 </option>
                 <option value="etf">
                   ETF
@@ -986,10 +986,10 @@ export function IpoInsidersClient({
                   CDR
                 </option>
                 <option value="fund">
-                  Fonds
+                  {pick(language, "Fonds", "Funds")}
                 </option>
                 <option value="other">
-                  Autres
+                  {pick(language, "Autres", "Other")}
                 </option>
               </select>
             </label>
@@ -1002,9 +1002,7 @@ export function IpoInsidersClient({
               }
             >
               <span>
-                {ipoError} Les dernières
-                données chargées restent
-                affichées.
+                {ipoError} {pick(language, "Les dernières données chargées restent affichées.", "The latest loaded data remains visible.")}
               </span>
               <button
                 type="button"
@@ -1014,7 +1012,7 @@ export function IpoInsidersClient({
                   })
                 }
               >
-                Réessayer
+                {pick(language, "Réessayer", "Try again")}
               </button>
             </div>
           ) : null}
@@ -1038,14 +1036,13 @@ export function IpoInsidersClient({
                   RADAR IPO
                 </span>
                 <h2>
-                  Nouvelles inscriptions
-                  et dépôts
+                  {pick(language, "Nouvelles inscriptions et dépôts", "New listings and filings")}
                 </h2>
               </div>
               <p>
                 {ipoLoading
-                  ? "Mise à jour…"
-                  : `${filteredIpos.length} événements affichés`}
+                  ? pick(language, "Mise à jour…", "Updating…")
+                  : pick(language, `${filteredIpos.length} événements affichés`, `${filteredIpos.length} events shown`)}
               </p>
             </header>
 
@@ -1084,7 +1081,7 @@ export function IpoInsidersClient({
                               : styles.statusFiled
                           }
                         >
-                          {item.status}
+                          {language === "fr" ? item.status : ({ "Cotée": "Listed", "Dépôt": "Filed", "À venir": "Upcoming" } as Record<string, string>)[item.status] ?? item.status}
                         </span>
                       </div>
 
@@ -1098,14 +1095,14 @@ export function IpoInsidersClient({
                         }
                       >
                         <span>
-                          {item.country}
+                          {item.country === "États-Unis" ? pick(language, "États-Unis", "United States") : item.country}
                         </span>
                         <span>
                           {item.exchange}
                         </span>
                         <span>
                           {
-                            item.instrument_label
+                            language === "fr" ? item.instrument_label : ({ Société: "Company", Fonds: "Fund", Autre: "Other" } as Record<string, string>)[item.instrument_label] ?? item.instrument_label
                           }
                         </span>
                       </div>
@@ -1117,12 +1114,13 @@ export function IpoInsidersClient({
                       >
                         <span>
                           {
-                            item.event_type
+                            language === "fr" ? item.event_type : item.event_type.startsWith("Dépôt réglementaire") ? item.event_type.replace("Dépôt réglementaire", "Regulatory filing") : item.event_type === "Nouvelle inscription" ? "New listing" : item.event_type
                           }
                         </span>
                         <strong>
                           {formatDate(
                             item.event_date,
+                            language,
                           )}
                         </strong>
                       </div>
@@ -1136,19 +1134,19 @@ export function IpoInsidersClient({
                         }
                       >
                         <span>
-                          {ipoPriceCaption(item)}
+                          {ipoPriceCaption(item, language)}
                         </span>
                         <strong>
-                          {formatIpoPrice(item)}
+                          {formatIpoPrice(item, language)}
                         </strong>
                         <small>
                           {item.offer_price_status ===
                           "not_published"
-                            ? "Le prospectus ne publie pas encore de prix."
+                            ? pick(language, "Le prospectus ne publie pas encore de prix.", "The prospectus does not yet publish a price.")
                             : item.offer_price_status ===
                                 "range"
-                              ? "Le prix final peut encore changer."
-                              : "Prix extrait du document officiel."}
+                              ? pick(language, "Le prix final peut encore changer.", "The final price may still change.")
+                              : pick(language, "Prix extrait du document officiel.", "Price extracted from the official document.")}
                         </small>
                       </div>
 
@@ -1158,8 +1156,7 @@ export function IpoInsidersClient({
                         }
                       >
                         <span>
-                          Confiance de la
-                          donnée
+                          {pick(language, "Confiance de la donnée", "Data confidence")}
                         </span>
                         <strong>
                           {
@@ -1193,11 +1190,11 @@ export function IpoInsidersClient({
                               )
                             }
                           >
-                            Ouvrir Focus
+                            {pick(language, "Ouvrir Focus", "Open Focus")}
                           </button>
                         ) : (
                           <span>
-                            Pipeline à confirmer
+                            {pick(language, "Pipeline à confirmer", "Pipeline to be confirmed")}
                           </span>
                         )}
 
@@ -1209,7 +1206,7 @@ export function IpoInsidersClient({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Source officielle ↗
+                          {pick(language, "Source officielle ↗", "Official source ↗")}
                         </a>
                       </div>
                     </article>
@@ -1222,8 +1219,7 @@ export function IpoInsidersClient({
                   styles.empty
                 }
               >
-                Aucun événement ne
-                correspond aux filtres.
+                {pick(language, "Aucun événement ne correspond aux filtres.", "No event matches the filters.")}
               </div>
             )}
           </section>
@@ -1240,15 +1236,14 @@ export function IpoInsidersClient({
                     styles.eyebrow
                   }
                 >
-                  ÉTAT DES SOURCES
+                  {pick(language, "ÉTAT DES SOURCES", "SOURCE STATUS")}
                 </span>
                 <h2>
-                  Couverture officielle
+                  {pick(language, "Couverture officielle", "Official coverage")}
                 </h2>
               </div>
               <span>
-                Actualisation toutes les
-                30 minutes
+                {pick(language, "Actualisation toutes les 30 minutes", "Refresh every 30 minutes")}
               </span>
             </header>
 
@@ -1272,17 +1267,17 @@ export function IpoInsidersClient({
                     >
                       {source.status ===
                       "available"
-                        ? "DISPONIBLE"
+                        ? pick(language, "DISPONIBLE", "AVAILABLE")
                         : source.status ===
                             "partial"
-                          ? "PARTIEL"
-                          : "INDISPONIBLE"}
+                          ? pick(language, "PARTIEL", "PARTIAL")
+                          : pick(language, "INDISPONIBLE", "UNAVAILABLE")}
                     </span>
                     <strong>
                       {source.source}
                     </strong>
                     <small>
-                      {source.count} éléments
+                      {source.count} {pick(language, "éléments", "items")}
                       {source.detail
                         ? ` · ${source.detail}`
                         : ""}
@@ -1304,15 +1299,15 @@ export function IpoInsidersClient({
               <span>Transactions</span>
               <strong>
                 {insidersAwaitingFirstResult
-                  ? "Analyse…"
+                  ? pick(language, "Analyse…", "Analyzing…")
                   : insiderCoverageUnavailable
-                    ? "Indisponible"
+                    ? pick(language, "Indisponible", "Unavailable")
                     : insiders.summary
                         .transactions}
               </strong>
             </article>
             <article>
-              <span>Achats</span>
+              <span>{pick(language, "Achats", "Purchases")}</span>
               <strong
                 className={
                   styles.positive
@@ -1327,7 +1322,7 @@ export function IpoInsidersClient({
               </strong>
             </article>
             <article>
-              <span>Ventes</span>
+              <span>{pick(language, "Ventes", "Sales")}</span>
               <strong
                 className={
                   styles.negative
@@ -1343,13 +1338,13 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                Ratio d’achats
+                {pick(language, "Ratio d’achats", "Purchase ratio")}
               </span>
               <strong>
                 {insidersAwaitingFirstResult
                   ? "…"
                   : insiderCoverageUnavailable
-                    ? "Indisponible"
+                    ? pick(language, "Indisponible", "Unavailable")
                     : `${insiders.summary.buy_ratio_percent.toFixed(
                         0,
                       )}%`}
@@ -1357,7 +1352,7 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                Flux net estimé
+                {pick(language, "Flux net estimé", "Estimated net flow")}
               </span>
               <strong
                 className={
@@ -1370,10 +1365,11 @@ export function IpoInsidersClient({
                 {insidersAwaitingFirstResult
                   ? "…"
                   : insiderCoverageUnavailable
-                    ? "Indisponible"
+                    ? pick(language, "Indisponible", "Unavailable")
                     : formatMoney(
                         insiders.summary
                           .net_value,
+                        language,
                       )}
               </strong>
             </article>
@@ -1392,7 +1388,7 @@ export function IpoInsidersClient({
             >
               <label>
                 <span>
-                  ANALYSE PAR TITRE
+                  {pick(language, "ANALYSE PAR TITRE", "SECURITY ANALYSIS")}
                 </span>
                 <input
                   value={insiderInput}
@@ -1406,7 +1402,7 @@ export function IpoInsidersClient({
                 />
               </label>
               <button type="submit">
-                Analyser
+                {pick(language, "Analyser", "Analyze")}
               </button>
               {activeTicker ? (
                 <button
@@ -1419,7 +1415,7 @@ export function IpoInsidersClient({
                     setInsiderInput("");
                   }}
                 >
-                  Retour au radar
+                  {pick(language, "Retour au radar", "Back to radar")}
                 </button>
               ) : null}
             </form>
@@ -1429,7 +1425,7 @@ export function IpoInsidersClient({
                 styles.selectField
               }
             >
-              <span>MARCHÉ</span>
+              <span>{pick(language, "MARCHÉ", "MARKET")}</span>
               <select
                 value={insiderMarket}
                 onChange={(event) => {
@@ -1445,7 +1441,7 @@ export function IpoInsidersClient({
                   Canada — SEDI
                 </option>
                 <option value="us">
-                  États-Unis — SEC
+                  {pick(language, "États-Unis — SEC", "United States — SEC")}
                 </option>
               </select>
             </label>
@@ -1455,7 +1451,7 @@ export function IpoInsidersClient({
                 styles.selectField
               }
             >
-              <span>PÉRIODE</span>
+              <span>{pick(language, "PÉRIODE", "PERIOD")}</span>
               <select
                 value={insiderDays}
                 onChange={(event) => {
@@ -1468,16 +1464,16 @@ export function IpoInsidersClient({
                 }}
               >
                 <option value={30}>
-                  30 jours
+                  {pick(language, "30 jours", "30 days")}
                 </option>
                 <option value={90}>
-                  90 jours
+                  {pick(language, "90 jours", "90 days")}
                 </option>
                 <option value={180}>
-                  180 jours
+                  {pick(language, "180 jours", "180 days")}
                 </option>
                 <option value={365}>
-                  1 an
+                  {pick(language, "1 an", "1 year")}
                 </option>
               </select>
             </label>
@@ -1498,19 +1494,19 @@ export function IpoInsidersClient({
                 }
               >
                 <option value="all">
-                  Toutes
+                  {pick(language, "Toutes", "All")}
                 </option>
                 <option value="buy">
-                  Achats
+                  {pick(language, "Achats", "Purchases")}
                 </option>
                 <option value="sell">
-                  Ventes
+                  {pick(language, "Ventes", "Sales")}
                 </option>
                 <option value="grant">
-                  Attributions
+                  {pick(language, "Attributions", "Grants")}
                 </option>
                 <option value="exercise">
-                  Exercices
+                  {pick(language, "Exercices", "Exercises")}
                 </option>
               </select>
             </label>
@@ -1523,9 +1519,7 @@ export function IpoInsidersClient({
               }
             >
               <span>
-                {insidersError} Les
-                dernières données chargées
-                restent affichées.
+                {insidersError} {pick(language, "Les dernières données chargées restent affichées.", "The latest loaded data remains visible.")}
               </span>
               <button
                 type="button"
@@ -1535,7 +1529,7 @@ export function IpoInsidersClient({
                   })
                 }
               >
-                Réessayer
+                {pick(language, "Réessayer", "Try again")}
               </button>
             </div>
           ) : null}
@@ -1559,10 +1553,7 @@ export function IpoInsidersClient({
                   {insiderProgressLabel}
                 </strong>
                 <small>
-                  Les premières données sont
-                  affichées dès qu’elles arrivent;
-                  le radar complet continue sans
-                  bloquer la page.
+                  {pick(language, "Les premières données sont affichées dès qu’elles arrivent; le radar complet continue sans bloquer la page.", "The first data appears as soon as it arrives; the full radar continues without blocking the page.")}
                 </small>
               </div>
             </div>
@@ -1584,18 +1575,18 @@ export function IpoInsidersClient({
                     styles.eyebrow
                   }
                 >
-                  RADAR DES INITIÉS
+                  {pick(language, "RADAR DES INITIÉS", "INSIDER RADAR")}
                 </span>
                 <h2>
                   {activeTicker
-                    ? `Transactions de ${activeTicker}`
-                    : `Mouvements récents — ${insiders.market}`}
+                    ? pick(language, `Transactions de ${activeTicker}`, `${activeTicker} transactions`)
+                    : pick(language, `Mouvements récents — ${insiders.market}`, `Recent activity — ${insiders.market}`)}
                 </h2>
               </div>
               <p>
                 {insidersLoading
-                  ? "Analyse en cours…"
-                  : `${filteredTrades.length} transactions · ${insiders.scanned_symbols} titres ou dépôts sondés`}
+                  ? pick(language, "Analyse en cours…", "Analysis in progress…")
+                  : pick(language, `${filteredTrades.length} transactions · ${insiders.scanned_symbols} titres ou dépôts sondés`, `${filteredTrades.length} transactions · ${insiders.scanned_symbols} securities or filings scanned`)}
               </p>
             </header>
 
@@ -1611,14 +1602,14 @@ export function IpoInsidersClient({
                   }
                 >
                   <span>
-                    Titre et initié
+                    {pick(language, "Titre et initié", "Security and insider")}
                   </span>
-                  <span>Opération</span>
-                  <span>Actions</span>
-                  <span>Prix</span>
-                  <span>Valeur</span>
-                  <span>Date</span>
-                  <span>Vérifier</span>
+                  <span>{pick(language, "Opération", "Transaction")}</span>
+                  <span>{pick(language, "Actions", "Shares")}</span>
+                  <span>{pick(language, "Prix", "Price")}</span>
+                  <span>{pick(language, "Valeur", "Value")}</span>
+                  <span>{pick(language, "Date", "Date")}</span>
+                  <span>{pick(language, "Vérifier", "Verify")}</span>
                 </div>
 
                 {filteredTrades.map(
@@ -1672,24 +1663,26 @@ export function IpoInsidersClient({
                       >
                         <strong>
                           {
-                            trade.transaction_label
+                            language === "fr" ? trade.transaction_label : ({ Achat: "Purchase", Vente: "Sale", Attribution: "Grant", Exercice: "Exercise" } as Record<string, string>)[trade.transaction_label] ?? trade.transaction_label
                           }
                         </strong>
                         <small>
                           {trade.transaction_code ||
                             trade.ownership ||
-                            "Déclaration"}
+                            pick(language, "Déclaration", "Filing")}
                         </small>
                       </span>
 
                       <span>
                         {formatNumber(
                           trade.shares,
+                          language,
                         )}
                       </span>
                       <span>
                         {formatMoney(
                           trade.price,
+                          language,
                         )}
                       </span>
                       <span
@@ -1699,6 +1692,7 @@ export function IpoInsidersClient({
                       >
                         {formatMoney(
                           trade.value,
+                          language,
                         )}
                         {trade.unusual ? (
                           <small
@@ -1706,13 +1700,14 @@ export function IpoInsidersClient({
                               styles.unusual
                             }
                           >
-                            INHABITUELLE
+                            {pick(language, "INHABITUELLE", "UNUSUAL")}
                           </small>
                         ) : null}
                       </span>
                       <span>
                         {formatDate(
                           trade.trade_date,
+                          language,
                         )}
                       </span>
                       <span
@@ -1727,7 +1722,7 @@ export function IpoInsidersClient({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Donnée ↗
+                          {pick(language, "Donnée ↗", "Data ↗")}
                         </a>
                         <a
                           href={
@@ -1736,7 +1731,7 @@ export function IpoInsidersClient({
                           target="_blank"
                           rel="noreferrer"
                         >
-                          Officiel ↗
+                          {pick(language, "Officiel ↗", "Official ↗")}
                         </a>
                       </span>
                     </div>
@@ -1764,12 +1759,11 @@ export function IpoInsidersClient({
               >
                 <strong>
                   {insiderCoverageUnavailable
-                    ? "Couverture automatisée indisponible"
-                    : "Aucune transaction normalisée"}
+                    ? pick(language, "Couverture automatisée indisponible", "Automated coverage unavailable")
+                    : pick(language, "Aucune transaction normalisée", "No normalized transaction")}
                 </strong>
                 <p>
-                  {insiders.message ??
-                    "Aucune transaction ne correspond aux filtres."}
+                  {language === "fr" ? insiders.message ?? "Aucune transaction ne correspond aux filtres." : "No transaction matches the filters."}
                 </p>
                 <div
                   className={
@@ -1785,7 +1779,7 @@ export function IpoInsidersClient({
                       })
                     }
                   >
-                    Relancer la collecte
+                    {pick(language, "Relancer la collecte", "Restart collection")}
                   </button>
                   {insiderMarket ===
                   "canada" ? (
@@ -1794,7 +1788,7 @@ export function IpoInsidersClient({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Vérifier dans SEDI ↗
+                      {pick(language, "Vérifier dans SEDI ↗", "Verify in SEDI ↗")}
                     </a>
                   ) : (
                     <a
@@ -1802,7 +1796,7 @@ export function IpoInsidersClient({
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Vérifier dans EDGAR ↗
+                      {pick(language, "Vérifier dans EDGAR ↗", "Verify in EDGAR ↗")}
                     </a>
                   )}
                 </div>
@@ -1817,7 +1811,7 @@ export function IpoInsidersClient({
           >
             <article>
               <span>
-                Achats estimés
+                {pick(language, "Achats estimés", "Estimated purchases")}
               </span>
               <strong
                 className={
@@ -1827,12 +1821,13 @@ export function IpoInsidersClient({
                 {formatMoney(
                   insiders.summary
                     .buy_value,
+                  language,
                 )}
               </strong>
             </article>
             <article>
               <span>
-                Ventes estimées
+                {pick(language, "Ventes estimées", "Estimated sales")}
               </span>
               <strong
                 className={
@@ -1842,12 +1837,13 @@ export function IpoInsidersClient({
                 {formatMoney(
                   insiders.summary
                     .sell_value,
+                  language,
                 )}
               </strong>
             </article>
             <article>
               <span>
-                Attributions et exercices
+                {pick(language, "Attributions et exercices", "Grants and exercises")}
               </span>
               <strong>
                 {
@@ -1858,7 +1854,7 @@ export function IpoInsidersClient({
             </article>
             <article>
               <span>
-                Transactions inhabituelles
+                {pick(language, "Transactions inhabituelles", "Unusual transactions")}
               </span>
               <strong>
                 {
@@ -1881,16 +1877,14 @@ export function IpoInsidersClient({
                     styles.eyebrow
                   }
                 >
-                  ÉTAT DES SOURCES
+                  {pick(language, "ÉTAT DES SOURCES", "SOURCE STATUS")}
                 </span>
                 <h2>
-                  Couverture des initiés
+                  {pick(language, "Couverture des initiés", "Insider coverage")}
                 </h2>
               </div>
               <span>
-                Les zéros ne sont affichés
-                que lorsque des données ont
-                réellement été observées.
+                {pick(language, "Les zéros ne sont affichés que lorsque des données ont réellement été observées.", "Zeros are shown only when data has actually been observed.")}
               </span>
             </header>
 
@@ -1914,17 +1908,17 @@ export function IpoInsidersClient({
                     >
                       {source.status ===
                       "available"
-                        ? "DISPONIBLE"
+                        ? pick(language, "DISPONIBLE", "AVAILABLE")
                         : source.status ===
                             "partial"
-                          ? "PARTIEL"
-                          : "INDISPONIBLE"}
+                          ? pick(language, "PARTIEL", "PARTIAL")
+                          : pick(language, "INDISPONIBLE", "UNAVAILABLE")}
                     </span>
                     <strong>
                       {source.source}
                     </strong>
                     <small>
-                      {source.count} opérations
+                      {source.count} {pick(language, "opérations", "transactions")}
                       {source.detail
                         ? ` · ${source.detail}`
                         : ""}
@@ -1940,16 +1934,7 @@ export function IpoInsidersClient({
               styles.methodFooter
             }
           >
-            Au Canada, Anatole
-            automatise une source
-            secondaire et fournit le
-            lien de vérification SEDI.
-            Aux États-Unis, les
-            opérations proviennent des
-            formulaires 4 et 4/A de la
-            SEC. Les attributions et
-            exercices sont exclus du
-            flux net achats–ventes.
+            {pick(language, "Au Canada, Anatole automatise une source secondaire et fournit le lien de vérification SEDI. Aux États-Unis, les opérations proviennent des formulaires 4 et 4/A de la SEC. Les attributions et exercices sont exclus du flux net achats–ventes.", "In Canada, Anatole automates a secondary source and provides a SEDI verification link. In the United States, transactions come from SEC Forms 4 and 4/A. Grants and exercises are excluded from net purchase-sale flow.")}
           </footer>
         </>
       )}

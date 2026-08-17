@@ -14,6 +14,7 @@ node_modules/
 # Playwright
 playwright-report/
 test-results/
+.playwright-last-failed.*.log
 
 # Local environment and operating-system files
 .env

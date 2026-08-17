@@ -5,6 +5,8 @@ import {
   useMemo,
   useState,
 } from "react";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick } from "@/lib/i18n";
 
 export type FundamentalView =
   | "fundamentals"
@@ -446,6 +448,8 @@ function Fundamentals({
 }: {
   snapshot: Snapshot;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const m = snapshot.metrics;
   const currency =
     snapshot.financial_currency ??
@@ -461,48 +465,48 @@ function Fundamentals({
         gap: 14,
       }}
     >
-      <Group title="Valorisation">
-        <Metric label="Capitalisation" value={compact(m.market_cap, currency)} />
-        <Metric label="Valeur d’entreprise" value={compact(m.enterprise_value, currency)} />
-        <Metric label="C/B historique" value={n(m.trailing_pe)} />
-        <Metric label="C/B anticipé" value={n(m.forward_pe)} />
-        <Metric label="Cours / valeur comptable" value={n(m.price_to_book)} />
-        <Metric label="Cours / ventes" value={n(m.price_to_sales)} />
-        <Metric label="VE / BAIIA" value={n(m.enterprise_to_ebitda)} />
-        <Metric label="BPA historique" value={money(m.trailing_eps, currency)} />
+      <Group title={pick(language, "Valorisation", "Valuation")}>
+        <Metric label={pick(language, "Capitalisation", "Market capitalization")} value={compact(m.market_cap, currency)} />
+        <Metric label={pick(language, "Valeur d’entreprise", "Enterprise value")} value={compact(m.enterprise_value, currency)} />
+        <Metric label={pick(language, "C/B historique", "Trailing P/E")} value={n(m.trailing_pe)} />
+        <Metric label={pick(language, "C/B anticipé", "Forward P/E")} value={n(m.forward_pe)} />
+        <Metric label={pick(language, "Cours / valeur comptable", "Price / book value")} value={n(m.price_to_book)} />
+        <Metric label={pick(language, "Cours / ventes", "Price / sales")} value={n(m.price_to_sales)} />
+        <Metric label={pick(language, "VE / BAIIA", "EV / EBITDA")} value={n(m.enterprise_to_ebitda)} />
+        <Metric label={pick(language, "BPA historique", "Trailing EPS")} value={money(m.trailing_eps, currency)} />
       </Group>
 
-      <Group title="Croissance et rentabilité">
-        <Metric label="Chiffre d’affaires" value={compact(m.total_revenue, currency)} />
-        <Metric label="BAIIA" value={compact(m.ebitda, currency)} />
-        <Metric label="Bénéfice net" value={compact(m.net_income_to_common, currency)} />
-        <Metric label="Marge brute" value={pct(m.gross_margin)} />
-        <Metric label="Marge opérationnelle" value={pct(m.operating_margin)} />
-        <Metric label="Marge nette" value={pct(m.profit_margin)} />
-        <Metric label="Croissance des revenus" value={pct(m.revenue_growth)} tone={(m.revenue_growth ?? 0) >= 0 ? "positive" : "negative"} />
-        <Metric label="Croissance des bénéfices" value={pct(m.earnings_growth)} tone={(m.earnings_growth ?? 0) >= 0 ? "positive" : "negative"} />
+      <Group title={pick(language, "Croissance et rentabilité", "Growth and profitability")}>
+        <Metric label={pick(language, "Chiffre d’affaires", "Revenue")} value={compact(m.total_revenue, currency)} />
+        <Metric label={pick(language, "BAIIA", "EBITDA")} value={compact(m.ebitda, currency)} />
+        <Metric label={pick(language, "Bénéfice net", "Net income")} value={compact(m.net_income_to_common, currency)} />
+        <Metric label={pick(language, "Marge brute", "Gross margin")} value={pct(m.gross_margin)} />
+        <Metric label={pick(language, "Marge opérationnelle", "Operating margin")} value={pct(m.operating_margin)} />
+        <Metric label={pick(language, "Marge nette", "Net margin")} value={pct(m.profit_margin)} />
+        <Metric label={pick(language, "Croissance des revenus", "Revenue growth")} value={pct(m.revenue_growth)} tone={(m.revenue_growth ?? 0) >= 0 ? "positive" : "negative"} />
+        <Metric label={pick(language, "Croissance des bénéfices", "Earnings growth")} value={pct(m.earnings_growth)} tone={(m.earnings_growth ?? 0) >= 0 ? "positive" : "negative"} />
       </Group>
 
-      <Group title="Bilan et trésorerie">
-        <Metric label="Trésorerie" value={compact(m.total_cash, currency)} />
-        <Metric label="Dette totale" value={compact(m.total_debt, currency)} />
-        <Metric label="Dette / capitaux propres" value={n(m.debt_to_equity)} />
-        <Metric label="Ratio courant" value={n(m.current_ratio)} />
-        <Metric label="Ratio rapide" value={n(m.quick_ratio)} />
-        <Metric label="Flux de trésorerie opérationnel" value={compact(m.operating_cash_flow, currency)} />
-        <Metric label="Flux de trésorerie disponible" value={compact(m.free_cash_flow, currency)} />
-        <Metric label="Rendement des capitaux propres" value={pct(m.return_on_equity)} />
+      <Group title={pick(language, "Bilan et trésorerie", "Balance sheet and cash flow")}>
+        <Metric label={pick(language, "Trésorerie", "Cash")} value={compact(m.total_cash, currency)} />
+        <Metric label={pick(language, "Dette totale", "Total debt")} value={compact(m.total_debt, currency)} />
+        <Metric label={pick(language, "Dette / capitaux propres", "Debt / equity")} value={n(m.debt_to_equity)} />
+        <Metric label={pick(language, "Ratio courant", "Current ratio")} value={n(m.current_ratio)} />
+        <Metric label={pick(language, "Ratio rapide", "Quick ratio")} value={n(m.quick_ratio)} />
+        <Metric label={pick(language, "Flux de trésorerie opérationnel", "Operating cash flow")} value={compact(m.operating_cash_flow, currency)} />
+        <Metric label={pick(language, "Flux de trésorerie disponible", "Free cash flow")} value={compact(m.free_cash_flow, currency)} />
+        <Metric label={pick(language, "Rendement des capitaux propres", "Return on equity")} value={pct(m.return_on_equity)} />
       </Group>
 
-      <Group title="Marché et dividende">
-        <Metric label="Bêta" value={n(m.beta)} />
-        <Metric label="Sommet 52 semaines" value={money(m.fifty_two_week_high, currency)} />
-        <Metric label="Creux 52 semaines" value={money(m.fifty_two_week_low, currency)} />
-        <Metric label="Actions en circulation" value={compact(m.shares_outstanding)} />
-        <Metric label="Rendement du dividende" value={pct(m.dividend_yield)} />
-        <Metric label="Dividende annuel" value={money(m.dividend_rate, currency)} />
-        <Metric label="Ratio de distribution" value={pct(m.payout_ratio)} />
-        <Metric label="Volume moyen 3 mois" value={compact(m.average_volume_3m)} />
+      <Group title={pick(language, "Marché et dividende", "Market and dividend")}>
+        <Metric label={pick(language, "Bêta", "Beta")} value={n(m.beta)} />
+        <Metric label={pick(language, "Sommet 52 semaines", "52-week high")} value={money(m.fifty_two_week_high, currency)} />
+        <Metric label={pick(language, "Creux 52 semaines", "52-week low")} value={money(m.fifty_two_week_low, currency)} />
+        <Metric label={pick(language, "Actions en circulation", "Shares outstanding")} value={compact(m.shares_outstanding)} />
+        <Metric label={pick(language, "Rendement du dividende", "Dividend yield")} value={pct(m.dividend_yield)} />
+        <Metric label={pick(language, "Dividende annuel", "Annual dividend")} value={money(m.dividend_rate, currency)} />
+        <Metric label={pick(language, "Ratio de distribution", "Payout ratio")} value={pct(m.payout_ratio)} />
+        <Metric label={pick(language, "Volume moyen 3 mois", "3-month average volume")} value={compact(m.average_volume_3m)} />
       </Group>
     </div>
   );
@@ -609,9 +613,11 @@ function FinancialTable({
   view: StatementView;
   currency: string;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const headers =
     view === "income"
-      ? [
+      ? (language === "fr" ? [
           "Période",
           "Revenus",
           "Coût des revenus",
@@ -622,9 +628,9 @@ function FinancialTable({
           "BPA dilué",
           "Croissance revenus",
           "Croissance bénéfice",
-        ]
+        ] : ["Period", "Revenue", "Cost of revenue", "Gross profit", "Operating income", "EBITDA", "Net income", "Diluted EPS", "Revenue growth", "Earnings growth"])
       : view === "cashflow"
-        ? [
+        ? (language === "fr" ? [
             "Période",
             "Flux opérationnel",
             "Immobilisations",
@@ -633,9 +639,9 @@ function FinancialTable({
             "Dividendes",
             "Rachats d’actions",
             "Croissance FTD",
-          ]
+          ] : ["Period", "Operating cash flow", "Capital expenditure", "Free cash flow", "FCF margin", "Dividends", "Share repurchases", "FCF growth"])
         : view === "balance"
-          ? [
+          ? (language === "fr" ? [
               "Période",
               "Trésorerie",
               "Dette",
@@ -645,8 +651,8 @@ function FinancialTable({
               "Actifs",
               "Passifs",
               "Capitaux propres",
-            ]
-          : [
+            ] : ["Period", "Cash", "Debt", "Net debt", "Current assets", "Current liabilities", "Assets", "Liabilities", "Shareholders’ equity"])
+          : (language === "fr" ? [
               "Période",
               "Marge brute",
               "Marge opérationnelle",
@@ -654,7 +660,7 @@ function FinancialTable({
               "Marge FTD",
               "Croissance BPA",
               "Actions diluées",
-            ];
+            ] : ["Period", "Gross margin", "Operating margin", "Net margin", "FCF margin", "EPS growth", "Diluted shares"]);
 
   return (
     <div data-mobile-table-wrap="true" style={{ overflowX: "auto" }}>
@@ -805,7 +811,7 @@ function FinancialTable({
                   textAlign: "left",
                 }}
               >
-                Cette série n’est pas publiée par la source.
+                {pick(language, "Cette série n’est pas publiée par la source.", "This series is not published by the source.")}
               </td>
             </tr>
           )}
@@ -820,6 +826,8 @@ function Financials({
 }: {
   snapshot: Snapshot;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [subview, setSubview] =
     useState<ResultsSubview>("overview");
   const [statementView, setStatementView] =
@@ -836,29 +844,29 @@ function Financials({
 
   const resultTabs: Array<{
     key: ResultsSubview;
-    label: string;
+    label: readonly [string, string];
   }> = [
-    { key: "overview", label: "Vue d’ensemble" },
-    { key: "quarterly", label: "Trimestriel" },
-    { key: "annual", label: "Annuel" },
-    { key: "estimates", label: "Estimations" },
-    { key: "earnings", label: "BPA & calendrier" },
+    { key: "overview", label: ["Vue d’ensemble", "Overview"] },
+    { key: "quarterly", label: ["Trimestriel", "Quarterly"] },
+    { key: "annual", label: ["Annuel", "Annual"] },
+    { key: "estimates", label: ["Estimations", "Estimates"] },
+    { key: "earnings", label: ["BPA & calendrier", "EPS & calendar"] },
   ];
 
   const statementTabs: Array<{
     key: StatementView;
-    label: string;
+    label: readonly [string, string];
   }> = [
-    { key: "income", label: "Compte de résultat" },
-    { key: "cashflow", label: "Flux de trésorerie" },
-    { key: "balance", label: "Bilan" },
-    { key: "margins", label: "Marges & croissance" },
+    { key: "income", label: ["Compte de résultat", "Income statement"] },
+    { key: "cashflow", label: ["Flux de trésorerie", "Cash flow"] },
+    { key: "balance", label: ["Bilan", "Balance sheet"] },
+    { key: "margins", label: ["Marges & croissance", "Margins & growth"] },
   ];
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <nav
-        aria-label="Vues des résultats financiers"
+        aria-label={pick(language, "Vues des résultats financiers", "Financial results views")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -897,7 +905,7 @@ function Financials({
                 whiteSpace: "nowrap",
               }}
             >
-              {tab.label}
+              {pick(language, tab.label[0], tab.label[1])}
             </button>
           );
         })}
@@ -906,9 +914,9 @@ function Financials({
       {subview === "overview" ? (
         <>
           <section style={panelStyle}>
-            <span className="eyebrow">DOUZE DERNIERS MOIS</span>
+            <span className="eyebrow">{pick(language, "DOUZE DERNIERS MOIS", "TRAILING TWELVE MONTHS")}</span>
             <h2 style={{ margin: "4px 0 14px" }}>
-              Tableau de bord financier
+              {pick(language, "Tableau de bord financier", "Financial dashboard")}
             </h2>
 
             <div
@@ -919,15 +927,15 @@ function Financials({
                 gap: 10,
               }}
             >
-              <Metric label="Revenus TTM" value={compact(t.total_revenue, currency)} />
-              <Metric label="Résultat opérationnel TTM" value={compact(t.operating_income, currency)} />
-              <Metric label="BAIIA TTM" value={compact(t.ebitda, currency)} />
-              <Metric label="Bénéfice net TTM" value={compact(t.net_income, currency)} />
-              <Metric label="BPA dilué TTM" value={money(t.diluted_eps, currency)} />
-              <Metric label="Flux disponible TTM" value={compact(t.free_cash_flow, currency)} />
-              <Metric label="Dette nette" value={compact(t.net_debt, currency)} />
+              <Metric label={pick(language, "Revenus TTM", "TTM revenue")} value={compact(t.total_revenue, currency)} />
+              <Metric label={pick(language, "Résultat opérationnel TTM", "TTM operating income")} value={compact(t.operating_income, currency)} />
+              <Metric label={pick(language, "BAIIA TTM", "TTM EBITDA")} value={compact(t.ebitda, currency)} />
+              <Metric label={pick(language, "Bénéfice net TTM", "TTM net income")} value={compact(t.net_income, currency)} />
+              <Metric label={pick(language, "BPA dilué TTM", "TTM diluted EPS")} value={money(t.diluted_eps, currency)} />
+              <Metric label={pick(language, "Flux disponible TTM", "TTM free cash flow")} value={compact(t.free_cash_flow, currency)} />
+              <Metric label={pick(language, "Dette nette", "Net debt")} value={compact(t.net_debt, currency)} />
               <Metric
-                label="Dette nette / BAIIA"
+                label={pick(language, "Dette nette / BAIIA", "Net debt / EBITDA")}
                 value={n(h.net_debt_to_ebitda)}
               />
             </div>
@@ -941,58 +949,58 @@ function Financials({
               gap: 14,
             }}
           >
-            <Group title="Croissance du dernier trimestre">
+            <Group title={pick(language, "Croissance du dernier trimestre", "Latest-quarter growth")}>
               <Metric
-                label="Revenus sur un an"
+                label={pick(language, "Revenus sur un an", "Revenue year over year")}
                 value={pct(h.revenue_growth_yoy)}
                 tone={tone(h.revenue_growth_yoy)}
               />
               <Metric
-                label="Résultat opérationnel sur un an"
+                label={pick(language, "Résultat opérationnel sur un an", "Operating income year over year")}
                 value={pct(h.operating_income_growth_yoy)}
                 tone={tone(h.operating_income_growth_yoy)}
               />
               <Metric
-                label="Bénéfice net sur un an"
+                label={pick(language, "Bénéfice net sur un an", "Net income year over year")}
                 value={pct(h.net_income_growth_yoy)}
                 tone={tone(h.net_income_growth_yoy)}
               />
               <Metric
-                label="BPA sur un an"
+                label={pick(language, "BPA sur un an", "EPS year over year")}
                 value={pct(h.eps_growth_yoy)}
                 tone={tone(h.eps_growth_yoy)}
               />
               <Metric
-                label="Flux disponible sur un an"
+                label={pick(language, "Flux disponible sur un an", "Free cash flow year over year")}
                 value={pct(h.free_cash_flow_growth_yoy)}
                 tone={tone(h.free_cash_flow_growth_yoy)}
               />
             </Group>
 
-            <Group title="Qualité des résultats TTM">
-              <Metric label="Marge brute" value={pct(t.gross_margin)} />
-              <Metric label="Marge opérationnelle" value={pct(t.operating_margin)} />
-              <Metric label="Marge nette" value={pct(t.net_margin)} />
-              <Metric label="Marge de flux disponible" value={pct(t.free_cash_flow_margin)} />
+            <Group title={pick(language, "Qualité des résultats TTM", "TTM earnings quality")}>
+              <Metric label={pick(language, "Marge brute", "Gross margin")} value={pct(t.gross_margin)} />
+              <Metric label={pick(language, "Marge opérationnelle", "Operating margin")} value={pct(t.operating_margin)} />
+              <Metric label={pick(language, "Marge nette", "Net margin")} value={pct(t.net_margin)} />
+              <Metric label={pick(language, "Marge de flux disponible", "Free cash flow margin")} value={pct(t.free_cash_flow_margin)} />
               <Metric
-                label="Conversion bénéfice → flux"
+                label={pick(language, "Conversion bénéfice → flux", "Income-to-cash conversion")}
                 value={pct(h.cash_conversion_percent)}
               />
             </Group>
 
-            <Group title="Croissance annualisée sur trois ans">
+            <Group title={pick(language, "Croissance annualisée sur trois ans", "Three-year annualized growth")}>
               <Metric
-                label="Revenus"
+                label={pick(language, "Revenus", "Revenue")}
                 value={pct(h.three_year_revenue_cagr)}
                 tone={tone(h.three_year_revenue_cagr)}
               />
               <Metric
-                label="Bénéfice net"
+                label={pick(language, "Bénéfice net", "Net income")}
                 value={pct(h.three_year_net_income_cagr)}
                 tone={tone(h.three_year_net_income_cagr)}
               />
               <Metric
-                label="Flux disponible"
+                label={pick(language, "Flux disponible", "Free cash flow")}
                 value={pct(h.three_year_free_cash_flow_cagr)}
                 tone={tone(h.three_year_free_cash_flow_cagr)}
               />
@@ -1008,19 +1016,19 @@ function Financials({
             }}
           >
             <MiniTrend
-              title="Évolution annuelle des revenus"
+              title={pick(language, "Évolution annuelle des revenus", "Annual revenue trend")}
               rows={annual}
               field="total_revenue"
               currency={currency}
             />
             <MiniTrend
-              title="Évolution annuelle du bénéfice net"
+              title={pick(language, "Évolution annuelle du bénéfice net", "Annual net-income trend")}
               rows={annual}
               field="net_income"
               currency={currency}
             />
             <MiniTrend
-              title="Évolution annuelle du flux disponible"
+              title={pick(language, "Évolution annuelle du flux disponible", "Annual free-cash-flow trend")}
               rows={annual}
               field="free_cash_flow"
               currency={currency}
@@ -1042,11 +1050,11 @@ function Financials({
             <div>
               <span className="eyebrow">
                 {subview === "quarterly"
-                  ? "RÉSULTATS TRIMESTRIELS"
-                  : "RÉSULTATS ANNUELS"}
+                  ? pick(language, "RÉSULTATS TRIMESTRIELS", "QUARTERLY RESULTS")
+                  : pick(language, "RÉSULTATS ANNUELS", "ANNUAL RESULTS")}
               </span>
               <h2 style={{ margin: "4px 0 0" }}>
-                États financiers détaillés
+                {pick(language, "États financiers détaillés", "Detailed financial statements")}
               </h2>
             </div>
 
@@ -1084,7 +1092,7 @@ function Financials({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {tab.label}
+                    {pick(language, tab.label[0], tab.label[1])}
                   </button>
                 );
               })}
@@ -1103,9 +1111,9 @@ function Financials({
         </section>
       ) : subview === "estimates" ? (
         <section style={panelStyle}>
-          <span className="eyebrow">ATTENTES DU MARCHÉ</span>
+          <span className="eyebrow">{pick(language, "ATTENTES DU MARCHÉ", "MARKET EXPECTATIONS")}</span>
           <h2 style={{ margin: "4px 0 14px" }}>
-            Estimations de revenus et de BPA
+            {pick(language, "Estimations de revenus et de BPA", "Revenue and EPS estimates")}
           </h2>
 
           <div data-mobile-table-wrap="true" style={{ overflowX: "auto" }}>
@@ -1119,7 +1127,7 @@ function Financials({
             >
               <thead>
                 <tr style={{ color: "#7898ad", textAlign: "right" }}>
-                  {[
+                  {(language === "fr" ? [
                     "Période",
                     "Fin",
                     "BPA moyen",
@@ -1131,7 +1139,7 @@ function Financials({
                     "Fourchette revenus",
                     "Croissance revenus",
                     "Analystes revenus",
-                  ].map((header, index) => (
+                  ] : ["Period", "End", "Average EPS", "EPS range", "Prior-year EPS", "EPS growth", "EPS analysts", "Average revenue", "Revenue range", "Revenue growth", "Revenue analysts"]).map((header, index) => (
                     <th
                       key={header}
                       style={{
@@ -1201,7 +1209,7 @@ function Financials({
                 ) : (
                   <tr>
                     <td colSpan={11} style={{ padding: 28, color: "#7f9db1" }}>
-                      Aucun consensus détaillé publié pour ce titre.
+                      {pick(language, "Aucun consensus détaillé publié pour ce titre.", "No detailed consensus is published for this security.")}
                     </td>
                   </tr>
                 )}
@@ -1212,9 +1220,9 @@ function Financials({
       ) : (
         <>
           <section style={panelStyle}>
-            <span className="eyebrow">BÉNÉFICES PAR ACTION</span>
+            <span className="eyebrow">{pick(language, "BÉNÉFICES PAR ACTION", "EARNINGS PER SHARE")}</span>
             <h2 style={{ margin: "4px 0 14px" }}>
-              Réel, consensus et surprise
+              {pick(language, "Réel, consensus et surprise", "Actual, consensus, and surprise")}
             </h2>
             <div
               style={{
@@ -1237,7 +1245,7 @@ function Financials({
                   >
                     <strong>{quarter.period}</strong>
                     <div style={{ marginTop: 9, color: "#dcecf6" }}>
-                      Réel : {money(quarter.actual, currency)}
+                      {pick(language, "Réel", "Actual")}: {money(quarter.actual, currency)}
                     </div>
                     <div style={{ color: "#819db0" }}>
                       Consensus : {money(quarter.estimate, currency)}
@@ -1262,9 +1270,9 @@ function Financials({
             </div>
           </section>
 
-          <Group title="Prochaines dates">
+          <Group title={pick(language, "Prochaines dates", "Upcoming dates")}>
             <Metric
-              label="Publication des résultats"
+              label={pick(language, "Publication des résultats", "Earnings release")}
               value={
                 snapshot.events.earnings_dates.length
                   ? snapshot.events.earnings_dates
@@ -1274,11 +1282,11 @@ function Financials({
               }
             />
             <Metric
-              label="Date ex-dividende"
+              label={pick(language, "Date ex-dividende", "Ex-dividend date")}
               value={date(snapshot.events.ex_dividend_date)}
             />
             <Metric
-              label="Versement du dividende"
+              label={pick(language, "Versement du dividende", "Dividend payment")}
               value={date(snapshot.events.dividend_date)}
             />
           </Group>
@@ -1293,14 +1301,16 @@ function AnalystsView({
 }: {
   snapshot: Snapshot;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const a = snapshot.analysts;
   const currency = snapshot.currency ?? "CAD";
   const distribution = [
-    ["Achat fort", a.strong_buy, "#12d8a5"],
-    ["Achat", a.buy, "#49b98f"],
-    ["Conserver", a.hold, "#6f8ca0"],
-    ["Vente", a.sell, "#dc6c79"],
-    ["Vente forte", a.strong_sell, "#ff4669"],
+    [pick(language, "Achat fort", "Strong buy"), a.strong_buy, "#12d8a5"],
+    [pick(language, "Achat", "Buy"), a.buy, "#49b98f"],
+    [pick(language, "Conserver", "Hold"), a.hold, "#6f8ca0"],
+    [pick(language, "Vente", "Sell"), a.sell, "#dc6c79"],
+    [pick(language, "Vente forte", "Strong sell"), a.strong_sell, "#ff4669"],
   ] as const;
   const total = distribution.reduce(
     (sum, [, value]) => sum + (value ?? 0),
@@ -1319,15 +1329,15 @@ function AnalystsView({
         }}
       >
         <div>
-          <span className="eyebrow">CONSENSUS ANALYSTES</span>
+          <span className="eyebrow">{pick(language, "CONSENSUS ANALYSTES", "ANALYST CONSENSUS")}</span>
           <h2 style={{ margin: "5px 0 8px", fontSize: 28 }}>
             {a.recommendation_key
               ? a.recommendation_key.replaceAll("_", " ").toUpperCase()
               : "N/D"}
           </h2>
           <p style={{ color: "#819db0", margin: 0 }}>
-            Note moyenne : {n(a.recommendation_mean)} ·{" "}
-            {a.analyst_count ?? "N/D"} analystes
+            {pick(language, "Note moyenne", "Average rating")}: {n(a.recommendation_mean)} ·{" "}
+            {a.analyst_count ?? "N/D"} {pick(language, "analystes", "analysts")}
           </p>
         </div>
 
@@ -1340,7 +1350,7 @@ function AnalystsView({
           }}
         >
           <span style={{ color: "#819db0", fontSize: 11 }}>
-            Potentiel vers la cible moyenne
+            {pick(language, "Potentiel vers la cible moyenne", "Upside to average target")}
           </span>
           <strong
             style={{
@@ -1358,17 +1368,17 @@ function AnalystsView({
         </div>
       </section>
 
-      <Group title="Objectifs de cours">
-        <Metric label="Cours observé" value={money(a.current_price, currency)} />
-        <Metric label="Objectif bas" value={money(a.target_low, currency)} />
-        <Metric label="Objectif moyen" value={money(a.target_mean, currency)} />
-        <Metric label="Objectif médian" value={money(a.target_median, currency)} />
-        <Metric label="Objectif élevé" value={money(a.target_high, currency)} />
+      <Group title={pick(language, "Objectifs de cours", "Price targets")}>
+        <Metric label={pick(language, "Cours observé", "Current price")} value={money(a.current_price, currency)} />
+        <Metric label={pick(language, "Objectif bas", "Low target")} value={money(a.target_low, currency)} />
+        <Metric label={pick(language, "Objectif moyen", "Average target")} value={money(a.target_mean, currency)} />
+        <Metric label={pick(language, "Objectif médian", "Median target")} value={money(a.target_median, currency)} />
+        <Metric label={pick(language, "Objectif élevé", "High target")} value={money(a.target_high, currency)} />
       </Group>
 
       <section style={panelStyle}>
         <h2 style={{ margin: "0 0 16px" }}>
-          Répartition des recommandations
+          {pick(language, "Répartition des recommandations", "Recommendation distribution")}
         </h2>
         <div style={{ display: "grid", gap: 12 }}>
           {distribution.map(([label, value, color]) => {
@@ -1422,6 +1432,8 @@ export function FocusFundamentals({
   ticker: string;
   view: FundamentalView;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [snapshot, setSnapshot] = useState<Snapshot | null>(
     null,
   );
@@ -1453,7 +1465,7 @@ export function FocusFundamentals({
           setError(
             reason instanceof Error
               ? reason.message
-              : "Chargement impossible.",
+              : pick(language, "Chargement impossible.", "Unable to load data."),
           );
         }
       } finally {
@@ -1463,16 +1475,16 @@ export function FocusFundamentals({
 
     void load();
     return () => controller.abort();
-  }, [ticker]);
+  }, [language, ticker]);
 
   const generated = useMemo(
     () =>
       snapshot
-        ? new Date(snapshot.generated_at).toLocaleString("fr-CA", {
+        ? new Date(snapshot.generated_at).toLocaleString(localeFor(language), {
             timeZone: "America/Toronto",
           })
         : null,
-    [snapshot],
+    [language, snapshot],
   );
 
   if (loading && !snapshot) {
@@ -1486,7 +1498,7 @@ export function FocusFundamentals({
           color: "#819db0",
         }}
       >
-        Chargement des données fondamentales…
+        {pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
       </section>
     );
   }
@@ -1494,7 +1506,7 @@ export function FocusFundamentals({
   if (error && !snapshot) {
     return (
       <section className="panel" style={{ ...panelStyle, color: "#ffd9e0" }}>
-        Données fondamentales indisponibles : {error}
+        {pick(language, "Données fondamentales indisponibles", "Fundamental data unavailable")}: {language === "fr" ? error : "The data provider did not return a usable response."}
       </section>
     );
   }
@@ -1517,14 +1529,14 @@ export function FocusFundamentals({
         }}
       >
         <div>
-          <span className="eyebrow">FOCUS FONDAMENTAL</span>
+          <span className="eyebrow">{pick(language, "FOCUS FONDAMENTAL", "FUNDAMENTAL FOCUS")}</span>
           <h2 style={{ margin: "4px 0 0" }}>
             {snapshot.name}
           </h2>
           <p style={{ margin: "6px 0 0", color: "#819db0" }}>
             {[snapshot.sector, snapshot.industry]
               .filter(Boolean)
-              .join(" · ") || "Classification non disponible"}
+              .join(" · ") || pick(language, "Classification non disponible", "Classification unavailable")}
           </p>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -1539,10 +1551,10 @@ export function FocusFundamentals({
             }}
           >
             {snapshot.status === "available"
-              ? "Données disponibles"
+              ? pick(language, "Données disponibles", "Data available")
               : snapshot.status === "partial"
-                ? "Données partielles"
-                : "Données indisponibles"}
+                ? pick(language, "Données partielles", "Partial data")
+                : pick(language, "Données indisponibles", "Data unavailable")}
           </strong>
           {snapshot.message ? (
             <div
@@ -1553,7 +1565,7 @@ export function FocusFundamentals({
                 fontSize: 10,
               }}
             >
-              {snapshot.message}
+              {language === "fr" ? snapshot.message : "Some fields may be unavailable from the current source."}
             </div>
           ) : null}
         </div>
@@ -1568,9 +1580,7 @@ export function FocusFundamentals({
       )}
 
       <footer className="status-footer">
-        Source : {snapshot.source} · Mise à jour : {generated ?? "N/D"} ·
-        Certaines valeurs peuvent être calculées à partir des données
-        disponibles · Les champs indéterminables sont affichés N/D.
+        {pick(language, "Source", "Source")}: {snapshot.source} · {pick(language, "Mise à jour", "Updated")}: {generated ?? "N/D"} · {pick(language, "Certaines valeurs peuvent être calculées à partir des données disponibles · Les champs indéterminables sont affichés N/D.", "Some values may be calculated from available data · Fields that cannot be determined are displayed as N/A.")}
       </footer>
     </div>
   );

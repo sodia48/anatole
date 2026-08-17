@@ -1,10 +1,25 @@
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
 const accountDatabaseURL =
   `sqlite:///file:anatole-e2e-${process.pid}` +
   "?mode=memory&cache=shared&uri=true";
+const localWindowsPython = resolve(".venv", "Scripts", "python.exe");
+const pythonCommand = process.platform === "win32" && existsSync(localWindowsPython)
+  ? `"${localWindowsPython}"`
+  : "python";
+const nextCommand = `"${process.execPath}" "${resolve(
+  "apps",
+  "web",
+  "node_modules",
+  "next",
+  "dist",
+  "bin",
+  "next",
+)}"`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -41,7 +56,7 @@ export default defineConfig({
     : [
         {
           command:
-            "python -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+            `${pythonCommand} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
           cwd: "apps/api",
           url: `${apiURL}/health`,
           reuseExistingServer: !process.env.CI,
@@ -59,7 +74,8 @@ export default defineConfig({
         },
         {
           command:
-            "corepack pnpm --dir apps/web dev --hostname 127.0.0.1 --port 3000",
+            `${nextCommand} dev --hostname 127.0.0.1 --port 3000`,
+          cwd: "apps/web",
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

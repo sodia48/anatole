@@ -29,6 +29,8 @@ import { KeyLevels } from "./KeyLevels";
 import { QuoteHeader } from "./QuoteHeader";
 import { TechnicalSummary } from "./TechnicalSummary";
 import { quoteWebSocketUrl } from "@/lib/api";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import type {
   Candle,
   FocusSnapshot,
@@ -41,12 +43,12 @@ type FocusSection = "chart" | FundamentalView;
 
 const FOCUS_SECTIONS: Array<{
   key: FocusSection;
-  label: string;
+  label: readonly [string, string];
 }> = [
-  { key: "chart", label: "Graphique" },
-  { key: "fundamentals", label: "Fondamentaux" },
-  { key: "financials", label: "Résultats" },
-  { key: "analysts", label: "Analystes" },
+  { key: "chart", label: ["Graphique", "Chart"] },
+  { key: "fundamentals", label: ["Fondamentaux", "Fundamentals"] },
+  { key: "financials", label: ["Résultats", "Financials"] },
+  { key: "analysts", label: ["Analystes", "Analysts"] },
 ];
 
 type PeriodKey =
@@ -307,14 +309,14 @@ function formatPerformance(value: number | null): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)} %`;
 }
 
-function formatGeneratedAt(value: string): string {
+function formatGeneratedAt(value: string, language: AnatoleLanguage): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return "N/D";
   }
 
-  return date.toLocaleString("fr-CA", {
+  return date.toLocaleString(localeFor(language), {
     timeZone: "America/Toronto",
   });
 }
@@ -351,6 +353,7 @@ function ChartPanel({
   refreshing,
   error,
   delayed,
+  language,
 }: {
   candles: Candle[];
   technicals: Technicals;
@@ -360,6 +363,7 @@ function ChartPanel({
   refreshing: boolean;
   error: string | null;
   delayed: boolean;
+  language: AnatoleLanguage;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const refs = useRef<ChartRefs | null>(null);
@@ -421,7 +425,7 @@ function ChartPanel({
         secondsVisible: false,
       },
       localization: {
-        locale: "fr-CA",
+        locale: localeFor(language),
       },
     });
 
@@ -493,7 +497,7 @@ function ChartPanel({
       refs.current = null;
       priceLines.current = [];
     };
-  }, [period]);
+  }, [language, period]);
 
   useEffect(() => {
     const chartRefs = refs.current;
@@ -570,7 +574,7 @@ function ChartPanel({
           lineWidth: 1,
           lineStyle: LineStyle.Dotted,
           axisLabelVisible: true,
-          title: "Résistance",
+          title: pick(language, "Résistance", "Resistance"),
         }),
       );
     }
@@ -583,7 +587,7 @@ function ChartPanel({
     } else if (period.key === "live") {
       chartRefs.chart.timeScale().scrollToRealTime();
     }
-  }, [displayCandles, period, technicals]);
+  }, [displayCandles, language, period, technicals]);
 
   useEffect(() => {
     if (period.key !== "live" || displayCandles.length === 0) {
@@ -632,9 +636,9 @@ function ChartPanel({
       <div className="chart-toolbar">
         <div>
           <span className="eyebrow">
-            GRAPHIQUE PROFESSIONNEL
+            {pick(language, "GRAPHIQUE PROFESSIONNEL", "PROFESSIONAL CHART")}
           </span>
-          <h2>Prix, volume et structure</h2>
+          <h2>{pick(language, "Prix, volume et structure", "Price, volume, and structure")}</h2>
         </div>
 
         <div className="chart-legend">
@@ -678,7 +682,7 @@ function ChartPanel({
         </strong>
 
         <span>
-          {displayCandles.length.toLocaleString("fr-CA")} bougies
+          {displayCandles.length.toLocaleString(localeFor(language))} {pick(language, "bougies", "candles")}
         </span>
 
         {period.key === "live" ? (
@@ -688,7 +692,7 @@ function ChartPanel({
               fontWeight: 750,
             }}
           >
-            ● graphique actualisé chaque seconde
+            {pick(language, "● graphique actualisé chaque seconde", "● chart refreshed every second")}
           </span>
         ) : period.key === "1w" ? (
           <span
@@ -697,19 +701,19 @@ function ChartPanel({
               fontWeight: 750,
             }}
           >
-            5 séances · bougies 5 min · actualisation 60 s
+            {pick(language, "5 séances · bougies 5 min · actualisation 60 s", "5 sessions · 5-minute candles · 60-second refresh")}
           </span>
         ) : null}
 
         {refreshing ? (
           <span style={{ color: "#65b8f5" }}>
-            Actualisation…
+            {pick(language, "Actualisation…", "Refreshing…")}
           </span>
         ) : null}
 
         {delayed ? (
           <span style={{ color: "#d2a45e" }}>
-            Donnée potentiellement différée
+            {pick(language, "Donnée potentiellement différée", "Potentially delayed data")}
           </span>
         ) : null}
       </div>
@@ -735,7 +739,7 @@ function ChartPanel({
               fontSize: 12,
             }}
           >
-            Chargement de la période…
+            {pick(language, "Chargement de la période…", "Loading period…")}
           </div>
         ) : null}
 
@@ -760,7 +764,7 @@ function ChartPanel({
       </div>
 
       <div className="tradingview-attribution">
-        Graphiques propulsés par{" "}
+        {pick(language, "Graphiques propulsés par", "Charts powered by")}{" "}
         <a
           href="https://www.tradingview.com/"
           target="_blank"
@@ -778,6 +782,8 @@ export function FocusClient({
 }: {
   initialSnapshot: FocusSnapshot;
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [quote, setQuote] = useState<Quote>(
     initialSnapshot.quote,
   );
@@ -892,9 +898,7 @@ export function FocusClient({
         );
 
         if (!response.ok) {
-          throw new Error(
-            `API Focus indisponible — HTTP ${response.status}`,
-          );
+          throw new Error(pick(language, `API Focus indisponible — HTTP ${response.status}`, `Focus API unavailable — HTTP ${response.status}`));
         }
 
         const nextSnapshot =
@@ -915,7 +919,7 @@ export function FocusClient({
           setError(
             requestError instanceof Error
               ? requestError.message
-              : "Impossible de charger cette période.",
+              : pick(language, "Impossible de charger cette période.", "Unable to load this period."),
           );
         }
       } finally {
@@ -947,6 +951,7 @@ export function FocusClient({
   }, [
     initialSnapshot,
     initialSnapshot.quote.ticker,
+    language,
     period,
   ]);
 
@@ -959,7 +964,7 @@ export function FocusClient({
 
       <nav
         className="focus-section-tabs"
-        aria-label="Sections de Focus"
+        aria-label={pick(language, "Sections de Focus", "Focus sections")}
         style={{
           display: "flex",
           alignItems: "center",
@@ -1003,7 +1008,7 @@ export function FocusClient({
                 cursor: "pointer",
               }}
             >
-              {section.label}
+              {pick(language, section.label[0], section.label[1])}
             </button>
           );
         })}
@@ -1028,7 +1033,7 @@ export function FocusClient({
               overflowX: "visible",
             }}
             role="group"
-            aria-label="Période du graphique Focus"
+            aria-label={pick(language, "Période du graphique Focus", "Focus chart period")}
           >
             {PERIODS.map((candidate) => {
               const active = candidate.key === periodKey;
@@ -1075,6 +1080,7 @@ export function FocusClient({
               delayed={Boolean(
                 periodSnapshot.quote.delayed,
               )}
+              language={language}
             />
 
             <aside className="right-column">
@@ -1090,17 +1096,17 @@ export function FocusClient({
 
                 <p>
                   {periodSnapshot.profile.description ??
-                    "Profil détaillé disponible lors du branchement des données Anatole."}
+                    pick(language, "Profil détaillé disponible lors du branchement des données Anatole.", "A detailed profile will be available when Anatole data is connected.")}
                 </p>
 
                 <div className="profile-tags">
                   <span>
                     {periodSnapshot.profile.sector ??
-                      "Marché canadien"}
+                      pick(language, "Marché canadien", "Canadian market")}
                   </span>
                   <span>
                     {periodSnapshot.profile.industry ??
-                      "Titre coté"}
+                      pick(language, "Titre coté", "Listed security")}
                   </span>
                 </div>
               </section>
@@ -1116,9 +1122,10 @@ export function FocusClient({
           </div>
 
           <footer className="status-footer">
-            Période {period.label} · Généré à{" "}
+            {pick(language, "Période", "Period")} {period.label} · {pick(language, "Généré à", "Generated at")}{" "}
             {formatGeneratedAt(
               periodSnapshot.generated_at,
+              language,
             )}{" "}
             · Source {quote.source}
           </footer>

@@ -18,6 +18,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getTerminalSnapshot } from "@/lib/api";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import type {
   TerminalAlert,
   TerminalOpportunity,
@@ -29,23 +31,23 @@ import styles from "./Analysis.module.css";
 
 type FeedMode = "all" | "volume" | "momentum" | "pressure";
 
-const FEED_MODES: Array<{ value: FeedMode; label: string }> = [
-  { value: "all", label: "Tous" },
-  { value: "volume", label: "Volume" },
-  { value: "momentum", label: "Momentum" },
-  { value: "pressure", label: "Sous pression" },
+const FEED_MODES: Array<{ value: FeedMode; label: readonly [string, string] }> = [
+  { value: "all", label: ["Tous", "All"] },
+  { value: "volume", label: ["Volume", "Volume"] },
+  { value: "momentum", label: ["Momentum", "Momentum"] },
+  { value: "pressure", label: ["Sous pression", "Under pressure"] },
 ];
 
-function formatPercent(value: number, digits = 2): string {
-  return `${new Intl.NumberFormat("fr-FR", {
+function formatPercent(value: number, digits = 2, language: AnatoleLanguage = "fr"): string {
+  return `${new Intl.NumberFormat(localeFor(language), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
     signDisplay: "exceptZero",
   }).format(value)} %`;
 }
 
-function formatPrice(value: number): string {
-  return new Intl.NumberFormat("fr-CA", {
+function formatPrice(value: number, language: AnatoleLanguage): string {
+  return new Intl.NumberFormat(localeFor(language), {
     style: "currency",
     currency: "CAD",
     minimumFractionDigits: 2,
@@ -96,6 +98,45 @@ function alertIcon(alert: TerminalAlert) {
   return <Activity size={16} />;
 }
 
+function regimeLabel(value: string, language: AnatoleLanguage): string {
+  if (language === "fr") return value;
+  return ({ Haussier: "Bullish", Constructif: "Constructive", Neutre: "Neutral", Fragile: "Fragile", Baissier: "Bearish" } as Record<string, string>)[value] ?? value;
+}
+
+function riskLabel(value: string, language: AnatoleLanguage): string {
+  if (language === "fr") return value;
+  return ({ Faible: "Low", Modéré: "Moderate", Élevé: "High", Critique: "Critical" } as Record<string, string>)[value] ?? value;
+}
+
+function stateLabel(value: string, language: AnatoleLanguage): string {
+  if (language === "fr") return value;
+  return ({ Leadership: "Leadership", Accumulation: "Accumulation", Neutre: "Neutral", Distribution: "Distribution", Faiblesse: "Weakness" } as Record<string, string>)[value] ?? value;
+}
+
+function opportunityLabel(value: string, language: AnatoleLanguage): string {
+  if (language === "fr") return value;
+  return ({ Leadership: "Leadership", "Sous pression": "Under pressure", Accélération: "Acceleration", Tendance: "Trend" } as Record<string, string>)[value] ?? value;
+}
+
+function componentCopy(component: TerminalSnapshot["components"][number], language: AnatoleLanguage) {
+  if (language === "fr") return component;
+  const copies: Record<string, { label: string; value: string; description: string }> = {
+    breadth: { label: "Market breadth", value: component.value.replace("hausses", "gainers").replace("baisses", "decliners"), description: "Share of TSX 60 securities rising among directional moves." },
+    trend: { label: "Trend structure", value: component.value.replace("au-dessus de la MM50", "above the 50-session average"), description: "Share of securities supported by their 20- and 50-session moving averages." },
+    momentum: { label: "20-day momentum", value: component.value.replace("en moyenne", "on average"), description: "Average cross-sectional momentum of TSX 60 constituents." },
+    quality: { label: "Signal quality", value: component.value, description: "Average Anatole score combining price, volume, momentum, RSI, and trend." },
+  };
+  return { ...component, ...(copies[component.key] ?? {}) };
+}
+
+function alertCopy(alert: TerminalAlert, language: AnatoleLanguage): TerminalAlert {
+  if (language === "fr") return alert;
+  if (alert.id === "market-breadth") return { ...alert, category: "Market", title: "Weak market breadth", detail: "Only a minority of directional moves are positive; index gains may be concentrated." };
+  if (alert.id.startsWith("volume:")) return { ...alert, category: "Price-volume", title: `Unusual activity in ${alert.symbol}`, detail: "Relative volume and the session move are unusually high." };
+  if (alert.id.startsWith("rsi:")) return { ...alert, category: "Extension", title: `${alert.symbol} is technically extended`, detail: "The 14-session RSI is elevated; strength can persist, but consolidation risk is higher." };
+  return { ...alert, category: "Dislocation", title: `Pullback within a positive trend — ${alert.symbol}`, detail: "Positive 20-day momentum contrasts with a negative session." };
+}
+
 function uniqueRadarItems(snapshot: TerminalSnapshot): TerminalOpportunity[] {
   const items = new Map<string, TerminalOpportunity>();
 
@@ -117,17 +158,19 @@ function RankingTable({
   title,
   items,
   direction,
+  language,
 }: {
   title: string;
   items: TerminalOpportunity[];
   direction: "leaders" | "laggards";
+  language: AnatoleLanguage;
 }) {
   return (
     <article className={`panel ${styles.sectionPanel}`}>
       <div className={styles.sectionHeading}>
         <div>
           <span className="eyebrow">
-            {direction === "leaders" ? "LEADERSHIP" : "PRESSION"}
+            {direction === "leaders" ? "LEADERSHIP" : pick(language, "PRESSION", "PRESSURE")}
           </span>
           <h2>{title}</h2>
         </div>
@@ -141,8 +184,8 @@ function RankingTable({
         <table className={styles.rankTable} data-mobile-cards="terminal">
           <thead>
             <tr>
-              <th>Titre</th>
-              <th>Séance</th>
+              <th>{pick(language, "Titre", "Security")}</th>
+              <th>{pick(language, "Séance", "Session")}</th>
               <th>Momentum</th>
               <th>Volume</th>
               <th>RSI</th>
@@ -152,7 +195,7 @@ function RankingTable({
           <tbody>
             {items.map((item, index) => (
               <tr key={item.symbol}>
-                <td data-label="Titre">
+                <td data-label={pick(language, "Titre", "Security")}>
                   <div className={styles.instrumentCell}>
                     <span className={styles.rankBadge}>{index + 1}</span>
                     <span>
@@ -161,11 +204,11 @@ function RankingTable({
                     </span>
                   </div>
                 </td>
-                <td data-label="Séance" className={valueClass(item.change_percent)}>
-                  {formatPercent(item.change_percent)}
+                <td data-label={pick(language, "Séance", "Session")} className={valueClass(item.change_percent)}>
+                  {formatPercent(item.change_percent, 2, language)}
                 </td>
                 <td data-label="Momentum" className={valueClass(item.momentum_20d)}>
-                  {formatPercent(item.momentum_20d, 1)}
+                  {formatPercent(item.momentum_20d, 1, language)}
                 </td>
                 <td data-label="Volume relatif">{item.relative_volume.toFixed(1)}×</td>
                 <td data-label="RSI">{item.rsi_14?.toFixed(1) ?? "—"}</td>
@@ -181,7 +224,7 @@ function RankingTable({
   );
 }
 
-function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
+function MarketSignalCard({ item, language }: { item: TerminalOpportunity; language: AnatoleLanguage }) {
   const marker = Math.max(2, Math.min(98, item.score));
   const direction =
     item.change_percent > 0.005
@@ -195,7 +238,7 @@ function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
       href={`/focus/${encodeURIComponent(item.symbol)}`}
       className={styles.marketSignalCard}
       data-direction={direction}
-      aria-label={`${item.symbol}, ${item.name}, variation ${formatPercent(item.change_percent)}, score ${item.score.toFixed(0)} sur 100`}
+      aria-label={pick(language, `${item.symbol}, ${item.name}, variation ${formatPercent(item.change_percent, 2, language)}, score ${item.score.toFixed(0)} sur 100`, `${item.symbol}, ${item.name}, change ${formatPercent(item.change_percent, 2, language)}, score ${item.score.toFixed(0)} out of 100`)}
     >
       <div className={styles.signalCardTop}>
         <div className={styles.signalIdentity}>
@@ -203,14 +246,14 @@ function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
           <span>{item.name}</span>
         </div>
         <div className={styles.signalPrice}>
-          <span>{formatPrice(item.price)}</span>
+          <span>{formatPrice(item.price, language)}</span>
           <strong className={valueClass(item.change_percent)}>
-            {formatPercent(item.change_percent)}
+            {formatPercent(item.change_percent, 2, language)}
           </strong>
         </div>
       </div>
 
-      <div className={styles.signalBar} aria-label={`Score Anatole ${item.score.toFixed(0)} sur 100`}>
+      <div className={styles.signalBar} aria-label={pick(language, `Score Anatole ${item.score.toFixed(0)} sur 100`, `Anatole score ${item.score.toFixed(0)} out of 100`)}>
         <span className={styles.signalZoneRisk} />
         <span className={styles.signalZoneNeutral} />
         <span className={styles.signalZoneStrong} />
@@ -228,7 +271,7 @@ function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
         <div>
           <span>Momentum</span>
           <strong className={valueClass(item.momentum_20d)}>
-            {formatPercent(item.momentum_20d, 1)}
+            {formatPercent(item.momentum_20d, 1, language)}
           </strong>
         </div>
         <div>
@@ -242,7 +285,7 @@ function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
       </div>
 
       <div className={styles.signalFooter}>
-        <span>{item.opportunity_type}</span>
+        <span>{opportunityLabel(item.opportunity_type, language)}</span>
         <span>
           Focus <ArrowRight size={12} />
         </span>
@@ -252,6 +295,8 @@ function MarketSignalCard({ item }: { item: TerminalOpportunity }) {
 }
 
 export function TerminalClient() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [snapshot, setSnapshot] = useState<TerminalSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -276,7 +321,7 @@ export function TerminalClient() {
           setError(
             reason instanceof Error
               ? reason.message
-              : "Terminal Pro est temporairement indisponible.",
+              : pick(language, "Terminal Pro est temporairement indisponible.", "Pro Terminal is temporarily unavailable."),
           );
         }
       } finally {
@@ -286,7 +331,7 @@ export function TerminalClient() {
         }
       }
     },
-    [],
+    [language],
   );
 
   useEffect(() => {
@@ -353,12 +398,12 @@ export function TerminalClient() {
     if (!snapshot) {
       return "";
     }
-    return new Intl.DateTimeFormat("fr-FR", {
+    return new Intl.DateTimeFormat(localeFor(language), {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
     }).format(new Date(snapshot.generated_at));
-  }, [snapshot]);
+  }, [language, snapshot]);
 
   if (loading && !snapshot) {
     return (
@@ -366,10 +411,9 @@ export function TerminalClient() {
         <section className={`panel ${styles.loadingPanel}`}>
           <div className={styles.loadingCopy}>
             <span className={styles.spinner} />
-            <strong>Initialisation du Terminal Pro</strong>
+            <strong>{pick(language, "Initialisation du Terminal Pro", "Initializing Pro Terminal")}</strong>
             <span>
-              Analyse de la largeur, des tendances, des secteurs et des anomalies
-              prix-volume.
+              {pick(language, "Analyse de la largeur, des tendances, des secteurs et des anomalies prix-volume.", "Analyzing breadth, trends, sectors, and price-volume anomalies.")}
             </span>
           </div>
         </section>
@@ -381,12 +425,10 @@ export function TerminalClient() {
     <div className={`${styles.page} ${styles.terminalPage}`}>
       <header className={`panel ${styles.hero} ${styles.terminalHeroV2}`}>
         <div className={styles.heroCopy}>
-          <span className="eyebrow">FLUX DE MARCHÉ · TERMINAL PRO</span>
+          <span className="eyebrow">{pick(language, "FLUX DE MARCHÉ", "MARKET FLOW")} · TERMINAL PRO</span>
           <h1>Terminal Pro</h1>
           <p>
-            Une lecture mobile du marché canadien inspirée des meilleurs
-            terminaux : régime, volume inhabituel, momentum, secteurs et alertes,
-            sans recommandations de placement.
+            {pick(language, "Une lecture mobile du marché canadien inspirée des meilleurs terminaux : régime, volume inhabituel, momentum, secteurs et alertes, sans recommandations de placement.", "A mobile view of the Canadian market inspired by leading terminals: regime, unusual volume, momentum, sectors, and alerts, without investment recommendations.")}
           </p>
         </div>
         {snapshot ? (
@@ -403,9 +445,9 @@ export function TerminalClient() {
               </span>
             </div>
             <div className={styles.regimeCopy}>
-              <span>Régime</span>
-              <strong>{snapshot.regime}</strong>
-              <small>Risque {snapshot.risk_level.toLowerCase()}</small>
+              <span>{pick(language, "Régime", "Regime")}</span>
+              <strong>{regimeLabel(snapshot.regime, language)}</strong>
+              <small>{pick(language, "Risque", "Risk")} {riskLabel(snapshot.risk_level, language).toLowerCase()}</small>
             </div>
           </div>
         ) : null}
@@ -413,7 +455,7 @@ export function TerminalClient() {
 
       {error ? (
         <div className={styles.errorNotice}>
-          {error} {snapshot ? "Les dernières données valides restent affichées." : ""}
+          {language === "fr" ? error : "Pro Terminal is temporarily unavailable."} {snapshot ? pick(language, "Les dernières données valides restent affichées.", "The latest valid data remains visible.") : ""}
         </div>
       ) : null}
 
@@ -424,13 +466,13 @@ export function TerminalClient() {
               <Bell size={18} />
             </div>
             <div className={styles.marketEventCopy}>
-              <span>Événements de marché</span>
+              <span>{pick(language, "Événements de marché", "Market events")}</span>
               <strong>
-                {snapshot.alerts.length} alertes · {snapshot.high_relative_volume_count} volumes inhabituels
+                {snapshot.alerts.length} {pick(language, "alertes", "alerts")} · {snapshot.high_relative_volume_count} {pick(language, "volumes inhabituels", "unusual volumes")}
               </strong>
             </div>
             <a href="#terminal-alerts">
-              Voir tout <ArrowRight size={14} />
+              {pick(language, "Voir tout", "View all")} <ArrowRight size={14} />
             </a>
           </section>
 
@@ -438,19 +480,19 @@ export function TerminalClient() {
             <article>
               <span>TSX 60</span>
               <strong className={valueClass(snapshot.weighted_change_percent)}>
-                {formatPercent(snapshot.weighted_change_percent)}
+                {formatPercent(snapshot.weighted_change_percent, 2, language)}
               </strong>
             </article>
             <article>
-              <span>Largeur</span>
+              <span>{pick(language, "Largeur", "Breadth")}</span>
               <strong>{snapshot.advance_ratio.toFixed(0)} %</strong>
             </article>
             <article>
-              <span>Au-dessus MM50</span>
+              <span>{pick(language, "Au-dessus MM50", "Above 50-session average")}</span>
               <strong>{snapshot.above_sma50_percent.toFixed(0)} %</strong>
             </article>
             <article>
-              <span>Score moyen</span>
+              <span>{pick(language, "Score moyen", "Average score")}</span>
               <strong>{snapshot.average_anatole_score.toFixed(0)}</strong>
             </article>
           </section>
@@ -458,17 +500,16 @@ export function TerminalClient() {
           <section className={`panel ${styles.terminalFeedPanel}`}>
             <div className={styles.terminalFeedHeading}>
               <div>
-                <span className="eyebrow">RADAR INSTITUTIONNEL</span>
-                <h2>Signaux à surveiller</h2>
+                <span className="eyebrow">{pick(language, "RADAR INSTITUTIONNEL", "INSTITUTIONAL RADAR")}</span>
+                <h2>{pick(language, "Signaux à surveiller", "Signals to monitor")}</h2>
                 <p>
-                  Les cartes classent les configurations selon le score, le volume,
-                  le momentum et la pression observée.
+                  {pick(language, "Les cartes classent les configurations selon le score, le volume, le momentum et la pression observée.", "Cards rank configurations by score, volume, momentum, and observed pressure.")}
                 </p>
               </div>
               <Radar size={22} color="#55a0ff" />
             </div>
 
-            <div className={styles.terminalTabs} role="tablist" aria-label="Filtrer le radar Terminal Pro">
+            <div className={styles.terminalTabs} role="tablist" aria-label={pick(language, "Filtrer le radar Terminal Pro", "Filter the Pro Terminal radar")}>
               {FEED_MODES.map((item) => (
                 <button
                   key={item.value}
@@ -478,12 +519,12 @@ export function TerminalClient() {
                   className={feedMode === item.value ? styles.terminalTabActive : styles.terminalTab}
                   onClick={() => setFeedMode(item.value)}
                 >
-                  {item.label}
+                  {pick(language, item.label[0], item.label[1])}
                 </button>
               ))}
             </div>
 
-            <div className={styles.terminalSectorFilters} aria-label="Filtrer par secteur">
+            <div className={styles.terminalSectorFilters} aria-label={pick(language, "Filtrer par secteur", "Filter by sector")}>
               {sectors.map((sector) => (
                 <button
                   key={sector}
@@ -491,7 +532,7 @@ export function TerminalClient() {
                   className={sectorFilter === sector ? styles.terminalSectorFilterActive : styles.terminalSectorFilter}
                   onClick={() => setSectorFilter(sector)}
                 >
-                  {sector}
+                  {sector === "Tous" ? pick(language, "Tous", "All") : sector}
                 </button>
               ))}
             </div>
@@ -499,12 +540,12 @@ export function TerminalClient() {
             {visibleRadarItems.length ? (
               <div className={styles.marketSignalGrid}>
                 {visibleRadarItems.map((item) => (
-                  <MarketSignalCard key={item.symbol} item={item} />
+                  <MarketSignalCard key={item.symbol} item={item} language={language} />
                 ))}
               </div>
             ) : (
               <div className={styles.emptyInline}>
-                Aucun titre ne correspond à ce filtre pour le moment.
+                {pick(language, "Aucun titre ne correspond à ce filtre pour le moment.", "No security currently matches this filter.")}
               </div>
             )}
           </section>
@@ -512,9 +553,9 @@ export function TerminalClient() {
           <section className={`panel ${styles.sectionPanel}`}>
             <div className={styles.sectionHeading}>
               <div>
-                <span className="eyebrow">ROTATION SECTORIELLE</span>
-                <h2>Carte de leadership</h2>
-                <p>Une lecture compacte de la force, du momentum et de la largeur de chaque secteur.</p>
+                <span className="eyebrow">{pick(language, "ROTATION SECTORIELLE", "SECTOR ROTATION")}</span>
+                <h2>{pick(language, "Carte de leadership", "Leadership map")}</h2>
+                <p>{pick(language, "Une lecture compacte de la force, du momentum et de la largeur de chaque secteur.", "A compact view of each sector’s strength, momentum, and breadth.")}</p>
               </div>
               <Waves size={21} color="#55a0ff" />
             </div>
@@ -524,7 +565,7 @@ export function TerminalClient() {
                   <div className={styles.terminalSectorTop}>
                     <strong>{sector.sector}</strong>
                     <span className={`${styles.statePill} ${stateClass(sector)}`}>
-                      {sector.state}
+                      {stateLabel(sector.state, language)}
                     </span>
                   </div>
                   <div className={styles.terminalSectorScore}>
@@ -533,19 +574,19 @@ export function TerminalClient() {
                   </div>
                   <div className={styles.terminalSectorMetrics}>
                     <div>
-                      <span>Séance</span>
+                      <span>{pick(language, "Séance", "Session")}</span>
                       <strong className={valueClass(sector.change_percent)}>
-                        {formatPercent(sector.change_percent)}
+                        {formatPercent(sector.change_percent, 2, language)}
                       </strong>
                     </div>
                     <div>
                       <span>Momentum</span>
                       <strong className={valueClass(sector.momentum_20d)}>
-                        {formatPercent(sector.momentum_20d, 1)}
+                        {formatPercent(sector.momentum_20d, 1, language)}
                       </strong>
                     </div>
                     <div>
-                      <span>Largeur</span>
+                      <span>{pick(language, "Largeur", "Breadth")}</span>
                       <strong>{sector.advancers}↑ {sector.decliners}↓</strong>
                     </div>
                   </div>
@@ -557,15 +598,17 @@ export function TerminalClient() {
           <section id="terminal-alerts" className={`panel ${styles.sectionPanel}`}>
             <div className={styles.sectionHeading}>
               <div>
-                <span className="eyebrow">SURVEILLANCE</span>
-                <h2>Alertes et dislocations</h2>
-                <p>Signaux qui méritent une vérification dans Focus.</p>
+                <span className="eyebrow">{pick(language, "SURVEILLANCE", "MONITORING")}</span>
+                <h2>{pick(language, "Alertes et dislocations", "Alerts and dislocations")}</h2>
+                <p>{pick(language, "Signaux qui méritent une vérification dans Focus.", "Signals worth reviewing in Focus.")}</p>
               </div>
               <Activity size={21} color="#f2b84b" />
             </div>
             <div className={styles.alertList}>
               {snapshot.alerts.length ? (
-                snapshot.alerts.map((alert) => (
+                snapshot.alerts.map((rawAlert) => {
+                  const alert = alertCopy(rawAlert, language);
+                  return (
                   <article
                     className={`${styles.alertCard} ${alertClass(alert)}`}
                     key={alert.id}
@@ -580,15 +623,16 @@ export function TerminalClient() {
                       <p>{alert.detail}</p>
                     </div>
                     {alert.symbol ? (
-                      <Link href={`/focus/${encodeURIComponent(alert.symbol)}`} aria-label={`Ouvrir ${alert.symbol} dans Focus`}>
+                      <Link href={`/focus/${encodeURIComponent(alert.symbol)}`} aria-label={pick(language, `Ouvrir ${alert.symbol} dans Focus`, `Open ${alert.symbol} in Focus`)}>
                         <ArrowRight size={15} />
                       </Link>
                     ) : null}
                   </article>
-                ))
+                  );
+                })
               ) : (
                 <div className={styles.emptyInline}>
-                  Aucune anomalie majeure détectée dans le dernier calcul.
+                  {pick(language, "Aucune anomalie majeure détectée dans le dernier calcul.", "No major anomaly was detected in the latest calculation.")}
                 </div>
               )}
             </div>
@@ -598,14 +642,16 @@ export function TerminalClient() {
             <summary>
               <span>
                 <Gauge size={18} />
-                Analyse détaillée du marché
+                {pick(language, "Analyse détaillée du marché", "Detailed market analysis")}
               </span>
-              <small>Composantes, leaders, pression et méthodologie</small>
+              <small>{pick(language, "Composantes, leaders, pression et méthodologie", "Components, leaders, pressure, and methodology")}</small>
             </summary>
 
             <div className={styles.terminalDetailsBody}>
               <section className={styles.componentGrid}>
-                {snapshot.components.map((component) => (
+                {snapshot.components.map((rawComponent) => {
+                  const component = componentCopy(rawComponent, language);
+                  return (
                   <article className={styles.componentCard} key={component.key}>
                     <div className={styles.componentTop}>
                       <span>{component.label}</span>
@@ -617,50 +663,53 @@ export function TerminalClient() {
                     <b>{component.value}</b>
                     <p>{component.description}</p>
                   </article>
-                ))}
+                  );
+                })}
               </section>
 
               <section className={styles.terminalColumns}>
                 <RankingTable
-                  title="Leaders du score Anatole"
+                  title={pick(language, "Leaders du score Anatole", "Anatole score leaders")}
                   items={snapshot.leaders}
                   direction="leaders"
+                  language={language}
                 />
                 <RankingTable
-                  title="Titres sous pression"
+                  title={pick(language, "Titres sous pression", "Securities under pressure")}
                   items={snapshot.laggards}
                   direction="laggards"
+                  language={language}
                 />
               </section>
 
               <section className={styles.kpiGrid}>
                 <article className={styles.notice}>
                   <strong>Leadership</strong><br />
-                  {strongestSector?.sector ?? "—"} domine avec un score de {strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.
+                  {pick(language, `${strongestSector?.sector ?? "—"} domine avec un score de ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${strongestSector?.sector ?? "—"} leads with a score of ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
                 </article>
                 <article className={styles.notice}>
-                  <strong>Faiblesse</strong><br />
-                  {weakestSector?.sector ?? "—"} ferme la marche à {weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.
+                  <strong>{pick(language, "Faiblesse", "Weakness")}</strong><br />
+                  {pick(language, `${weakestSector?.sector ?? "—"} ferme la marche à ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${weakestSector?.sector ?? "—"} trails at ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
                 </article>
                 <article className={styles.notice}>
-                  <strong>Impulsion moyenne</strong><br />
-                  Le momentum 20 jours transversal est de {formatPercent(snapshot.average_momentum_20d, 2)}.
+                  <strong>{pick(language, "Impulsion moyenne", "Average momentum")}</strong><br />
+                  {pick(language, "Le momentum 20 jours transversal est de", "Cross-sectional 20-day momentum is")} {formatPercent(snapshot.average_momentum_20d, 2, language)}.
                 </article>
                 <article className={styles.notice}>
-                  <strong>Actualisation</strong><br />
-                  Calcul généré à {generatedAt}. {refreshing ? "Actualisation en cours…" : "Surveillance active."}
+                  <strong>{pick(language, "Actualisation", "Refresh")}</strong><br />
+                  {pick(language, "Calcul généré à", "Calculation generated at")} {generatedAt}. {refreshing ? pick(language, "Actualisation en cours…", "Refresh in progress…") : pick(language, "Surveillance active.", "Monitoring active.")}
                 </article>
               </section>
 
               <footer className={styles.methodology}>
-                {snapshot.methodology}
+                {language === "fr" ? snapshot.methodology : "The regime combines market breadth, moving-average position, average Anatole score, cross-sectional momentum, and weighted change. Radar items are research signals, not buy or sell recommendations."}
                 <button
                   type="button"
                   className={styles.secondaryLink}
                   disabled={refreshing}
                   onClick={() => void load(true)}
                 >
-                  <RefreshCw size={13} /> {refreshing ? "Actualisation…" : "Actualiser"}
+                  <RefreshCw size={13} /> {refreshing ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}
                 </button>
               </footer>
             </div>
@@ -670,9 +719,9 @@ export function TerminalClient() {
         <section className={`panel ${styles.loadingPanel}`}>
           <div className={styles.loadingCopy}>
             <Zap size={30} />
-            <strong>Terminal Pro n’a pas reçu de snapshot.</strong>
+            <strong>{pick(language, "Terminal Pro n’a pas reçu de snapshot.", "Pro Terminal did not receive a snapshot.")}</strong>
             <button type="button" className={styles.compareButton} onClick={() => void load(false)}>
-              Réessayer
+              {pick(language, "Réessayer", "Try again")}
             </button>
           </div>
         </section>

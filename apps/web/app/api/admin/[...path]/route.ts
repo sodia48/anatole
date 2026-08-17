@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  expiredSessionCookie,
+  SESSION_COOKIE_NAME,
+} from "@/lib/session-cookie";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -10,7 +15,6 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "https://anatole-api.onrender.com"
 ).replace(/\/+$/, "");
-const COOKIE_NAME = "anatole_session";
 
 type Context = {
   params: Promise<{ path: string[] }> | { path: string[] };
@@ -50,7 +54,7 @@ async function proxy(
     );
   }
 
-  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!token) {
     return NextResponse.json(
       { detail: "Connexion administrateur requise." },
@@ -104,16 +108,7 @@ async function proxy(
     const upstreamRequestId = upstream.headers.get("X-Request-ID");
     if (upstreamRequestId) response.headers.set("X-Request-ID", upstreamRequestId);
     if (upstream.status === 401) {
-      response.cookies.set({
-        name: COOKIE_NAME,
-        value: "",
-        httpOnly: true,
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        path: "/",
-        expires: new Date(0),
-        maxAge: 0,
-      });
+      response.cookies.set(expiredSessionCookie());
     }
     return response;
   } catch (error) {

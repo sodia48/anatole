@@ -44,6 +44,65 @@ function safeRoute(item: NotificationItem): string | null {
     : null;
 }
 
+function notificationCopy(value: string, language: "fr" | "en"): string {
+  if (language === "fr") return value;
+
+  const exact: Record<string, string> = {
+    "Bonjour,": "Hello,",
+    "Événement de marché à venir": "Upcoming market event",
+    "Résumé Anatole envoyé": "Anatole digest sent",
+    "Aucune alerte déclenchée lors de cette vérification.": "No alert was triggered during this check.",
+    "Aucun événement majeur prochainement.": "No major event is coming up.",
+    "Information générale seulement. Anatole ne formule aucune recommandation de placement.":
+      "General information only. Anatole does not provide investment recommendations.",
+    "Voici les principaux éléments observés dans ton espace Anatole. Chaque point est descriptif et peut être approfondi dans l’application.":
+      "Here are the main items observed in your Anatole workspace. Each point is descriptive and can be explored further in the app.",
+  };
+  if (exact[value]) return exact[value];
+
+  return value
+    .replace(/^Alerte déclenchée · /, "Alert triggered · ")
+    .replace(/^Mouvement inhabituel · /, "Unusual move · ")
+    .replace(/^Bonjour\s+/, "Hello ")
+    .replace(/^Le résumé «\s*/, "The digest “")
+    .replace(/\s*» a été envoyé à /, "” was sent to ")
+    .replace(/^Déclenchée\s*:\s*/, "Triggered: ")
+    .replace(/^Surveillance active\s*:\s*/, "Monitoring: ")
+    .replace(/^(Triggered|Monitoring): Prix à /, "$1: Price at ")
+    .replace(/^(Triggered|Monitoring): Variation du jour à /, "$1: Daily change at ")
+    .replace(/^(Triggered|Monitoring): Momentum 20 séances à /, "$1: 20-session momentum at ")
+    .replace(/^(Triggered|Monitoring): Volume relatif à /, "$1: Relative volume at ")
+    .replace(/^(Triggered|Monitoring): Score Anatole à /, "$1: Anatole score at ")
+    .replace(/Donnée temporairement indisponible\./g, "Data temporarily unavailable.")
+    .replace(/Alerte désactivée\./g, "Alert disabled.")
+    .replace(/Variation pondérée\s*:/g, "Weighted change:")
+    .replace(/Largeur\s*:/g, "Breadth:")
+    .replace(/ hausses?, /g, " advancers, ")
+    .replace(/ baisses?/g, " decliners")
+    .replace(/Secteurs les plus solides\s*:/g, "Strongest sectors:")
+    .replace(/Secteurs sous pression\s*:/g, "Sectors under pressure:")
+    .replace(/ varie de /g, " changed by ")
+    .replace(/ aujourd’hui\.?/g, " today.")
+    .replace(/seuil au-dessus de/g, "threshold above")
+    .replace(/seuil sous/g, "threshold below")
+    .replace(/Portefeuille de suivi/g, "Tracking portfolio")
+    .replace(
+      /^(\d+) position\(s\) suivie\(s\)\. Consulte Anatole pour la valorisation actualisée\.$/,
+      (_, count: string) => `${count} tracked ${count === "1" ? "position" : "positions"}. Open Anatole for the latest valuation.`,
+    );
+}
+
+function digestSectionTitle(key: string, title: string, language: "fr" | "en"): string {
+  if (language === "fr") return title;
+  return ({
+    market: "Canadian market",
+    watchlist: "Watchlist",
+    alerts: "Alerts",
+    calendar: "Upcoming events",
+    portfolio: "Tracking portfolio",
+  } as Record<string, string>)[key] ?? notificationCopy(title, language);
+}
+
 export function NotificationsClient() {
   const account = useAccount();
   const { preferences: appPreferences } = usePreferences();
@@ -185,10 +244,10 @@ export function NotificationsClient() {
                     <span className={`${styles.severity} ${styles[item.severity]}`} aria-hidden="true" />
                     <div>
                       <div className={styles.itemTitle}>
-                        <strong>{item.title}</strong>
+                        <strong>{notificationCopy(item.title, language)}</strong>
                         {!item.read_at ? <em>{pick(language, "Nouveau", "New")}</em> : null}
                       </div>
-                      <p>{item.message}</p>
+                      <p>{notificationCopy(item.message, language)}</p>
                       <small><Clock3 size={13} /> {formatDate(item.created_at, language)}</small>
                       <div className={styles.itemActions}>
                         {route ? <Link href={route}>{pick(language, "Ouvrir", "Open")}</Link> : null}
@@ -257,7 +316,31 @@ export function NotificationsClient() {
               <button type="button" onClick={() => void run("preview", async () => setDigest(await previewNotificationDigest()))} disabled={Boolean(busy)}>{pick(language, "Prévisualiser", "Preview")}</button>
               {settings?.email_delivery_available ? <button type="button" onClick={() => void run("send", async () => { setDigest(await sendTestNotificationDigest()); setMessage(pick(language, "Résumé de test envoyé.", "Test digest sent.")); })} disabled={Boolean(busy)}>{pick(language, "Envoyer un test", "Send a test")}</button> : null}
             </div>
-            {digest ? <article className={styles.digest}><strong>{digest.subject}</strong><p>{digest.greeting}</p><p>{digest.summary}</p>{digest.sections.map((section) => <section key={section.key}><h3>{section.title}</h3><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></section>)}<small>{digest.disclaimer}</small></article> : null}
+            {digest ? (
+              <article className={styles.digest}>
+                <strong>
+                  {language === "en"
+                    ? `Anatole Today · ${new Intl.DateTimeFormat("en-CA", {
+                      dateStyle: "long",
+                      timeZone: notificationPreferences?.timezone ?? "America/Toronto",
+                    }).format(new Date(digest.generated_at))}`
+                    : digest.subject}
+                </strong>
+                <p>{notificationCopy(digest.greeting, language)}</p>
+                <p>{notificationCopy(digest.summary, language)}</p>
+                {digest.sections.map((section) => (
+                  <section key={section.key}>
+                    <h3>{digestSectionTitle(section.key, section.title, language)}</h3>
+                    <ul>
+                      {section.items.map((item) => (
+                        <li key={item}>{notificationCopy(item, language)}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+                <small>{notificationCopy(digest.disclaimer, language)}</small>
+              </article>
+            ) : null}
           </section>
         </aside>
       </div>

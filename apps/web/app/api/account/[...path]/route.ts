@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import {
+  expiredSessionCookie,
+  sessionCookie,
+  SESSION_COOKIE_NAME,
+} from "@/lib/session-cookie";
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,7 +17,6 @@ const API_URL = (
   "https://anatole-api.onrender.com"
 ).replace(/\/+$/, "");
 
-const COOKIE_NAME = "anatole_session";
 const PUBLIC_ROUTES = new Set(["registration", "register", "login"]);
 const ROUTES = new Map<string, ReadonlySet<string>>([
   ["registration", new Set(["GET"])],
@@ -49,16 +54,7 @@ function noStoreHeaders(
 }
 
 function clearSession(response: NextResponse): void {
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: "",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: new Date(0),
-    maxAge: 0,
-  });
+  response.cookies.set(expiredSessionCookie());
 }
 
 function setSession(
@@ -69,15 +65,7 @@ function setSession(
   const expires = new Date(expiresAt);
   if (!Number.isFinite(expires.getTime())) return false;
 
-  response.cookies.set({
-    name: COOKIE_NAME,
-    value: token,
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires,
-  });
+  response.cookies.set(sessionCookie(token, expires));
   return true;
 }
 
@@ -110,7 +98,7 @@ async function proxy(
     return response;
   }
 
-  const token = request.cookies.get(COOKIE_NAME)?.value;
+  const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   if (!PUBLIC_ROUTES.has(route) && !token) {
     return NextResponse.json(
       { detail: "Connexion requise." },

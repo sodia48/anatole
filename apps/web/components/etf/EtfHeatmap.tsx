@@ -10,6 +10,8 @@ import {
 } from "react";
 
 import styles from "./EtfHeatmap.module.css";
+import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 export type EtfHeatmapItem = {
   ticker: string;
@@ -82,13 +84,10 @@ const MOBILE_VIEWPORT: Viewport = {
 
 const MIN_WEIGHT = 0.65;
 
-const GROUPING_LABELS: Record<
-  GroupingMode,
-  string
-> = {
-  sector: "Par secteur",
-  provider: "Par fournisseur",
-  direction: "Hausses / baisses",
+const GROUPING_LABELS: Record<GroupingMode, readonly [string, string]> = {
+  sector: ["Par secteur", "By sector"],
+  provider: ["Par fournisseur", "By provider"],
+  direction: ["Hausses / baisses", "Gainers / decliners"],
 };
 
 const SHORT_GROUP_LABELS:
@@ -291,12 +290,13 @@ function createGroup(
 function buildGroups(
   items: EtfHeatmapItem[],
   mode: GroupingMode,
+  language: AnatoleLanguage,
 ): Group[] {
   if (mode === "direction") {
     const definitions = [
       {
         key: "gainers",
-        label: "Hausses",
+        label: pick(language, "Hausses", "Gainers"),
         items: items.filter(
           (item) =>
             item.price > 0 &&
@@ -306,7 +306,7 @@ function buildGroups(
       {
         key: "unchanged",
         label:
-          "Inchangés / sans cotation",
+          pick(language, "Inchangés / sans cotation", "Unchanged / unquoted"),
         items: items.filter(
           (item) =>
             item.price <= 0 ||
@@ -318,7 +318,7 @@ function buildGroups(
       },
       {
         key: "losers",
-        label: "Baisses",
+        label: pick(language, "Baisses", "Decliners"),
         items: items.filter(
           (item) =>
             item.price > 0 &&
@@ -561,13 +561,14 @@ function formatItemChange(
 
 function formatPrice(
   item: EtfHeatmapItem,
+  language: AnatoleLanguage,
 ): string {
   if (item.price <= 0) {
-    return "Cotation en attente";
+    return pick(language, "Cotation en attente", "Quote pending");
   }
 
   return item.price.toLocaleString(
-    "fr-CA",
+    localeFor(language),
     {
       style: "currency",
       currency:
@@ -685,6 +686,8 @@ export function EtfHeatmap({
 }: {
   items: readonly unknown[];
 }) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
   const [grouping, setGrouping] =
     useState<GroupingMode>("sector");
   const [expandedGroup, setExpandedGroup] =
@@ -710,8 +713,9 @@ export function EtfHeatmap({
       buildGroups(
         normalizedItems,
         grouping,
+        language,
       ),
-    [grouping, normalizedItems],
+    [grouping, language, normalizedItems],
   );
 
   useEffect(() => {
@@ -831,14 +835,13 @@ export function EtfHeatmap({
         <div className={styles.heading}>
           <div>
             <span className="eyebrow">
-              CARTE DES ETF
+              {pick(language, "CARTE DES ETF", "ETF MAP")}
             </span>
-            <h2>ETF canadiens</h2>
+            <h2>{pick(language, "ETF canadiens", "Canadian ETFs")}</h2>
           </div>
         </div>
         <p className={styles.empty}>
-          Aucun ETF n’est disponible
-          pour la carte.
+          {pick(language, "Aucun ETF n’est disponible pour la carte.", "No ETF is available for the map.")}
         </p>
       </section>
     );
@@ -851,12 +854,11 @@ export function EtfHeatmap({
       <div className={styles.heading}>
         <div>
           <span className="eyebrow">
-            CARTE DES ETF
+            {pick(language, "CARTE DES ETF", "ETF MAP")}
           </span>
-          <h2>ETF canadiens</h2>
+          <h2>{pick(language, "ETF canadiens", "Canadian ETFs")}</h2>
           <p>
-            {normalizedItems.length} ETF affichés · couleur selon la variation ·
-            taille proportionnelle sur ordinateur.
+            {normalizedItems.length} {pick(language, "ETF affichés · couleur selon la variation · taille proportionnelle sur ordinateur.", "ETFs shown · colour reflects change · size is proportional on desktop.")}
           </p>
         </div>
 
@@ -864,9 +866,9 @@ export function EtfHeatmap({
           <label
             className={styles.selectLabel}
           >
-            <span>Regroupement</span>
+            <span>{pick(language, "Regroupement", "Grouping")}</span>
             <select
-              aria-label="Regroupement de la carte des ETF"
+              aria-label={pick(language, "Regroupement de la carte des ETF", "ETF map grouping")}
               value={grouping}
               onChange={(
                 event:
@@ -885,7 +887,7 @@ export function EtfHeatmap({
                   value={value}
                   key={value}
                 >
-                  {label}
+                  {pick(language, label[0], label[1])}
                 </option>
               ))}
             </select>
@@ -899,12 +901,11 @@ export function EtfHeatmap({
                 setExpandedGroup(null)
               }
             >
-              Vue complète
+              {pick(language, "Vue complète", "Full view")}
             </button>
           ) : (
             <span className={styles.hint}>
-              Touchez un groupe pour
-              l’agrandir
+              {pick(language, "Touchez un groupe pour l’agrandir", "Select a group to expand it")}
             </span>
           )}
         </div>
@@ -912,7 +913,7 @@ export function EtfHeatmap({
 
       <div
         className={styles.mobileMap}
-        aria-label={`Carte mobile de ${normalizedItems.length} ETF avec leurs variations`}
+        aria-label={pick(language, `Carte mobile de ${normalizedItems.length} ETF avec leurs variations`, `Mobile map of ${normalizedItems.length} ETFs and their changes`)}
       >
         {visibleGroups.map((group) => (
           <section
@@ -964,7 +965,7 @@ export function EtfHeatmap({
                   >
                     <span>{item.ticker}</span>
                     <strong>{formatItemChange(item)}</strong>
-                    <small>{formatPrice(item)}</small>
+                    <small>{formatPrice(item, language)}</small>
                   </Link>
                 );
               })}
@@ -975,7 +976,7 @@ export function EtfHeatmap({
 
       <div
         className={styles.treemap}
-        aria-label={`Carte de ${normalizedItems.length} ETF canadiens`}
+        aria-label={pick(language, `Carte de ${normalizedItems.length} ETF canadiens`, `Map of ${normalizedItems.length} Canadian ETFs`)}
         data-layout-ready="true"
       >
         {positionedGroups.map(
@@ -1178,7 +1179,7 @@ export function EtfHeatmap({
                         {detail >= 3 ? (
                           <>
                             <small>
-                              {formatPrice(item)}
+                              {formatPrice(item, language)}
                             </small>
                             <span
                               className={
@@ -1197,7 +1198,7 @@ export function EtfHeatmap({
                               styles.delayed
                             }
                           >
-                            différé
+                            {pick(language, "différé", "delayed")}
                           </span>
                         ) : null}
                       </Link>

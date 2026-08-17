@@ -1,11 +1,47 @@
 import { expect, request as playwrightRequest, test } from "@playwright/test";
 
+import {
+  expiredSessionCookie,
+  sessionCookie,
+  SESSION_COOKIE_NAME,
+} from "../../apps/web/lib/session-cookie";
+
 const password = "Anatole2026!";
 const newPassword = "Nouveau2027!";
 
 function emailFor(project: string): string {
   return `bff-${project.replace(/[^a-z0-9]/gi, "-")}-${Date.now()}@example.com`;
 }
+
+function expectSessionCookieHeader(header: string, cleared = false): void {
+  const normalized = header.toLowerCase();
+  expect(normalized).toContain(`${SESSION_COOKIE_NAME}=`);
+  expect(normalized).toContain("httponly");
+  expect(normalized).toContain("samesite=lax");
+  expect(normalized).toContain("path=/");
+  if (cleared) expect(normalized).toContain("max-age=0");
+}
+
+test("les options de cookie de production restent sécurisées sans navigateur HTTP", () => {
+  const active = sessionCookie("server-only-token", new Date("2030-01-01T00:00:00Z"), true);
+  const expired = expiredSessionCookie(true);
+
+  expect(active).toMatchObject({
+    name: SESSION_COOKIE_NAME,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+  });
+  expect(expired).toMatchObject({
+    name: SESSION_COOKIE_NAME,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: true,
+    path: "/",
+    maxAge: 0,
+  });
+});
 
 test("le BFF compte protège le jeton et couvre le cycle de vie", async ({ context, page }, testInfo) => {
   const email = emailFor(testInfo.project.name);
@@ -33,11 +69,9 @@ test("le BFF compte protège le jeton et couvre le cycle de vie", async ({ conte
   expect(createdBody.token).toBeUndefined();
   expect(createdBody.token_type).toBeUndefined();
   expect(createdBody.user.email).toBe(email);
-  const setCookie = created.headers()["set-cookie"].toLowerCase();
-  expect(setCookie).toContain("anatole_session=");
-  expect(setCookie).toContain("httponly");
-  expect(setCookie).toContain("samesite=lax");
-  expect(setCookie).toContain("path=/");
+  expectSessionCookieHeader(created.headers()["set-cookie"]);
+  expect(JSON.stringify(createdBody).toLowerCase()).not.toContain('"token"');
+  expect(JSON.stringify(createdBody).toLowerCase()).not.toContain('"token_type"');
 
   const me = await api.get("/api/account/me");
   expect(me.status()).toBe(200);
@@ -106,18 +140,23 @@ test("le BFF compte protège le jeton et couvre le cycle de vie", async ({ conte
 
   const logoutAll = await api.post("/api/account/logout-all");
   expect(logoutAll.status()).toBe(204);
-  expect(logoutAll.headers()["set-cookie"].toLowerCase()).toContain("max-age=0");
+  expectSessionCookieHeader(logoutAll.headers()["set-cookie"], true);
   expect((await api.get("/api/account/me")).status()).toBe(401);
 
   const login = await api.post("/api/account/login", {
     data: { email, password: newPassword },
   });
   expect(login.status()).toBe(200);
-  expect((await login.json()).token).toBeUndefined();
+  const loginBody = await login.json();
+  expect(loginBody.token).toBeUndefined();
+  expect(loginBody.token_type).toBeUndefined();
+  expectSessionCookieHeader(login.headers()["set-cookie"]);
+  expect(JSON.stringify(loginBody).toLowerCase()).not.toContain('"token"');
+  expect(JSON.stringify(loginBody).toLowerCase()).not.toContain('"token_type"');
 
   const logout = await api.post("/api/account/logout");
   expect(logout.status()).toBe(204);
-  expect(logout.headers()["set-cookie"].toLowerCase()).toContain("max-age=0");
+  expectSessionCookieHeader(logout.headers()["set-cookie"], true);
   expect((await api.get("/api/account/me")).status()).toBe(401);
 
   expect((await api.post("/api/account/login", {
@@ -128,7 +167,7 @@ test("le BFF compte protège le jeton et couvre le cycle de vie", async ({ conte
     data: { password: newPassword, confirmation: "SUPPRIMER" },
   });
   expect(deleted.status()).toBe(204);
-  expect(deleted.headers()["set-cookie"].toLowerCase()).toContain("max-age=0");
+  expectSessionCookieHeader(deleted.headers()["set-cookie"], true);
   expect((await api.get("/api/account/me")).status()).toBe(401);
 });
 
@@ -192,12 +231,26 @@ test("le centre de notifications utilise son BFF authentifié", async ({ context
   expect(preferences.status()).toBe(200);
   expect((await preferences.json()).preferences.digest_frequency).toBe("off");
 
+  await page.addInitScript(() => {
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
+      theme: "dark",
+      density: "comfortable",
+      decimals: 2,
+      defaultRange: "1y",
+      defaultUniverse: "tsx60",
+      language: "en",
+    }));
+  });
   await page.goto("/notifications");
   await expect(page.getByRole("heading", { name: /Tes signaux Anatole|Your Anatole signals/i })).toBeVisible();
   await expect(page.getByText(/Aucune notification|No notifications/i)).toBeVisible();
   await expect(page.getByText(/n’est pas configuré|is not configured/i)).toBeVisible();
   await page.getByRole("button", { name: /Enregistrer|Save/i }).click();
   await expect(page.getByText(/Préférences enregistrées|Preferences saved/i)).toBeVisible();
+  await page.getByRole("button", { name: /Prévisualiser|Preview/i }).click();
+  await expect(page.getByText(/Anatole Today/)).toBeVisible();
+  await expect(page.getByText(/Here are the main items observed/)).toBeVisible();
+  await expect(page.getByText(/Information générale seulement/)).toHaveCount(0);
 
   const deleted = await api.delete("/api/account/delete", {
     data: { password, confirmation: "SUPPRIMER" },

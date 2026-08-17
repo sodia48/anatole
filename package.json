@@ -15,6 +15,7 @@
     "quality": "pnpm test:api && pnpm typecheck:web && pnpm build:web && pnpm test:e2e"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
     "@playwright/test": "1.62.0"
   }
 }
