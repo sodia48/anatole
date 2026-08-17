@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     cors_origin_regex: str = r"^https://anatole(?:-[a-z0-9-]+)*\.vercel\.app$"
     market_data_provider: str = "yahoo"
     yahoo_timeout_seconds: float = 8.0
+    finnhub_api_key: str = ""
     account_database_url: str = Field(
         default="sqlite:///./anatole_accounts.db",
         validation_alias=AliasChoices("ACCOUNT_DATABASE_URL", "DATABASE_URL"),
