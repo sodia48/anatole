@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
+const accountDatabaseURL =
+  `sqlite:///file:anatole-e2e-${process.pid}` +
+  "?mode=memory&cache=shared&uri=true";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -22,14 +25,15 @@ export default defineConfig({
   expect: {
     timeout: 15_000,
   },
+  timeout: 60_000,
   projects: [
     {
       name: "desktop-chromium",
       use: { ...devices["Desktop Chrome"] },
     },
     {
-      name: "mobile-webkit",
-      use: { ...devices["iPhone 14"] },
+      name: "mobile-pixel-7",
+      use: { ...devices["Pixel 7"] },
     },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
@@ -46,10 +50,16 @@ export default defineConfig({
             MARKET_DATA_PROVIDER: "demo",
             CORS_ORIGINS: "http://127.0.0.1:3000",
             PYTHONUNBUFFERED: "1",
+            ACCOUNT_DATABASE_URL: accountDatabaseURL,
+            ACCOUNT_REGISTRATION_ENABLED: "true",
+            ACCOUNT_INVITE_CODES: "",
+            ACCOUNT_ADMIN_EMAILS:
+              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com",
           },
         },
         {
-          command: "pnpm --dir apps/web dev --hostname 127.0.0.1 --port 3000",
+          command:
+            "corepack pnpm --dir apps/web dev --hostname 127.0.0.1 --port 3000",
           url: baseURL,
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,

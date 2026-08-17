@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.db
+
+# JavaScript / Next.js
+node_modules/
+.pnpm-store/
+.next/
+*.tsbuildinfo
+
+# Playwright
+playwright-report/
+test-results/
+
+# Local environment and operating-system files
+.env
+.env.local
+.env.*.local
+.DS_Store
+Thumbs.db
