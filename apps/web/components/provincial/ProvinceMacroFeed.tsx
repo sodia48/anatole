@@ -68,21 +68,25 @@ export default function ProvinceMacroFeed({
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      void getProvincialMacroSnapshot(region, language, controller.signal)
+        .then((data) => {
+          setSnapshot(data);
+          setLoading(false);
+        })
+        .catch((caught: unknown) => {
+          if (controller.signal.aborted) return;
+          setError(caught instanceof Error ? caught.message : String(caught));
+          setLoading(false);
+        });
+    }, 0);
 
-    void getProvincialMacroSnapshot(region, language, controller.signal)
-      .then((data) => {
-        setSnapshot(data);
-        setLoading(false);
-      })
-      .catch((caught: unknown) => {
-        if (controller.signal.aborted) return;
-        setError(caught instanceof Error ? caught.message : String(caught));
-        setLoading(false);
-      });
-
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [region, language]);
 
   const newsItems = useMemo(() => {

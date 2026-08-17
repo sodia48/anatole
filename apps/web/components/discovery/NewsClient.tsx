@@ -175,7 +175,9 @@ export function NewsClient() {
 
     const timer =
       window.setInterval(
-        () => void load(),
+        () => {
+          if (!document.hidden) void load();
+        },
         REFRESH_INTERVALS.news,
       );
 

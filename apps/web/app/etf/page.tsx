@@ -440,14 +440,16 @@ export default function EtfPage() {
     const cached =
       readCachedDirectory();
 
-    if (cached?.items.length) {
-      setDirectory(cached);
-      setLoading(false);
-    }
-
-    void loadDirectory();
+    const timer = window.setTimeout(() => {
+      if (cached?.items.length) {
+        setDirectory(cached);
+        setLoading(false);
+      }
+      void loadDirectory();
+    }, 0);
 
     return () => {
+      window.clearTimeout(timer);
       requestRef.current?.abort();
     };
   }, [loadDirectory]);

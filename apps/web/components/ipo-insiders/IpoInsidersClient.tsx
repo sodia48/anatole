@@ -576,7 +576,8 @@ export function IpoInsidersClient({
   );
 
   useEffect(() => {
-    setTab(initialTab);
+    const timer = window.setTimeout(() => setTab(initialTab), 0);
+    return () => window.clearTimeout(timer);
   }, [initialTab]);
 
   /*
@@ -584,17 +585,21 @@ export function IpoInsidersClient({
    * un balayage de 24 à 40 titres en même temps.
    */
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (tab === "ipo") void loadIpo();
+      else void loadInsiders();
+    }, 0);
+
     if (tab === "ipo") {
-      void loadIpo();
 
       return () => {
+        window.clearTimeout(timer);
         ipoAbortRef.current?.abort();
       };
     }
 
-    void loadInsiders();
-
     return () => {
+      window.clearTimeout(timer);
       insidersAbortRef.current?.abort();
     };
   }, [

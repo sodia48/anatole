@@ -18,6 +18,7 @@ import { useAccount } from "@/components/providers/AccountProvider";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { PreferencesForm } from "@/components/settings/PreferencesForm";
 import { pick } from "@/lib/i18n";
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 import { DataQualityClient } from "@/components/workspace/DataQualityClient";
 
 import styles from "./SettingsHub.module.css";
@@ -143,7 +144,7 @@ export function SettingsHubClient() {
     <div className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>{pick(language, "CENTRE DE CONTRÔLE", "CONTROL CENTER")} · v1.3.6</span>
+          <span className={styles.eyebrow}>{pick(language, "CENTRE DE CONTRÔLE", "CONTROL CENTER")} · {ANATOLE_VERSION_LABEL}</span>
           <h1>{pick(language, "Compte et paramètres", "Account & settings")}</h1>
           <p>
             {pick(

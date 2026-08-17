@@ -6,6 +6,8 @@ import {
   useState,
 } from "react";
 
+import { resilientFetch } from "@/lib/resilient-fetch";
+
 import styles from "./ProvincialStatsPanel.module.css";
 
 type Language = "fr" | "en";
@@ -51,7 +53,9 @@ type Snapshot = {
 };
 
 function apiBase(): string {
+  if (typeof window !== "undefined") return "/api/anatole";
   const value =
+    process.env.ANATOLE_API_URL ??
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.NEXT_PUBLIC_API_BASE_URL ??
     "https://anatole-api.onrender.com";
@@ -198,12 +202,14 @@ export function ProvincialStatsPanel({
           region: normalizedRegion,
           lang: language,
         });
-        const response = await fetch(
+        const response = await resilientFetch(
           `${apiBase()}/api/v1/discovery/provincial-statistics?${params.toString()}`,
           {
             signal: controller.signal,
             headers: { Accept: "application/json" },
             cache: "no-store",
+            timeoutMs: 25_000,
+            retries: 1,
           },
         );
         if (!response.ok) {

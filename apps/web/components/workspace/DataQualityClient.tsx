@@ -57,14 +57,13 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState("Toutes");
 
-  const refresh = async () => {
-    const controller = new AbortController();
+  const refresh = async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
       const [qualityResult, reliabilityResult] = await Promise.allSettled([
-        getDataQuality(controller.signal),
-        getReliabilityStatus(controller.signal),
+        getDataQuality(signal),
+        getReliabilityStatus(signal),
       ]);
       if (qualityResult.status === "fulfilled") {
         setSnapshot(qualityResult.value);
@@ -82,9 +81,16 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
   };
 
   useEffect(() => {
-    void refresh();
-    const interval = window.setInterval(() => void refresh(), 60_000);
-    return () => window.clearInterval(interval);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void refresh(controller.signal), 0);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, 60_000);
+    return () => {
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
+      controller.abort();
+    };
   }, []);
 
   const categories = useMemo(

@@ -3,6 +3,7 @@ import {
   reportClientEvent,
   type ApiTrace,
 } from "./reliability";
+import { ANATOLE_VERSION } from "./version";
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 const CACHE_PREFIX = "anatole:0.9:last-good:";
@@ -169,7 +170,7 @@ export async function resilientFetch(
     try {
       const headers = new Headers(init.headers);
       if (!headers.has("X-Request-ID")) headers.set("X-Request-ID", id);
-      headers.set("X-Anatole-Client-Version", "0.9.0");
+      headers.set("X-Anatole-Client-Version", ANATOLE_VERSION);
 
       const response = await fetch(input, {
         ...init,

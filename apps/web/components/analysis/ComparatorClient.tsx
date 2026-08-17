@@ -435,33 +435,36 @@ export function ComparatorClient() {
   }, []);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = (params.get("symbols") ?? "")
-        .split(",")
-        .map(cleanSymbol)
-        .filter(Boolean);
-      const uniqueFromUrl = [...new Set(fromUrl)].slice(0, 5);
+    const timer = window.setTimeout(() => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const fromUrl = (params.get("symbols") ?? "")
+          .split(",")
+          .map(cleanSymbol)
+          .filter(Boolean);
+        const uniqueFromUrl = [...new Set(fromUrl)].slice(0, 5);
 
-      if (uniqueFromUrl.length >= 2) {
-        setSymbols(uniqueFromUrl);
-        return;
-      }
+        if (uniqueFromUrl.length >= 2) {
+          setSymbols(uniqueFromUrl);
+          return;
+        }
 
-      const stored = JSON.parse(
-        window.localStorage.getItem(STORAGE_KEY) ?? "null",
-      ) as unknown;
-      if (
-        Array.isArray(stored) &&
-        stored.length >= 2 &&
-        stored.length <= 5 &&
-        stored.every((value) => typeof value === "string")
-      ) {
-        setSymbols(stored.map(cleanSymbol).filter(Boolean));
+        const stored = JSON.parse(
+          window.localStorage.getItem(STORAGE_KEY) ?? "null",
+        ) as unknown;
+        if (
+          Array.isArray(stored) &&
+          stored.length >= 2 &&
+          stored.length <= 5 &&
+          stored.every((value) => typeof value === "string")
+        ) {
+          setSymbols(stored.map(cleanSymbol).filter(Boolean));
+        }
+      } catch {
+        // Les valeurs par défaut restent actives.
       }
-    } catch {
-      // Les valeurs par défaut restent actives.
-    }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -475,8 +478,8 @@ export function ComparatorClient() {
   useEffect(() => {
     const clean = query.trim();
     if (clean.length < 1) {
-      setSuggestions([]);
-      return;
+      const timer = window.setTimeout(() => setSuggestions([]), 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();

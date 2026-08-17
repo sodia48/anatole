@@ -63,17 +63,21 @@ export function CockpitClient() {
   const [refreshing, setRefreshing] = useState(false);
   const requestIdRef = useRef(0);
   const universeRef = useRef<CockpitUniverse>(universe);
-  universeRef.current = universe;
+
+  useEffect(() => {
+    universeRef.current = universe;
+  }, [universe]);
 
   const snapshot = snapshots[universe] ?? null;
   const selectedUniverse = UNIVERSES[universe];
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (isCockpitUniverse(stored)) {
-      setUniverse(stored);
-    }
-    setReady(true);
+    const timer = window.setTimeout(() => {
+      const stored = window.localStorage.getItem(STORAGE_KEY);
+      if (isCockpitUniverse(stored)) setUniverse(stored);
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -128,15 +132,18 @@ export function CockpitClient() {
     }
 
     const controller = new AbortController();
-    void load(universe, controller.signal);
+    const timer = window.setTimeout(() => void load(universe, controller.signal), 0);
 
     const interval = window.setInterval(
-      () => void load(universe),
+      () => {
+        if (!document.hidden) void load(universe);
+      },
       UNIVERSES[universe].interval,
     );
 
     return () => {
       controller.abort();
+      window.clearTimeout(timer);
       window.clearInterval(interval);
     };
   }, [load, ready, universe]);

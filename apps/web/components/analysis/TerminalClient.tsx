@@ -8,12 +8,10 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bell,
-  CalendarDays,
   Gauge,
   Radar,
   RefreshCw,
   ShieldAlert,
-  Sparkles,
   Waves,
   Zap,
 } from "lucide-react";
@@ -293,8 +291,11 @@ export function TerminalClient() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void load(false, controller.signal);
-    return () => controller.abort();
+    const timer = window.setTimeout(() => void load(false, controller.signal), 0);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [load]);
 
   useEffect(() => {
@@ -303,7 +304,9 @@ export function TerminalClient() {
     }
 
     const interval = window.setInterval(
-      () => void load(true),
+      () => {
+        if (!document.hidden) void load(true);
+      },
       Math.max(snapshot.refresh_after_seconds, 60) * 1000,
     );
 

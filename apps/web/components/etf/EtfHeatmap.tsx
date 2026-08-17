@@ -715,7 +715,8 @@ export function EtfHeatmap({
   );
 
   useEffect(() => {
-    setExpandedGroup(null);
+    const timer = window.setTimeout(() => setExpandedGroup(null), 0);
+    return () => window.clearTimeout(timer);
   }, [grouping]);
 
   const visibleGroups = useMemo(() => {

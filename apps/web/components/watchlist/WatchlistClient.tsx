@@ -17,8 +17,11 @@ export function WatchlistClient() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    setTickers(readWatchlist());
-    setHydrated(true);
+    const timer = window.setTimeout(() => {
+      setTickers(readWatchlist());
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -49,9 +52,12 @@ export function WatchlistClient() {
   useEffect(() => {
     if (!hydrated || tickers.length === 0) return;
     const controller = new AbortController();
-    void load(tickers, controller.signal);
-    const interval = window.setInterval(() => void load(tickers), REFRESH_INTERVALS.watchlist);
+    const timer = window.setTimeout(() => void load(tickers, controller.signal), 0);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void load(tickers);
+    }, REFRESH_INTERVALS.watchlist);
     return () => {
+      window.clearTimeout(timer);
       controller.abort();
       window.clearInterval(interval);
     };

@@ -187,8 +187,11 @@ export function PortfolioClient() {
   useEffect(() => {
     const saved = loadPositions();
     const add = searchParams.get("add")?.toUpperCase().replace(/\.TO$/, "");
-    setPositions(add && !saved.some((item) => item.symbol === add) ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }] : saved);
-    setHydrated(true);
+    const timer = window.setTimeout(() => {
+      setPositions(add && !saved.some((item) => item.symbol === add) ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }] : saved);
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [searchParams]);
 
   useEffect(() => {
@@ -204,8 +207,8 @@ export function PortfolioClient() {
 
   useEffect(() => {
     if (!symbol.trim()) {
-      setSuggestions([]);
-      return;
+      const timer = window.setTimeout(() => setSuggestions([]), 0);
+      return () => window.clearTimeout(timer);
     }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -243,9 +246,9 @@ export function PortfolioClient() {
     if (!hydrated || !positions.length) return;
     const timer = window.setTimeout(() => void refresh(positions), 450);
     return () => window.clearTimeout(timer);
-    // refresh intentionally follows the serialized position state.
+    // refresh intentionally follows the position state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrated, JSON.stringify(positions)]);
+  }, [hydrated, positions]);
 
   const addPosition = () => {
     const clean = symbol.trim().toUpperCase().replace(/\.TO$/, "");
@@ -345,12 +348,12 @@ export function PortfolioClient() {
         </div>
         <div className={styles.formGrid}>
           <div className={styles.searchField}>
-            <label>Symbole ou entreprise</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
+            <label htmlFor="portfolio-symbol">Symbole ou entreprise</label>
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
             {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
           </div>
-          <div className={styles.field}><label>Quantité</label><input inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
-          <div className={styles.field}><label>Coût moyen</label><input inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0,00" /></div>
+          <div className={styles.field}><label htmlFor="portfolio-quantity">Quantité</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
+          <div className={styles.field}><label htmlFor="portfolio-average-cost">Coût moyen</label><input id="portfolio-average-cost" inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0,00" /></div>
           <button className={styles.primaryButton} type="button" onClick={addPosition}><Plus size={16} /> Ajouter</button>
         </div>
       </section>

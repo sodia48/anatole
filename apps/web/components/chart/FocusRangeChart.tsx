@@ -271,6 +271,7 @@ function chartOptions(
   live: boolean,
 ) {
   return {
+    autoSize: false,
     width: Math.max(container.clientWidth, 320),
     height: Math.max(container.clientHeight, 360),
     layout: {
@@ -465,7 +466,7 @@ export function FocusRangeChart({
       chartRefs.current = null;
       priceLinesRef.current = [];
     };
-  }, []);
+  }, [periodKey]);
 
   useEffect(() => {
     const refs = chartRefs.current;

@@ -9,6 +9,7 @@ import {
 } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import type { ScreenerRow, ScreenerSnapshot } from "@/lib/types";
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 
 const money = new Intl.NumberFormat("fr-CA", { style: "currency", currency: "CAD", minimumFractionDigits: 2 });
 const compact = new Intl.NumberFormat("fr-CA", { notation: "compact", maximumFractionDigits: 1 });
@@ -80,7 +81,9 @@ export function ScreenerClient() {
 
     const timer =
       window.setInterval(
-        () => void load(),
+        () => {
+          if (!document.hidden) void load();
+        },
         universe === "composite"
           ? 180_000
           : REFRESH_INTERVALS.screener,
@@ -133,7 +136,7 @@ export function ScreenerClient() {
       <header className="panel discovery-hero">
         <div>
           <span className="eyebrow">
-            MARCHÉS · V1.3.4
+            MARCHÉS · {ANATOLE_VERSION_LABEL.toUpperCase()}
           </span>
           <h1>
             Screener{" "}

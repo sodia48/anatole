@@ -74,39 +74,46 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
   const provinceMode = isProvinceRegion(region);
 
   useEffect(() => {
-    setLanguage(detectLanguage());
+    const timer = window.setTimeout(() => setLanguage(detectLanguage()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!provinceMode) {
-      setSnapshot(null);
-      setError(null);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setSnapshot(null);
+        setError(null);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      void getProvincialCalendarSnapshot(region, language, controller.signal)
+        .then((data) => {
+          setSnapshot(data);
+          setLoading(false);
+        })
+        .catch((caught: unknown) => {
+          if ((caught as Error)?.name === "AbortError") return;
+          setError(caught instanceof Error ? caught.message : String(caught));
+          setLoading(false);
+        });
+    }, 0);
 
-    void getProvincialCalendarSnapshot(region, language, controller.signal)
-      .then((data) => {
-        setSnapshot(data);
-        setLoading(false);
-      })
-      .catch((caught: unknown) => {
-        if ((caught as Error)?.name === "AbortError") return;
-        setError(caught instanceof Error ? caught.message : String(caught));
-        setLoading(false);
-      });
-
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [region, language, provinceMode]);
 
   const events = useMemo(() => {
     if (!snapshot) return [];
 
-    const now = Date.now() - 2 * 60 * 60 * 1000;
+    const now = new Date(snapshot.generated_at).getTime() - 2 * 60 * 60 * 1000;
     return [...snapshot.upcoming_events]
       .filter((event) => {
         const timestamp = new Date(event.starts_at).getTime();

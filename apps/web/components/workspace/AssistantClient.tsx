@@ -69,6 +69,10 @@ type Message = {
   createdAt: number;
 };
 
+function messageTimestamp(): number {
+  return Date.now();
+}
+
 type NumericProfileKey =
   | "horizon_years"
   | "target_amount"
@@ -226,9 +230,12 @@ export function AssistantClient() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setPortfolio(loadPortfolio());
-    setProfile(loadProfile());
-    setHydrated(true);
+    const timer = window.setTimeout(() => {
+      setPortfolio(loadPortfolio());
+      setProfile(loadProfile());
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -322,11 +329,12 @@ export function AssistantClient() {
     const clean = messageText.trim();
     if (!clean || loading) return;
 
+    const createdAt = messageTimestamp();
     const userMessage: Message = {
-      id: `user-${Date.now()}`,
+      id: `user-${createdAt}`,
       role: "user",
       text: clean,
-      createdAt: Date.now(),
+      createdAt,
     };
 
     setMessages((current) => [...current, userMessage]);
@@ -348,7 +356,7 @@ export function AssistantClient() {
           role: "assistant",
           text: response.answer.replaceAll("**", ""),
           response,
-          createdAt: Date.now(),
+          createdAt: messageTimestamp(),
         },
       ]);
     } catch (reason) {

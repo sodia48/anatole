@@ -6,6 +6,7 @@ import type {
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { FeedbackButton } from "@/components/reliability/FeedbackButton";
 import { ReliabilityNotice } from "@/components/reliability/ReliabilityNotice";
+import { ANATOLE_VERSION } from "@/lib/version";
 import { AppProviders } from "./providers";
 
 import "./globals.css";
@@ -37,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
+    <html lang="fr" suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -45,7 +46,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body data-anatole-version="1.2.0">
+      <body data-anatole-version={ANATOLE_VERSION}>
         <AppProviders>
           <div className="app-shell">
             <AppSidebar />

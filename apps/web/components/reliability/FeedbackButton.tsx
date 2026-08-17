@@ -19,6 +19,7 @@ import {
   submitFeedback,
   type FeedbackCategory,
 } from "@/lib/reliability";
+import { ANATOLE_VERSION } from "@/lib/version";
 
 import styles from "./FeedbackButton.module.css";
 
@@ -55,6 +56,7 @@ export function FeedbackButton() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const selectedLabel = useMemo(
@@ -65,6 +67,7 @@ export function FeedbackButton() {
   useEffect(() => {
     const openDialog = () => setOpen(true);
     window.addEventListener("anatole:open-feedback", openDialog);
+    triggerRef.current?.setAttribute("data-client-ready", "true");
     return () => window.removeEventListener("anatole:open-feedback", openDialog);
   }, []);
 
@@ -115,7 +118,7 @@ export function FeedbackButton() {
         user_agent: includeDiagnostics ? window.navigator.userAgent : null,
         viewport_width: includeDiagnostics ? window.innerWidth : null,
         viewport_height: includeDiagnostics ? window.innerHeight : null,
-        app_version: "0.8.0",
+        app_version: ANATOLE_VERSION,
         consent_diagnostics: includeDiagnostics,
       });
       setReportId(result.report_id);
@@ -133,10 +136,12 @@ export function FeedbackButton() {
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         onClick={() => setOpen(true)}
         aria-label="Signaler un problème"
+        data-client-ready="false"
       >
         <Bug size={17} aria-hidden="true" />
         <span>Signaler un problème</span>

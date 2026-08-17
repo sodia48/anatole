@@ -488,21 +488,12 @@ function ChartPanel({
       sma200,
     };
 
-    const observer = new ResizeObserver(() => {
-      chart.applyOptions({
-        width: container.clientWidth,
-      });
-    });
-
-    observer.observe(container);
-
     return () => {
-      observer.disconnect();
       chart.remove();
       refs.current = null;
       priceLines.current = [];
     };
-  }, []);
+  }, [period]);
 
   useEffect(() => {
     const chartRefs = refs.current;
@@ -592,7 +583,7 @@ function ChartPanel({
     } else if (period.key === "live") {
       chartRefs.chart.timeScale().scrollToRealTime();
     }
-  }, [displayCandles, period.key, technicals]);
+  }, [displayCandles, period, technicals]);
 
   useEffect(() => {
     if (period.key !== "live" || displayCandles.length === 0) {
@@ -634,7 +625,7 @@ function ChartPanel({
     const timer = window.setInterval(tick, 1_000);
 
     return () => window.clearInterval(timer);
-  }, [displayCandles, period.key, quote.price]);
+  }, [displayCandles, period, quote.price, quote.timestamp]);
 
   return (
     <section className="panel chart-panel">
@@ -864,11 +855,13 @@ export function FocusClient({
 
   useEffect(() => {
     if (period.key === "1y") {
-      setPeriodSnapshot(initialSnapshot);
-      setError(null);
-      setLoading(false);
-      setRefreshing(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setPeriodSnapshot(initialSnapshot);
+        setError(null);
+        setLoading(false);
+        setRefreshing(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     let disposed = false;
@@ -933,7 +926,7 @@ export function FocusClient({
       }
     }
 
-    void load(false);
+    const initialTimer = window.setTimeout(() => void load(false), 0);
 
     const timer =
       period.refreshMs === undefined
@@ -944,6 +937,7 @@ export function FocusClient({
 
     return () => {
       disposed = true;
+      window.clearTimeout(initialTimer);
       controller?.abort();
 
       if (timer !== null) {

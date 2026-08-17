@@ -99,14 +99,14 @@ export function AlertsClient() {
   useEffect(() => {
     const saved = loadRules();
     const requestedSymbol = searchParams.get("symbol")?.toUpperCase().replace(/\.TO$/, "");
-    setRules(saved);
-    setSymbol(requestedSymbol ?? "");
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setPermission(Notification.permission);
-    } else {
-      setPermission("unsupported");
-    }
-    hydrated.current = true;
+    const timer = window.setTimeout(() => {
+      setRules(saved);
+      setSymbol(requestedSymbol ?? "");
+      if ("Notification" in window) setPermission(Notification.permission);
+      else setPermission("unsupported");
+      hydrated.current = true;
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [searchParams]);
 
   useEffect(() => {
@@ -116,13 +116,16 @@ export function AlertsClient() {
 
   useEffect(() => {
     const selected = METRICS.find((item) => item.key === metric);
-    if (selected) setThreshold(String(selected.defaultThreshold));
+    const timer = window.setTimeout(() => {
+      if (selected) setThreshold(String(selected.defaultThreshold));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [metric]);
 
   useEffect(() => {
     if (!symbol.trim()) {
-      setSuggestions([]);
-      return;
+      const timer = window.setTimeout(() => setSuggestions([]), 0);
+      return () => window.clearTimeout(timer);
     }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
@@ -180,13 +183,15 @@ export function AlertsClient() {
   useEffect(() => {
     if (!rules.length) return;
     const timer = window.setTimeout(() => void runEvaluation(rules), 350);
-    const interval = window.setInterval(() => void runEvaluation(rules), 30_000);
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void runEvaluation(rules);
+    }, 30_000);
     return () => {
       window.clearTimeout(timer);
       window.clearInterval(interval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(rules), permission]);
+  }, [rules, permission]);
 
   const addRule = () => {
     const clean = symbol.trim().toUpperCase().replace(/\.TO$/, "");
@@ -256,13 +261,13 @@ export function AlertsClient() {
 
         <div className={styles.alertFormGrid}>
           <div className={styles.searchField}>
-            <label>Symbole</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
+            <label htmlFor="alert-symbol">Symbole</label>
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input id="alert-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
             {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
           </div>
-          <div className={styles.field}><label>Indicateur</label><select value={metric} onChange={(event) => setMetric(event.target.value as AlertMetric)}>{METRICS.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></div>
-          <div className={styles.field}><label>Condition</label><select value={operator} onChange={(event) => setOperator(event.target.value as "above" | "below")}><option value="above">Au-dessus de</option><option value="below">Sous</option></select></div>
-          <div className={styles.field}><label>Seuil</label><input inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></div>
+          <div className={styles.field}><label htmlFor="alert-metric">Indicateur</label><select id="alert-metric" value={metric} onChange={(event) => setMetric(event.target.value as AlertMetric)}>{METRICS.map((item) => <option value={item.key} key={item.key}>{item.label}</option>)}</select></div>
+          <div className={styles.field}><label htmlFor="alert-operator">Condition</label><select id="alert-operator" value={operator} onChange={(event) => setOperator(event.target.value as "above" | "below")}><option value="above">Au-dessus de</option><option value="below">Sous</option></select></div>
+          <div className={styles.field}><label htmlFor="alert-threshold">Seuil</label><input id="alert-threshold" inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></div>
           <button className={styles.primaryButton} type="button" onClick={addRule}><Plus size={16} /> Créer</button>
         </div>
       </section>

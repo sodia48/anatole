@@ -20,6 +20,8 @@ import {
   Star,
 } from "lucide-react";
 
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
+
 import { useAccount } from "@/components/providers/AccountProvider";
 import {
   usePreferences,
@@ -272,6 +274,7 @@ export default function TodayPage() {
   const [calendar, setCalendar] = useState<CalendarSnapshot | null>(null);
   const [issues, setIssues] = useState<SourceIssue[]>([]);
   const [state, setState] = useState<LoadState>("loading");
+  const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const mounted = useRef(true);
   const loadingRef = useRef(false);
@@ -323,13 +326,14 @@ export default function TodayPage() {
 
   useEffect(() => {
     mounted.current = true;
-    reloadWorkspace();
+    const timer = window.setTimeout(reloadWorkspace, 0);
     const onSync = () => reloadWorkspace();
     window.addEventListener(WORKSPACE_SYNC_EVENT, onSync);
     window.addEventListener("storage", onSync);
     window.addEventListener("anatole-watchlist-change", onSync);
     return () => {
       mounted.current = false;
+      window.clearTimeout(timer);
       window.removeEventListener(WORKSPACE_SYNC_EVENT, onSync);
       window.removeEventListener("storage", onSync);
       window.removeEventListener("anatole-watchlist-change", onSync);
@@ -341,8 +345,11 @@ export default function TodayPage() {
      * Le changement FR / EN doit être visible immédiatement :
      * l’ancienne édition est retirée avant le rechargement officiel.
      */
-    setNews(null);
-    setCalendar(null);
+    const timer = window.setTimeout(() => {
+      setNews(null);
+      setCalendar(null);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [language]);
 
   const recordIssues = useCallback((next: SourceIssue[]) => {
@@ -502,17 +509,20 @@ export default function TodayPage() {
   const loadAll = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    setRefreshing(true);
     setState((current) => current === "idle" ? "loading" : current);
     try {
       await Promise.all([loadMarket(), loadPersonal(), loadContext()]);
       if (mounted.current && !lastUpdated) setLastUpdated(new Date().toISOString());
     } finally {
       loadingRef.current = false;
+      if (mounted.current) setRefreshing(false);
     }
   }, [lastUpdated, loadContext, loadMarket, loadPersonal]);
 
   useEffect(() => {
-    void loadAll();
+    const timer = window.setTimeout(() => void loadAll(), 0);
+    return () => window.clearTimeout(timer);
   }, [loadAll]);
 
   useEffect(() => {
@@ -523,17 +533,23 @@ export default function TodayPage() {
 
     const fast =
       window.setInterval(
-        () => void loadMarket(),
+        () => {
+          if (!document.hidden) void loadMarket();
+        },
         marketInterval,
       );
     const personal =
       window.setInterval(
-        () => void loadPersonal(),
+        () => {
+          if (!document.hidden) void loadPersonal();
+        },
         30_000,
       );
     const context =
       window.setInterval(
-        () => void loadContext(),
+        () => {
+          if (!document.hidden) void loadContext();
+        },
         120_000,
       );
 
@@ -550,7 +566,7 @@ export default function TodayPage() {
   ]);
 
   const upcomingEvents = useMemo(() => {
-    const now = Date.now() - 30 * 60 * 1000;
+    const now = new Date(calendar?.generated_at ?? 0).getTime() - 30 * 60 * 1000;
     return (calendar?.events ?? [])
       .filter((event) => {
         const time = new Date(event.starts_at).getTime();
@@ -612,7 +628,7 @@ export default function TodayPage() {
     <main className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
-          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · v1.3.5</span>
+          <span className={styles.eyebrow}>ANATOLE AUJOURD’HUI · {ANATOLE_VERSION_LABEL}</span>
           <h1>{displayName ? `Bonjour ${displayName}` : "Aujourd’hui sur les marchés"}</h1>
           <p>Une lecture quotidienne claire du marché canadien et de ton espace, sans recommandation de placement.</p>
         </div>
@@ -622,7 +638,7 @@ export default function TodayPage() {
             <strong>{state === "loading" ? "Chargement…" : issues.length ? "Mode résilient" : "Données actives"}</strong>
             <small>{sourceCount}/8 sources · mis à jour {formatTime(lastUpdated)}</small>
           </div>
-          <button type="button" onClick={() => void loadAll()} disabled={loadingRef.current}>
+          <button type="button" onClick={() => void loadAll()} disabled={refreshing}>
             Actualiser
           </button>
         </div>
