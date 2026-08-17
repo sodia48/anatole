@@ -7,6 +7,9 @@ import pytest
 from app.services.screener import (
     ScreenerService,
 )
+from app.services.tsx_composite_universe import (
+    tsx_composite_universe_service,
+)
 
 
 def test_universe_normalization() -> None:
@@ -58,3 +61,21 @@ def test_tsx60_constituents_are_available() -> None:
         item.ticker
         for item in constituents
     )
+
+
+def test_composite_constituents_use_honest_tsx60_bootstrap(monkeypatch) -> None:
+    async def unavailable_constituents():
+        raise RuntimeError("BlackRock unavailable")
+
+    monkeypatch.setattr(
+        tsx_composite_universe_service,
+        "get_constituents",
+        unavailable_constituents,
+    )
+    service = ScreenerService()
+    universe, constituents = asyncio.run(
+        service._constituents("composite")
+    )
+
+    assert universe == "S&P/TSX Composite — repli TSX 60"
+    assert len(constituents) == 60

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from time import monotonic
+from typing import Any
 
 from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
@@ -22,6 +23,7 @@ from app.services.market_data import market_data_service
 from app.services.news import news_service
 from app.services.psychology import psychology_service
 from app.services.screener import screener_service
+from app.services.tsx_composite_universe import tsx_composite_universe_service
 
 
 _STARTED_AT = monotonic()
@@ -31,6 +33,21 @@ def _age(timestamp: float) -> float | None:
     if not timestamp:
         return None
     return max(0.0, monotonic() - timestamp)
+
+
+def _latest_language_cache(
+    cached: Any,
+    cached_at: Any,
+) -> tuple[Any | None, float]:
+    """Return the freshest localized snapshot without treating dict.items as data."""
+    if not isinstance(cached, dict):
+        return cached, float(cached_at) if isinstance(cached_at, (int, float)) else 0.0
+    if not cached:
+        return None, 0.0
+
+    timestamps = cached_at if isinstance(cached_at, dict) else {}
+    language = max(cached, key=lambda key: float(timestamps.get(key, 0.0)))
+    return cached[language], float(timestamps.get(language, 0.0))
 
 
 def _cached_source(
@@ -79,9 +96,29 @@ class DataQualityService:
         api_error_rate = float(reliability["error_rate_5xx"])
 
         cockpit = cockpit_service._cached
-        screener = screener_service._cached
-        news = news_service._cached
-        calendar = calendar_service._cached
+        tsx60_cache = screener_service._cache.get("tsx60")
+        tsx60_cached_at, tsx60_screener = (
+            tsx60_cache if tsx60_cache is not None else (0.0, None)
+        )
+        composite_cache = screener_service._cache.get("composite")
+        composite_cached_at, composite_screener = (
+            composite_cache if composite_cache is not None else (0.0, None)
+        )
+        composite_universe_cache = tsx_composite_universe_service._cache
+        composite_universe_cached_at, composite_universe = (
+            composite_universe_cache
+            if composite_universe_cache is not None
+            else (0.0, None)
+        )
+        screener_warmed = tsx60_screener is not None or composite_screener is not None
+        news, news_cached_at = _latest_language_cache(
+            news_service._cached,
+            news_service._cached_at,
+        )
+        calendar, calendar_cached_at = _latest_language_cache(
+            calendar_service._cached,
+            calendar_service._cached_at,
+        )
         psychology = psychology_service._cached
         ipo = ipo_service._cached
 
@@ -99,16 +136,55 @@ class DataQualityService:
                 coverage=(len(cockpit.constituents) / 60 * 100 if cockpit else 0),
             ),
             _cached_source(
-                key="screener",
+                key="screener-tsx60",
                 label="Screener TSX 60",
                 category="Analyse",
-                cached=screener,
-                cached_at=screener_service._cached_at,
-                ttl=screener_service.cache_ttl_seconds,
-                count=len(screener.items) if screener else 0,
+                cached=tsx60_screener,
+                cached_at=tsx60_cached_at,
+                ttl=screener_service.tsx60_cache_ttl_seconds,
+                count=len(tsx60_screener.items) if tsx60_screener else 0,
                 source="Yahoo public + moteur Anatole",
                 detail="Historique, RSI, momentum, volume relatif et score.",
-                coverage=(len(screener.items) / 60 * 100 if screener else 0),
+                coverage=(len(tsx60_screener.items) / 60 * 100 if tsx60_screener else 0),
+            ),
+            _cached_source(
+                key="screener-composite",
+                label="Screener S&P/TSX Composite",
+                category="Analyse",
+                cached=composite_screener,
+                cached_at=composite_cached_at,
+                ttl=screener_service.composite_cache_ttl_seconds,
+                count=len(composite_screener.items) if composite_screener else 0,
+                source="BlackRock XIC + Yahoo public + moteur Anatole",
+                detail="Univers Composite, historique, RSI, momentum, volume relatif et score.",
+                coverage=(
+                    len(composite_screener.items)
+                    / screener_service.composite_max_constituents
+                    * 100
+                    if composite_screener
+                    else 0
+                ),
+            ),
+            _cached_source(
+                key="tsx-composite-universe",
+                label="Univers S&P/TSX Composite",
+                category="Marché",
+                cached=composite_universe,
+                cached_at=composite_universe_cached_at,
+                ttl=tsx_composite_universe_service.cache_ttl_seconds,
+                count=len(composite_universe) if composite_universe else 0,
+                source="Positions officielles BlackRock XIC",
+                detail="Liste opérationnelle des sociétés canadiennes du Composite, hors espèces et dérivés.",
+                coverage=(
+                    min(
+                        100.0,
+                        len(composite_universe)
+                        / screener_service.composite_max_constituents
+                        * 100,
+                    )
+                    if composite_universe
+                    else 0
+                ),
             ),
             _cached_source(
                 key="etf-directory",
@@ -138,7 +214,7 @@ class DataQualityService:
                 label="Actualités officielles",
                 category="Découverte",
                 cached=news,
-                cached_at=news_service._cached_at,
+                cached_at=news_cached_at,
                 ttl=news_service.cache_ttl_seconds,
                 count=len(news.items) if news else 0,
                 source="Banque du Canada + Statistique Canada",
@@ -150,7 +226,7 @@ class DataQualityService:
                 label="Calendrier économique",
                 category="Découverte",
                 cached=calendar,
-                cached_at=calendar_service._cached_at,
+                cached_at=calendar_cached_at,
                 ttl=calendar_service.cache_ttl_seconds,
                 count=len(calendar.events) if calendar else 0,
                 source="Banque du Canada + Statistique Canada",
@@ -328,11 +404,11 @@ class DataQualityService:
         endpoints = [
             DataQualityEndpoint(path="/health", label="Santé API", status="available", detail="Liveness locale sans dépendance externe."),
             DataQualityEndpoint(path="/api/v1/market/cockpit", label="Cockpit", status="available" if cockpit else "not_warmed", detail="Cache conservé en cas de panne temporaire."),
-            DataQualityEndpoint(path="/api/v1/discovery/screener", label="Screener", status="available" if screener else "not_warmed", detail="Historique groupé et limitation de concurrence."),
+            DataQualityEndpoint(path="/api/v1/discovery/screener", label="Screener", status="available" if screener_warmed else "not_warmed", detail="Caches distincts TSX 60 et Composite, historique groupé et limitation de concurrence."),
             DataQualityEndpoint(path="/api/v1/discovery/etfs/{ticker}/holdings", label="Participations ETF", status="available", detail="Chargement à la demande avec cache de composition."),
             DataQualityEndpoint(path="/api/v1/discovery/ipo", label="IPO", status="available" if ipo else "not_warmed", detail="TMX et SEC EDGAR; dernières données conservées en secours."),
             DataQualityEndpoint(path="/api/v1/discovery/insiders", label="Initiés", status="available" if insider_service._snapshot_cache else "not_warmed", detail="Scans limités pour protéger l’API publique."),
-            DataQualityEndpoint(path="/api/v1/analysis/terminal", label="Terminal Pro", status="available" if screener else "not_warmed", detail="Réutilise les caches Cockpit et Screener."),
+            DataQualityEndpoint(path="/api/v1/analysis/terminal", label="Terminal Pro", status="available" if screener_warmed else "not_warmed", detail="Réutilise les caches Cockpit et Screener."),
             DataQualityEndpoint(path="/api/v1/workspace/portfolio", label="Portefeuille", status="available", detail="Analyse à la demande; positions stockées uniquement dans le navigateur."),
             DataQualityEndpoint(path="/api/v1/reliability/status", label="Observabilité v0.8", status="available", detail="Latence, taux 5xx, erreurs récentes et signalements bêta du processus courant."),
         ]

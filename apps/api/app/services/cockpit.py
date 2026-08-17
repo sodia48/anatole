@@ -360,7 +360,23 @@ class CockpitService:
                         error,
                     )
                     return self._composite_cached
-                raise
+                logger.warning(
+                    "composite_cockpit_tsx60_fallback error=%s detail=%s",
+                    type(error).__name__,
+                    error,
+                )
+                snapshot = await self._build_snapshot(
+                    constituents=self._tsx60_constituents(),
+                    universe="S&P/TSX Composite — repli TSX 60",
+                    universe_as_of=TSX60_AS_OF,
+                    universe_source=(
+                        f"{TSX60_SOURCE} — repli temporaire; "
+                        f"{XIC_UNIVERSE_SOURCE} indisponible"
+                    ),
+                    previous=None,
+                    refresh_after_seconds=90,
+                    include_unavailable=False,
+                )
 
             self._composite_cached = snapshot
             self._composite_cached_at = monotonic()

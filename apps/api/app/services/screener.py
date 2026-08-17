@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import UTC, datetime
 from time import monotonic
 
@@ -10,6 +11,8 @@ from app.services.tsx_composite_universe import (
     CompositeConstituent,
     tsx_composite_universe_service,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _clamp(value: float, minimum: float = 0.0, maximum: float = 100.0) -> float:
@@ -118,10 +121,28 @@ class ScreenerService:
                 ],
             )
 
-        constituents = (
-            await tsx_composite_universe_service
-            .get_constituents()
-        )
+        try:
+            constituents = (
+                await tsx_composite_universe_service
+                .get_constituents()
+            )
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "composite_screener_tsx60_fallback error=%s detail=%s",
+                type(error).__name__,
+                error,
+            )
+            return (
+                "S&P/TSX Composite — repli TSX 60",
+                [
+                    CompositeConstituent(
+                        ticker=item.symbol,
+                        name=item.name,
+                        sector=item.sector,
+                    )
+                    for item in TSX60
+                ],
+            )
         return (
             "S&P/TSX Composite",
             constituents[
