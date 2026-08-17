@@ -29,12 +29,31 @@ import type {
   CalendarSnapshot,
 } from "@/lib/types";
 import {
+  getProvincialCalendarSnapshot,
+  isProvinceRegion,
+  type ProvincialMacroSnapshot,
+} from "@/lib/provincial-macro";
+import {
   REGION_CODES,
   matchesRegion,
   regionLabel,
   regionSummary,
   type RegionCode,
 } from "@/lib/regions";
+
+type CalendarDisplayEvent = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  importance: string;
+  startsAt: string;
+  source: string;
+  url: string | null;
+  region: string;
+  currency: string | null;
+  timeIsEstimated: boolean;
+};
 
 export function CalendarClient() {
   const { preferences } =
@@ -76,6 +95,10 @@ export function CalendarClient() {
     useState<CalendarSnapshot | null>(
       null,
     );
+  const [provincialData, setProvincialData] =
+    useState<ProvincialMacroSnapshot | null>(
+      null,
+    );
   const [error, setError] =
     useState<string | null>(null);
   const [query, setQuery] =
@@ -86,14 +109,20 @@ export function CalendarClient() {
     useState("Toutes");
   const [region, setRegion] =
     useState<RegionCode>("ALL");
+  const provinceMode =
+    isProvinceRegion(region);
 
   useEffect(() => {
     let active = true;
     let controller =
       new AbortController();
 
-    setData(null);
-    setError(null);
+    queueMicrotask(() => {
+      if (!active) return;
+      setData(null);
+      setProvincialData(null);
+      setError(null);
+    });
 
     const load = async () => {
       controller.abort();
@@ -101,17 +130,30 @@ export function CalendarClient() {
         new AbortController();
 
       try {
-        const snapshot =
-          await getCalendarSnapshot(
-            language,
-            controller.signal,
-          );
+        const snapshot = provinceMode
+          ? await getProvincialCalendarSnapshot(
+              region,
+              language,
+              controller.signal,
+            )
+          : await getCalendarSnapshot(
+              language,
+              controller.signal,
+            );
 
         if (
           active &&
           !controller.signal.aborted
         ) {
-          setData(snapshot);
+          if (provinceMode) {
+            setProvincialData(
+              snapshot as ProvincialMacroSnapshot,
+            );
+          } else {
+            setData(
+              snapshot as CalendarSnapshot,
+            );
+          }
           setError(null);
         }
       } catch {
@@ -122,8 +164,12 @@ export function CalendarClient() {
           setError(
             pick(
               language,
-              "Le calendrier officiel est temporairement indisponible. Une nouvelle tentative sera faite automatiquement.",
-              "The official calendar is temporarily unavailable. Anatole will retry automatically.",
+              provinceMode
+                ? "Le calendrier économique provincial est temporairement indisponible. Anatole n’invente aucune date et réessaiera automatiquement."
+                : "Le calendrier officiel est temporairement indisponible. Une nouvelle tentative sera faite automatiquement.",
+              provinceMode
+                ? "The provincial economic calendar is temporarily unavailable. Anatole does not invent dates and will retry automatically."
+                : "The official calendar is temporarily unavailable. Anatole will retry automatically.",
             ),
           );
         }
@@ -143,18 +189,69 @@ export function CalendarClient() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [language]);
+  }, [language, provinceMode, region]);
+
+  const events = useMemo<CalendarDisplayEvent[]>(() => {
+    if (provinceMode) {
+      return (provincialData?.upcoming_events ?? []).map(
+        (item) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          importance: item.importance,
+          startsAt: item.starts_at,
+          source: item.source,
+          url: item.source_url,
+          region: item.province,
+          currency: null,
+          timeIsEstimated:
+            item.time_is_estimated,
+        }),
+      );
+    }
+
+    return (data?.events ?? [])
+      .filter((item) =>
+        matchesRegion(
+          item.regions,
+          region,
+        ),
+      )
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        category: item.category,
+        importance: item.importance,
+        startsAt: item.starts_at,
+        source: item.source,
+        url: item.url,
+        region: regionSummary(
+          item.regions,
+          language,
+        ),
+        currency: item.currency,
+        timeIsEstimated: false,
+      }));
+  }, [
+    data,
+    language,
+    provinceMode,
+    provincialData,
+    region,
+  ]);
 
   const categories = useMemo(
     () =>
       Array.from(
         new Set(
-          data?.events.map(
+          events.map(
             (item) => item.category,
-          ) ?? [],
+          ),
         ),
       ).sort(),
-    [data],
+    [events],
   );
 
   const filtered = useMemo(() => {
@@ -162,7 +259,7 @@ export function CalendarClient() {
       query.trim().toLowerCase();
 
     return (
-      data?.events ?? []
+      events
     ).filter((item) => {
       const text =
         `${item.title} ${
@@ -177,10 +274,6 @@ export function CalendarClient() {
         (importance === "Toutes" ||
           item.importance ===
             importance) &&
-        matchesRegion(
-          item.regions,
-          region,
-        ) &&
         (category === "Toutes" ||
           item.category ===
             category)
@@ -188,10 +281,9 @@ export function CalendarClient() {
     });
   }, [
     category,
-    data,
+    events,
     importance,
     query,
-    region,
   ]);
 
   const grouped = useMemo(() => {
@@ -205,7 +297,7 @@ export function CalendarClient() {
       const key =
         dayFormatter.format(
           new Date(
-            event.starts_at,
+            event.startsAt,
           ),
         );
 
@@ -223,7 +315,31 @@ export function CalendarClient() {
     filtered,
   ]);
 
-  if (!data && !error) {
+  const activeData = provinceMode
+    ? provincialData
+    : data;
+  const sourceStatuses = provinceMode
+    ? (provincialData?.sources ?? []).map(
+        (item) => ({
+          key: item.key,
+          label: item.label,
+          status: item.status,
+          detail: item.detail,
+        }),
+      )
+    : (data?.source_statuses ?? []).map(
+        (item) => ({
+          key: item.source,
+          label: item.source,
+          status:
+            item.status === "ok"
+              ? "available"
+              : "unavailable",
+          detail: item.detail,
+        }),
+      );
+
+  if (!activeData && !error) {
     return (
       <section className="panel discovery-loading">
         <span className="live-dot" />
@@ -268,8 +384,12 @@ export function CalendarClient() {
           <p>
             {pick(
               language,
-              "Dates futures des principaux indicateurs canadiens, avec une lecture par province lorsque les données régionales sont publiées.",
-              "Upcoming Canadian economic indicators, with province-level coverage when regional data are published.",
+              provinceMode
+                ? `Diffusions économiques essentielles visant directement ${provincialData?.province ?? region}, sources provinciales officielles en priorité.`
+                : "Dates futures des principaux indicateurs canadiens, avec une lecture par province lorsque les données régionales sont publiées.",
+              provinceMode
+                ? `Essential economic releases for ${provincialData?.province ?? region}, prioritizing official provincial sources.`
+                : "Upcoming Canadian economic indicators, with province-level coverage when regional data are published.",
             )}
           </p>
         </div>
@@ -289,8 +409,12 @@ export function CalendarClient() {
           <small>
             {pick(
               language,
-              "Canada + 10 provinces · heure de Toronto",
-              "Canada + 10 provinces · Toronto time",
+              provinceMode
+                ? `${provincialData?.province ?? region} · mode province-first`
+                : "Canada + 10 provinces · heure de Toronto",
+              provinceMode
+                ? `${provincialData?.province ?? region} · province-first mode`
+                : "Canada + 10 provinces · Toronto time",
             )}
           </small>
         </div>
@@ -302,21 +426,33 @@ export function CalendarClient() {
         </div>
       ) : null}
 
+      {provincialData?.message ? (
+        <div className="cockpit-warning">
+          {provincialData.message}
+        </div>
+      ) : null}
+
       <section className="source-status-grid">
-        {data?.source_statuses.map(
+        {sourceStatuses.map(
           (item) => (
             <article
-              className={`panel source-status source-${item.status}`}
-              key={item.source}
+              className={`panel source-status source-${item.status === "unavailable" ? "unavailable" : "ok"}`}
+              key={item.key}
             >
               <span>
-                {item.status === "ok"
+                {item.status === "available"
                   ? pick(
                       language,
                       "Disponible",
                       "Available",
                     )
-                  : pick(
+                  : item.status === "partial"
+                    ? pick(
+                        language,
+                        "Partielle",
+                        "Partial",
+                      )
+                    : pick(
                       language,
                       "Indisponible",
                       "Unavailable",
@@ -324,7 +460,7 @@ export function CalendarClient() {
               </span>
               <strong>
                 {localizeSource(
-                  item.source,
+                  item.label,
                   language,
                 )}
               </strong>
@@ -431,6 +567,13 @@ export function CalendarClient() {
                 "Medium",
               )}
             </option>
+            <option value="Faible">
+              {pick(
+                language,
+                "Faible",
+                "Low",
+              )}
+            </option>
           </select>
         </label>
 
@@ -488,11 +631,17 @@ export function CalendarClient() {
                     key={event.id}
                   >
                     <time>
-                      {timeFormatter.format(
-                        new Date(
-                          event.starts_at,
-                        ),
-                      )}
+                      {event.timeIsEstimated
+                        ? pick(
+                            language,
+                            "Heure non publiée",
+                            "Time not published",
+                          )
+                        : timeFormatter.format(
+                            new Date(
+                              event.startsAt,
+                            ),
+                          )}
                     </time>
 
                     <span
@@ -514,10 +663,7 @@ export function CalendarClient() {
                         {event.title}
                       </strong>
                       <small>
-                        {regionSummary(
-                          event.regions,
-                          language,
-                        )}{" "}
+                        {event.region}{" "}
                         ·{" "}
                         {localizeCategory(
                           event.category,
@@ -528,7 +674,9 @@ export function CalendarClient() {
                           event.source,
                           language,
                         )}{" "}
-                        · {event.currency}
+                        {event.currency
+                          ? ` · ${event.currency}`
+                          : ""}
                       </small>
 
                       {event.description ? (

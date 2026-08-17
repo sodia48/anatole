@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+from fastapi.testclient import TestClient
+
+from app.main import app
+from app.schemas.provincial_macro import ProvincialMacroSnapshot
 from app.services.provincial_macro import (
     PROVINCES,
     _ontario_calendar_events,
@@ -8,14 +12,65 @@ from app.services.provincial_macro import (
     _saskatchewan_calendar_events,
     classify_macro,
     normalize_region,
+    provincial_macro_service,
     provincialize_statcan_events,
 )
+
+
+client = TestClient(app)
 
 
 def test_all_ten_provinces_are_registered() -> None:
     assert set(PROVINCES) == {
         "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL"
     }
+
+
+def test_provincial_routes_are_mounted_once_for_all_provinces(monkeypatch) -> None:
+    async def fake_snapshot(region: object, lang: str = "fr") -> ProvincialMacroSnapshot:
+        code = str(region)
+        return ProvincialMacroSnapshot(
+            region=code,
+            province=PROVINCES[code].fr,
+            language="en" if lang == "en" else "fr",
+            latest_releases=[],
+            upcoming_events=[],
+            sources=[],
+            generated_at=datetime.now(UTC),
+            message="N-D",
+        )
+
+    monkeypatch.setattr(
+        provincial_macro_service,
+        "get_calendar_snapshot",
+        fake_snapshot,
+    )
+    monkeypatch.setattr(
+        provincial_macro_service,
+        "get_snapshot",
+        fake_snapshot,
+    )
+
+    for region in PROVINCES:
+        calendar = client.get(
+            "/api/v1/discovery/provincial-calendar",
+            params={"region": region, "lang": "fr"},
+        )
+        macro = client.get(
+            "/api/v1/discovery/provincial-macro",
+            params={"region": region, "lang": "fr"},
+        )
+
+        assert calendar.status_code == 200
+        assert macro.status_code == 200
+        assert calendar.json()["region"] == region
+        assert macro.json()["region"] == region
+
+    duplicate_prefix = client.get(
+        "/api/v1/discovery/api/v1/discovery/provincial-calendar",
+        params={"region": "QC", "lang": "fr"},
+    )
+    assert duplicate_prefix.status_code == 404
 
 
 def test_region_aliases() -> None:
@@ -32,6 +87,9 @@ def test_noise_is_rejected() -> None:
     ) == (None, 0)
     assert classify_macro(
         "Mise en garde à la population - présence possible de Listeria"
+    ) == (None, 0)
+    assert classify_macro(
+        "Le gouvernement annonce un investissement dans un centre communautaire"
     ) == (None, 0)
 
 

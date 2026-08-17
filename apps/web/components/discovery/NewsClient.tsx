@@ -17,6 +17,7 @@ import {
 import {
   localizeCategory,
   localizeFeedDetail,
+  localizeImportance,
   localizeSentiment,
   localizeSource,
   localeFor,
@@ -38,6 +39,25 @@ import {
 import type {
   NewsSnapshot,
 } from "@/lib/types";
+import {
+  getProvincialMacroSnapshot,
+  isProvinceRegion,
+  type ProvincialMacroSnapshot,
+} from "@/lib/provincial-macro";
+
+type NewsDisplayItem = {
+  id: string;
+  title: string;
+  summary: string;
+  url: string;
+  source: string;
+  category: string;
+  publishedAt: string | null;
+  sentiment: string | null;
+  sentimentScore: number | null;
+  importance: string | null;
+  region: string;
+};
 
 export function NewsClient() {
   const { preferences } =
@@ -63,6 +83,10 @@ export function NewsClient() {
     useState<NewsSnapshot | null>(
       null,
     );
+  const [provincialData, setProvincialData] =
+    useState<ProvincialMacroSnapshot | null>(
+      null,
+    );
   const [error, setError] =
     useState<string | null>(null);
   const [query, setQuery] =
@@ -75,6 +99,8 @@ export function NewsClient() {
     useState("Tous");
   const [region, setRegion] =
     useState<RegionCode>("ALL");
+  const provinceMode =
+    isProvinceRegion(region);
 
   useEffect(() => {
     let active = true;
@@ -86,8 +112,12 @@ export function NewsClient() {
      * contenu anglais/français à l’écran en attendant la nouvelle
      * édition officielle.
      */
-    setData(null);
-    setError(null);
+    queueMicrotask(() => {
+      if (!active) return;
+      setData(null);
+      setProvincialData(null);
+      setError(null);
+    });
 
     const load = async () => {
       controller.abort();
@@ -95,17 +125,30 @@ export function NewsClient() {
         new AbortController();
 
       try {
-        const snapshot =
-          await getNewsSnapshot(
-            language,
-            controller.signal,
-          );
+        const snapshot = provinceMode
+          ? await getProvincialMacroSnapshot(
+              region,
+              language,
+              controller.signal,
+            )
+          : await getNewsSnapshot(
+              language,
+              controller.signal,
+            );
 
         if (
           active &&
           !controller.signal.aborted
         ) {
-          setData(snapshot);
+          if (provinceMode) {
+            setProvincialData(
+              snapshot as ProvincialMacroSnapshot,
+            );
+          } else {
+            setData(
+              snapshot as NewsSnapshot,
+            );
+          }
           setError(null);
         }
       } catch {
@@ -116,8 +159,12 @@ export function NewsClient() {
           setError(
             pick(
               language,
-              "Les flux officiels ne répondent pas pour le moment. Anatole réessaiera automatiquement.",
-              "Official feeds are not responding right now. Anatole will retry automatically.",
+              provinceMode
+                ? "Les sources économiques provinciales ne répondent pas pour le moment. Anatole n’invente aucune publication et réessaiera automatiquement."
+                : "Les flux officiels ne répondent pas pour le moment. Anatole réessaiera automatiquement.",
+              provinceMode
+                ? "Provincial economic sources are not responding right now. Anatole does not fabricate releases and will retry automatically."
+                : "Official feeds are not responding right now. Anatole will retry automatically.",
             ),
           );
         }
@@ -137,30 +184,81 @@ export function NewsClient() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [language]);
+  }, [language, provinceMode, region]);
+
+  const items = useMemo<NewsDisplayItem[]>(() => {
+    if (provinceMode) {
+      return (provincialData?.latest_releases ?? []).map(
+        (item) => ({
+          id: item.id,
+          title: item.title,
+          summary: item.summary,
+          url: item.source_url,
+          source: item.source,
+          category: item.category,
+          publishedAt: item.published_at,
+          sentiment: null,
+          sentimentScore: null,
+          importance: item.importance,
+          region: item.province,
+        }),
+      );
+    }
+
+    return (data?.items ?? [])
+      .filter((item) =>
+        matchesRegion(
+          item.regions,
+          region,
+        ),
+      )
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        summary: item.summary,
+        url: item.url,
+        source: item.source,
+        category: item.category,
+        publishedAt: item.published_at,
+        sentiment: item.sentiment,
+        sentimentScore:
+          item.sentiment_score,
+        importance: null,
+        region: regionSummary(
+          item.regions,
+          language,
+        ),
+      }));
+  }, [
+    data,
+    language,
+    provinceMode,
+    provincialData,
+    region,
+  ]);
 
   const sources = useMemo(
     () =>
       Array.from(
         new Set(
-          data?.items.map(
+          items.map(
             (item) => item.source,
-          ) ?? [],
+          ),
         ),
       ).sort(),
-    [data],
+    [items],
   );
 
   const categories = useMemo(
     () =>
       Array.from(
         new Set(
-          data?.items.map(
+          items.map(
             (item) => item.category,
-          ) ?? [],
+          ),
         ),
       ).sort(),
-    [data],
+    [items],
   );
 
   const filtered = useMemo(() => {
@@ -168,7 +266,7 @@ export function NewsClient() {
       query.trim().toLowerCase();
 
     return (
-      data?.items ?? []
+      items
     ).filter((item) => {
       const text =
         `${item.title} ${item.summary}`
@@ -184,25 +282,48 @@ export function NewsClient() {
         (category === "Toutes" ||
           item.category ===
             category) &&
-        matchesRegion(
-          item.regions,
-          region,
-        ) &&
-        (sentiment === "Tous" ||
+        (provinceMode || sentiment === "Tous" ||
           item.sentiment ===
             sentiment)
       );
     });
   }, [
     category,
-    data,
+    items,
+    provinceMode,
     query,
-    region,
     sentiment,
     source,
   ]);
 
-  if (!data && !error) {
+  const activeData = provinceMode
+    ? provincialData
+    : data;
+  const sourceStatuses = provinceMode
+    ? (provincialData?.sources ?? []).map(
+        (item) => ({
+          key: item.key,
+          label: item.label,
+          status: item.status,
+          detail: item.detail,
+        }),
+      )
+    : (data?.source_statuses ?? [])
+        .filter((item) =>
+          item.source.startsWith("Statistique Canada") ||
+          item.source.startsWith("Banque du Canada"),
+        )
+        .map((item) => ({
+          key: item.source,
+          label: item.source,
+          status:
+            item.status === "ok"
+              ? "available"
+              : "unavailable",
+          detail: item.detail,
+        }));
+
+  if (!activeData && !error) {
     return (
       <section className="panel discovery-loading">
         <span className="live-dot" />
@@ -240,15 +361,23 @@ export function NewsClient() {
           <h1>
             {pick(
               language,
-              "Fil macro canadien",
-              "Canadian macro feed",
+              provinceMode
+                ? `Fil macro — ${provincialData?.province ?? region}`
+                : "Fil macro canadien",
+              provinceMode
+                ? `${provincialData?.province ?? region} macro feed`
+                : "Canadian macro feed",
             )}
           </h1>
           <p>
             {pick(
               language,
-              "Publications économiques officielles du Canada et des provinces, catégorisées et accompagnées d’une lecture de sentiment simple et explicable.",
-              "Official economic publications from Canada and the provinces, categorized and paired with a simple, explainable sentiment reading.",
+              provinceMode
+                ? "Publications économiques provinciales essentielles, sources statistiques officielles en priorité et sans communiqués gouvernementaux génériques."
+                : "Publications économiques officielles du Canada et des provinces, catégorisées et accompagnées d’une lecture de sentiment simple et explicable.",
+              provinceMode
+                ? "Essential provincial economic releases, prioritizing official statistical sources and excluding generic government announcements."
+                : "Official economic publications from Canada and the provinces, categorized and paired with a simple, explainable sentiment reading.",
             )}
           </p>
         </div>
@@ -268,8 +397,12 @@ export function NewsClient() {
           <small>
             {pick(
               language,
-              "Canada + 10 provinces · mise à jour toutes les 15 minutes",
-              "Canada + 10 provinces · refresh every 15 minutes",
+              provinceMode
+                ? `${provincialData?.province ?? region} · mode province-first`
+                : "Canada + 10 provinces · mise à jour toutes les 15 minutes",
+              provinceMode
+                ? `${provincialData?.province ?? region} · province-first mode`
+                : "Canada + 10 provinces · refresh every 15 minutes",
             )}
           </small>
         </div>
@@ -281,26 +414,33 @@ export function NewsClient() {
         </div>
       ) : null}
 
+      {provincialData?.message ? (
+        <div className="cockpit-warning">
+          {provincialData.message}
+        </div>
+      ) : null}
+
       <section className="source-status-grid">
-        {data?.source_statuses
-          .filter((item) =>
-            item.source.startsWith("Statistique Canada") ||
-            item.source.startsWith("Banque du Canada"),
-          )
-          .map(
+        {sourceStatuses.map(
           (item) => (
             <article
-              className={`panel source-status source-${item.status}`}
-              key={item.source}
+              className={`panel source-status source-${item.status === "unavailable" ? "unavailable" : "ok"}`}
+              key={item.key}
             >
               <span>
-                {item.status === "ok"
+                {item.status === "available"
                   ? pick(
                       language,
                       "Disponible",
                       "Available",
                     )
-                  : pick(
+                  : item.status === "partial"
+                    ? pick(
+                        language,
+                        "Partielle",
+                        "Partial",
+                      )
+                    : pick(
                       language,
                       "Indisponible",
                       "Unavailable",
@@ -308,7 +448,7 @@ export function NewsClient() {
               </span>
               <strong>
                 {localizeSource(
-                  item.source,
+                  item.label,
                   language,
                 )}
               </strong>
@@ -351,11 +491,12 @@ export function NewsClient() {
           </span>
           <select
             value={region}
-            onChange={(event) =>
+            onChange={(event) => {
+              setSource("Toutes");
               setRegion(
                 event.target.value as RegionCode,
-              )
-            }
+              );
+            }}
           >
             {REGION_CODES.map((code) => (
               <option
@@ -445,52 +586,54 @@ export function NewsClient() {
           </select>
         </label>
 
-        <label>
-          <span>
-            {pick(
-              language,
-              "Sentiment",
-              "Sentiment",
-            )}
-          </span>
-          <select
-            value={sentiment}
-            onChange={(event) =>
-              setSentiment(
-                event.target.value,
-              )
-            }
-          >
-            <option value="Tous">
+        {!provinceMode ? (
+          <label>
+            <span>
               {pick(
                 language,
-                "Tous",
-                "All",
+                "Sentiment",
+                "Sentiment",
               )}
-            </option>
-            <option value="Positif">
-              {pick(
-                language,
-                "Positif",
-                "Positive",
-              )}
-            </option>
-            <option value="Neutre">
-              {pick(
-                language,
-                "Neutre",
-                "Neutral",
-              )}
-            </option>
-            <option value="Négatif">
-              {pick(
-                language,
-                "Négatif",
-                "Negative",
-              )}
-            </option>
-          </select>
-        </label>
+            </span>
+            <select
+              value={sentiment}
+              onChange={(event) =>
+                setSentiment(
+                  event.target.value,
+                )
+              }
+            >
+              <option value="Tous">
+                {pick(
+                  language,
+                  "Tous",
+                  "All",
+                )}
+              </option>
+              <option value="Positif">
+                {pick(
+                  language,
+                  "Positif",
+                  "Positive",
+                )}
+              </option>
+              <option value="Neutre">
+                {pick(
+                  language,
+                  "Neutre",
+                  "Neutral",
+                )}
+              </option>
+              <option value="Négatif">
+                {pick(
+                  language,
+                  "Négatif",
+                  "Negative",
+                )}
+              </option>
+            </select>
+          </label>
+        ) : null}
       </section>
 
       <section className="news-grid">
@@ -507,10 +650,7 @@ export function NewsClient() {
                 )}
               </span>
               <span>
-                {regionSummary(
-                  item.regions,
-                  language,
-                )}
+                {item.region}
               </span>
               <em>
                 {localizeCategory(
@@ -519,12 +659,17 @@ export function NewsClient() {
                 )}
               </em>
               <time>
-                {formatter.format(
-                  new Date(
-                    item.published_at,
-                  ),
-                )}{" "}
-                ET
+                {item.publishedAt
+                  ? `${formatter.format(
+                      new Date(
+                        item.publishedAt,
+                      ),
+                    )} ET`
+                  : pick(
+                      language,
+                      "Date non publiée",
+                      "Date not published",
+                    )}
               </time>
             </div>
 
@@ -537,21 +682,33 @@ export function NewsClient() {
             ) : null}
 
             <div className="news-card-footer">
-              <span
-                className={`sentiment sentiment-${item.sentiment.toLowerCase()}`}
-              >
-                {localizeSentiment(
-                  item.sentiment,
-                  language,
-                )}{" "}
-                {item.sentiment_score >
-                0
-                  ? "+"
-                  : ""}
-                {item.sentiment_score.toFixed(
-                  0,
-                )}
-              </span>
+              {item.sentiment !== null && item.sentimentScore !== null ? (
+                <span
+                  className={`sentiment sentiment-${item.sentiment.toLowerCase()}`}
+                >
+                  {localizeSentiment(
+                    item.sentiment,
+                    language,
+                  )}{" "}
+                  {item.sentimentScore > 0
+                    ? "+"
+                    : ""}
+                  {item.sentimentScore.toFixed(
+                    0,
+                  )}
+                </span>
+              ) : item.importance ? (
+                <span
+                  className={`importance importance-${item.importance
+                    .toLowerCase()
+                    .replaceAll(" ", "-")}`}
+                >
+                  {localizeImportance(
+                    item.importance,
+                    language,
+                  )}
+                </span>
+              ) : null}
 
               <a
                 href={item.url}
