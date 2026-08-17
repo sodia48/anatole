@@ -123,6 +123,7 @@ async def test_preview_scan_does_not_expand_to_full_directory(
         ticker: str,
         company: str,
         *,
+        days: int,
         force_refresh: bool = False,
     ) -> list[InsiderTrade]:
         calls.append(ticker)
@@ -159,6 +160,7 @@ async def test_full_scan_can_expand_when_initial_group_is_empty(
         ticker: str,
         company: str,
         *,
+        days: int,
         force_refresh: bool = False,
     ) -> list[InsiderTrade]:
         calls.append(ticker)

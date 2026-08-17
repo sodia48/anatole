@@ -49,3 +49,5 @@ services:
         sync: false
       - key: ACCOUNT_INVITE_CODES
         sync: false
+      - key: FINNHUB_API_KEY
+        sync: false

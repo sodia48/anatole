@@ -728,13 +728,23 @@ export function IpoInsidersClient({
     insiders.summary.transactions === 0 &&
     insiders.trades.length === 0;
 
+  const automatedInsiderSources =
+    insiders.sources.filter(
+      (source) =>
+        !source.source.startsWith(
+          "SEDI",
+        ),
+    );
+
   const insiderCoverageUnavailable =
     !insidersLoading &&
     insidersLoadStage === "ready" &&
     insiders.summary.transactions === 0 &&
-    insiders.sources.length > 0 &&
-    insiders.sources.every(
-      (source) => source.count === 0,
+    automatedInsiderSources.length > 0 &&
+    automatedInsiderSources.every(
+      (source) =>
+        source.status ===
+        "unavailable",
     );
 
   const insiderProgressLabel =
@@ -1438,7 +1448,7 @@ export function IpoInsidersClient({
                 }}
               >
                 <option value="canada">
-                  Canada — SEDI
+                  Canada — SEDI via Finnhub
                 </option>
                 <option value="us">
                   {pick(language, "États-Unis — SEC", "United States — SEC")}
@@ -1760,10 +1770,12 @@ export function IpoInsidersClient({
                 <strong>
                   {insiderCoverageUnavailable
                     ? pick(language, "Couverture automatisée indisponible", "Automated coverage unavailable")
-                    : pick(language, "Aucune transaction normalisée", "No normalized transaction")}
+                    : pick(language, "Aucune transaction observée", "No transaction observed")}
                 </strong>
                 <p>
-                  {language === "fr" ? insiders.message ?? "Aucune transaction ne correspond aux filtres." : "No transaction matches the filters."}
+                  {insiderCoverageUnavailable
+                    ? pick(language, insiders.message ?? "Les fournisseurs automatisés sont indisponibles.", "Automated providers are unavailable.")
+                    : pick(language, insiders.message ?? "Aucune transaction observée pour les critères sélectionnés.", "No transaction was observed for the selected criteria.")}
                 </p>
                 <div
                   className={
@@ -1934,7 +1946,7 @@ export function IpoInsidersClient({
               styles.methodFooter
             }
           >
-            {pick(language, "Au Canada, Anatole automatise une source secondaire et fournit le lien de vérification SEDI. Aux États-Unis, les opérations proviennent des formulaires 4 et 4/A de la SEC. Les attributions et exercices sont exclus du flux net achats–ventes.", "In Canada, Anatole automates a secondary source and provides a SEDI verification link. In the United States, transactions come from SEC Forms 4 and 4/A. Grants and exercises are excluded from net purchase-sale flow.")}
+            {pick(language, "Au Canada, Finnhub est la source automatisée principale, Yahoo Finance sert de repli et SEDI reste le registre officiel de vérification, sans collecte automatisée. Aux États-Unis, les opérations proviennent des formulaires 4 et 4/A de la SEC. Les attributions et exercices sont exclus du flux net achats–ventes.", "In Canada, Finnhub is the primary automated source, Yahoo Finance is the fallback, and SEDI remains the official verification registry without automated collection. In the United States, transactions come from SEC Forms 4 and 4/A. Grants and exercises are excluded from net purchase-sale flow.")}
           </footer>
         </>
       )}
