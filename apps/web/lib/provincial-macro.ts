@@ -1,3 +1,5 @@
+import { resilientFetch } from "./resilient-fetch";
+
 export type AnatoleLanguage = "fr" | "en";
 
 export type ProvinceCode =
@@ -100,6 +102,8 @@ const REGION_ALIASES: Record<string, ProvinceCode> = {
   "newfoundland and labrador": "NL",
 };
 
+const DEFAULT_API_URL = "https://anatole-api.onrender.com";
+
 function normalize(value: string): string {
   return value
     .normalize("NFD")
@@ -122,12 +126,41 @@ export function isProvinceRegion(region: string): boolean {
 }
 
 function apiBaseUrl(): string {
-  const configured =
+  if (typeof window !== "undefined") {
+    return "/api/anatole";
+  }
+
+  return (
+    process.env.ANATOLE_API_URL ??
     process.env.NEXT_PUBLIC_API_URL ??
     process.env.NEXT_PUBLIC_API_BASE_URL ??
-    "https://anatole-api.onrender.com";
+    DEFAULT_API_URL
+  ).replace(/\/+$/, "");
+}
 
-  return configured.replace(/\/+$/, "");
+class ProvincialApiError extends Error {
+  readonly status: number;
+
+  constructor(label: string, status: number) {
+    super(`${label} HTTP ${status}`);
+    this.name = "ProvincialApiError";
+    this.status = status;
+  }
+}
+
+function provincialRequest(
+  path: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return resilientFetch(`${apiBaseUrl()}${path}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal,
+    retries: 1,
+    timeoutMs: 45_000,
+    allowStale: false,
+  });
 }
 
 export async function getProvincialCalendarSnapshot(
@@ -150,22 +183,22 @@ export async function getProvincialCalendarSnapshot(
     `/api/v1/discovery/provincial-macro?${query.toString()}`,
   ];
 
-  let lastStatus = 0;
+  let lastResponse: Response | null = null;
   for (const path of paths) {
-    const response = await fetch(`${apiBaseUrl()}${path}`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal,
-    });
+    const response = await provincialRequest(path, signal);
     if (response.ok) {
       return response.json() as Promise<ProvincialMacroSnapshot>;
     }
-    lastStatus = response.status;
-    if (response.status !== 404 && response.status !== 405) break;
+    lastResponse = response;
+    if (response.status !== 404 && response.status !== 405) {
+      throw new ProvincialApiError("Provincial calendar", response.status);
+    }
   }
 
-  throw new Error(`Provincial calendar HTTP ${lastStatus || "error"}`);
+  if (lastResponse) {
+    throw new ProvincialApiError("Provincial calendar", lastResponse.status);
+  }
+  throw new Error("Provincial calendar unavailable");
 }
 
 
@@ -184,18 +217,13 @@ export async function getProvincialMacroSnapshot(
     lang: language,
   });
 
-  const response = await fetch(
-    `${apiBaseUrl()}/api/v1/discovery/provincial-macro?${query.toString()}`,
-    {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal,
-    },
+  const response = await provincialRequest(
+    `/api/v1/discovery/provincial-macro?${query.toString()}`,
+    signal,
   );
 
   if (!response.ok) {
-    throw new Error(`Provincial macro HTTP ${response.status}`);
+    throw new ProvincialApiError("Provincial macro", response.status);
   }
 
   return response.json() as Promise<ProvincialMacroSnapshot>;
