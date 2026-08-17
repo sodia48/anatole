@@ -56,7 +56,7 @@ class EtfDirectoryService:
         self._quote_cache: dict[str, Any] = {}
         self._last_full_refresh = 0.0
         self._refresh_task: asyncio.Task[None] | None = None
-        self._last_cold_start_attempt = 0.0
+        self._last_cold_start_attempt: float | None = None
         self._cold_start_lock = asyncio.Lock()
 
     async def _fetch_quotes(
@@ -149,7 +149,8 @@ class EtfDirectoryService:
 
         now = monotonic()
         if (
-            now - self._last_cold_start_attempt
+            self._last_cold_start_attempt is not None
+            and now - self._last_cold_start_attempt
             < COLD_START_RETRY_SECONDS
         ):
             return
@@ -160,7 +161,8 @@ class EtfDirectoryService:
 
             now = monotonic()
             if (
-                now - self._last_cold_start_attempt
+                self._last_cold_start_attempt is not None
+                and now - self._last_cold_start_attempt
                 < COLD_START_RETRY_SECONDS
             ):
                 return
