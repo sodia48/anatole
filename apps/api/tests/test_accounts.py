@@ -38,6 +38,19 @@ def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_sqlite_account_store_waits_for_concurrent_writes(tmp_path: Path):
+    service = AccountService(f"sqlite:///{tmp_path / 'concurrent.db'}")
+    try:
+        with service.engine.connect() as connection:
+            busy_timeout = connection.exec_driver_sql(
+                "PRAGMA busy_timeout"
+            ).scalar_one()
+        assert busy_timeout == 30_000
+        assert service.engine.pool.size() == 1
+    finally:
+        service.engine.dispose()
+
+
 def test_register_login_me_and_logout(account_client: TestClient):
     created = register(account_client)
     assert created["user"]["email"] == "beta@example.com"
@@ -66,6 +79,41 @@ def test_register_login_me_and_logout(account_client: TestClient):
     )
     assert login.status_code == 200
     assert login.json()["user"]["email"] == "beta@example.com"
+
+
+def test_logout_all_invalidates_every_session(account_client: TestClient):
+    created = register(account_client, "sessions@example.com")
+    second_response = account_client.post(
+        "/api/v1/account/login",
+        json={"email": "sessions@example.com", "password": "Anatole2026!"},
+    )
+    assert second_response.status_code == 200
+    second = second_response.json()
+
+    response = account_client.post(
+        "/api/v1/account/logout-all",
+        headers=auth(created["token"]),
+    )
+    assert response.status_code == 204
+    assert account_client.get(
+        "/api/v1/account/me", headers=auth(created["token"])
+    ).status_code == 401
+    assert account_client.get(
+        "/api/v1/account/me", headers=auth(second["token"])
+    ).status_code == 401
+
+
+def test_expired_session_is_rejected(
+    account_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(account_routes.settings, "account_session_days", -1)
+    created = register(account_client, "expired@example.com")
+    response = account_client.get(
+        "/api/v1/account/me",
+        headers=auth(created["token"]),
+    )
+    assert response.status_code == 401
 
 
 def test_duplicate_account_and_invalid_password(account_client: TestClient):

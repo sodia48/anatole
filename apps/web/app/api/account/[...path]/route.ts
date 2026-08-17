@@ -12,17 +12,30 @@ const API_URL = (
 ).replace(/\/+$/, "");
 
 const COOKIE_NAME = "anatole_session";
-const ROOTS = new Set([
-  "preferences",
-  "feed",
-  "refresh",
-  "read-all",
-  "preview",
-  "send-test",
+const PUBLIC_ROUTES = new Set(["registration", "register", "login"]);
+const ROUTES = new Map<string, ReadonlySet<string>>([
+  ["registration", new Set(["GET"])],
+  ["register", new Set(["POST"])],
+  ["login", new Set(["POST"])],
+  ["me", new Set(["GET"])],
+  ["logout", new Set(["POST"])],
+  ["logout-all", new Set(["POST"])],
+  ["workspace", new Set(["GET", "PUT"])],
+  ["profile", new Set(["PUT"])],
+  ["change-password", new Set(["POST"])],
+  ["export", new Set(["GET"])],
+  ["delete", new Set(["DELETE"])],
 ]);
 
 type Context = {
   params: Promise<{ path: string[] }> | { path: string[] };
+};
+
+type UpstreamSession = {
+  token?: unknown;
+  token_type?: unknown;
+  expires_at?: unknown;
+  [key: string]: unknown;
 };
 
 function noStoreHeaders(
@@ -35,16 +48,42 @@ function noStoreHeaders(
   });
 }
 
-function validSegments(segments: string[]): boolean {
-  if (segments.length < 1 || segments.length > 3) return false;
-  if (!ROOTS.has(segments[0])) return false;
-  if (!segments.every((segment) => /^[a-zA-Z0-9_-]+$/.test(segment))) {
-    return false;
-  }
-  if (segments[0] === "feed" && segments.length > 1) {
-    return segments.length === 3 && segments[2] === "read";
-  }
-  return segments.length === 1;
+function clearSession(response: NextResponse): void {
+  response.cookies.set({
+    name: COOKIE_NAME,
+    value: "",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(0),
+    maxAge: 0,
+  });
+}
+
+function setSession(
+  response: NextResponse,
+  token: string,
+  expiresAt: string,
+): boolean {
+  const expires = new Date(expiresAt);
+  if (!Number.isFinite(expires.getTime())) return false;
+
+  response.cookies.set({
+    name: COOKIE_NAME,
+    value: token,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires,
+  });
+  return true;
+}
+
+function copyRequestId(upstream: Response, response: NextResponse): void {
+  const requestId = upstream.headers.get("X-Request-ID");
+  if (requestId) response.headers.set("X-Request-ID", requestId);
 }
 
 async function proxy(
@@ -53,26 +92,36 @@ async function proxy(
 ): Promise<NextResponse> {
   const params = await context.params;
   const segments = params.path ?? [];
+  const route = segments.length === 1 ? segments[0] : "";
+  const allowedMethods = ROUTES.get(route);
 
-  if (!validSegments(segments)) {
+  if (!allowedMethods) {
     return NextResponse.json(
-      { detail: "Route de notifications invalide." },
+      { detail: "Route de compte invalide." },
       { status: 404, headers: noStoreHeaders() },
     );
   }
+  if (!allowedMethods.has(request.method)) {
+    const response = NextResponse.json(
+      { detail: "Méthode non autorisée pour cette route de compte." },
+      { status: 405, headers: noStoreHeaders() },
+    );
+    response.headers.set("Allow", [...allowedMethods].join(", "));
+    return response;
+  }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  if (!token) {
+  if (!PUBLIC_ROUTES.has(route) && !token) {
     return NextResponse.json(
-      { detail: "Connexion requise pour les notifications." },
+      { detail: "Connexion requise." },
       { status: 401, headers: noStoreHeaders() },
     );
   }
 
-  const headers = new Headers({
-    Accept: "application/json",
-    Authorization: `Bearer ${token}`,
-  });
+  const headers = new Headers({ Accept: "application/json" });
+  if (token && !PUBLIC_ROUTES.has(route)) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
   const requestId = request.headers.get("X-Request-ID");
   if (requestId) headers.set("X-Request-ID", requestId);
 
@@ -88,15 +137,14 @@ async function proxy(
     }
   }
 
-  const upstreamUrl = new URL(
-    `${API_URL}/api/v1/notifications/${segments.join("/")}`,
-  );
+  const upstreamUrl = new URL(`${API_URL}/api/v1/account/${route}`);
   request.nextUrl.searchParams.forEach((value: string, key: string) => {
     upstreamUrl.searchParams.append(key, value);
   });
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 35_000);
+  const timer = setTimeout(() => controller.abort(), 30_000);
+  const clearsSession = new Set(["logout", "logout-all", "delete"]).has(route);
 
   try {
     const upstream = await fetch(upstreamUrl, {
@@ -110,6 +158,46 @@ async function proxy(
       upstream.headers.get("content-type") ??
       "application/json; charset=utf-8";
     const raw = await upstream.arrayBuffer();
+
+    if (upstream.ok && (route === "register" || route === "login")) {
+      let session: UpstreamSession;
+      try {
+        session = JSON.parse(new TextDecoder().decode(raw)) as UpstreamSession;
+      } catch {
+        return NextResponse.json(
+          { detail: "Réponse de session invalide." },
+          { status: 502, headers: noStoreHeaders() },
+        );
+      }
+
+      if (
+        typeof session.token !== "string" ||
+        typeof session.expires_at !== "string"
+      ) {
+        return NextResponse.json(
+          { detail: "Réponse de session incomplète." },
+          { status: 502, headers: noStoreHeaders() },
+        );
+      }
+
+      const sessionToken = session.token;
+      const clientSession = { ...session };
+      delete clientSession.token;
+      delete clientSession.token_type;
+      const response = NextResponse.json(clientSession, {
+        status: upstream.status,
+        headers: noStoreHeaders(),
+      });
+      if (!setSession(response, sessionToken, session.expires_at)) {
+        return NextResponse.json(
+          { detail: "Expiration de session invalide." },
+          { status: 502, headers: noStoreHeaders() },
+        );
+      }
+      copyRequestId(upstream, response);
+      return response;
+    }
+
     const response =
       upstream.status === 204
         ? new NextResponse(null, {
@@ -120,20 +208,21 @@ async function proxy(
             status: upstream.status,
             headers: noStoreHeaders(contentType),
           });
-    const upstreamRequestId = upstream.headers.get("X-Request-ID");
-    if (upstreamRequestId) {
-      response.headers.set("X-Request-ID", upstreamRequestId);
+    copyRequestId(upstream, response);
+    if ((clearsSession && upstream.ok) || upstream.status === 401) {
+      clearSession(response);
     }
     return response;
   } catch (error) {
     const detail =
       error instanceof Error && error.name === "AbortError"
-        ? "Délai dépassé lors de l’actualisation des notifications."
-        : "Le centre de notifications est temporairement indisponible.";
-    return NextResponse.json(
+        ? "Délai dépassé lors de la communication avec le service de compte."
+        : "Le service de compte est temporairement indisponible.";
+    const response = NextResponse.json(
       { detail },
       { status: 502, headers: noStoreHeaders() },
     );
+    return response;
   } finally {
     clearTimeout(timer);
   }
@@ -142,4 +231,4 @@ async function proxy(
 export const GET = proxy;
 export const POST = proxy;
 export const PUT = proxy;
-
+export const DELETE = proxy;

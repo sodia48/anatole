@@ -30,6 +30,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.pool import QueuePool
 
 from app.core.config import settings
 from app.schemas.accounts import (
@@ -140,14 +141,26 @@ class AccountService:
         elif self.database_url.startswith("postgresql://"):
             self.database_url = self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
         connect_args: dict[str, Any] = {}
+        pool_args: dict[str, Any] = {}
         if self.database_url.startswith("sqlite"):
             connect_args["check_same_thread"] = False
+            connect_args["timeout"] = 30
+            # SQLite allows a single writer. Keeping one pooled connection
+            # avoids immediate SQLITE_LOCKED failures with shared in-memory
+            # databases and makes local account writes deterministic.
+            pool_args.update(
+                poolclass=QueuePool,
+                pool_size=1,
+                max_overflow=0,
+                pool_timeout=30,
+            )
 
         self.engine: Engine = create_engine(
             self.database_url,
             future=True,
             pool_pre_ping=True,
             connect_args=connect_args,
+            **pool_args,
         )
         self.metadata = MetaData()
         self.users = Table(

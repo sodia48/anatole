@@ -8,6 +8,9 @@ import {
   useState,
 } from "react";
 
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
+import { resilientFetch } from "@/lib/resilient-fetch";
+
 type AdminTab =
   | "overview"
   | "users"
@@ -95,44 +98,36 @@ async function adminRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const controller = new AbortController();
-  const timeout = window.setTimeout(
-    () => controller.abort(),
-    25_000,
-  );
+  const response = await resilientFetch(`/api/admin${path}`, {
+    ...options,
+    headers,
+    credentials: "same-origin",
+    cache: "no-store",
+    timeoutMs: 25_000,
+    retries: options.method && options.method !== "GET" ? 0 : 1,
+    allowStale: false,
+  });
 
-  try {
-    const response = await fetch(`/api/admin${path}`, {
-      ...options,
-      headers,
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    });
+  if (!response.ok) {
+    let message = `Erreur administrateur ${response.status}`;
 
-    if (!response.ok) {
-      let message = `Erreur administrateur ${response.status}`;
-
-      try {
-        const body = (await response.json()) as {
-          detail?: string;
-        };
-        if (body.detail) message = body.detail;
-      } catch {
-        // Réponse non JSON.
-      }
-
-      throw new Error(message);
+    try {
+      const body = (await response.json()) as {
+        detail?: string;
+      };
+      if (body.detail) message = body.detail;
+    } catch {
+      // Réponse non JSON.
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
-  } finally {
-    window.clearTimeout(timeout);
+    throw new Error(message);
   }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await response.json()) as T;
 }
 
 function formatDate(value: string | null): string {
@@ -232,7 +227,8 @@ export default function AdminPage() {
   );
 
   useEffect(() => {
-    void load("");
+    const timer = window.setTimeout(() => void load(""), 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const openReports = useMemo(
@@ -373,7 +369,7 @@ export default function AdminPage() {
       <header className="hero">
         <div>
           <span className="eyebrow">
-            ANATOLE ADMIN · v1.1.2
+            ANATOLE ADMIN · {ANATOLE_VERSION_LABEL}
           </span>
           <h1>Console de bêta</h1>
           <p>

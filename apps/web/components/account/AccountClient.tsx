@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   Cloud,
@@ -29,6 +29,7 @@ import {
   updateAccountProfile,
 } from "@/lib/account";
 import { readLocalWorkspace } from "@/lib/workspace-sync";
+import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 
 import styles from "./Account.module.css";
 
@@ -67,6 +68,8 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [registrationPolicy, setRegistrationPolicy] =
     useState<AccountRegistrationPolicy | null>(null);
+  const [registrationPolicyError, setRegistrationPolicyError] =
+    useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [profileName, setProfileName] = useState("");
@@ -80,7 +83,11 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
   const [accountError, setAccountError] = useState<string | null>(null);
 
   useEffect(() => {
-    setProfileName(account.user?.display_name ?? "");
+    const timer = window.setTimeout(
+      () => setProfileName(account.user?.display_name ?? ""),
+      0,
+    );
+    return () => window.clearTimeout(timer);
   }, [account.user?.display_name]);
 
   useEffect(() => {
@@ -88,16 +95,17 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
 
     void getRegistrationPolicy()
       .then((policy) => {
-        if (!cancelled) setRegistrationPolicy(policy);
+        if (!cancelled) {
+          setRegistrationPolicy(policy);
+          setRegistrationPolicyError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) {
-          setRegistrationPolicy({
-            enabled: true,
-            invite_required: false,
-            terms_version: "2026-08-01",
-            privacy_version: "2026-08-01",
-          });
+          setRegistrationPolicy(null);
+          setRegistrationPolicyError(
+            "La politique d’inscription est indisponible. La connexion reste accessible, mais aucune inscription ne peut être acceptée pour le moment.",
+          );
         }
       });
 
@@ -106,16 +114,13 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     };
   }, []);
 
-  const counts = useMemo(() => {
-    if (!account.hydrated) return null;
-    const data = readLocalWorkspace().data;
-    return {
-      watchlist: data.watchlist.length,
-      portfolio: data.portfolio.length,
-      alerts: data.alerts.length,
-      comparator: data.comparator_symbols.length,
-    };
-  }, [account.hydrated, account.lastSyncedAt, account.workspaceRevision]);
+  const localData = account.hydrated ? readLocalWorkspace().data : null;
+  const counts = localData ? {
+    watchlist: localData.watchlist.length,
+    portfolio: localData.portfolio.length,
+    alerts: localData.alerts.length,
+    comparator: localData.comparator_symbols.length,
+  } : null;
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -123,6 +128,11 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     setFormError(null);
     try {
       if (mode === "register") {
+        if (!registrationPolicy?.enabled) {
+          throw new Error(
+            registrationPolicyError ?? "Les nouvelles inscriptions sont temporairement fermées.",
+          );
+        }
         await account.register(
           email,
           password,
@@ -171,7 +181,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
       <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
         <header className={styles.hero}>
           <div>
-            <span className={styles.eyebrow}>ANATOLE v1.0.0</span>
+            <span className={styles.eyebrow}>ANATOLE {ANATOLE_VERSION_LABEL}</span>
             <h1>Retrouve ton espace sur tous tes appareils</h1>
             <p>Watchlist, Portefeuille, Alertes, préférences et profil Anatole Conseil restent utilisables sans compte. La connexion ajoute uniquement la synchronisation.</p>
           </div>
@@ -254,6 +264,12 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
               </div>
             ) : null}
 
+            {mode === "register" && registrationPolicyError ? (
+              <div className={styles.policyNotice} role="alert">
+                {registrationPolicyError}
+              </div>
+            ) : null}
+
             {formError || account.error ? <div className={styles.error}>{formError ?? account.error}</div> : null}
             <button
               className={styles.primaryButton}
@@ -285,7 +301,7 @@ export function AccountClient({ embedded = false }: { embedded?: boolean }) {
     <div className={`${styles.page} ${embedded ? styles.embedded : ""}`}>
       <header className={styles.hero}>
         <div>
-          <span className={styles.eyebrow}>MON ESPACE ANATOLE · v1.0.0</span>
+          <span className={styles.eyebrow}>MON ESPACE ANATOLE · {ANATOLE_VERSION_LABEL}</span>
           <h1>{account.user.display_name ? `Bonjour ${account.user.display_name}` : "Compte synchronisé"}</h1>
           <p>{account.user.email}</p>
         </div>
