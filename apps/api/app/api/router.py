@@ -11,6 +11,7 @@ from app.api.routes import (
     ipo_insiders,
     market,
     notifications,
+    provincial_macro,
     reliability,
     search,
     stocks,
@@ -57,6 +58,14 @@ api_router.include_router(
     discovery.router,
     prefix="/api/v1/discovery",
     tags=["discovery"],
+)
+
+# Calendrier et fil macro strictement provinciaux. Les routes déclarent
+# seulement leur suffixe afin de ne pas doubler le préfixe discovery.
+api_router.include_router(
+    provincial_macro.router,
+    prefix="/api/v1/discovery",
+    tags=["provincial-macro"],
 )
 
 # Participations et historique détaillé des ETF

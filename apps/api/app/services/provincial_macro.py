@@ -344,8 +344,16 @@ PROVINCES: dict[str, ProvinceConfig] = {
         "ON", "Ontario", "Ontario", ON_PAGES, "ontario",
         "https://budget.ontario.ca/2026/chapter-2.html",
     ),
-    "BC": ProvinceConfig("BC", "Colombie-Britannique", "British Columbia", BC_PAGES),
-    "AB": ProvinceConfig("AB", "Alberta", "Alberta", AB_PAGES),
+    "BC": ProvinceConfig(
+        "BC", "Colombie-Britannique", "British Columbia", BC_PAGES,
+        "british_columbia",
+        "https://www2.gov.bc.ca/gov/content/data/statistics/bc-stats",
+    ),
+    "AB": ProvinceConfig(
+        "AB", "Alberta", "Alberta", AB_PAGES,
+        "alberta",
+        "https://www.alberta.ca/labour-market-highlights",
+    ),
     "SK": ProvinceConfig(
         "SK", "Saskatchewan", "Saskatchewan", SK_PAGES, "saskatchewan",
         "https://publications.saskatchewan.ca/api/v1/products/86689/formats/156260/download",
@@ -377,7 +385,8 @@ ESSENTIAL_RULES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
     )),
     ("Emploi", 100, (
         "labour force survey", "enquete sur la population active", "employment", "unemployment",
-        "emploi", "chomage", "payroll employment", "earnings and hours", "weekly earnings",
+        "labour force statistics", "emploi", "chomage", "payroll employment",
+        "earnings and hours", "weekly earnings",
     )),
     ("PIB", 100, (
         "gross domestic product", "produit interieur brut", "economic accounts", "comptes economiques",
@@ -388,13 +397,16 @@ ESSENTIAL_RULES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
     )),
     ("Industrie", 86, (
         "manufacturing", "manufacturing sales", "ventes de biens fabriques", "fabrication",
+        "industries manufacturieres",
     )),
     ("Commerce", 84, (
         "international merchandise exports", "international merchandise trade",
         "exports", "imports", "exportations", "importations", "wholesale trade",
+        "commerce de gros",
     )),
     ("Logement", 84, (
         "building permits", "permis de batir", "housing starts", "mises en chantier",
+        "investment in building construction", "investissement en construction de batiments",
     )),
     ("Population", 82, (
         "quarterly population", "population estimates", "estimations demographiques",
@@ -424,26 +436,42 @@ HARD_EXCLUSIONS = (
 # Events that truly have province-level output and may safely be "provincialised".
 STATCAN_PROVINCIAL_EVENT_PATTERNS = (
     "consumer price index",
+    "indice des prix a la consommation",
     "labour force survey",
+    "enquete sur la population active",
+    "payroll employment, earnings and hours",
     "employment, earnings and hours",
     "survey of employment, payrolls and hours",
+    "emploi salarie, remuneration, heures travaillees",
+    "emploi, remuneration et heures de travail",
     "retail trade",
     "retail sales",
+    "commerce de detail",
+    "ventes au detail",
     "wholesale trade",
+    "commerce de gros",
     "monthly survey of manufacturing",
     "manufacturing sales",
-    "employment, earnings and hours",
-    "survey of employment, payrolls and hours",
+    "enquete mensuelle sur les industries manufacturieres",
+    "ventes de biens fabriques",
     "average weekly earnings",
+    "remuneration hebdomadaire moyenne",
     "building permits",
+    "permis de batir",
     "investment in building construction",
+    "investissement en construction de batiments",
     "quarterly demographic estimates",
+    "estimations demographiques trimestrielles",
     "population estimates",
+    "estimations de la population",
     "gross domestic product by industry: provinces",
     "gross domestic product by industry, provinces",
     "gross domestic product by industry: provinces and territories",
+    "produit interieur brut par industrie : provinces",
     "international merchandise trade by province",
     "international merchandise exports by province",
+    "commerce international de marchandises par province",
+    "exportations internationales de marchandises par province",
 )
 
 # Dated safety net copied from Statistique Québec's official main-indicator
@@ -615,7 +643,7 @@ class ContentParser(HTMLParser):
             return
         if self._skip:
             return
-        if tag in {"h1", "h2", "h3", "p"}:
+        if tag in {"h1", "h2", "h3", "p", "li"}:
             self._tag = tag
             self._parts = []
         if tag == "a":
@@ -1035,6 +1063,150 @@ def _ontario_calendar_events(
     return _dedupe_events(events)
 
 
+def _british_columbia_calendar_events(
+    html_text: str,
+    *,
+    now: datetime,
+    lang: str,
+    source_url: str,
+) -> list[ProvincialMacroEvent]:
+    parser = ContentParser()
+    parser.feed(html_text)
+    schedule_year: int | None = None
+    for tag, text in parser.blocks:
+        if tag not in {"h2", "h3"} or "release schedule" not in _norm(text):
+            continue
+        year_match = re.search(r"\b(20\d{2})\b", text)
+        if year_match:
+            schedule_year = int(year_match.group(1))
+            break
+    if schedule_year is None:
+        return []
+
+    header: list[str] | None = None
+    for row in parser.rows:
+        if row and _norm(row[0]) == str(schedule_year):
+            header = row
+            break
+    if not header or len(header) < 2:
+        return []
+
+    province = province_name("BC", lang)
+    today = now.astimezone(TORONTO).date()
+    events: list[ProvincialMacroEvent] = []
+    for row in parser.rows:
+        if not row:
+            continue
+        month = EN_MONTHS.get(_norm(row[0]))
+        if not month:
+            continue
+        for index, raw_day in enumerate(row[1:], start=1):
+            if index >= len(header):
+                break
+            day_match = re.fullmatch(r"\s*([0-3]?\d)\s*", raw_day)
+            if not day_match:
+                continue
+            try:
+                release_day = date(schedule_year, month, int(day_match.group(1)))
+            except ValueError:
+                continue
+            if release_day < today:
+                continue
+            indicator = header[index].strip()
+            category, score = classify_macro(indicator)
+            if not category:
+                continue
+            localized_indicator = _translate_statcan_title(indicator, lang)
+            title = f"{province} — {localized_indicator}"
+            starts_at = datetime.combine(release_day, time(12, 0), tzinfo=TORONTO)
+            events.append(
+                ProvincialMacroEvent(
+                    id=_id("BC", title, starts_at.isoformat()),
+                    region="BC",
+                    province=province,
+                    title=title[:240],
+                    description=(
+                        "Date publiée dans le calendrier officiel de BC Stats."
+                        if lang == "fr"
+                        else "Date published in BC Stats' official release schedule."
+                    ),
+                    category=category,
+                    importance=importance_label(score),
+                    importance_score=score,
+                    starts_at=starts_at,
+                    time_is_estimated=True,
+                    source="BC Stats",
+                    source_kind="statistics",
+                    source_url=source_url,
+                    official=True,
+                    specificity="province-direct",
+                )
+            )
+    return _dedupe_events(events)
+
+
+def _alberta_calendar_events(
+    html_text: str,
+    *,
+    now: datetime,
+    lang: str,
+    source_url: str,
+) -> list[ProvincialMacroEvent]:
+    parser = ContentParser()
+    parser.feed(html_text)
+    marker_index: int | None = None
+    for index, (_tag, text) in enumerate(parser.blocks):
+        if "labour force survey release dates" in _norm(text):
+            marker_index = index
+            break
+    if marker_index is None:
+        return []
+
+    province = province_name("AB", lang)
+    today = now.astimezone(TORONTO).date()
+    title_base = (
+        "Enquête sur la population active"
+        if lang == "fr"
+        else "Labour Force Survey"
+    )
+    title = f"{province} — {title_base}"
+    events: list[ProvincialMacroEvent] = []
+    for tag, text in parser.blocks[marker_index + 1 :]:
+        normalized = _norm(text)
+        if tag == "h2" or "following statistics are available" in normalized:
+            break
+        for release_day in _dates_in_text(text):
+            if release_day < today:
+                continue
+            starts_at = datetime.combine(release_day, time(12, 0), tzinfo=TORONTO)
+            events.append(
+                ProvincialMacroEvent(
+                    id=_id("AB", title, starts_at.isoformat()),
+                    region="AB",
+                    province=province,
+                    title=title,
+                    description=(
+                        "Date de diffusion de l’EPA publiée par le gouvernement de l’Alberta; "
+                        "l’heure n’est pas affichée comme heure exacte."
+                        if lang == "fr"
+                        else "LFS release date published by the Government of Alberta; "
+                        "the time is not presented as an exact release time."
+                    ),
+                    category="Emploi",
+                    importance="Élevée",
+                    importance_score=100,
+                    starts_at=starts_at,
+                    time_is_estimated=True,
+                    source="Alberta Labour Market Information",
+                    source_kind="statistics",
+                    source_url=source_url,
+                    official=True,
+                    specificity="province-direct",
+                )
+            )
+    return _dedupe_events(events)
+
+
 def _saskatchewan_calendar_events(
     *,
     now: datetime,
@@ -1142,9 +1314,19 @@ def provincialize_statcan_events(
 
 
 def _dedupe_events(events: list[ProvincialMacroEvent]) -> list[ProvincialMacroEvent]:
+    direct_keys = {
+        (event.category, event.starts_at.date())
+        for event in events
+        if event.specificity in {"province-direct", "fiscal-direct"}
+    }
     seen: set[tuple[str, str]] = set()
     output: list[ProvincialMacroEvent] = []
     for event in sorted(events, key=lambda item: (item.starts_at, -item.importance_score)):
+        if (
+            event.specificity == "province-normalized"
+            and (event.category, event.starts_at.date()) in direct_keys
+        ):
+            continue
         key = (_norm(event.title), event.starts_at.date().isoformat())
         if key in seen:
             continue
@@ -1287,6 +1469,24 @@ class ProvincialMacroService:
                 )
                 label = "Ontario Economic Accounts — calendrier"
                 kind = "economic_accounts"
+            elif config.calendar_kind == "british_columbia":
+                events = _british_columbia_calendar_events(
+                    response.text,
+                    now=now,
+                    lang=lang,
+                    source_url=config.calendar_url,
+                )
+                label = "BC Stats — release schedule"
+                kind = "statistics"
+            elif config.calendar_kind == "alberta":
+                events = _alberta_calendar_events(
+                    response.text,
+                    now=now,
+                    lang=lang,
+                    source_url=config.calendar_url,
+                )
+                label = "Alberta Labour Market Information — calendrier"
+                kind = "statistics"
             else:
                 events = []
                 label = f"{province_name(config.code, lang)} — calendrier"
@@ -1303,7 +1503,13 @@ class ProvincialMacroService:
                 detail=(
                     "Secours officiel daté du 14 août 2026; lecture live à retester."
                     if config.calendar_kind == "quebec" and locals().get("used_snapshot_fallback", False)
-                    else None if events else "Calendrier accessible, mais aucune date future extraite."
+                    else None
+                    if events
+                    else (
+                        "Calendrier officiel accessible, mais aucune date future valide n’y est publiée."
+                        if lang == "fr"
+                        else "Official schedule accessible, but it publishes no valid future date."
+                    )
                 ),
             )
         except Exception as exc:
@@ -1347,27 +1553,44 @@ class ProvincialMacroService:
     ) -> tuple[list[ProvincialMacroEvent], ProvincialMacroSource]:
         try:
             from app.services.calendar import calendar_service
-            snapshot = await calendar_service.get_snapshot()
+
+            national_events, feed_status = await calendar_service.get_statcan_events(lang)
             events = provincialize_statcan_events(
-                getattr(snapshot, "events", []),
+                national_events,
                 region=region,
                 lang=lang,
                 now=now,
             )
             province = province_name(region, lang)
+            status = (
+                "available"
+                if events and feed_status.status == "ok"
+                else "partial"
+                if events
+                else "unavailable"
+            )
+            policy_detail = (
+                "Seules les diffusions qui comportent une ventilation provinciale essentielle sont conservées."
+                if lang == "fr"
+                else "Only essential releases with provincial breakdowns are retained."
+            )
+            detail = policy_detail
+            if feed_status.detail:
+                detail = f"{policy_detail} {feed_status.detail}"
+            source_url = (
+                str(getattr(national_events[0], "url", "") or "")
+                if national_events
+                else ""
+            ) or "https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm"
             return events, ProvincialMacroSource(
                 key=f"statcan-{region.lower()}",
                 label=f"Statistique Canada — {province}" if lang == "fr" else f"Statistics Canada — {province}",
                 region=region,
                 kind="statcan",
-                url="https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm",
-                status="available" if events else "partial",
+                url=source_url,
+                status=status,
                 count=len(events),
-                detail=(
-                    "Seules les diffusions qui comportent une ventilation provinciale essentielle sont conservées."
-                    if lang == "fr"
-                    else "Only essential releases with provincial breakdowns are retained."
-                ),
+                detail=detail,
             )
         except Exception as exc:
             province = province_name(region, lang)
@@ -1469,7 +1692,7 @@ class ProvincialMacroService:
                 province=province_name(code, language),
                 language=language,
                 latest_releases=[],
-                upcoming_events=events[:50],
+                upcoming_events=events[:80],
                 sources=sources,
                 generated_at=now,
                 refresh_after_seconds=900 if events else 90,
@@ -1581,7 +1804,7 @@ class ProvincialMacroService:
                 province=province_name(code, language),
                 language=language,
                 latest_releases=releases[:30],
-                upcoming_events=events[:50],
+                upcoming_events=events[:80],
                 sources=sources,
                 generated_at=now,
                 refresh_after_seconds=900 if (releases or events) else 90,

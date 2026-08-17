@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 
 from app.services.calendar import (
     BOC_URLS,
+    STATCAN_ANNUAL_SCHEDULE_URLS,
+    STATCAN_JSON_URLS,
     STATCAN_URLS,
     CalendarService,
     _category,
@@ -12,6 +14,8 @@ from app.services.calendar import (
     _parse_full_date,
     _parse_short_date,
     _parse_statcan_html,
+    _parse_statcan_json,
+    _statcan_official_schedule_fallback,
 )
 
 
@@ -45,6 +49,52 @@ def test_french_statcan_calendar_keeps_official_title() -> None:
     assert events[1].title == "Commerce de gros, juin 2026"
     assert events[0].url == STATCAN_URLS["fr"]
     assert events[0].category == "Industrie"
+
+
+def test_statcan_javascript_array_calendar_is_parsed_without_eval() -> None:
+    content = """
+    [
+      {
+        date: "2026-09-04 00:00:01",
+        type: "meeting",
+        title: "Labour Force Survey",
+        description: "August 2026",
+        url: "//www.statcan.gc.ca/daily-quotidien/260904/dq260904a-eng.htm"
+      }
+    ]
+    """
+    events = _parse_statcan_json(
+        content,
+        now=datetime(2026, 8, 16, 12, tzinfo=UTC),
+        language="en",
+        url=STATCAN_JSON_URLS["en"],
+    )
+
+    assert len(events) == 1
+    assert events[0].title == "Labour Force Survey"
+    assert events[0].starts_at.isoformat().startswith("2026-09-04T08:30")
+    assert events[0].url.startswith("https://www.statcan.gc.ca/")
+    assert "August 2026" in (events[0].description or "")
+
+
+def test_statcan_annual_schedule_fallback_is_official_and_bounded() -> None:
+    events = _statcan_official_schedule_fallback(
+        now=datetime(2026, 8, 16, 12, tzinfo=UTC),
+        language="fr",
+    )
+    titles = {event.title for event in events}
+    dates = {event.starts_at.date().isoformat() for event in events}
+
+    assert "Indice des prix à la consommation" in titles
+    assert "Enquête sur la population active" in titles
+    assert "Commerce de détail" in titles
+    assert "2026-08-17" in dates
+    assert "2027-03-31" in dates
+    assert all(event.url == STATCAN_ANNUAL_SCHEDULE_URLS["fr"] for event in events)
+    assert not _statcan_official_schedule_fallback(
+        now=datetime(2027, 4, 1, 12, tzinfo=UTC),
+        language="fr",
+    )
 
 
 def test_french_boc_calendar_keeps_official_title_and_time() -> None:
