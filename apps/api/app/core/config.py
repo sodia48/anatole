@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     market_data_provider: str = "yahoo"
     yahoo_timeout_seconds: float = 8.0
     finnhub_api_key: str = ""
+    sec_user_agent: str = "Anatole contact@anatole.app"
     account_database_url: str = Field(
         default="sqlite:///./anatole_accounts.db",
         validation_alias=AliasChoices("ACCOUNT_DATABASE_URL", "DATABASE_URL"),
