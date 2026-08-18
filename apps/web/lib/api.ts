@@ -4,6 +4,9 @@ import type {
   ComparisonSnapshot,
   CockpitSnapshot,
   EtfDirectorySnapshot,
+  InstitutionDetail,
+  InstitutionFlow,
+  InstitutionsSnapshot,
   FocusSnapshot,
   HealthStatus,
   NewsSnapshot,
@@ -210,6 +213,55 @@ export function getEtfDirectory(
     {},
     signal,
     35_000,
+  );
+}
+
+export function getInstitutionsSnapshot(
+  limit = 50,
+  refresh = false,
+  signal?: AbortSignal,
+): Promise<InstitutionsSnapshot> {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    refresh: String(refresh),
+  });
+
+  return apiRequest<InstitutionsSnapshot>(
+    `/api/v1/discovery/institutions?${params.toString()}`,
+    {},
+    signal,
+    60_000,
+  );
+}
+
+export function getInstitutionDetail(
+  cik: string,
+  refresh = false,
+  signal?: AbortSignal,
+): Promise<InstitutionDetail> {
+  const params = new URLSearchParams({
+    refresh: String(refresh),
+  });
+
+  return apiRequest<InstitutionDetail>(
+    `/api/v1/discovery/institutions/${encodeURIComponent(cik)}?${params.toString()}`,
+    {},
+    signal,
+    90_000,
+  );
+}
+
+export function getInstitutionSecurityActivity(
+  query: string,
+  signal?: AbortSignal,
+): Promise<InstitutionFlow> {
+  const params = new URLSearchParams({ q: query.trim() });
+
+  return apiRequest<InstitutionFlow>(
+    `/api/v1/discovery/institutions/security/activity?${params.toString()}`,
+    {},
+    signal,
+    120_000,
   );
 }
 

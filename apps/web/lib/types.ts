@@ -240,6 +240,99 @@ export type EtfDirectorySnapshot = {
   refresh_after_seconds: number;
 };
 
+export type InstitutionHoldingStatus =
+  | "new"
+  | "increased"
+  | "reduced"
+  | "closed"
+  | "unchanged";
+
+export type InstitutionSourceState =
+  | "available"
+  | "partial"
+  | "unavailable"
+  | "stale";
+
+export type InstitutionSourceStatus = {
+  source: string;
+  status: InstitutionSourceState;
+  detail: string;
+  url: string;
+  updated_at: string | null;
+};
+
+export type InstitutionSummary = {
+  cik: string;
+  name: string;
+  country: string;
+  report_period: string;
+  filed_at: string;
+  filing_url: string;
+  total_13f_value: number;
+  holdings_count: number;
+  previous_total_13f_value: number;
+  top10_concentration_percent: number;
+  new_positions_count: number;
+  increased_positions_count: number;
+  reduced_positions_count: number;
+  closed_positions_count: number;
+  comparison_available: boolean;
+};
+
+export type InstitutionHolding = {
+  cusip: string;
+  ticker: string | null;
+  issuer: string;
+  security_class: string;
+  shares: number;
+  previous_shares: number;
+  share_change: number;
+  share_change_percent: number | null;
+  value: number;
+  portfolio_weight_percent: number;
+  previous_value: number;
+  put_call: string | null;
+  status: InstitutionHoldingStatus;
+};
+
+export type InstitutionDetail = {
+  institution: InstitutionSummary;
+  holdings: InstitutionHolding[];
+  previous_report_period: string | null;
+  source_statuses: InstitutionSourceStatus[];
+  generated_at: string;
+  stale: boolean;
+  message: string | null;
+};
+
+export type InstitutionFlow = {
+  ticker: string | null;
+  cusip: string;
+  issuer: string;
+  institutions_holding: number;
+  institutions_increased: number;
+  institutions_reduced: number;
+  institutions_new: number;
+  institutions_closed: number;
+  aggregate_share_change: number | null;
+  current_reported_value: number;
+  institution_names: string[];
+};
+
+export type InstitutionsSnapshot = {
+  institutions: InstitutionSummary[];
+  top_increased: InstitutionFlow[];
+  top_new: InstitutionFlow[];
+  top_reduced: InstitutionFlow[];
+  top_closed: InstitutionFlow[];
+  report_period: string | null;
+  previous_report_period: string | null;
+  generated_at: string;
+  sources: InstitutionSourceStatus[];
+  stale: boolean;
+  message: string | null;
+};
+
 export type PsychologyComponent = {
   key: string;
   label: string;
