@@ -51,3 +51,5 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      - key: SEC_USER_AGENT
+        sync: false

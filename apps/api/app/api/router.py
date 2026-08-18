@@ -8,6 +8,7 @@ from app.api.routes import (
     etf_holdings,
     fundamentals,
     health,
+    institutions,
     ipo_insiders,
     market,
     notifications,
@@ -80,6 +81,13 @@ api_router.include_router(
     ipo_insiders.router,
     prefix="/api/v1/discovery",
     tags=["ipo-insiders"],
+)
+
+# Grands gestionnaires institutionnels et positions SEC Form 13F
+api_router.include_router(
+    institutions.router,
+    prefix="/api/v1/discovery",
+    tags=["institutions"],
 )
 
 

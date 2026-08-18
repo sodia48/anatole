@@ -21,6 +21,7 @@ const routes = [
   "/insiders",
   "/ipo",
   "/ipo-insiders",
+  "/institutions",
   "/notifications",
   "/parametres",
   "/portefeuille",

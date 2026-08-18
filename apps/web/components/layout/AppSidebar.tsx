@@ -20,6 +20,7 @@ import {
   Bell,
   Bot,
   BriefcaseBusiness,
+  Building2,
   CalendarDays,
   CircleDollarSign,
   Database,
@@ -103,6 +104,12 @@ const groups: Array<{
         href: "/etf",
         label: "ETF",
         icon: CircleDollarSign,
+        available: true,
+      },
+      {
+        href: "/institutions",
+        label: "Institutions",
+        icon: Building2,
         available: true,
       },
       {
@@ -215,6 +222,10 @@ function isActive(
 
   if (item.href.startsWith("/focus")) {
     return pathname.startsWith("/focus");
+  }
+
+  if (item.href === "/institutions") {
+    return pathname.startsWith("/institutions");
   }
 
   if (item.href === "/ipo-insiders") {
