@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime
 
 import pytest
@@ -16,6 +17,7 @@ from app.schemas.company_network import (
 from app.schemas.fundamentals import IssuerDocumentCandidate
 from app.services.accounts import AccountService
 from app.services.company_network import (
+    CompanyResolver,
     CompanyNetworkService,
     CompanyNetworkStore,
     FinnhubSupplyChainProvider,
@@ -33,6 +35,7 @@ from app.services.fundamentals import fundamentals_service
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
+from app.services.tsx_composite_universe import tsx_composite_universe_service
 
 
 def node(ticker: str, name: str, sector: str = "Industrials") -> CompanyNetworkNode:
@@ -250,6 +253,33 @@ def test_tables_compile_for_postgresql_without_user_domain_columns() -> None:
         assert "user_id" not in sql
 
 
+@pytest.mark.asyncio
+async def test_resolver_reuses_precompiled_base_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    async def constituents():
+        nonlocal calls
+        calls += 1
+        return []
+
+    monkeypatch.setattr(
+        tsx_composite_universe_service,
+        "get_constituents",
+        constituents,
+    )
+    resolver = CompanyResolver()
+    center = await resolver.resolve("RY")
+
+    first = await resolver.index(center)
+    second = await resolver.index(center)
+
+    assert calls == 1
+    assert first is not second
+    assert first._compiled_aliases is second._compiled_aliases
+
+
 def test_corroboration_requires_two_distinct_credible_sources() -> None:
     a, b = node("A", "Alpha Corp"), node("B", "Beta Corp")
     first = relationship(a, b, confidence="secondary", url="https://source-one.example/relation")
@@ -286,9 +316,13 @@ async def test_paths_depth_one_two_three_no_path_and_confidence_filter(tmp_path)
         assert (await service.path("A", "D", max_depth=3, include_secondary=True)).depth == 3
         filtered = await service.path("A", "D", max_depth=3, include_secondary=False)
         assert filtered.found is False
-        assert "Aucun lien vérifié" in (filtered.message_fr or "")
-        assert (await service.path("A", "E", max_depth=3)).found is False
+        assert filtered.status == "building"
+        assert "arrière-plan" in (filtered.message_fr or "")
+        no_path = await service.path("A", "E", max_depth=3)
+        assert no_path.found is False
+        assert no_path.status == "building"
     finally:
+        await service.close()
         await account.close()
 
 
@@ -342,10 +376,15 @@ async def test_finnhub_failure_does_not_hide_official_relationships(tmp_path, mo
         finnhub_provider=FinnhubSupplyChainProvider(),
     )
     try:
-        snapshot = await service.get_snapshot("A", refresh=True)
+        initial = await service.get_snapshot("A", refresh=True)
+        assert initial.coverage.build_status == "building"
+        await asyncio.gather(*list(service._build_tasks.values()))
+        await asyncio.sleep(0)
+        snapshot = await service.get_snapshot("A")
         assert snapshot.relationships == [official]
         finnhub = next(item for item in snapshot.sources if item.source == "Finnhub Supply Chain")
         assert finnhub.status == "unavailable"
         assert snapshot.coverage.verified_relationships == 1
     finally:
+        await service.close()
         await account.close()

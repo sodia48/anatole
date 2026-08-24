@@ -163,8 +163,31 @@ function snapshot(center: FixtureNode, nodes: FixtureNode[], relationships: Retu
       corroborated_relationships: 0,
       secondary_relationships: 0,
       official_documents_scanned: relationships.length,
+      build_status: "ready",
+      retry_after_seconds: null,
+      build_error: null,
       message_fr: relationships.length ? null : "Anatole n'a pas trouvé suffisamment de relations publiques vérifiables pour cette entreprise.",
       message_en: relationships.length ? null : "Anatole did not find enough publicly verifiable relationships for this company.",
+    },
+  };
+}
+
+function buildingSnapshot(
+  value: ReturnType<typeof snapshot>,
+  depth: 1 | 2,
+  stale = false,
+) {
+  return {
+    ...value,
+    stale,
+    coverage: {
+      ...value.coverage,
+      depth,
+      build_status: "building",
+      retry_after_seconds: 3,
+      build_error: null,
+      message_fr: "Analyse des documents officiels en cours.",
+      message_en: "Official documents are being analyzed.",
     },
   };
 }
@@ -207,6 +230,8 @@ async function fulfillPath(route: Route, url: URL): Promise<void> {
         depth: 1,
         generated_at: GENERATED_AT,
         found: true,
+        status: "ready",
+        retry_after_seconds: null,
         message_fr: null,
         message_en: null,
       }
@@ -218,6 +243,8 @@ async function fulfillPath(route: Route, url: URL): Promise<void> {
         depth: 0,
         generated_at: GENERATED_AT,
         found: false,
+        status: "ready",
+        retry_after_seconds: null,
         message_fr: "Aucun lien vérifié n'a été trouvé dans les données disponibles.",
         message_en: "No verified relationship was found in the available data.",
       };
@@ -232,6 +259,72 @@ async function openEcosystem(page: Page, ticker: string): Promise<void> {
 }
 
 test.describe("Company ecosystem", () => {
+  test("uncached load, refresh and depth two poll without hiding the graph", async ({ page }) => {
+    test.setTimeout(120_000);
+    let initialReadyAt = 0;
+    let initialCompleted = false;
+    let refreshReadyAt = 0;
+    let depthTwoReadyAt = 0;
+
+    await page.route("**/api/anatole/api/v1/discovery/company-network/**", async (route) => {
+      const url = new URL(route.request().url());
+      const requestedDepth = url.searchParams.get("depth") === "2" ? 2 : 1;
+      const refresh = url.searchParams.get("refresh") === "true";
+      let value;
+
+      if (refresh) {
+        if (refreshReadyAt === 0) refreshReadyAt = Date.now() + 1_500;
+        value = buildingSnapshot(snapshots.get("MDA")!, requestedDepth, true);
+      } else if (refreshReadyAt !== 0) {
+        if (Date.now() < refreshReadyAt) {
+          value = buildingSnapshot(snapshots.get("MDA")!, requestedDepth, true);
+        } else {
+          refreshReadyAt = 0;
+          value = snapshots.get("MDA")!;
+        }
+      } else if (requestedDepth === 2) {
+        if (depthTwoReadyAt === 0) depthTwoReadyAt = Date.now() + 1_500;
+        value = Date.now() < depthTwoReadyAt
+          ? buildingSnapshot(snapshots.get("MDA")!, 2, true)
+          : {
+            ...snapshots.get("MDA")!,
+            coverage: { ...snapshots.get("MDA")!.coverage, depth: 2 },
+          };
+      } else {
+        if (!initialCompleted && initialReadyAt === 0) {
+          initialReadyAt = Date.now() + 1_500;
+        }
+        if (!initialCompleted && Date.now() < initialReadyAt) {
+          value = buildingSnapshot(snapshot(mda, [mda], []), 1);
+        } else {
+          initialCompleted = true;
+          value = snapshots.get("MDA")!;
+        }
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(value),
+      });
+    });
+
+    await openEcosystem(page, "MDA");
+    await expect(page.getByText("Analyse des relations officielles en cours…", { exact: true })).toBeVisible();
+    await expect(page.getByText("Anatole n'a pas trouvé suffisamment de relations publiques vérifiables pour cette entreprise.", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("img", { name: /MDA Space.*2 (nœuds|nodes).*1 relations/i })).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("button", { name: /Actualiser|Refresh/, exact: true }).click();
+    await expect(page.getByText("Actualisation en arrière-plan…", { exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: /MDA Space.*2 (nœuds|nodes).*1 relations/i })).toBeVisible();
+    await expect(page.getByText("Actualisation en arrière-plan…", { exact: true })).toHaveCount(0, { timeout: 10_000 });
+
+    await page.getByRole("button", { name: /Profondeur 1.*charger 2|Depth 1.*load 2/ }).click();
+    await expect(page.getByText("Actualisation en arrière-plan…", { exact: true })).toBeVisible();
+    await expect(page.getByRole("img", { name: /MDA Space.*2 (nœuds|nodes).*1 relations/i })).toBeVisible();
+    await expect(page.getByText("Actualisation en arrière-plan…", { exact: true })).toHaveCount(0, { timeout: 10_000 });
+  });
+
   test("verified network, value chain, evidence, path finder and responsive layout", async ({ page }) => {
     test.setTimeout(120_000);
     await mockCompanyNetwork(page);

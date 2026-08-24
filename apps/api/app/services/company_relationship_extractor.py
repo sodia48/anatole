@@ -35,6 +35,16 @@ SENTENCE_SPLIT = re.compile(
     r"(?<!\bInc)(?<!\bLtd)(?<!\bCorp)(?<!\bCo)(?<!\bU\.S)"
     r"(?<=[.!?])\s+(?=[A-Z])|[\r\n]+"
 )
+RELATIONSHIP_HINT_PATTERN = re.compile(
+    r"\b(?:customer|customers|client|clients|supplier|suppliers|supply|"
+    r"sourced|procured|purchased|partner|partnered|partnership|"
+    r"collaborat(?:e|ed|ion)|alliance|joint\s+venture|jv|contract|"
+    r"subsidiar(?:y|ies)|parent|distributor|distributed|revenue|"
+    r"sales\s+to|provided\s+by|awarded|selected\s+by|acquired\s+by|"
+    r"foundries|manufacturers|produce|manufacture|rely\s+on|utilize|"
+    r"major\s+customer|largest\s+customer|single\s+source|sole\s+supplier)\b",
+    re.IGNORECASE,
+)
 PRIVATE_NAME = (
     r"[A-Z][A-Za-z0-9&'’.\-]{1,40}"
     r"(?:\s+(?:[A-Z][A-Za-z0-9&'’.\-]{1,40}|of|the|and)){0,5}"
@@ -121,6 +131,9 @@ class CompanyEntityIndex:
     def __init__(self, nodes: Iterable[CompanyNetworkNode] = ()) -> None:
         self._nodes: dict[str, CompanyNetworkNode] = {}
         self._aliases: dict[str, CompanyNetworkNode] = {}
+        self._compiled_aliases: tuple[
+            tuple[re.Pattern[str], CompanyNetworkNode, str], ...
+        ] | None = None
         for node in nodes:
             self.add(node)
 
@@ -140,6 +153,36 @@ class CompanyEntityIndex:
         for alias in self.aliases_for(node) | {_alias_key(item) for item in aliases}:
             if alias:
                 self._aliases.setdefault(alias, node)
+        self._compiled_aliases = None
+
+    def contains(self, node_id: str) -> bool:
+        return node_id in self._nodes
+
+    def prepare(self) -> None:
+        self._compiled()
+
+    def copy(self) -> "CompanyEntityIndex":
+        clone = CompanyEntityIndex()
+        clone._nodes = dict(self._nodes)
+        clone._aliases = dict(self._aliases)
+        clone._compiled_aliases = self._compiled_aliases
+        return clone
+
+    def _compiled(
+        self,
+    ) -> tuple[tuple[re.Pattern[str], CompanyNetworkNode, str], ...]:
+        if self._compiled_aliases is None:
+            self._compiled_aliases = tuple(
+                (
+                    re.compile(
+                        rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])"
+                    ),
+                    self._aliases[alias],
+                    alias,
+                )
+                for alias in sorted(self._aliases, key=len, reverse=True)
+            )
+        return self._compiled_aliases
 
     def resolve_exact(self, value: str) -> CompanyNetworkNode | None:
         return self._aliases.get(_alias_key(value))
@@ -147,11 +190,10 @@ class CompanyEntityIndex:
     def mentions(self, sentence: str, *, exclude_id: str | None = None) -> list[tuple[CompanyNetworkNode, str]]:
         normalized = _normalized(sentence)
         found: dict[str, tuple[CompanyNetworkNode, str]] = {}
-        for alias in sorted(self._aliases, key=len, reverse=True):
-            node = self._aliases[alias]
+        for pattern, node, alias in self._compiled():
             if node.id == exclude_id or node.id in found:
                 continue
-            if re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized):
+            if pattern.search(normalized):
                 found[node.id] = (node, alias)
         return list(found.values())
 
@@ -415,6 +457,8 @@ class CompanyRelationshipExtractor:
         for raw_sentence in SENTENCE_SPLIT.split(text):
             sentence = " ".join(raw_sentence.split())
             if len(sentence) < 12 or len(sentence) > 1_500:
+                continue
+            if RELATIONSHIP_HINT_PATTERN.search(sentence) is None:
                 continue
             matched_ids: set[str] = set()
             for entity, alias in index.mentions(sentence, exclude_id=center.id):

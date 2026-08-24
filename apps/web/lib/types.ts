@@ -159,6 +159,9 @@ export type CompanyNetworkSnapshot = {
     corroborated_relationships: number;
     secondary_relationships: number;
     official_documents_scanned: number;
+    build_status: "ready" | "building" | "failed";
+    retry_after_seconds: number | null;
+    build_error: string | null;
     message_fr: string | null;
     message_en: string | null;
   };
@@ -172,6 +175,8 @@ export type CompanyRelationshipPath = {
   depth: number;
   generated_at: string;
   found: boolean;
+  status: "ready" | "building" | "failed";
+  retry_after_seconds: number | null;
   message_fr: string | null;
   message_en: string | null;
 };
@@ -183,6 +188,9 @@ export type CompanyNetworkEvidenceResponse = {
     evidence: RelationshipEvidence[];
   }>;
   generated_at: string;
+  status: "ready" | "building" | "failed";
+  retry_after_seconds: number | null;
+  build_error: string | null;
 };
 
 export type StockHistoryResponse = {

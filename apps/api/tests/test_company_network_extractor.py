@@ -211,3 +211,45 @@ def test_charitable_partnership_is_not_an_economic_relation() -> None:
 
     assert nodes == []
     assert relationships == []
+
+
+def test_relationship_prefilter_skips_non_relational_text_without_losing_matches(
+    monkeypatch,
+) -> None:
+    center = company("MDA", "MDA Space Ltd.")
+    honeywell = company("HON", "Honeywell International Inc.")
+    tesla = company("TSLA", "Tesla, Inc.")
+    rbc = company("RY", "Royal Bank of Canada")
+    index = CompanyEntityIndex([center, honeywell, tesla, rbc])
+    original_mentions = index.mentions
+    calls = 0
+
+    def counted_mentions(sentence: str, *, exclude_id: str | None = None):
+        nonlocal calls
+        calls += 1
+        return original_mentions(sentence, exclude_id=exclude_id)
+
+    monkeypatch.setattr(index, "mentions", counted_mentions)
+    filler = "\n".join(
+        f"Operational discussion section {number} covers general business conditions."
+        for number in range(2_000)
+    )
+    text = "\n".join((
+        filler,
+        "Honeywell International Inc. is our supplier.",
+        "Tesla, Inc. is our major customer.",
+        "We signed a contract with Royal Bank of Canada.",
+    ))
+
+    _, relationships = company_relationship_extractor.extract(
+        center,
+        document(text),
+        index,
+    )
+
+    assert calls == 3
+    assert {item.relationship_type for item in relationships} == {
+        "supplier",
+        "customer",
+        "major_contract",
+    }

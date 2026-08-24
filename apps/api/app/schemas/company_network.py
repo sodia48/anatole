@@ -37,6 +37,7 @@ EvidenceSourceType = Literal[
     "other",
 ]
 SourceAvailability = Literal["available", "partial", "unavailable"]
+CompanyNetworkBuildStatus = Literal["ready", "building", "failed"]
 
 
 class CompanyNetworkNode(BaseModel):
@@ -116,6 +117,9 @@ class CompanyNetworkCoverage(BaseModel):
     corroborated_relationships: int = Field(default=0, ge=0)
     secondary_relationships: int = Field(default=0, ge=0)
     official_documents_scanned: int = Field(default=0, ge=0)
+    build_status: CompanyNetworkBuildStatus = "ready"
+    retry_after_seconds: int | None = Field(default=None, ge=1)
+    build_error: str | None = Field(default=None, max_length=240)
     message_fr: str | None = None
     message_en: str | None = None
 
@@ -139,6 +143,8 @@ class CompanyRelationshipPath(BaseModel):
     depth: int = Field(default=0, ge=0, le=3)
     generated_at: datetime
     found: bool
+    status: CompanyNetworkBuildStatus = "ready"
+    retry_after_seconds: int | None = Field(default=None, ge=1)
     message_fr: str | None = None
     message_en: str | None = None
 
@@ -152,3 +158,6 @@ class CompanyNetworkEvidenceResponse(BaseModel):
     ticker: str
     groups: list[RelationshipEvidenceGroup]
     generated_at: datetime
+    status: CompanyNetworkBuildStatus = "ready"
+    retry_after_seconds: int | None = Field(default=None, ge=1)
+    build_error: str | None = Field(default=None, max_length=240)
