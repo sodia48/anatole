@@ -1,9 +1,20 @@
 from app.services.issuer_documents import (
+    IssuerFinancialDocumentsService,
     _LinkExtractor,
     classify_document,
     document_format,
     score_document,
 )
+
+
+def test_mda_uses_the_official_external_investor_site() -> None:
+    website, pages = IssuerFinancialDocumentsService()._website(
+        "MDA",
+        "https://mda.space",
+    )
+
+    assert website == "https://mda-en.investorroom.com/"
+    assert pages == []
 
 
 def test_document_scoring_prefers_statements_over_presentations() -> None:

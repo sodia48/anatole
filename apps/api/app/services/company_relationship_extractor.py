@@ -61,6 +61,19 @@ GENERIC_PRIVATE_NAMES = {
     "market",
     "the company",
 }
+PRIVATE_LOCATION_PREFIX = re.compile(
+    r"^(?:(?:canadian|american|british|european|u\.?s\.?|u\.?k\.?)"
+    r"-based)\s+",
+    re.IGNORECASE,
+)
+NON_COMMERCIAL_PARTNERSHIP_TERMS = (
+    "charity",
+    "charitable",
+    "donation",
+    "non-profit",
+    "nonprofit",
+    "scholarship",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -155,6 +168,43 @@ def private_node(name: str) -> CompanyNetworkNode:
         industry=None,
         public_company=False,
         node_type="private_company",
+    )
+
+
+def _clean_private_name(name: str) -> str:
+    return PRIVATE_LOCATION_PREFIX.sub("", name).strip()
+
+
+def _looks_like_issuer_heading(
+    name: str,
+    center: CompanyNetworkNode,
+) -> bool:
+    candidate = _normalized(name)
+    center_name = _normalized(center.name)
+    without_suffix = _normalized(
+        CORPORATE_SUFFIXES.sub("", center.name).strip(" ,.")
+    )
+    prefixes = {
+        value
+        for value in (
+            center_name,
+            without_suffix,
+            _normalized(center.ticker or ""),
+        )
+        if len(value) >= 3
+    }
+    return any(
+        candidate == prefix
+        or candidate.startswith(f"{prefix} ")
+        for prefix in prefixes
+    )
+
+
+def _non_commercial_partnership(sentence: str) -> bool:
+    value = _normalized(sentence)
+    return any(
+        term in value
+        for term in NON_COMMERCIAL_PARTNERSHIP_TERMS
     )
 
 
@@ -371,18 +421,37 @@ class CompanyRelationshipExtractor:
                 relationship_type = _explicit_type(sentence, alias)
                 if relationship_type is None:
                     continue
+                if (
+                    relationship_type == "strategic_partner"
+                    and _non_commercial_partnership(sentence)
+                ):
+                    continue
                 nodes[entity.id] = entity
                 matched_ids.add(entity.id)
                 relationships.append(_relationship(center, entity, relationship_type, sentence, alias, document))
 
             for expected_type, pattern in PRIVATE_PATTERNS:
                 for match in pattern.finditer(sentence):
-                    name = " ".join(match.group("name").split()).strip(" ,.;:()[]")
+                    name = _clean_private_name(
+                        " ".join(match.group("name").split()).strip(
+                            " ,.;:()[]"
+                        )
+                    )
                     resolved = index.resolve_exact(name)
+                    if resolved is None and _looks_like_issuer_heading(
+                        name,
+                        center,
+                    ):
+                        continue
                     entity = resolved or private_node(name)
                     if entity.id == center.id or entity.id in matched_ids or _normalized(entity.name) in GENERIC_PRIVATE_NAMES:
                         continue
                     relationship_type = _explicit_type(sentence, _normalized(name)) or expected_type
+                    if (
+                        relationship_type == "strategic_partner"
+                        and _non_commercial_partnership(sentence)
+                    ):
+                        continue
                     nodes[entity.id] = entity
                     matched_ids.add(entity.id)
                     relationships.append(_relationship(center, entity, relationship_type, sentence, _normalized(name), document))

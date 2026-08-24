@@ -174,3 +174,40 @@ def test_real_mda_contract_example_extracts_only_published_value() -> None:
     assert relationships[0].relationship_type == "major_contract"
     assert relationships[0].contract_value == 1_100_000_000
     assert relationships[0].contract_currency == "CAD"
+
+
+def test_mda_pdf_heading_is_not_treated_as_a_company() -> None:
+    globalstar = company("GSAT", "Globalstar, Inc.")
+    _, nodes, relationships = extraction(
+        "\n".join((
+            "MDA SPACE SIGNS $1.1B CONTRACT WITH MDA SPACE ACHIEVES AN INDUSTRY FIRST IN DIGITAL BEAM FORMING.",
+            "MDA Space Ltd. was awarded an approximate CAD $1.1 billion contract with Globalstar, Inc.",
+        )),
+        globalstar,
+    )
+
+    assert [node.name for node in nodes] == ["Globalstar, Inc."]
+    assert len(relationships) == 1
+    assert relationships[0].target_node_id == globalstar.id
+
+
+def test_location_qualified_private_partner_is_deduplicated() -> None:
+    _, nodes, relationships = extraction(
+        "\n".join((
+            "Partnership with ThothX Group supports the program.",
+            "The standing offer, in partnership with Canadian-based ThothX Group, supports the mission.",
+        )),
+    )
+
+    assert [node.name for node in nodes] == ["ThothX Group"]
+    assert len(relationships) == 1
+    assert len(relationships[0].evidence) == 2
+
+
+def test_charitable_partnership_is_not_an_economic_relation() -> None:
+    _, nodes, relationships = extraction(
+        "In partnership with Indspire, an Indigenous national charity.",
+    )
+
+    assert nodes == []
+    assert relationships == []

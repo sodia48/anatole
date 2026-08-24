@@ -13,18 +13,25 @@ from app.schemas.company_network import (
     CompanyRelationship,
     RelationshipEvidence,
 )
+from app.schemas.fundamentals import IssuerDocumentCandidate
 from app.services.accounts import AccountService
 from app.services.company_network import (
     CompanyNetworkService,
     CompanyNetworkStore,
     FinnhubSupplyChainProvider,
+    OfficialRelationshipProvider,
     ProviderResult,
+    _relationship_document_candidates,
 )
 from app.services.company_relationship_extractor import (
     CompanyEntityIndex,
     merge_relationships,
     node_id,
     relationship_id,
+)
+from app.services.fundamentals import fundamentals_service
+from app.services.issuer_documents import (
+    issuer_financial_documents_service,
 )
 
 
@@ -73,6 +80,128 @@ def relationship(
         last_verified_at=datetime(2026, 3, 31, tzinfo=UTC) if confidence == "verified" else None,
         evidence=[evidence],
     )
+
+
+def issuer_document(
+    title: str,
+    document_type: str,
+    published_at: datetime,
+    score: float,
+) -> IssuerDocumentCandidate:
+    return IssuerDocumentCandidate(
+        url=f"https://issuer.example/{title.lower().replace(' ', '-')}.pdf",
+        title=title,
+        document_format="pdf",
+        document_type=document_type,
+        score=score,
+        origin_url="https://issuer.example/investors",
+        published_at=published_at,
+    )
+
+
+def test_relationship_documents_prioritize_recent_annual_reports() -> None:
+    documents = [
+        issuer_document(
+            "Q4 statements",
+            "quarterly",
+            datetime(2025, 12, 31, tzinfo=UTC),
+            95,
+        ),
+        issuer_document(
+            "2024 annual report",
+            "annual",
+            datetime(2024, 12, 31, tzinfo=UTC),
+            60,
+        ),
+        issuer_document(
+            "2025 annual report",
+            "annual",
+            datetime(2025, 12, 31, tzinfo=UTC),
+            58,
+        ),
+        issuer_document(
+            "Q3 statements",
+            "quarterly",
+            datetime(2025, 9, 30, tzinfo=UTC),
+            90,
+        ),
+        issuer_document(
+            "Q2 statements",
+            "quarterly",
+            datetime(2025, 6, 30, tzinfo=UTC),
+            85,
+        ),
+    ]
+
+    selected = _relationship_document_candidates(documents)
+
+    assert [item.title for item in selected] == [
+        "2025 annual report",
+        "2024 annual report",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_official_relationships_discover_without_parsing_financials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    center = node("MDA", "MDA Space Ltd.")
+    candidate = issuer_document(
+        "2025 annual report",
+        "annual",
+        datetime(2025, 12, 31, tzinfo=UTC),
+        58,
+    )
+
+    async def snapshot(_ticker: str):
+        return type(
+            "Fundamentals",
+            (),
+            {"website": "https://mda.space"},
+        )()
+
+    async def discover(_ticker: str, _website: str):
+        return (
+            "https://mda-en.investorroom.com/",
+            [candidate],
+            None,
+        )
+
+    async def financials(*_args, **_kwargs):
+        raise AssertionError(
+            "Relationship discovery must not parse financial statements."
+        )
+
+    provider = OfficialRelationshipProvider()
+
+    async def extract(_center, _index, _candidate):
+        return [], []
+
+    monkeypatch.setattr(
+        fundamentals_service,
+        "get_snapshot",
+        snapshot,
+    )
+    monkeypatch.setattr(
+        issuer_financial_documents_service,
+        "discover",
+        discover,
+    )
+    monkeypatch.setattr(
+        issuer_financial_documents_service,
+        "get_financials",
+        financials,
+    )
+    monkeypatch.setattr(provider, "_issuer_document", extract)
+
+    result = await provider.issuer_documents(
+        center,
+        CompanyEntityIndex([center]),
+        refresh=True,
+    )
+
+    assert result.documents_scanned == 1
+    assert result.status.status == "available"
 
 
 class Resolver:
