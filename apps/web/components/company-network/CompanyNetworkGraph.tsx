@@ -131,6 +131,14 @@ export function CompanyNetworkGraph({
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectRelationship(relationship); }}
                 className={styles.edge}
               >
+                <line
+                  x1={from.x}
+                  y1={from.y}
+                  x2={to.x}
+                  y2={to.y}
+                  className={styles.edgeHitArea}
+                  aria-hidden="true"
+                />
                 <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} className={selected ? styles.edgeSelected : relationship.confidence === "secondary" ? styles.edgeSecondary : styles.edgeLine} markerEnd="url(#ecosystem-arrow)" />
                 <text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 7}>{relationshipLabel(relationship.relationship_type, language)}</text>
               </g>

@@ -21,6 +21,8 @@
 .graph { display: block; width: 100%; min-width: 760px; height: 610px; touch-action: none; background: radial-gradient(circle at center, rgba(29,88,125,.22), transparent 54%); }
 .edge { cursor: pointer; }
 .edge line { stroke-width: 1.6; }
+.edgeHitArea { stroke: transparent; stroke-width: 20 !important; pointer-events: stroke; }
+.edge line:not(.edgeHitArea), .edge text { pointer-events: none; }
 .edgeLine { stroke: #4b82a6; }
 .edgeSecondary { stroke: #846f4e; stroke-dasharray: 5 5; }
 .edgeSelected { stroke: #f6b94a; stroke-width: 3 !important; }
