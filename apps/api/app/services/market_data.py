@@ -52,10 +52,25 @@ class DemoProvider:
             "5y": 900,
             "10y": 1200,
         }.get(range_, 260)
-        intraday = interval in {
-            "1m", "2m", "5m", "15m", "30m", "60m", "90m"
+        intraday_minutes = {
+            "1m": 1,
+            "2m": 2,
+            "5m": 5,
+            "15m": 15,
+            "30m": 30,
+            "60m": 60,
+            "90m": 90,
         }
-        step = timedelta(minutes=5) if intraday else timedelta(days=1)
+        intraday = interval in intraday_minutes
+        step = (
+            timedelta(minutes=intraday_minutes[interval])
+            if intraday
+            else timedelta(weeks=1)
+            if interval == "1wk"
+            else timedelta(days=30)
+            if interval == "1mo"
+            else timedelta(days=1)
+        )
         current = datetime.now(UTC) - step * count
         price = 45 + self._seed(symbol) % 120
         output: list[Candle] = []

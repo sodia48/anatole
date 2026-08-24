@@ -57,6 +57,36 @@ export type FocusSnapshot = {
   generated_at: string;
 };
 
+export type StockHistoryResponse = {
+  ticker: string;
+  range: string;
+  interval: string;
+  candles: Candle[];
+};
+
+export type FocusFundamentalOverlaySnapshot = {
+  ticker: string;
+  source: string;
+  quarterly_financials: Array<{
+    period_end: string;
+    total_revenue: number | null;
+    diluted_eps: number | null;
+    source: {
+      source_name: string;
+      source_url: string | null;
+    } | null;
+  }>;
+  events: {
+    earnings_dates: string[];
+    ex_dividend_date: string | null;
+    dividend_date: string | null;
+  };
+  metrics: {
+    dividend_rate: number | null;
+    dividend_yield: number | null;
+  };
+};
+
 
 export type MarketTile = {
   ticker: string;
@@ -592,6 +622,13 @@ export type AlertMetric =
   | "relative_volume"
   | "score";
 
+export type AlertType =
+  | "price_level"
+  | "indicator_threshold"
+  | "indicator_cross"
+  | "drawing_break"
+  | "strategy_signal";
+
 export type AlertRule = {
   id: string;
   symbol: string;
@@ -600,6 +637,17 @@ export type AlertRule = {
   threshold: number;
   enabled: boolean;
   label?: string | null;
+  alert_type?: AlertType;
+  indicator_id?: string | null;
+  indicator_output?: string;
+  indicator_inputs?: Record<string, number | string>;
+  comparison_indicator_id?: string | null;
+  comparison_indicator_output?: string;
+  comparison_indicator_inputs?: Record<string, number | string>;
+  drawing_points?: Array<{ time: number; price: number }>;
+  strategy_id?: string | null;
+  strategy_parameters?: Record<string, number | string>;
+  strategy_signal?: "buy" | "sell";
 };
 
 export type AlertEvaluation = {
@@ -607,6 +655,7 @@ export type AlertEvaluation = {
   symbol: string;
   name: string;
   metric: AlertMetric;
+  alert_type: AlertType;
   metric_label: string;
   operator: "above" | "below";
   threshold: number;
@@ -626,6 +675,155 @@ export type AlertSnapshot = {
   unavailable_count: number;
   generated_at: string;
   refresh_after_seconds: number;
+};
+
+export type BacktestStrategy =
+  | "sma_crossover"
+  | "ema_crossover"
+  | "rsi_mean_reversion"
+  | "macd_crossover"
+  | "bollinger_breakout"
+  | "donchian_breakout"
+  | "anatole_script";
+
+export type BacktestRequest = {
+  ticker: string;
+  range: string;
+  interval: string;
+  strategy: BacktestStrategy;
+  strategy_parameters: Record<string, number | string>;
+  script?: string | null;
+  initial_capital: number;
+  position_size: number;
+  commission: number;
+  slippage: number;
+  direction: "long" | "short" | "both";
+};
+
+export type BacktestTrade = {
+  side: "long" | "short";
+  entry_time: number;
+  entry_price: number;
+  exit_time: number;
+  exit_price: number;
+  quantity: number;
+  pnl: number;
+  pnl_percent: number;
+  commission: number;
+  slippage: number;
+  reason: string;
+};
+
+export type BacktestResult = {
+  ticker: string;
+  strategy: BacktestStrategy;
+  interval: string;
+  initial_capital: number;
+  final_equity: number;
+  net_profit: number;
+  net_profit_percent: number;
+  cagr: number | null;
+  max_drawdown: number;
+  max_drawdown_percent: number;
+  win_rate: number;
+  trades_count: number;
+  winning_trades: number;
+  losing_trades: number;
+  profit_factor: number | null;
+  average_trade: number;
+  sharpe: number | null;
+  sortino: number | null;
+  exposure_percent: number;
+  equity_curve: Array<{ time: number; equity: number; drawdown: number; drawdown_percent: number }>;
+  trades: BacktestTrade[];
+  execution_convention: string;
+  disclaimer: string;
+};
+
+export type AnatoleScriptValidation = {
+  valid: boolean;
+  name: string | null;
+  kind: "indicator" | "strategy" | null;
+  statements_count: number;
+  indicators_count: number;
+  plots: string[];
+  diagnostics: Array<{ line: number; column: number; message: string }>;
+};
+
+export type PaperOrderRequest = {
+  ticker: string;
+  order_type: "market" | "limit" | "stop" | "stop_limit";
+  side: "buy" | "sell";
+  quantity: number;
+  limit_price?: number | null;
+  stop_price?: number | null;
+};
+
+export type PaperOrder = PaperOrderRequest & {
+  id: string;
+  status: "pending" | "filled" | "cancelled" | "rejected";
+  submitted_market_time: string;
+  created_at: string;
+  activated_at: string | null;
+  filled_at: string | null;
+  filled_price: number | null;
+  cancelled_at: string | null;
+  rejection_reason: string | null;
+};
+
+export type PaperPosition = {
+  ticker: string;
+  quantity: number;
+  average_cost: number;
+  current_price: number;
+  market_value: number;
+  unrealized_pnl: number;
+  unrealized_pnl_percent: number;
+  realized_pnl: number;
+};
+
+export type PaperTrade = {
+  id: string;
+  order_id: string;
+  ticker: string;
+  side: "buy" | "sell";
+  quantity: number;
+  price: number;
+  notional: number;
+  commission: number;
+  realized_pnl: number;
+  executed_at: string;
+};
+
+export type PaperAccount = {
+  currency: "CAD";
+  initial_capital: number;
+  cash: number;
+  equity: number;
+  buying_power: number;
+  market_value: number;
+  total_return: number;
+  total_return_percent: number;
+  commission: number;
+  positions: PaperPosition[];
+  orders: PaperOrder[];
+  trades: PaperTrade[];
+  updated_at: string;
+  paper: true;
+};
+
+export type PaperOrderPreview = {
+  ticker: string;
+  side: "buy" | "sell";
+  order_type: PaperOrderRequest["order_type"];
+  quantity: number;
+  estimated_price: number;
+  estimated_notional: number;
+  estimated_commission: number;
+  available_cash: number;
+  existing_position: number;
+  sufficient_cash: boolean;
+  message: string;
 };
 
 export type AdvisorLevel = "low" | "medium" | "high";
