@@ -868,8 +868,8 @@ class CompanyNetworkService:
         self.official_provider = official_provider or OfficialRelationshipProvider()
         self.finnhub_provider = finnhub_provider or FinnhubSupplyChainProvider()
         self._cache: dict[tuple[str, int, bool], tuple[float, CompanyNetworkSnapshot]] = {}
-        self._build_tasks: dict[tuple[str, int, bool], asyncio.Task[None]] = {}
-        self._build_errors: dict[tuple[str, int, bool], str] = {}
+        self._build_tasks: dict[tuple[str, int], asyncio.Task[None]] = {}
+        self._build_errors: dict[tuple[str, int], str] = {}
         self._global_build_semaphore = asyncio.Semaphore(
             settings.company_network_build_concurrency
         )
@@ -1059,10 +1059,10 @@ class CompanyNetworkService:
         self,
         center: CompanyNetworkNode,
         *,
-        key: tuple[str, int, bool],
+        key: tuple[str, int],
         refresh: bool,
     ) -> None:
-        symbol, depth, include_secondary = key
+        symbol, depth = key
         started = monotonic()
         try:
             async with self._global_build_semaphore:
@@ -1104,30 +1104,39 @@ class CompanyNetworkService:
                         nodes, relationships = await self.store.graph(
                             center,
                             depth=2,
-                            include_secondary=include_secondary,
+                            include_secondary=True,
                         )
                     else:
                         stored_nodes, stored_relationships = await self.store.graph(
                             center,
                             depth=1,
-                            include_secondary=include_secondary,
+                            include_secondary=True,
                         )
                         if stored_relationships:
                             nodes, relationships = (
                                 stored_nodes,
                                 stored_relationships,
                             )
-                    snapshot = self._snapshot(
-                        center,
-                        nodes,
-                        relationships,
-                        depth=depth,
-                        include_secondary=include_secondary,
-                        sources=sources,
-                        documents_scanned=documents_scanned,
-                    )
-                    self._cache[key] = (monotonic(), snapshot)
+                    snapshots = {
+                        include_secondary: self._snapshot(
+                            center,
+                            nodes,
+                            relationships,
+                            depth=depth,
+                            include_secondary=include_secondary,
+                            sources=sources,
+                            documents_scanned=documents_scanned,
+                        )
+                        for include_secondary in (True, False)
+                    }
+                    cached_at = monotonic()
+                    for include_secondary, snapshot in snapshots.items():
+                        self._cache[(symbol, depth, include_secondary)] = (
+                            cached_at,
+                            snapshot,
+                        )
                     self._build_errors.pop(key, None)
+                    snapshot = snapshots[True]
                     logger.info(
                         "company_network_build_finished ticker=%s depth=%s "
                         "duration_ms=%.1f nodes=%s relationships=%s "
@@ -1145,7 +1154,7 @@ class CompanyNetworkService:
             raise
         except Exception as exc:  # noqa: BLE001
             self._build_errors[key] = self._public_build_error()
-            logger.exception(
+            logger.error(
                 "company_network_build_failed ticker=%s depth=%s error_type=%s",
                 symbol,
                 depth,
@@ -1161,7 +1170,7 @@ class CompanyNetworkService:
         refresh: bool,
         include_secondary: bool,
     ) -> bool:
-        key = (_normalize_ticker(ticker), depth, include_secondary)
+        key = (_normalize_ticker(ticker), depth)
         existing = self._build_tasks.get(key)
         if existing is not None and not existing.done():
             return False
@@ -1192,6 +1201,7 @@ class CompanyNetworkService:
     ) -> CompanyNetworkSnapshot:
         symbol = _normalize_ticker(ticker)
         key = (symbol, depth, include_secondary)
+        build_key = (symbol, depth)
         cached = self._cache.get(key)
         cache_is_fresh = self._has_fresh_cache(key)
         if cache_is_fresh and cached:
@@ -1204,13 +1214,13 @@ class CompanyNetworkService:
                     include_secondary=include_secondary,
                 )
                 return self._with_build_status(cached[1], "building")
-            if key in self._build_tasks:
+            if build_key in self._build_tasks:
                 return self._with_build_status(cached[1], "building")
-            if key in self._build_errors:
+            if build_key in self._build_errors:
                 return self._with_build_status(
                     cached[1],
                     "failed",
-                    build_error=self._build_errors[key],
+                    build_error=self._build_errors[build_key],
                 )
             return cached[1]
         center = await self.resolver.resolve(symbol)
@@ -1243,7 +1253,7 @@ class CompanyNetworkService:
             )
             return snapshot
 
-        if key in self._build_errors and not refresh:
+        if build_key in self._build_errors and not refresh:
             return self._snapshot(
                 center,
                 [center],
@@ -1251,7 +1261,7 @@ class CompanyNetworkService:
                 depth=depth,
                 include_secondary=include_secondary,
                 build_status="failed",
-                build_error=self._build_errors[key],
+                build_error=self._build_errors[build_key],
                 stale=True,
             )
         self.schedule_build(
@@ -1344,7 +1354,7 @@ class CompanyNetworkService:
                     include_secondary=include_secondary,
                 )
         relevant_keys = [
-            (_normalize_ticker(build_ticker), build_depth, include_secondary)
+            (_normalize_ticker(build_ticker), build_depth)
             for build_ticker, _, build_depth in build_specs
         ]
         building = any(key in self._build_tasks for key in relevant_keys)

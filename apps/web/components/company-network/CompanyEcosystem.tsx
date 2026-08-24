@@ -23,6 +23,10 @@ function isAbortError(reason: unknown): boolean {
 
 function waitForPoll(delayMs: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
     let timer: number | null = null;
 
     const cleanup = () => {
@@ -112,6 +116,7 @@ export function CompanyEcosystem({ ticker, language }: { ticker: string; languag
             : Math.max(5, retrySeconds) * 1000;
           pollCount += 1;
           await waitForPoll(delayMs, controller.signal);
+          if (Date.now() - pollingStarted >= MAX_BUILD_POLL_MS) break;
         }
       } catch (reason: unknown) {
         if (!isAbortError(reason)) {
@@ -125,11 +130,6 @@ export function CompanyEcosystem({ ticker, language }: { ticker: string; languag
     void load();
     return () => controller.abort();
   }, [depth, includeSecondary, networkTicker, refreshKey]);
-
-  useEffect(() => {
-    setNetworkTicker(ticker);
-    setDepth(1);
-  }, [ticker]);
 
   const recenter = (node: CompanyNetworkNode) => {
     if (!node.public_company || !node.ticker) return;
@@ -176,7 +176,7 @@ export function CompanyEcosystem({ ticker, language }: { ticker: string; languag
         {mode === "network" ? <CompanyNetworkGraph center={snapshot.center} nodes={snapshot.nodes} relationships={snapshot.relationships} selectedRelationship={selectedRelationship} language={language} onSelectRelationship={setSelectedRelationship} onRecenter={recenter} onExpand={expand} onFind={find} /> : null}
         {mode === "value_chain" ? <CompanyValueChain center={snapshot.center} nodes={snapshot.nodes} relationships={snapshot.relationships} language={language} onSelect={(item) => { setSelectedRelationship(item); setMode("evidence"); }} /> : null}
         {mode === "evidence" ? <RelationshipEvidencePanel snapshot={snapshot} selected={selectedRelationship} language={language} onSelect={setSelectedRelationship} /> : null}
-        <RelationshipPathFinder fromTicker={snapshot.center.ticker ?? networkTicker} initialTarget={pathTarget} language={language} />
+        <RelationshipPathFinder key={snapshot.center.ticker ?? networkTicker} fromTicker={snapshot.center.ticker ?? networkTicker} initialTarget={pathTarget} language={language} />
         <footer className={styles.footer}><span>{snapshot.nodes.length}/{snapshot.coverage.node_limit} {pick(language, "nœuds", "nodes")} · {snapshot.relationships.length} {pick(language, "relations", "edges")}</span><span>{snapshot.coverage.verified_relationships} {pick(language, "vérifiées", "verified")} · {snapshot.coverage.corroborated_relationships} {pick(language, "corroborées", "corroborated")} · {snapshot.coverage.secondary_relationships} {pick(language, "secondaires", "secondary")}</span><span>{snapshot.stale ? pick(language, "ACTUALISATION", "REFRESHING") : "CACHE 24H"}</span></footer>
       </> : null}
     </section>

@@ -14,6 +14,10 @@ const MAX_PATH_POLL_MS = 75_000;
 
 function waitForVisiblePoll(delayMs: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
     let timer: number | null = null;
     const cleanup = () => {
       if (timer !== null) window.clearTimeout(timer);
@@ -47,11 +51,6 @@ export function RelationshipPathFinder({ fromTicker, initialTarget, language }: 
   const pathControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => () => pathControllerRef.current?.abort(), []);
-  useEffect(() => {
-    pathControllerRef.current?.abort();
-    setResult(null);
-    setPolling(false);
-  }, [fromTicker]);
   useEffect(() => {
     if (!initialTarget) return;
     const timer = window.setTimeout(() => {
@@ -99,6 +98,7 @@ export function RelationshipPathFinder({ fromTicker, initialTarget, language }: 
           : Math.max(5, retrySeconds) * 1000;
         pollCount += 1;
         await waitForVisiblePoll(delayMs, controller.signal);
+        if (Date.now() - started >= MAX_PATH_POLL_MS) break;
       }
     } catch (reason) {
       if (!(reason instanceof DOMException && reason.name === "AbortError")) {
