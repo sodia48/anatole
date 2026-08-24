@@ -51,6 +51,8 @@ NETWORK_CACHE_SECONDS = 86_400
 MAX_NODES = 40
 MAX_RELATIONSHIPS = 80
 MAX_DEPTH_TWO_COMPANIES = 8
+MAX_RELATIONSHIP_DOCUMENTS = 2
+RELATIONSHIP_PDF_PAGE_LIMIT = 30
 
 
 US_COMPANIES: tuple[tuple[str, str, str], ...] = (
@@ -80,6 +82,48 @@ VALIDATED_ALIASES: dict[str, tuple[str, ...]] = {
     "TSM": ("TSMC", "Taiwan Semiconductor"),
     "TSLA": ("Tesla",),
 }
+
+
+def _relationship_document_candidates(
+    documents: Iterable[IssuerDocumentCandidate],
+) -> list[IssuerDocumentCandidate]:
+    supported = [
+        item
+        for item in documents
+        if item.document_format in {"pdf", "html"}
+    ]
+    annual = sorted(
+        (
+            item
+            for item in supported
+            if item.document_type == "annual"
+        ),
+        key=lambda item: (
+            item.published_at
+            or datetime.min.replace(tzinfo=UTC),
+            item.score,
+        ),
+        reverse=True,
+    )
+    other = [
+        item
+        for item in supported
+        if item.document_type != "annual"
+    ]
+
+    # Annual reports carry the broadest issuer-reviewed disclosures about
+    # customers, suppliers, contracts and partnerships. Prefer recent annual
+    # reports and fill any remaining bounded slot with the crawler's highest
+    # scoring interim material.
+    selected = annual[:MAX_RELATIONSHIP_DOCUMENTS]
+    if len(selected) < MAX_RELATIONSHIP_DOCUMENTS:
+        selected.extend(
+            other[
+                : MAX_RELATIONSHIP_DOCUMENTS
+                - len(selected)
+            ]
+        )
+    return selected[:MAX_RELATIONSHIP_DOCUMENTS]
 
 
 def _utc_now() -> datetime:
@@ -356,7 +400,12 @@ class OfficialRelationshipProvider:
         if not content:
             return None
         try:
-            text = await asyncio.to_thread(financial_document_parser.extract_text, content, candidate)
+            text = await asyncio.to_thread(
+                financial_document_parser.extract_text,
+                content,
+                candidate,
+                max_pdf_pages=RELATIONSHIP_PDF_PAGE_LIMIT,
+            )
         except Exception:  # noqa: BLE001
             return None
         if not text:
@@ -385,10 +434,11 @@ class OfficialRelationshipProvider:
     ) -> ProviderResult:
         try:
             fundamentals = await fundamentals_service.get_snapshot(center.ticker or center.name)
-            result = await issuer_financial_documents_service.get_financials(
-                center.ticker or center.name,
-                fundamentals.website,
-                force_refresh=refresh,
+            _, documents, discovery_error = (
+                await issuer_financial_documents_service.discover(
+                    center.ticker or center.name,
+                    fundamentals.website,
+                )
             )
         except Exception as exc:  # noqa: BLE001
             return ProviderResult([], [], CompanyNetworkSourceStatus(
@@ -397,7 +447,7 @@ class OfficialRelationshipProvider:
                 detail=f"Documents officiels indisponibles ({type(exc).__name__}).",
                 detail_en=f"Official documents are unavailable ({type(exc).__name__}).",
             ))
-        candidates = [item for item in result.documents if item.document_format in {"pdf", "html"}][:4]
+        candidates = _relationship_document_candidates(documents)
         extracted = await asyncio.gather(
             *(self._issuer_document(center, index, item) for item in candidates),
             return_exceptions=True,
@@ -415,7 +465,9 @@ class OfficialRelationshipProvider:
         status = "available" if scanned else "partial" if candidates else "unavailable"
         detail = (
             f"{scanned}/{len(candidates)} document(s) IR officiel(s) analysé(s) par règles déterministes."
-            if candidates else "Aucun rapport annuel ou document IR exploitable n’a été trouvé."
+            if candidates
+            else discovery_error
+            or "Aucun rapport annuel ou document IR exploitable n’a été trouvé."
         )
         return ProviderResult(
             list(nodes.values()),

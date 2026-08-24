@@ -876,11 +876,21 @@ class FinancialDocumentParser:
 
         return output
 
-    def _pdf_text(self, content: bytes) -> str:
+    def _pdf_text(
+        self,
+        content: bytes,
+        *,
+        max_pages: int | None = None,
+    ) -> str:
         reader = PdfReader(io.BytesIO(content))
         pages: list[str] = []
 
-        for page in reader.pages[: self.max_pdf_pages]:
+        page_limit = (
+            self.max_pdf_pages
+            if max_pages is None
+            else max(1, min(max_pages, self.max_pdf_pages))
+        )
+        for page in reader.pages[:page_limit]:
             try:
                 text = page.extract_text(
                     extraction_mode="layout"
@@ -955,10 +965,15 @@ class FinancialDocumentParser:
         self,
         content: bytes,
         document: IssuerDocumentCandidate,
+        *,
+        max_pdf_pages: int | None = None,
     ) -> str:
         """Return bounded document text for deterministic downstream parsers."""
         if document.document_format == "pdf":
-            return self._pdf_text(content)
+            return self._pdf_text(
+                content,
+                max_pages=max_pdf_pages,
+            )
         if document.document_format in {"xlsx", "xls"}:
             return self._xlsx_text(content)
         if document.document_format == "html":
