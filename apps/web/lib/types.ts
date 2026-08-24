@@ -57,6 +57,134 @@ export type FocusSnapshot = {
   generated_at: string;
 };
 
+export type CompanyNetworkNodeType =
+  | "company"
+  | "private_company"
+  | "government"
+  | "end_market"
+  | "commodity";
+
+export type CompanyNetworkNode = {
+  id: string;
+  ticker: string | null;
+  name: string;
+  exchange: string | null;
+  country: string | null;
+  sector: string | null;
+  industry: string | null;
+  public_company: boolean;
+  node_type: CompanyNetworkNodeType;
+};
+
+export type CompanyRelationshipType =
+  | "supplier"
+  | "customer"
+  | "distributor"
+  | "strategic_partner"
+  | "joint_venture"
+  | "parent"
+  | "subsidiary"
+  | "major_contract";
+
+export type RelationshipEvidence = {
+  id: string;
+  relationship_id: string | null;
+  source_type:
+    | "issuer_filing"
+    | "annual_report"
+    | "sedar"
+    | "sec"
+    | "investor_relations"
+    | "press_release"
+    | "finnhub"
+    | "other";
+  title: string;
+  url: string;
+  published_at: string | null;
+  document_date: string | null;
+  excerpt: string;
+  issuer: string;
+};
+
+export type CompanyRelationship = {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relationship_type: CompanyRelationshipType;
+  direction: "source_to_target";
+  status: "active" | "historical" | "unknown";
+  confidence: "verified" | "corroborated" | "secondary";
+  materiality: "critical" | "material" | "notable" | "unknown";
+  revenue_share_percent: number | null;
+  contract_value: number | null;
+  contract_currency: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  source_count: number;
+  last_verified_at: string | null;
+  evidence: RelationshipEvidence[];
+  correlation_2w: number | null;
+  correlation_1m: number | null;
+  correlation_3m: number | null;
+  correlation_6m: number | null;
+  correlation_1y: number | null;
+  correlation_2y: number | null;
+};
+
+export type CompanyNetworkSourceStatus = {
+  source: string;
+  status: "available" | "partial" | "unavailable";
+  count: number;
+  detail: string;
+  detail_en?: string | null;
+};
+
+export type CompanyNetworkSnapshot = {
+  center: CompanyNetworkNode;
+  nodes: CompanyNetworkNode[];
+  relationships: CompanyRelationship[];
+  sector_exposure: Array<{
+    sector: string;
+    verified_relationship_count: number;
+    quantified_revenue_share_percent: number | null;
+  }>;
+  sources: CompanyNetworkSourceStatus[];
+  generated_at: string;
+  stale: boolean;
+  coverage: {
+    depth: 1 | 2;
+    node_limit: number;
+    truncated: boolean;
+    verified_relationships: number;
+    corroborated_relationships: number;
+    secondary_relationships: number;
+    official_documents_scanned: number;
+    message_fr: string | null;
+    message_en: string | null;
+  };
+};
+
+export type CompanyRelationshipPath = {
+  from_company: CompanyNetworkNode;
+  to_company: CompanyNetworkNode;
+  nodes: CompanyNetworkNode[];
+  relationships: CompanyRelationship[];
+  depth: number;
+  generated_at: string;
+  found: boolean;
+  message_fr: string | null;
+  message_en: string | null;
+};
+
+export type CompanyNetworkEvidenceResponse = {
+  ticker: string;
+  groups: Array<{
+    relationship: CompanyRelationship;
+    evidence: RelationshipEvidence[];
+  }>;
+  generated_at: string;
+};
+
 export type StockHistoryResponse = {
   ticker: string;
   range: string;

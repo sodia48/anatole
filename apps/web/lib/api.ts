@@ -29,6 +29,9 @@ import type {
   AnatoleScriptValidation,
   BacktestRequest,
   BacktestResult,
+  CompanyNetworkEvidenceResponse,
+  CompanyNetworkSnapshot,
+  CompanyRelationshipPath,
 } from "./types";
 import { resilientFetch } from "./resilient-fetch";
 
@@ -233,6 +236,60 @@ export function getFocusSnapshotForRange(
     {},
     signal,
     45_000,
+  );
+}
+
+export function getCompanyNetwork(
+  ticker: string,
+  depth: 1 | 2 = 1,
+  includeSecondary = true,
+  signal?: AbortSignal,
+  refresh = false,
+): Promise<CompanyNetworkSnapshot> {
+  const params = new URLSearchParams({
+    depth: String(depth),
+    include_secondary: String(includeSecondary),
+    refresh: String(refresh),
+  });
+  return apiRequest<CompanyNetworkSnapshot>(
+    `/api/v1/discovery/company-network/${encodeURIComponent(ticker)}?${params.toString()}`,
+    {},
+    signal,
+    60_000,
+  );
+}
+
+export function getCompanyNetworkEvidence(
+  ticker: string,
+  includeSecondary = true,
+  signal?: AbortSignal,
+): Promise<CompanyNetworkEvidenceResponse> {
+  const params = new URLSearchParams({ include_secondary: String(includeSecondary) });
+  return apiRequest<CompanyNetworkEvidenceResponse>(
+    `/api/v1/discovery/company-network/${encodeURIComponent(ticker)}/evidence?${params.toString()}`,
+    {},
+    signal,
+    45_000,
+  );
+}
+
+export function findCompanyRelationshipPath(
+  fromTicker: string,
+  toTicker: string,
+  includeSecondary = true,
+  signal?: AbortSignal,
+): Promise<CompanyRelationshipPath> {
+  const params = new URLSearchParams({
+    from_ticker: fromTicker,
+    to_ticker: toTicker,
+    max_depth: "3",
+    include_secondary: String(includeSecondary),
+  });
+  return apiRequest<CompanyRelationshipPath>(
+    `/api/v1/discovery/company-network/path?${params.toString()}`,
+    {},
+    signal,
+    60_000,
   );
 }
 
