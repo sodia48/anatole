@@ -951,23 +951,28 @@ class FinancialDocumentParser:
         parser.close()
         return "\n".join(parser.lines)
 
+    def extract_text(
+        self,
+        content: bytes,
+        document: IssuerDocumentCandidate,
+    ) -> str:
+        """Return bounded document text for deterministic downstream parsers."""
+        if document.document_format == "pdf":
+            return self._pdf_text(content)
+        if document.document_format in {"xlsx", "xls"}:
+            return self._xlsx_text(content)
+        if document.document_format == "html":
+            return self._html_text(content)
+        return ""
+
     def parse_bytes(
         self,
         content: bytes,
         document: IssuerDocumentCandidate,
     ) -> list[FinancialPeriod]:
-        if document.document_format == "pdf":
-            text = self._pdf_text(content)
-        elif document.document_format in {
-            "xlsx",
-            "xls",
-        }:
-            text = self._xlsx_text(content)
-        elif document.document_format == "html":
-            text = self._html_text(content)
-        else:
+        text = self.extract_text(content, document)
+        if not text:
             return []
-
         return self.parse_text(text, document)
 
 

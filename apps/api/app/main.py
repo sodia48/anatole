@@ -15,6 +15,7 @@ from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
+from app.services.company_network import company_network_service
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
 
@@ -29,6 +30,7 @@ logger = logging.getLogger("anatole.api")
 async def lifespan(_: FastAPI):
     await shared_http_client.start()
     await account_service.start()
+    await company_network_service.start()
     notification_service.account_service = account_service
     await notification_service.start()
     paper_trading_service.account_service = account_service

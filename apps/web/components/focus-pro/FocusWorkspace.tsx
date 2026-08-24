@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, WalletCards } from "lucide-react";
+import { FlaskConical, Network, WalletCards } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
+import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { FocusFundamentals, type FundamentalView } from "@/components/stock/FocusFundamentals";
 import { KeyLevels } from "@/components/stock/KeyLevels";
@@ -69,13 +70,14 @@ import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
 import styles from "./FocusPro.module.css";
 
 type Panel = "indicators" | "compare" | "alerts" | "layouts" | "strategy" | "paper" | null;
-type Section = "chart" | FundamentalView;
+type Section = "chart" | "ecosystem" | FundamentalView;
 
 const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
   { id: "chart", fr: "Workstation", en: "Workstation" },
   { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" },
   { id: "financials", fr: "Résultats", en: "Financials" },
   { id: "analysts", fr: "Analystes", en: "Analysts" },
+  { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
 
 export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnapshot }) {
@@ -323,8 +325,8 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
   return (
     <div className="focus-page" data-focus-ready={clientReady ? "true" : "false"}>
       <QuoteHeader quote={quote} liveState={liveState} />
-      <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}</nav>
-      {section !== "chart" ? <FocusFundamentals ticker={ticker} view={section} /> : (
+      <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button></nav>
+      {section === "ecosystem" ? <CompanyEcosystem ticker={ticker} language={language} /> : section !== "chart" ? <FocusFundamentals ticker={ticker} view={section} /> : (
         <div className={styles.workspace}>
           <FocusToolbar ticker={ticker} timeframe={layout.timeframe} chartType={layout.chart_type} language={language} onTimeframe={(value) => setLayout({ ...layout, timeframe: value })} onChartType={(value) => setLayout({ ...layout, chart_type: value })} onToggleIndicators={() => togglePanel("indicators")} onToggleCompare={() => togglePanel("compare")} onCreateAlert={() => togglePanel("alerts")} onToggleLayouts={() => togglePanel("layouts")} onToggleStrategy={() => togglePanel("strategy")} onTogglePaper={() => togglePanel("paper")} onSaveLayout={() => saveLayout()} />
           <div className={`${styles.mainGrid} ${panel ? "" : styles.mainGridNoSide}`}>

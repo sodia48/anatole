@@ -780,6 +780,18 @@ class IssuerFinancialDocumentsService:
         ):
             return None
 
+    async def download_document(
+        self,
+        document: IssuerDocumentCandidate,
+    ) -> bytes | None:
+        """Download one already-vetted issuer document with existing limits."""
+        async with httpx.AsyncClient(
+            timeout=18.0,
+            follow_redirects=True,
+            headers=self.headers,
+        ) as client:
+            return await self._download(client, document)
+
     @staticmethod
     def _merge_document_periods(
         periods: list[FinancialPeriod],

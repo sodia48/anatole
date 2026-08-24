@@ -1,0 +1,90 @@
+.ecosystem { display: grid; gap: 10px; min-width: 0; color: #dceaf3; }
+.hero, .panel, .graphShell, .pathFinder, .valueChain, .emptyState, .loading, .error { border: 1px solid rgba(48,92,121,.68); border-radius: 11px; background: rgba(5,20,31,.96); }
+.hero { display: flex; justify-content: space-between; gap: 20px; padding: 18px; }
+.hero h2 { margin: 4px 0 7px; font-size: 22px; }
+.hero p { max-width: 780px; margin: 0; color: #87a3b6; font-size: 12px; line-height: 1.55; }
+.eyebrow { color: #5daee7; font-size: 9px; font-weight: 900; letter-spacing: .15em; }
+.heroActions, .modeTabs, .graphControls, .nodeActions, .pathForm { display: flex; align-items: center; gap: 6px; }
+.heroActions button, .modeTabs button, .graphControls button, .nodeActions button, .nodeActions a, .pathForm button { min-height: 34px; padding: 0 11px; border: 1px solid #326484; border-radius: 7px; background: #0a273a; color: #c8deeb; font-size: 11px; font-weight: 800; text-decoration: none; cursor: pointer; }
+.heroActions label, .secondaryToggle { display: flex; align-items: center; gap: 6px; color: #8ba7ba; font-size: 11px; }
+.modeTabs { overflow-x: auto; padding: 5px; border: 1px solid rgba(48,92,121,.62); border-radius: 9px; background: #061722; }
+.modeTabs button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.modeTabs button[aria-pressed="true"] { border-color: #2c9cff; background: #164b70; color: #fff; }
+.depthButton { margin-left: auto; }
+.loading, .emptyState, .error { padding: 28px; text-align: center; }
+.emptyState strong { color: #f2f8fb; }
+.emptyState p, .muted, .disclaimer { color: #7795a9; }
+.error { border-color: rgba(255,77,103,.55); color: #ffc3cc; }
+.graphShell { position: relative; overflow: hidden; min-height: 620px; }
+.graphControls { position: absolute; z-index: 3; top: 10px; right: 10px; }
+.graphControls button { width: 34px; padding: 0; }
+.graph { display: block; width: 100%; min-width: 760px; height: 610px; touch-action: none; background: radial-gradient(circle at center, rgba(29,88,125,.22), transparent 54%); }
+.edge { cursor: pointer; }
+.edge line { stroke-width: 1.6; }
+.edgeHitArea { stroke: transparent; stroke-width: 20 !important; pointer-events: stroke; }
+.edge line:not(.edgeHitArea), .edge text { pointer-events: none; }
+.edgeLine { stroke: #4b82a6; }
+.edgeSecondary { stroke: #846f4e; stroke-dasharray: 5 5; }
+.edgeSelected { stroke: #f6b94a; stroke-width: 3 !important; }
+.edge text { fill: #8fb1c7; font-size: 8px; font-weight: 700; paint-order: stroke; stroke: #06131e; stroke-width: 3px; }
+.node { cursor: pointer; }
+.node rect { fill: #0a2a3d; stroke: #326484; stroke-width: 1.2; }
+.node:hover rect, .node:focus rect { fill: #123e59; stroke: #5db4eb; }
+.centerNode rect { fill: #174f75; stroke: #64c4ff; stroke-width: 2; }
+.node text { fill: #edf7fc; font-size: 10px; font-weight: 900; }
+.node .nodeName { fill: #94afc0; font-size: 8px; font-weight: 600; }
+.nodeActions { position: absolute; z-index: 3; left: 10px; right: 10px; bottom: 10px; padding: 8px; border: 1px solid #315f7d; border-radius: 8px; background: rgba(4,17,27,.95); }
+.nodeActions div { display: grid; margin-right: auto; }
+.nodeActions span { color: #7897aa; font-size: 10px; }
+.valueChain { display: grid; grid-template-columns: repeat(4,minmax(180px,1fr)); gap: 10px; padding: 14px; }
+.chainColumn { display: grid; align-content: start; gap: 7px; min-width: 0; padding: 10px; border: 1px solid rgba(49,94,123,.52); border-radius: 9px; background: #071b29; }
+.chainColumn h3, .panel h3, .pathFinder h3 { margin: 0 0 7px; font-size: 13px; }
+.chainCard, .relationshipCard, .selectedCard, .dependency { display: grid; gap: 2px; width: 100%; padding: 9px; border: 1px solid #284f69; border-radius: 7px; background: #0a2739; color: #dceaf3; text-align: left; cursor: pointer; }
+.chainCard span, .relationshipCard span, .selectedCard span, .dependency span { color: #8eacbe; font-size: 10px; }
+.chainCard small, .relationshipCard small, .selectedCard small { color: #66879c; }
+.chainCenter { border-color: #3a89bd; }
+.activeCompany { display: grid; gap: 4px; padding: 20px 10px; text-align: center; }
+.activeCompany strong { color: #62c0fb; font-size: 24px; }
+.activeCompany span { font-weight: 800; }
+.activeCompany small { color: #809db0; }
+.chainBottom { grid-column: 1/-1; }
+.chainBottom .chainColumn { grid-template-columns: repeat(auto-fit,minmax(170px,1fr)); }
+.chainBottom h3 { grid-column: 1/-1; }
+.competitorNote { grid-column: 1/-1; margin: 0; color: #728fa2; font-size: 10px; }
+.evidenceGrid { display: grid; grid-template-columns: minmax(260px,.8fr) minmax(360px,1.5fr) minmax(250px,.8fr); gap: 10px; }
+.panel { min-width: 0; padding: 14px; }
+.relationshipList, .sourceCards, .detailList { display: grid; gap: 7px; }
+.selectedCard { border-color: #2c9cff; background: #123b55; }
+.detailList p { display: flex; justify-content: space-between; gap: 12px; margin: 0; padding: 7px 0; border-bottom: 1px solid rgba(48,92,121,.3); font-size: 11px; }
+.detailList p span { color: #7e9aac; }
+.detailList strong[data-confidence="secondary"] { color: #f6b94a; }
+.sourceCards article { padding: 10px; border: 1px solid #2c526b; border-radius: 8px; background: #071a27; }
+.sourceCards article > strong, .sourceCards a { display: flex; align-items: center; gap: 5px; }
+.sourceCards blockquote { margin: 8px 0; color: #b6cbd8; font-size: 11px; line-height: 1.55; }
+.sourceCards small { display: block; color: #708ea1; }
+.sourceCards a { margin-top: 8px; color: #6ac2fb; font-size: 11px; }
+.metricRow { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 0; padding: 7px 0; border-bottom: 1px solid rgba(48,92,121,.3); }
+.metricRow em { grid-column: 1/-1; color: #6bc9ab; font-size: 10px; }
+.dependency { margin-bottom: 6px; }
+.sourceStatus { padding: 8px 0; border-bottom: 1px solid rgba(48,92,121,.3); }
+.sourceStatus div { display: flex; justify-content: space-between; gap: 10px; }
+.sourceStatus span { font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.sourceStatus span[data-status="available"] { color: #48cfa4; }
+.sourceStatus span[data-status="partial"] { color: #f6b94a; }
+.sourceStatus span[data-status="unavailable"] { color: #ff788d; }
+.sourceStatus p { margin: 5px 0 0; color: #7896a8; font-size: 10px; }
+.pathFinder { position: relative; padding: 14px; }
+.pathForm { flex-wrap: wrap; margin-top: 10px; }
+.pathForm input { min-width: 240px; height: 34px; padding: 0 9px; border: 1px solid #315e7b; border-radius: 7px; background: #071a28; color: #e5f1f7; }
+.suggestions { position: absolute; z-index: 5; top: 94px; left: 92px; display: grid; width: min(340px,calc(100% - 120px)); padding: 5px; border: 1px solid #326483; border-radius: 8px; background: #061722; box-shadow: 0 15px 40px #0009; }
+.suggestions button { display: flex; justify-content: space-between; padding: 8px; border: 0; background: transparent; color: #dbeaf2; cursor: pointer; }
+.suggestions span { color: #7895a8; }
+.secondaryToggle { margin-top: 9px; }
+.pathResult { display: flex; align-items: stretch; gap: 6px; overflow-x: auto; margin-top: 12px; }
+.pathStep { display: flex; align-items: center; gap: 8px; min-width: max-content; padding: 10px; border: 1px solid #2d5670; border-radius: 8px; background: #081f2e; }
+.pathStep span, .pathStep small { color: #84a1b3; }
+.pathStep a { color: #64bef7; }
+.emptyPath { padding: 12px; border-left: 3px solid #f6b94a; background: #2b2412; color: #f4d18b; }
+.footer { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; color: #617f92; font-size: 9px; }
+@media (max-width: 1000px) { .valueChain { grid-template-columns: repeat(2,minmax(0,1fr)); } .evidenceGrid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 720px) { .hero { flex-direction: column; } .heroActions { justify-content: space-between; } .depthButton { margin-left: 0; } .graphShell { min-height: 520px; overflow: auto; } .graph { height: 520px; } .nodeActions { position: sticky; left: 0; bottom: 0; flex-wrap: wrap; } .valueChain, .evidenceGrid { display: flex; flex-direction: column; } .chainColumn { width: 100%; } .pathForm { align-items: stretch; } .pathForm input { min-width: 0; width: 100%; } .pathResult { flex-direction: column; } .pathStep { min-width: 0; flex-wrap: wrap; } .footer { flex-direction: column; } }
