@@ -33,6 +33,7 @@ from app.services.accounts import (
     account_service,
 )
 from app.services.notifications import notification_service
+from app.services.paper_trading import paper_trading_service
 
 logger = logging.getLogger(__name__)
 
@@ -340,4 +341,9 @@ async def delete_account(
         await notification_service.delete_user_data(user.id)
     except Exception:
         logger.exception("notification_cleanup_failed user_id=%s", user.id)
+    paper_trading_service.account_service = account_service
+    try:
+        await paper_trading_service.delete_user_data(user.id)
+    except Exception:
+        logger.exception("paper_cleanup_failed user_id=%s", user.id)
 

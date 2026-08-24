@@ -4,6 +4,7 @@ from app.api.routes import (
     accounts,
     admin,
     analysis,
+    backtest,
     discovery,
     etf_holdings,
     fundamentals,
@@ -12,6 +13,7 @@ from app.api.routes import (
     ipo_insiders,
     market,
     notifications,
+    paper_trading,
     provincial_macro,
     reliability,
     search,
@@ -98,6 +100,13 @@ api_router.include_router(
     tags=["analysis"],
 )
 
+# Backtests Focus Pro et validation Anatole Script
+api_router.include_router(
+    backtest.router,
+    prefix="/api/v1/backtest",
+    tags=["backtest"],
+)
+
 
 # Portefeuille, alertes, assistant et observabilité des données
 api_router.include_router(
@@ -127,6 +136,13 @@ api_router.include_router(
     notifications.router,
     prefix="/api/v1/notifications",
     tags=["notifications"],
+)
+
+# Compte de simulation Focus Pro; aucun courtier réel n’est activé
+api_router.include_router(
+    paper_trading.router,
+    prefix="/api/v1/paper",
+    tags=["paper-trading"],
 )
 
 # Observabilité, incidents clients et signalements bêta
