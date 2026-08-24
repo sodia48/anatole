@@ -56,6 +56,7 @@ MAX_DEPTH_TWO_COMPANIES = 8
 MAX_RELATIONSHIP_DOCUMENTS = 2
 RELATIONSHIP_PDF_PAGE_LIMIT = 30
 BUILD_RETRY_AFTER_SECONDS = 3
+RESOLVER_INDEX_CACHE_SECONDS = 21_600
 
 
 logger = logging.getLogger("anatole.api.company_network")
@@ -194,6 +195,8 @@ class CompanyResolver:
             )
             for ticker, name, sector in US_COMPANIES
         }
+        self._base_index_cache: tuple[float, CompanyEntityIndex] | None = None
+        self._base_index_lock = asyncio.Lock()
 
     async def resolve(self, ticker: str) -> CompanyNetworkNode:
         symbol = _normalize_ticker(ticker)
@@ -226,22 +229,35 @@ class CompanyResolver:
         # unresolved and clearly labelled instead of inventing a company name.
         return _node(symbol, symbol, public=True)
 
+    async def _base_index(self) -> CompanyEntityIndex:
+        cached = self._base_index_cache
+        if cached and monotonic() - cached[0] < RESOLVER_INDEX_CACHE_SECONDS:
+            return cached[1]
+        async with self._base_index_lock:
+            cached = self._base_index_cache
+            if cached and monotonic() - cached[0] < RESOLVER_INDEX_CACHE_SECONDS:
+                return cached[1]
+            nodes = list(self._tsx60.values()) + list(self._us.values())
+            try:
+                constituents = await tsx_composite_universe_service.get_constituents()
+            except Exception:  # noqa: BLE001
+                constituents = []
+            seen = {node.ticker for node in nodes}
+            for item in constituents:
+                if item.ticker in seen:
+                    continue
+                nodes.append(_node(item.ticker, item.name, exchange=item.exchange or "TSX", country="Canada", sector=item.sector))
+            index = CompanyEntityIndex()
+            for item in nodes:
+                index.add(item, VALIDATED_ALIASES.get(item.ticker or "", ()))
+            index.prepare()
+            self._base_index_cache = (monotonic(), index)
+            return index
+
     async def index(self, center: CompanyNetworkNode) -> CompanyEntityIndex:
-        nodes = list(self._tsx60.values()) + list(self._us.values())
-        try:
-            constituents = await tsx_composite_universe_service.get_constituents()
-        except Exception:  # noqa: BLE001
-            constituents = []
-        seen = {node.ticker for node in nodes}
-        for item in constituents:
-            if item.ticker in seen:
-                continue
-            nodes.append(_node(item.ticker, item.name, exchange=item.exchange or "TSX", country="Canada", sector=item.sector))
-        if center.id not in {node.id for node in nodes}:
-            nodes.append(center)
-        index = CompanyEntityIndex()
-        for item in nodes:
-            index.add(item, VALIDATED_ALIASES.get(item.ticker or "", ()))
+        index = (await self._base_index()).copy()
+        if not index.contains(center.id):
+            index.add(center, VALIDATED_ALIASES.get(center.ticker or "", ()))
         return index
 
 
