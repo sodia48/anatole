@@ -5,6 +5,7 @@ from app.api.routes import (
     admin,
     analysis,
     backtest,
+    company_network,
     discovery,
     etf_holdings,
     fundamentals,
@@ -83,6 +84,13 @@ api_router.include_router(
     ipo_insiders.router,
     prefix="/api/v1/discovery",
     tags=["ipo-insiders"],
+)
+
+# Réseau économique sourcé des entreprises Focus
+api_router.include_router(
+    company_network.router,
+    prefix="/api/v1/discovery",
+    tags=["company-network"],
 )
 
 # Grands gestionnaires institutionnels et positions SEC Form 13F
