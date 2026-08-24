@@ -138,6 +138,18 @@ AlertMetric = Literal[
     "score",
 ]
 AlertOperator = Literal["above", "below"]
+AlertType = Literal[
+    "price_level",
+    "indicator_threshold",
+    "indicator_cross",
+    "drawing_break",
+    "strategy_signal",
+]
+
+
+class DrawingAlertPoint(BaseModel):
+    time: int = Field(ge=0)
+    price: float
 
 
 class AlertRule(BaseModel):
@@ -148,6 +160,19 @@ class AlertRule(BaseModel):
     threshold: float
     enabled: bool = True
     label: str | None = None
+    alert_type: AlertType = "price_level"
+    indicator_id: str | None = Field(default=None, max_length=40)
+    indicator_output: str = Field(default="value", max_length=40)
+    indicator_inputs: dict[str, float | int | str] = Field(default_factory=dict)
+    comparison_indicator_id: str | None = Field(default=None, max_length=40)
+    comparison_indicator_output: str = Field(default="value", max_length=40)
+    comparison_indicator_inputs: dict[str, float | int | str] = Field(
+        default_factory=dict
+    )
+    drawing_points: list[DrawingAlertPoint] = Field(default_factory=list, max_length=2)
+    strategy_id: str | None = Field(default=None, max_length=50)
+    strategy_parameters: dict[str, float | int | str] = Field(default_factory=dict)
+    strategy_signal: Literal["buy", "sell"] = "buy"
 
     @field_validator("id", "symbol")
     @classmethod
@@ -156,6 +181,27 @@ class AlertRule(BaseModel):
         if not value:
             raise ValueError("La valeur ne peut pas être vide.")
         return value.upper() if value != value.lower() else value
+
+    @field_validator(
+        "indicator_inputs",
+        "comparison_indicator_inputs",
+        "strategy_parameters",
+    )
+    @classmethod
+    def limit_alert_parameters(
+        cls,
+        values: dict[str, float | int | str],
+    ) -> dict[str, float | int | str]:
+        if len(values) > 12:
+            raise ValueError("Une alerte accepte au plus 12 paramètres.")
+        if any(
+            not key.strip()
+            or len(key) > 40
+            or isinstance(value, str) and len(value) > 80
+            for key, value in values.items()
+        ):
+            raise ValueError("Paramètres d’alerte invalides.")
+        return values
 
 
 class AlertEvaluateRequest(BaseModel):
@@ -167,6 +213,7 @@ class AlertEvaluation(BaseModel):
     symbol: str
     name: str
     metric: AlertMetric
+    alert_type: AlertType = "price_level"
     metric_label: str
     operator: AlertOperator
     threshold: float
