@@ -7,6 +7,7 @@ from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
+from app.services.company_network import company_network_service
 
 router = APIRouter()
 
@@ -78,6 +79,7 @@ async def ready(request: Request) -> dict[str, object]:
         "http_pool_started": shared_http_client.started,
         "upstream_metrics": shared_http_client.metrics.as_dict(),
         "account_storage": account_storage,
+        "company_network": company_network_service.readiness(),
         "admin_console": {
             "status": "ready" if not missing_admin_routes else "degraded",
             "routes_enabled": not missing_admin_routes,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import threading
 from collections import deque
 from dataclasses import dataclass
@@ -53,6 +54,10 @@ MAX_RELATIONSHIPS = 80
 MAX_DEPTH_TWO_COMPANIES = 8
 MAX_RELATIONSHIP_DOCUMENTS = 2
 RELATIONSHIP_PDF_PAGE_LIMIT = 30
+BUILD_RETRY_AFTER_SECONDS = 3
+
+
+logger = logging.getLogger("anatole.api.company_network")
 
 
 US_COMPANIES: tuple[tuple[str, str, str], ...] = (
@@ -809,13 +814,40 @@ class CompanyNetworkService:
         self.official_provider = official_provider or OfficialRelationshipProvider()
         self.finnhub_provider = finnhub_provider or FinnhubSupplyChainProvider()
         self._cache: dict[tuple[str, int, bool], tuple[float, CompanyNetworkSnapshot]] = {}
-        self._locks: dict[str, asyncio.Lock] = {}
+        self._build_tasks: dict[tuple[str, int, bool], asyncio.Task[None]] = {}
+        self._build_errors: dict[tuple[str, int, bool], str] = {}
+        self._global_build_semaphore = asyncio.Semaphore(
+            settings.company_network_build_concurrency
+        )
+        self._active_builds = 0
 
     async def start(self) -> None:
         await self.store.start()
 
-    def _lock(self, ticker: str) -> asyncio.Lock:
-        return self._locks.setdefault(ticker, asyncio.Lock())
+    async def close(self) -> None:
+        tasks = list(self._build_tasks.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        close_provider = getattr(self.official_provider, "close", None)
+        if close_provider is not None:
+            result = close_provider()
+            if asyncio.iscoroutine(result):
+                await result
+
+    def readiness(self) -> dict[str, int]:
+        return {
+            "active_builds": self._active_builds,
+            "queued_or_running": len(self._build_tasks),
+            "cached_snapshots": len(self._cache),
+        }
+
+    def _has_fresh_cache(self, key: tuple[str, int, bool]) -> bool:
+        cached = self._cache.get(key)
+        return bool(
+            cached and monotonic() - cached[0] < self.cache_ttl_seconds
+        )
 
     async def _build_depth_one(self, center: CompanyNetworkNode, *, refresh: bool) -> tuple[list[CompanyNetworkNode], list[CompanyRelationship], list[CompanyNetworkSourceStatus], int]:
         index = await self.resolver.index(center)
@@ -846,6 +878,256 @@ class CompanyNetworkService:
         scanned = issuer_result.documents_scanned + sec_result.documents_scanned
         return list(nodes.values()), merged, sources, scanned
 
+    @staticmethod
+    def _public_build_error() -> str:
+        return "L'analyse du réseau a échoué temporairement."
+
+    def _snapshot(
+        self,
+        center: CompanyNetworkNode,
+        nodes: Iterable[CompanyNetworkNode],
+        relationships: Iterable[CompanyRelationship],
+        *,
+        depth: int,
+        include_secondary: bool,
+        sources: list[CompanyNetworkSourceStatus] | None = None,
+        documents_scanned: int = 0,
+        build_status: str = "ready",
+        build_error: str | None = None,
+        stale: bool = False,
+    ) -> CompanyNetworkSnapshot:
+        node_map = {node.id: node for node in nodes}
+        node_map[center.id] = center
+        ordered_nodes = [center] + [
+            node for node in node_map.values() if node.id != center.id
+        ]
+        truncated = len(ordered_nodes) > MAX_NODES
+        ordered_nodes = ordered_nodes[:MAX_NODES]
+        visible = {node.id for node in ordered_nodes}
+        visible_relationships = [
+            item
+            for item in relationships
+            if item.source_node_id in visible
+            and item.target_node_id in visible
+            and (include_secondary or item.confidence != "secondary")
+        ][:MAX_RELATIONSHIPS]
+        counts = {
+            value: sum(
+                item.confidence == value for item in visible_relationships
+            )
+            for value in ("verified", "corroborated", "secondary")
+        }
+        empty_ready = build_status == "ready" and not visible_relationships
+        if build_status == "building":
+            message_fr = "Analyse des documents officiels en cours."
+            message_en = "Official documents are being analyzed."
+        elif build_status == "failed":
+            message_fr = self._public_build_error()
+            message_en = "The network analysis failed temporarily."
+        else:
+            message_fr = (
+                "Anatole n'a pas trouvé suffisamment de relations publiques "
+                "vérifiables pour cette entreprise. Cette absence ne signifie "
+                "pas que l'entreprise n'a aucun fournisseur, client ou partenaire."
+                if empty_ready
+                else None
+            )
+            message_en = (
+                "Anatole did not find enough publicly verifiable relationships "
+                "for this company. This does not mean that the company has no "
+                "suppliers, customers, or partners."
+                if empty_ready
+                else None
+            )
+        return CompanyNetworkSnapshot(
+            center=center,
+            nodes=ordered_nodes,
+            relationships=visible_relationships,
+            sector_exposure=_sector_exposure(
+                ordered_nodes,
+                visible_relationships,
+                center.id,
+            ),
+            sources=sources or [],
+            generated_at=_utc_now(),
+            stale=stale,
+            coverage=CompanyNetworkCoverage(
+                depth=depth,
+                truncated=truncated,
+                verified_relationships=counts["verified"],
+                corroborated_relationships=counts["corroborated"],
+                secondary_relationships=counts["secondary"],
+                official_documents_scanned=documents_scanned,
+                build_status=build_status,
+                retry_after_seconds=(
+                    BUILD_RETRY_AFTER_SECONDS
+                    if build_status == "building"
+                    else None
+                ),
+                build_error=build_error if build_status == "failed" else None,
+                message_fr=message_fr,
+                message_en=message_en,
+            ),
+        )
+
+    def _with_build_status(
+        self,
+        snapshot: CompanyNetworkSnapshot,
+        status: str,
+        *,
+        build_error: str | None = None,
+    ) -> CompanyNetworkSnapshot:
+        if status == "building":
+            message_fr = "Analyse des documents officiels en cours."
+            message_en = "Official documents are being analyzed."
+        elif status == "failed":
+            message_fr = self._public_build_error()
+            message_en = "The network analysis failed temporarily."
+        else:
+            message_fr = snapshot.coverage.message_fr
+            message_en = snapshot.coverage.message_en
+        coverage = snapshot.coverage.model_copy(
+            update={
+                "build_status": status,
+                "retry_after_seconds": (
+                    BUILD_RETRY_AFTER_SECONDS if status == "building" else None
+                ),
+                "build_error": build_error if status == "failed" else None,
+                "message_fr": message_fr,
+                "message_en": message_en,
+            }
+        )
+        return snapshot.model_copy(
+            update={"stale": status != "ready", "coverage": coverage}
+        )
+
+    async def _build_and_cache(
+        self,
+        center: CompanyNetworkNode,
+        *,
+        key: tuple[str, int, bool],
+        refresh: bool,
+    ) -> None:
+        symbol, depth, include_secondary = key
+        started = monotonic()
+        try:
+            async with self._global_build_semaphore:
+                self._active_builds += 1
+                logger.info(
+                    "company_network_build_started ticker=%s depth=%s",
+                    symbol,
+                    depth,
+                )
+                try:
+                    nodes, relationships, sources, documents_scanned = (
+                        await self._build_depth_one(center, refresh=refresh)
+                    )
+                    if depth == 2:
+                        public_neighbors = [
+                            node
+                            for node in nodes
+                            if node.id != center.id
+                            and node.public_company
+                            and node.ticker
+                        ][:MAX_DEPTH_TWO_COMPANIES]
+                        for neighbor in public_neighbors:
+                            try:
+                                _, _, _, scanned = await self._build_depth_one(
+                                    neighbor,
+                                    refresh=refresh,
+                                )
+                                documents_scanned += scanned
+                            except asyncio.CancelledError:
+                                raise
+                            except Exception as exc:  # noqa: BLE001
+                                logger.warning(
+                                    "company_network_depth_two_neighbor_failed "
+                                    "ticker=%s neighbor=%s error_type=%s",
+                                    symbol,
+                                    neighbor.ticker,
+                                    type(exc).__name__,
+                                )
+                        nodes, relationships = await self.store.graph(
+                            center,
+                            depth=2,
+                            include_secondary=include_secondary,
+                        )
+                    else:
+                        stored_nodes, stored_relationships = await self.store.graph(
+                            center,
+                            depth=1,
+                            include_secondary=include_secondary,
+                        )
+                        if stored_relationships:
+                            nodes, relationships = (
+                                stored_nodes,
+                                stored_relationships,
+                            )
+                    snapshot = self._snapshot(
+                        center,
+                        nodes,
+                        relationships,
+                        depth=depth,
+                        include_secondary=include_secondary,
+                        sources=sources,
+                        documents_scanned=documents_scanned,
+                    )
+                    self._cache[key] = (monotonic(), snapshot)
+                    self._build_errors.pop(key, None)
+                    logger.info(
+                        "company_network_build_finished ticker=%s depth=%s "
+                        "duration_ms=%.1f nodes=%s relationships=%s "
+                        "documents_scanned=%s",
+                        symbol,
+                        depth,
+                        (monotonic() - started) * 1000,
+                        len(snapshot.nodes),
+                        len(snapshot.relationships),
+                        documents_scanned,
+                    )
+                finally:
+                    self._active_builds -= 1
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            self._build_errors[key] = self._public_build_error()
+            logger.exception(
+                "company_network_build_failed ticker=%s depth=%s error_type=%s",
+                symbol,
+                depth,
+                type(exc).__name__,
+            )
+
+    def schedule_build(
+        self,
+        ticker: str,
+        center: CompanyNetworkNode,
+        *,
+        depth: int,
+        refresh: bool,
+        include_secondary: bool,
+    ) -> bool:
+        key = (_normalize_ticker(ticker), depth, include_secondary)
+        existing = self._build_tasks.get(key)
+        if existing is not None and not existing.done():
+            return False
+        if not refresh and key in self._build_errors:
+            return False
+        if refresh:
+            self._build_errors.pop(key, None)
+        task = asyncio.create_task(
+            self._build_and_cache(center, key=key, refresh=refresh),
+            name=f"company-network:{key[0]}:depth-{depth}",
+        )
+        self._build_tasks[key] = task
+
+        def remove_finished(finished: asyncio.Task[None]) -> None:
+            if self._build_tasks.get(key) is finished:
+                self._build_tasks.pop(key, None)
+
+        task.add_done_callback(remove_finished)
+        return True
+
     async def get_snapshot(
         self,
         ticker: str,
@@ -857,77 +1139,82 @@ class CompanyNetworkService:
         symbol = _normalize_ticker(ticker)
         key = (symbol, depth, include_secondary)
         cached = self._cache.get(key)
-        if not refresh and cached and monotonic() - cached[0] < self.cache_ttl_seconds:
+        cache_is_fresh = self._has_fresh_cache(key)
+        if cache_is_fresh and cached:
+            if refresh:
+                self.schedule_build(
+                    symbol,
+                    cached[1].center,
+                    depth=depth,
+                    refresh=True,
+                    include_secondary=include_secondary,
+                )
+                return self._with_build_status(cached[1], "building")
+            if key in self._build_tasks:
+                return self._with_build_status(cached[1], "building")
+            if key in self._build_errors:
+                return self._with_build_status(
+                    cached[1],
+                    "failed",
+                    build_error=self._build_errors[key],
+                )
             return cached[1]
         center = await self.resolver.resolve(symbol)
-        async with self._lock(symbol):
-            sources: list[CompanyNetworkSourceStatus] = []
-            documents_scanned = 0
-            persisted_nodes, persisted_relationships = await self.store.graph(center, depth=depth, include_secondary=include_secondary)
-            if not refresh and persisted_relationships:
-                nodes, relationships = persisted_nodes, persisted_relationships
-                sources = _persisted_source_statuses(relationships)
-            else:
-                nodes, relationships, sources, documents_scanned = await self._build_depth_one(center, refresh=refresh)
-                if depth == 2:
-                    public_neighbors = [node for node in nodes if node.id != center.id and node.public_company and node.ticker][:MAX_DEPTH_TWO_COMPANIES]
-                    semaphore = asyncio.Semaphore(3)
-
-                    async def expand(node: CompanyNetworkNode) -> tuple[list[CompanyNetworkNode], list[CompanyRelationship]]:
-                        async with semaphore:
-                            expanded_nodes, expanded_relationships, _, _ = await self._build_depth_one(node, refresh=refresh)
-                            return expanded_nodes, expanded_relationships
-
-                    expanded = await asyncio.gather(*(expand(node) for node in public_neighbors), return_exceptions=True)
-                    node_map = {node.id: node for node in nodes}
-                    all_relationships = list(relationships)
-                    for result in expanded:
-                        if isinstance(result, Exception):
-                            continue
-                        more_nodes, more_relationships = result
-                        node_map.update({node.id: node for node in more_nodes})
-                        all_relationships.extend(more_relationships)
-                    nodes = list(node_map.values())
-                    relationships = merge_relationships(all_relationships)
-                stored_nodes, stored_relationships = await self.store.graph(center, depth=depth, include_secondary=include_secondary)
-                if stored_relationships:
-                    nodes, relationships = stored_nodes, stored_relationships
-
-            node_map = {node.id: node for node in nodes}
-            node_map[center.id] = center
-            ordered_nodes = [center] + [node for node in node_map.values() if node.id != center.id]
-            truncated = len(ordered_nodes) > MAX_NODES
-            ordered_nodes = ordered_nodes[:MAX_NODES]
-            visible = {node.id for node in ordered_nodes}
-            relationships = [
-                item for item in relationships
-                if item.source_node_id in visible
-                and item.target_node_id in visible
-                and (include_secondary or item.confidence != "secondary")
-            ][:MAX_RELATIONSHIPS]
-            counts = {value: sum(item.confidence == value for item in relationships) for value in ("verified", "corroborated", "secondary")}
-            empty = not relationships
-            snapshot = CompanyNetworkSnapshot(
-                center=center,
-                nodes=ordered_nodes,
-                relationships=relationships,
-                sector_exposure=_sector_exposure(ordered_nodes, relationships, center.id),
-                sources=sources,
-                generated_at=_utc_now(),
-                stale=False,
-                coverage=CompanyNetworkCoverage(
-                    depth=depth,
-                    truncated=truncated,
-                    verified_relationships=counts["verified"],
-                    corroborated_relationships=counts["corroborated"],
-                    secondary_relationships=counts["secondary"],
-                    official_documents_scanned=documents_scanned,
-                    message_fr="Anatole n'a pas trouvé suffisamment de relations publiques vérifiables pour cette entreprise. Cette absence ne signifie pas que l'entreprise n'a aucun fournisseur, client ou partenaire." if empty else None,
-                    message_en="Anatole did not find enough publicly verifiable relationships for this company. This does not mean that the company has no suppliers, customers, or partners." if empty else None,
-                ),
+        persisted_depth = 1 if depth == 2 else depth
+        persisted_nodes, persisted_relationships = await self.store.graph(
+            center,
+            depth=persisted_depth,
+            include_secondary=include_secondary,
+        )
+        if persisted_relationships:
+            snapshot = self._snapshot(
+                center,
+                persisted_nodes,
+                persisted_relationships,
+                depth=depth,
+                include_secondary=include_secondary,
+                sources=_persisted_source_statuses(persisted_relationships),
+                build_status=("building" if refresh or depth == 2 else "ready"),
+                stale=refresh or depth == 2,
             )
-            self._cache[key] = (monotonic(), snapshot)
+            if not refresh and depth == 1:
+                self._cache[key] = (monotonic(), snapshot)
+                return snapshot
+            self.schedule_build(
+                symbol,
+                center,
+                depth=depth,
+                refresh=refresh,
+                include_secondary=include_secondary,
+            )
             return snapshot
+
+        if key in self._build_errors and not refresh:
+            return self._snapshot(
+                center,
+                [center],
+                [],
+                depth=depth,
+                include_secondary=include_secondary,
+                build_status="failed",
+                build_error=self._build_errors[key],
+                stale=True,
+            )
+        self.schedule_build(
+            symbol,
+            center,
+            depth=depth,
+            refresh=refresh,
+            include_secondary=include_secondary,
+        )
+        return self._snapshot(
+            center,
+            [center],
+            [],
+            depth=depth,
+            include_secondary=include_secondary,
+            build_status="building",
+        )
 
     async def evidence(self, ticker: str, *, include_secondary: bool = True) -> CompanyNetworkEvidenceResponse:
         snapshot = await self.get_snapshot(ticker, include_secondary=include_secondary)
@@ -935,6 +1222,9 @@ class CompanyNetworkService:
             ticker=snapshot.center.ticker or ticker,
             groups=[RelationshipEvidenceGroup(relationship=item, evidence=item.evidence) for item in snapshot.relationships],
             generated_at=_utc_now(),
+            status=snapshot.coverage.build_status,
+            retry_after_seconds=snapshot.coverage.retry_after_seconds,
+            build_error=snapshot.coverage.build_error,
         )
 
     async def path(
@@ -947,28 +1237,6 @@ class CompanyNetworkService:
     ) -> CompanyRelationshipPath:
         source = await self.resolver.resolve(from_ticker)
         target = await self.resolver.resolve(to_ticker)
-        if source.id != target.id:
-            # A path request is an explicit user action. Build only the bounded
-            # neighbourhoods needed for a three-edge search, while preserving
-            # any durable graph already cached. Provider failures remain local
-            # to their snapshot and never turn into invented relationships.
-            source_depth = min(2, max_depth)
-            builds = [
-                self.get_snapshot(
-                    source.ticker or from_ticker,
-                    depth=source_depth,
-                    include_secondary=include_secondary,
-                )
-            ]
-            if max_depth >= 3:
-                builds.append(
-                    self.get_snapshot(
-                        target.ticker or to_ticker,
-                        depth=1,
-                        include_secondary=include_secondary,
-                    )
-                )
-            await asyncio.gather(*builds, return_exceptions=True)
         nodes, relationships = await self.store.all_graph(include_secondary)
         node_map = {node.id: node for node in nodes}
         node_map[source.id] = source
@@ -991,6 +1259,7 @@ class CompanyNetworkService:
                     depth=len(edge_path),
                     generated_at=_utc_now(),
                     found=True,
+                    status="ready",
                 )
             if len(edge_path) >= max_depth:
                 continue
@@ -1001,14 +1270,58 @@ class CompanyNetworkService:
                     continue
                 visited_depth[neighbor] = next_depth
                 queue.append((neighbor, [*node_path, neighbor], [*edge_path, edge]))
+        build_specs = [
+            (source.ticker or from_ticker, source, min(2, max_depth))
+        ]
+        if source.id != target.id and max_depth >= 3:
+            build_specs.append((target.ticker or to_ticker, target, 1))
+        for build_ticker, build_center, build_depth in build_specs:
+            build_key = (
+                _normalize_ticker(build_ticker),
+                build_depth,
+                include_secondary,
+            )
+            if not self._has_fresh_cache(build_key):
+                self.schedule_build(
+                    build_ticker,
+                    build_center,
+                    depth=build_depth,
+                    refresh=False,
+                    include_secondary=include_secondary,
+                )
+        relevant_keys = [
+            (_normalize_ticker(build_ticker), build_depth, include_secondary)
+            for build_ticker, _, build_depth in build_specs
+        ]
+        building = any(key in self._build_tasks for key in relevant_keys)
+        failed = not building and any(
+            key in self._build_errors for key in relevant_keys
+        )
+        status = "building" if building else "failed" if failed else "ready"
         return CompanyRelationshipPath(
             from_company=source,
             to_company=target,
             depth=0,
             generated_at=_utc_now(),
             found=False,
-            message_fr="Aucun lien vérifié n'a été trouvé dans les données disponibles.",
-            message_en="No verified relationship was found in the available data.",
+            status=status,
+            retry_after_seconds=(
+                BUILD_RETRY_AFTER_SECONDS if status == "building" else None
+            ),
+            message_fr=(
+                "Analyse du graphe en arrière-plan."
+                if status == "building"
+                else self._public_build_error()
+                if status == "failed"
+                else "Aucun lien vérifié n'a été trouvé dans les données disponibles."
+            ),
+            message_en=(
+                "The graph is being analyzed in the background."
+                if status == "building"
+                else "The network analysis failed temporarily."
+                if status == "failed"
+                else "No verified relationship was found in the available data."
+            ),
         )
 
 

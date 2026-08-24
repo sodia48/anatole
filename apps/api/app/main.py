@@ -39,6 +39,7 @@ async def lifespan(_: FastAPI):
     try:
         yield
     finally:
+        await company_network_service.close()
         await shared_http_client.close()
         await account_service.close()
         logger.info("anatole_api_stopped shared_http_pool=false")
