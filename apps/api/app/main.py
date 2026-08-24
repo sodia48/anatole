@@ -16,6 +16,7 @@ from app.core.telemetry import reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
 from app.services.notifications import notification_service
+from app.services.paper_trading import paper_trading_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +31,8 @@ async def lifespan(_: FastAPI):
     await account_service.start()
     notification_service.account_service = account_service
     await notification_service.start()
+    paper_trading_service.account_service = account_service
+    await paper_trading_service.start()
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield

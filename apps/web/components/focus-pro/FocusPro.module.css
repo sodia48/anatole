@@ -1,0 +1,565 @@
+.workspace {
+  --focus-border: rgba(48, 92, 121, 0.72);
+  --focus-panel: rgba(5, 20, 31, 0.94);
+  display: grid;
+  gap: 10px;
+  width: min(100%, 1920px);
+  margin: 0 auto;
+  color: #dcecf6;
+}
+
+.eyebrow {
+  display: block;
+  color: #65b8f5;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.toolbar,
+.drawingToolbar,
+.bottomTabs,
+.panel,
+.chartPanel {
+  border: 1px solid var(--focus-border);
+  background: var(--focus-panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 50px;
+  padding: 7px;
+  border-radius: 11px;
+  backdrop-filter: blur(14px);
+}
+
+.toolbarGroup,
+.toolbarActions,
+.toolGroup,
+.inlineActions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toolbarGroup {
+  padding-right: 8px;
+  border-right: 1px solid rgba(48, 92, 121, 0.42);
+}
+
+.toolbarActions {
+  margin-left: auto;
+}
+
+.tickerInput,
+.select,
+.input,
+.textarea {
+  border: 1px solid rgba(56, 105, 137, 0.76);
+  border-radius: 7px;
+  background: #061722;
+  color: #e8f5fc;
+  outline: none;
+}
+
+.tickerInput {
+  width: 94px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.select,
+.input {
+  min-width: 92px;
+  height: 34px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.button,
+.iconButton,
+.primaryButton,
+.dangerButton,
+.tabButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid rgba(56, 105, 137, 0.68);
+  border-radius: 7px;
+  background: rgba(9, 31, 45, 0.96);
+  color: #9fbbce;
+  font-size: 11px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.button {
+  padding: 0 10px;
+}
+
+.iconButton {
+  width: 34px;
+  padding: 0;
+}
+
+.button:hover,
+.iconButton:hover,
+.tabButton:hover,
+.buttonActive {
+  border-color: #2c9cff;
+  background: rgba(35, 111, 164, 0.35);
+  color: #fff;
+}
+
+.button:disabled,
+.iconButton:disabled,
+.primaryButton:disabled,
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.primaryButton {
+  padding: 0 12px;
+  border-color: rgba(44, 156, 255, 0.78);
+  background: #1b66c9;
+  color: #fff;
+}
+
+.dangerButton {
+  padding: 0 10px;
+  border-color: rgba(255, 77, 103, 0.48);
+  background: rgba(103, 25, 40, 0.5);
+  color: #ffb5c0;
+}
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(280px, 330px);
+  gap: 10px;
+  min-height: 650px;
+}
+
+.mainGridNoSide {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.drawingToolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 4px;
+  border-radius: 10px;
+}
+
+.drawingDivider {
+  width: 26px;
+  height: 1px;
+  margin: 3px 0;
+  background: rgba(65, 112, 141, 0.48);
+}
+
+.drawingCount {
+  color: #5f8198;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.chartPanel {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 11px;
+}
+
+.chartHeader,
+.chartFooter,
+.sectionHeader,
+.between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chartHeader {
+  min-height: 58px;
+  padding: 9px 13px;
+  border-bottom: 1px solid rgba(48, 92, 121, 0.52);
+}
+
+.chartHeader h2,
+.sectionHeader h2 {
+  margin: 3px 0 0;
+  color: #f1f8fc;
+  font-size: 15px;
+}
+
+.chartStatus {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 3px;
+  color: #7898ad;
+  font-size: 10px;
+}
+
+.chartStatus strong {
+  color: #f6b94a;
+}
+
+.chartStatus i {
+  color: #65b8f5;
+}
+
+.chartStage {
+  position: relative;
+  min-height: 590px;
+}
+
+.chartCanvas {
+  width: 100%;
+  height: clamp(590px, 68vh, 820px);
+}
+
+.chartOverlay,
+.chartError {
+  position: absolute;
+  z-index: 12;
+  left: 14px;
+  right: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.chartOverlay {
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 13, 21, 0.68);
+  color: #b9d0df;
+}
+
+.chartError {
+  bottom: 14px;
+  border: 1px solid rgba(255, 77, 103, 0.55);
+  background: rgba(91, 26, 42, 0.94);
+  color: #ffd9e0;
+}
+
+.chartFooter {
+  min-height: 32px;
+  padding: 5px 12px;
+  border-top: 1px solid rgba(48, 92, 121, 0.42);
+  color: #5f7c91;
+  font-size: 9px;
+}
+
+.sidePanel {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.panel {
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.sectionHeader {
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(48, 92, 121, 0.42);
+}
+
+.sectionBody {
+  display: grid;
+  gap: 9px;
+  padding: 11px 12px;
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+  color: #7595aa;
+  font-size: 10px;
+}
+
+.field .input,
+.field .select {
+  width: 100%;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 10px;
+  resize: vertical;
+  font: 11px/1.55 "SFMono-Regular", Consolas, monospace;
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(48, 92, 121, 0.45);
+  border-radius: 7px;
+  background: rgba(8, 29, 42, 0.7);
+  color: #9fbbce;
+  font-size: 10px;
+}
+
+.listItem strong {
+  display: block;
+  color: #e5f2f9;
+  font-size: 11px;
+}
+
+.listItem small,
+.muted,
+.notice {
+  color: #6f8ca0;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.notice {
+  padding: 9px 10px;
+  border: 1px solid rgba(246, 185, 74, 0.32);
+  border-radius: 7px;
+  background: rgba(100, 70, 14, 0.12);
+  color: #c9a65e;
+}
+
+.errorNotice,
+.successNotice {
+  padding: 8px 10px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+
+.errorNotice {
+  border: 1px solid rgba(255, 77, 103, 0.42);
+  color: #ffb5c0;
+}
+
+.successNotice {
+  border: 1px solid rgba(22, 199, 154, 0.38);
+  color: #72d9bd;
+}
+
+.bottomPanel {
+  min-height: 190px;
+  border-radius: 10px;
+}
+
+.bottomTabs {
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.tabButton {
+  min-width: 94px;
+  padding: 0 12px;
+  border-color: transparent;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.kpi {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid rgba(48, 92, 121, 0.45);
+  border-radius: 7px;
+  background: rgba(8, 29, 42, 0.74);
+}
+
+.kpi span {
+  color: #7898ad;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.kpi strong {
+  color: #f1f8fc;
+  font-size: 15px;
+}
+
+.positive { color: #16c79a !important; }
+.negative { color: #ff5f76 !important; }
+.paperBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border: 1px solid rgba(246, 185, 74, 0.58);
+  border-radius: 999px;
+  background: rgba(246, 185, 74, 0.12);
+  color: #f6b94a;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.tableWrap {
+  overflow: auto;
+  max-height: 310px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10px;
+}
+
+.table th,
+.table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(48, 92, 121, 0.34);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th:first-child,
+.table td:first-child {
+  text-align: left;
+}
+
+.mobileMenuLabel {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .mainGrid,
+  .mainGridNoSide {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .sidePanel {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .toolbarActions {
+    width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace {
+    gap: 7px;
+  }
+
+  .toolbar {
+    position: relative;
+    align-items: stretch;
+  }
+
+  .toolbarGroup {
+    flex: 1 1 auto;
+    border-right: 0;
+  }
+
+  .toolbarActions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .toolbarActions .button {
+    overflow: hidden;
+    padding: 0 6px;
+    white-space: nowrap;
+  }
+
+  .mainGrid,
+  .mainGridNoSide {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .drawingToolbar {
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  .drawingDivider {
+    width: 1px;
+    height: 26px;
+  }
+
+  .chartStage {
+    min-height: 480px;
+  }
+
+  .chartCanvas {
+    height: 520px;
+  }
+
+  .chartHeader,
+  .chartFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chartStatus {
+    align-items: flex-start;
+  }
+
+  .sidePanel {
+    display: block;
+  }
+
+  .sidePanel > * {
+    margin-bottom: 7px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bottomTabs {
+    overflow-x: auto;
+  }
+
+  .mobileMenuLabel {
+    display: inline;
+  }
+}

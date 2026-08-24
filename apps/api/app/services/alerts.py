@@ -7,8 +7,17 @@ from app.schemas.workspace import (
     AlertEvaluateRequest,
     AlertEvaluation,
     AlertSnapshot,
+    DrawingAlertPoint,
 )
+from app.schemas.backtest import BacktestRequest
+from app.services.backtest import strategy_signals
 from app.services.market_data import market_data_service
+from app.services.technical_analysis import (
+    calculate_indicator,
+    crossed_above,
+    crossed_below,
+    latest_value,
+)
 
 
 _METRIC_LABELS = {
@@ -61,6 +70,19 @@ def _format(value: float | None, unit: str) -> str:
     return f"{value:.1f}"
 
 
+def drawing_level(points: list[DrawingAlertPoint], time: int) -> float | None:
+    if not points:
+        return None
+    if len(points) == 1 or points[1].time == points[0].time:
+        return points[0].price
+    slope = (
+        points[1].price - points[0].price
+    ) / (
+        points[1].time - points[0].time
+    )
+    return points[0].price + slope * (time - points[0].time)
+
+
 class AlertService:
     async def evaluate(self, request: AlertEvaluateRequest) -> AlertSnapshot:
         enabled_symbols = list(
@@ -94,6 +116,7 @@ class AlertService:
                         symbol=symbol,
                         name=symbol,
                         metric=rule.metric,
+                        alert_type=rule.alert_type,
                         metric_label=label,
                         operator=rule.operator,
                         threshold=rule.threshold,
@@ -116,6 +139,7 @@ class AlertService:
                         symbol=symbol,
                         name=quote.name if quote else symbol,
                         metric=rule.metric,
+                        alert_type=rule.alert_type,
                         metric_label=label,
                         operator=rule.operator,
                         threshold=rule.threshold,
@@ -130,37 +154,165 @@ class AlertService:
                 )
                 continue
 
-            technicals = market_data_service.calculate_technicals(candles)
-            average_volume = _average_volume(candles)
-            relative_volume = quote.volume / average_volume if average_volume else 0.0
-            momentum = _momentum(candles)
-            values = {
-                "price": quote.price,
-                "change_percent": quote.change_percent,
-                "rsi_14": technicals.rsi_14,
-                "momentum_20d": momentum,
-                "relative_volume": relative_volume,
-                "score": _score(
-                    quote.change_percent,
-                    momentum,
-                    relative_volume,
-                    technicals.rsi_14,
-                    technicals.trend,
-                ),
-            }
-            current = values[rule.metric]
-            triggered = False
-            if current is not None:
-                triggered = (
-                    current >= rule.threshold
-                    if rule.operator == "above"
-                    else current <= rule.threshold
+            try:
+                if rule.alert_type == "price_level":
+                    technicals = market_data_service.calculate_technicals(candles)
+                    average_volume = _average_volume(candles)
+                    relative_volume = (
+                        quote.volume / average_volume if average_volume else 0.0
+                    )
+                    momentum = _momentum(candles)
+                    values = {
+                        "price": quote.price,
+                        "change_percent": quote.change_percent,
+                        "rsi_14": technicals.rsi_14,
+                        "momentum_20d": momentum,
+                        "relative_volume": relative_volume,
+                        "score": _score(
+                            quote.change_percent,
+                            momentum,
+                            relative_volume,
+                            technicals.rsi_14,
+                            technicals.trend,
+                        ),
+                    }
+                    current = values[rule.metric]
+                    threshold = rule.threshold
+                    triggered = (
+                        current is not None
+                        and (
+                            current >= threshold
+                            if rule.operator == "above"
+                            else current <= threshold
+                        )
+                    )
+                elif rule.alert_type == "indicator_threshold":
+                    indicator_id = rule.indicator_id or "rsi"
+                    outputs = calculate_indicator(
+                        candles,
+                        indicator_id,
+                        rule.indicator_inputs,
+                    )
+                    output = outputs.get(rule.indicator_output)
+                    if output is None:
+                        output = next(iter(outputs.values()))
+                    current = latest_value(output)
+                    threshold = rule.threshold
+                    label = f"{indicator_id.upper()} / {rule.indicator_output}"
+                    unit = ""
+                    triggered = (
+                        current is not None
+                        and (
+                            current >= threshold
+                            if rule.operator == "above"
+                            else current <= threshold
+                        )
+                    )
+                elif rule.alert_type == "indicator_cross":
+                    primary_id = rule.indicator_id or "sma"
+                    comparison_id = rule.comparison_indicator_id or "ema"
+                    primary_outputs = calculate_indicator(
+                        candles,
+                        primary_id,
+                        rule.indicator_inputs,
+                    )
+                    comparison_outputs = calculate_indicator(
+                        candles,
+                        comparison_id,
+                        rule.comparison_indicator_inputs,
+                    )
+                    primary = primary_outputs.get(rule.indicator_output)
+                    comparison = comparison_outputs.get(
+                        rule.comparison_indicator_output
+                    )
+                    if primary is None:
+                        primary = next(iter(primary_outputs.values()))
+                    if comparison is None:
+                        comparison = next(iter(comparison_outputs.values()))
+                    current = latest_value(primary)
+                    threshold = latest_value(comparison)
+                    label = f"{primary_id.upper()} / {comparison_id.upper()}"
+                    unit = ""
+                    triggered = (
+                        crossed_above(primary, comparison)
+                        if rule.operator == "above"
+                        else crossed_below(primary, comparison)
+                    )
+                elif rule.alert_type == "drawing_break":
+                    if not rule.drawing_points:
+                        raise ValueError("Drawing anchors are required.")
+                    current = candles[-1].close
+                    threshold = drawing_level(rule.drawing_points, candles[-1].time)
+                    previous_threshold = (
+                        drawing_level(rule.drawing_points, candles[-2].time)
+                        if len(candles) > 1
+                        else None
+                    )
+                    label = "Cassure de dessin"
+                    unit = "$"
+                    triggered = bool(
+                        threshold is not None
+                        and previous_threshold is not None
+                        and (
+                            (
+                                candles[-2].close <= previous_threshold
+                                and current > threshold
+                            )
+                            if rule.operator == "above"
+                            else (
+                                candles[-2].close >= previous_threshold
+                                and current < threshold
+                            )
+                        )
+                    )
+                else:
+                    strategy_id = rule.strategy_id or "sma_crossover"
+                    signals = strategy_signals(
+                        candles,
+                        BacktestRequest(
+                            ticker=symbol,
+                            range="3mo",
+                            interval="1d",
+                            strategy=strategy_id,
+                            strategy_parameters=rule.strategy_parameters,
+                        ),
+                    )
+                    signal_series = (
+                        signals.enter_long
+                        if rule.strategy_signal == "buy"
+                        else signals.exit_long
+                    )
+                    current = 1.0 if signal_series and signal_series[-1] else 0.0
+                    threshold = 1.0
+                    label = f"Signal {strategy_id} / {rule.strategy_signal}"
+                    unit = ""
+                    triggered = current == threshold
+            except (KeyError, TypeError, ValueError) as error:
+                items.append(
+                    AlertEvaluation(
+                        id=rule.id,
+                        symbol=symbol,
+                        name=quote.name or symbol,
+                        metric=rule.metric,
+                        alert_type=rule.alert_type,
+                        metric_label=label,
+                        operator=rule.operator,
+                        threshold=rule.threshold,
+                        current_value=None,
+                        unit=unit,
+                        triggered=False,
+                        status="unavailable",
+                        message=f"Règle invalide ou indisponible : {error}",
+                        source=quote.source,
+                        evaluated_at=evaluated_at,
+                    )
                 )
+                continue
             operator_text = "au-dessus de" if rule.operator == "above" else "sous"
             state_text = "Déclenchée" if triggered else "Surveillance active"
             message = (
                 f"{state_text} : {label} à {_format(current, unit)}, "
-                f"seuil {operator_text} {_format(rule.threshold, unit)}."
+                f"seuil {operator_text} {_format(threshold, unit)}."
             )
             items.append(
                 AlertEvaluation(
@@ -168,9 +320,10 @@ class AlertService:
                     symbol=symbol,
                     name=quote.name or symbol,
                     metric=rule.metric,
+                    alert_type=rule.alert_type,
                     metric_label=label,
                     operator=rule.operator,
-                    threshold=rule.threshold,
+                    threshold=float(threshold if threshold is not None else rule.threshold),
                     current_value=(round(float(current), 4) if current is not None else None),
                     unit=unit,
                     triggered=triggered,

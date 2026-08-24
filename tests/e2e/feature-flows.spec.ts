@@ -72,8 +72,17 @@ test.describe("contrôles fonctionnels Anatole", () => {
 
   test("Focus change de période avec des données réelles de démonstration", async ({ page }) => {
     await gotoReady(page, "/focus/RY");
-    await page.getByRole("button", { name: "3M", exact: true }).click();
-    await expect(page.locator(".status-footer")).toContainText("Période 3M");
+    const timeframe = page.getByLabel(/Unité de temps|Timeframe/i);
+    const focusRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith("/api/v1/stocks/RY/focus")
+        && url.searchParams.get("range") === "3mo"
+        && url.searchParams.get("interval") === "60m";
+    });
+    await Promise.all([focusRequest, timeframe.selectOption("4h")]);
+    await expect(timeframe).toHaveValue("4h");
+    await expect(page.getByRole("heading", { name: /RY.*4h/i })).toBeVisible();
+    await expect(page.getByText(/observations/).first()).toBeVisible();
   });
 
   test("le Comparateur ajoute puis retire ENB", async ({ page }) => {
