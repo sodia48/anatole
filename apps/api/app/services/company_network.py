@@ -4,6 +4,7 @@ import asyncio
 import logging
 import threading
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
@@ -393,29 +394,29 @@ class OfficialRelationshipProvider:
     def __init__(self) -> None:
         self._document_semaphore = asyncio.Semaphore(3)
         self._sec_semaphore = asyncio.Semaphore(1)
+        self._cpu_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="company-network-cpu",
+        )
 
-    async def _issuer_document(
-        self,
+    async def close(self) -> None:
+        self._cpu_executor.shutdown(wait=False, cancel_futures=True)
+
+    @staticmethod
+    def _extract_document_sync(
         center: CompanyNetworkNode,
         index: CompanyEntityIndex,
+        content: bytes,
         candidate: IssuerDocumentCandidate,
+        source_type: str,
     ) -> tuple[list[CompanyNetworkNode], list[CompanyRelationship]] | None:
-        async with self._document_semaphore:
-            content = await issuer_financial_documents_service.download_document(candidate)
-        if not content:
-            return None
-        try:
-            text = await asyncio.to_thread(
-                financial_document_parser.extract_text,
-                content,
-                candidate,
-                max_pdf_pages=RELATIONSHIP_PDF_PAGE_LIMIT,
-            )
-        except Exception:  # noqa: BLE001
-            return None
+        text = financial_document_parser.extract_text(
+            content,
+            candidate,
+            max_pdf_pages=RELATIONSHIP_PDF_PAGE_LIMIT,
+        )
         if not text:
             return None
-        source_type = "annual_report" if candidate.document_type == "annual" else "investor_relations"
         return company_relationship_extractor.extract(
             center,
             RelationshipDocument(
@@ -429,6 +430,47 @@ class OfficialRelationshipProvider:
             ),
             index,
         )
+
+    async def _extract_document(
+        self,
+        center: CompanyNetworkNode,
+        index: CompanyEntityIndex,
+        content: bytes,
+        candidate: IssuerDocumentCandidate,
+        source_type: str,
+    ) -> tuple[list[CompanyNetworkNode], list[CompanyRelationship]] | None:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self._cpu_executor,
+            self._extract_document_sync,
+            center,
+            index,
+            content,
+            candidate,
+            source_type,
+        )
+
+    async def _issuer_document(
+        self,
+        center: CompanyNetworkNode,
+        index: CompanyEntityIndex,
+        candidate: IssuerDocumentCandidate,
+    ) -> tuple[list[CompanyNetworkNode], list[CompanyRelationship]] | None:
+        async with self._document_semaphore:
+            content = await issuer_financial_documents_service.download_document(candidate)
+        if not content:
+            return None
+        try:
+            source_type = "annual_report" if candidate.document_type == "annual" else "investor_relations"
+            return await self._extract_document(
+                center,
+                index,
+                content,
+                candidate,
+                source_type,
+            )
+        except Exception:  # noqa: BLE001
+            return None
 
     async def issuer_documents(
         self,
@@ -562,20 +604,16 @@ class OfficialRelationshipProvider:
                     content_type=response.headers.get("content-type"),
                     published_at=filed_at,
                 )
-                text = financial_document_parser.extract_text(response.content, candidate)
-                item_nodes, item_relationships = company_relationship_extractor.extract(
+                extracted = await self._extract_document(
                     center,
-                    RelationshipDocument(
-                        source_type="sec",
-                        title=f"SEC {form}",
-                        url=url,
-                        text=text,
-                        issuer=center.name,
-                        published_at=filed_at,
-                        document_date=filed_at,
-                    ),
                     index,
+                    response.content,
+                    candidate,
+                    "sec",
                 )
+                if extracted is None:
+                    continue
+                item_nodes, item_relationships = extracted
                 nodes.update({node.id: node for node in item_nodes})
                 relationships.extend(item_relationships)
                 scanned += 1
