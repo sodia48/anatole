@@ -165,7 +165,7 @@ def test_real_mda_contract_example_extracts_only_published_value() -> None:
     _, relationships = company_relationship_extractor.extract(
         center,
         document(
-            "MDA Space Ltd. signed a USD $1.1 billion contract with Globalstar, Inc. to build its next generation LEO constellation.",
+            "MDA Space Ltd. signed a CAD $1.1 billion contract with Globalstar, Inc. to build its next generation LEO constellation.",
             source_type="press_release",
             url="https://mda.space/article/mda-space-signs-1.1b-contract-with-globalstar-to-build-next-generation-leo-constellation",
         ),
@@ -173,4 +173,4 @@ def test_real_mda_contract_example_extracts_only_published_value() -> None:
     )
     assert relationships[0].relationship_type == "major_contract"
     assert relationships[0].contract_value == 1_100_000_000
-    assert relationships[0].contract_currency == "USD"
+    assert relationships[0].contract_currency == "CAD"
