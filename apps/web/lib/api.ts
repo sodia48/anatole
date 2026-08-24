@@ -8,12 +8,14 @@ import type {
   InstitutionFlow,
   InstitutionsSnapshot,
   FocusSnapshot,
+  FocusFundamentalOverlaySnapshot,
   HealthStatus,
   NewsSnapshot,
   PsychologySnapshot,
   ReliabilitySnapshot,
   ScreenerSnapshot,
   SymbolSearchResponse,
+  StockHistoryResponse,
   TerminalSnapshot,
   WatchlistSnapshot,
   AlertRule,
@@ -24,6 +26,9 @@ import type {
   DataQualitySnapshot,
   PortfolioPositionInput,
   PortfolioSnapshot,
+  AnatoleScriptValidation,
+  BacktestRequest,
+  BacktestResult,
 } from "./types";
 import { resilientFetch } from "./resilient-fetch";
 
@@ -213,6 +218,72 @@ export function getEtfDirectory(
     {},
     signal,
     35_000,
+  );
+}
+
+export function getFocusSnapshotForRange(
+  ticker: string,
+  range: string,
+  interval: string,
+  signal?: AbortSignal,
+): Promise<FocusSnapshot> {
+  const params = new URLSearchParams({ range, interval });
+  return apiRequest<FocusSnapshot>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/focus?${params.toString()}`,
+    {},
+    signal,
+    45_000,
+  );
+}
+
+export function getStockHistory(
+  ticker: string,
+  range: string,
+  interval: string,
+  signal?: AbortSignal,
+): Promise<StockHistoryResponse> {
+  const params = new URLSearchParams({ range, interval });
+  return apiRequest<StockHistoryResponse>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/history?${params.toString()}`,
+    {},
+    signal,
+    45_000,
+  );
+}
+
+export function getFocusFundamentalOverlay(
+  ticker: string,
+  signal?: AbortSignal,
+): Promise<FocusFundamentalOverlaySnapshot> {
+  return apiRequest<FocusFundamentalOverlaySnapshot>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamentals`,
+    {},
+    signal,
+    45_000,
+  );
+}
+
+export function runFocusBacktest(
+  request: BacktestRequest,
+  signal?: AbortSignal,
+): Promise<BacktestResult> {
+  return apiRequest<BacktestResult>(
+    "/api/v1/backtest",
+    { method: "POST", body: JSON.stringify(request) },
+    signal,
+    90_000,
+  );
+}
+
+export function validateAnatoleScript(
+  source: string,
+  signal?: AbortSignal,
+): Promise<AnatoleScriptValidation> {
+  return apiRequest<AnatoleScriptValidation>(
+    "/api/v1/backtest/script/validate",
+    { method: "POST", body: JSON.stringify({ source }) },
+    signal,
+    20_000,
   );
 }
 
