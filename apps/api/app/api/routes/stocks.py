@@ -1,7 +1,15 @@
 from fastapi import APIRouter, Query
 
-from app.schemas.stocks import FocusSnapshot, HistoryResponse, Quote, StockProfile, Technicals
+from app.schemas.stocks import (
+    FocusSnapshot,
+    HistoryResponse,
+    Quote,
+    StockNewsSnapshot,
+    StockProfile,
+    Technicals,
+)
 from app.services.market_data import market_data_service
+from app.services.stock_news import stock_news_service
 
 router = APIRouter()
 
@@ -30,6 +38,19 @@ async def technicals(ticker: str, range_: str = Query("1y", alias="range"), inte
 @router.get("/{ticker}/profile", response_model=StockProfile)
 async def profile(ticker: str) -> StockProfile:
     return await market_data_service.get_profile(ticker)
+
+
+@router.get("/{ticker}/news", response_model=StockNewsSnapshot)
+async def stock_news(
+    ticker: str,
+    company: str | None = Query(None, min_length=1, max_length=160),
+    lang: str = Query("fr", pattern="^(fr|en)$"),
+) -> StockNewsSnapshot:
+    return await stock_news_service.get_snapshot(
+        ticker,
+        company=company,
+        language=lang,
+    )
 
 
 @router.get("/{ticker}/focus", response_model=FocusSnapshot)

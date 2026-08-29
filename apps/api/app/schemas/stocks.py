@@ -67,3 +67,23 @@ class FocusSnapshot(BaseModel):
     technicals: Technicals
     profile: StockProfile
     generated_at: datetime
+
+
+class StockNewsItem(BaseModel):
+    id: str
+    title: str
+    url: str
+    publisher: str
+    published_at: datetime
+    related_tickers: list[str] = Field(default_factory=list)
+
+
+class StockNewsSnapshot(BaseModel):
+    ticker: str
+    symbol: str
+    company: str
+    items: list[StockNewsItem]
+    status: str = "ok"
+    detail: str | None = None
+    generated_at: datetime
+    refresh_after_seconds: int = 900

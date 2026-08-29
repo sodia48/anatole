@@ -1,6 +1,42 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Focus Pro workstation", () => {
+  test("shows the selected stock's latest news below the price chart", async ({ page }) => {
+    const recentNewsDate = new Date(Date.now() - 30 * 60 * 1_000).toISOString();
+    await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ticker: "RY",
+        symbol: "RY.TO",
+        company: "Royal Bank of Canada",
+        items: [{
+          id: "royal-bank-news",
+          title: "Royal Bank of Canada announces a strategic investment",
+          url: "https://example.com/royal-bank-news",
+          publisher: "Canadian Business Wire",
+          published_at: recentNewsDate,
+          related_tickers: ["RY.TO", "RY"],
+        }],
+        status: "ok",
+        detail: null,
+        generated_at: new Date().toISOString(),
+        refresh_after_seconds: 900,
+      }),
+    }));
+
+    await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    const performance = page.getByRole("region", { name: "Performance du titre" });
+    const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
+    await expect(performance).toBeVisible();
+    await expect(stockNews).toBeVisible();
+    await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
+    await expect(stockNews.getByText("Canadian Business Wire")).toBeVisible();
+    const [performanceBox, stockNewsBox] = await Promise.all([performance.boundingBox(), stockNews.boundingBox()]);
+    expect(stockNewsBox?.y).toBeGreaterThan(performanceBox?.y ?? Number.POSITIVE_INFINITY);
+  });
+
   test("chart, indicators, drawings, layout, comparison, markers, alerts and backtest", async ({ page }) => {
     const visibleEarningsDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1_000).toISOString();
     await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({

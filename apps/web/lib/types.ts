@@ -57,6 +57,26 @@ export type FocusSnapshot = {
   generated_at: string;
 };
 
+export type StockNewsItem = {
+  id: string;
+  title: string;
+  url: string;
+  publisher: string;
+  published_at: string;
+  related_tickers: string[];
+};
+
+export type StockNewsSnapshot = {
+  ticker: string;
+  symbol: string;
+  company: string;
+  items: StockNewsItem[];
+  status: string;
+  detail: string | null;
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
 export type CompanyNetworkNodeType =
   | "company"
   | "private_company"
