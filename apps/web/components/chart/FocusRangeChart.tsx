@@ -24,6 +24,7 @@ import {
 } from "react";
 
 import { pick } from "@/lib/i18n";
+import { FocusStockNews } from "@/components/stock/FocusStockNews";
 
 import styles from "./FocusRangeChart.module.css";
 
@@ -43,6 +44,9 @@ type FocusSnapshot = {
     delayed?: boolean;
     timestamp?: string;
     source?: string;
+  };
+  profile?: {
+    name?: string;
   };
   history: Candle[];
   technicals?: Record<string, unknown>;
@@ -860,6 +864,12 @@ export function FocusRangeChart({
           </p>
         </aside>
       </div>
+
+      <FocusStockNews
+        ticker={ticker}
+        company={snapshot?.profile?.name ?? ticker}
+        language={language}
+      />
 
       <p className={styles.note}>
         Pour 5A et 10A, les bougies et les SMA utilisent une

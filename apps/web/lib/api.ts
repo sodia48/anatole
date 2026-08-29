@@ -17,6 +17,7 @@ import type {
   ScreenerSnapshot,
   SymbolSearchResponse,
   StockHistoryResponse,
+  StockNewsSnapshot,
   TerminalSnapshot,
   WatchlistSnapshot,
   AlertRule,
@@ -149,6 +150,24 @@ export function getFocusSnapshot(
     {},
     signal,
     30_000,
+  );
+}
+
+export function getStockNewsSnapshot(
+  ticker: string,
+  company: string,
+  language: "fr" | "en" = "fr",
+  signal?: AbortSignal,
+): Promise<StockNewsSnapshot> {
+  const params = new URLSearchParams({
+    company,
+    lang: language,
+  });
+  return apiRequest<StockNewsSnapshot>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/news?${params.toString()}`,
+    {},
+    signal,
+    25_000,
   );
 }
 

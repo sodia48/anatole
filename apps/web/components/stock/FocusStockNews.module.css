@@ -1,0 +1,147 @@
+.root {
+  display: grid;
+  gap: 11px;
+  padding: 16px;
+  border: 1px solid rgba(35, 73, 96, 0.88);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(7, 28, 43, 0.94), rgba(4, 18, 29, 0.94));
+}
+
+.header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #55b9ff;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.header h2 {
+  margin: 5px 0 0;
+  color: #eef8fd;
+  font-size: 17px;
+}
+
+.count {
+  color: #7694a8;
+  font-size: 10px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  gap: 9px;
+}
+
+.card {
+  min-width: 0;
+  min-height: 132px;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border: 1px solid rgba(44, 89, 116, 0.72);
+  border-radius: 9px;
+  background: rgba(5, 23, 36, 0.76);
+  color: inherit;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+
+.card:hover {
+  border-color: rgba(69, 161, 224, 0.78);
+  background: rgba(9, 36, 54, 0.88);
+  transform: translateY(-1px);
+}
+
+.card:focus-visible {
+  outline: 2px solid rgba(57, 161, 255, 0.9);
+  outline-offset: 2px;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  color: #7392a7;
+  font-size: 9px;
+}
+
+.meta span {
+  min-width: 0;
+  overflow: hidden;
+  color: #7bbfff;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta time {
+  flex: 0 0 auto;
+}
+
+.card h3 {
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #e5f2f9;
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.open {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8db7d1;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.state {
+  min-height: 84px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border: 1px dashed rgba(48, 88, 113, 0.64);
+  border-radius: 9px;
+  color: #718fa3;
+  font-size: 10px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .root {
+    padding: 13px;
+  }
+
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+}
