@@ -24,6 +24,10 @@ test.describe("Focus Pro workstation", () => {
     await expect(page.getByRole("button", { name: "LIVE", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "1S", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "3M", exact: true })).toBeVisible();
+    const volumePanel = page.getByRole("complementary", { name: /Volumes acheteur et vendeur estimés/i });
+    await expect(volumePanel).toBeVisible();
+    await expect(volumePanel.getByText("Acheteur estimé", { exact: true })).toBeVisible();
+    await expect(volumePanel.getByText("Vendeur estimé", { exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "Focus Pro chart" })).toHaveCount(0);
 
     const oneWeekRequest = page.waitForRequest((request) => {

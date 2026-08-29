@@ -249,6 +249,51 @@ function periodPerformance(candles: Candle[]): number | null {
   return ((last - first) / first) * 100;
 }
 
+type VolumeBreakdown = {
+  buyer: number;
+  seller: number;
+  neutral: number;
+  total: number;
+};
+
+function periodVolume(candles: Candle[]): VolumeBreakdown {
+  let buyer = 0;
+  let seller = 0;
+  let neutral = 0;
+
+  for (const candle of candles) {
+    const volume = Number.isFinite(candle.volume)
+      ? Math.max(candle.volume, 0)
+      : 0;
+
+    if (candle.close > candle.open) {
+      buyer += volume;
+    } else if (candle.close < candle.open) {
+      seller += volume;
+    } else {
+      neutral += volume;
+    }
+  }
+
+  return {
+    buyer,
+    seller,
+    neutral,
+    total: buyer + seller + neutral,
+  };
+}
+
+function formatVolume(value: number): string {
+  return new Intl.NumberFormat("fr-CA", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
+function volumeShare(value: number, total: number): number {
+  return total > 0 ? (value / total) * 100 : 0;
+}
+
 function formatPercent(value: number | null): string {
   if (value === null) {
     return "N/D";
@@ -434,6 +479,7 @@ export function FocusRangeChart({
     () => periodPerformance(candles),
     [candles],
   );
+  const volume = useMemo(() => periodVolume(candles), [candles]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -732,20 +778,72 @@ export function FocusRangeChart({
         ) : null}
       </div>
 
-      <div className={styles.chartShell}>
-        <div ref={chartContainerRef} className={styles.chart} />
+      <div className={styles.chartLayout}>
+        <div className={styles.chartShell}>
+          <div ref={chartContainerRef} className={styles.chart} />
 
-        {loading && candles.length === 0 ? (
-          <div className={styles.overlay}>
-            Chargement de la période…
-          </div>
-        ) : null}
+          {loading && candles.length === 0 ? (
+            <div className={styles.overlay}>
+              Chargement de la période…
+            </div>
+          ) : null}
 
-        {error ? (
-          <div className={styles.errorBanner}>
-            {error}
+          {error ? (
+            <div className={styles.errorBanner}>
+              {error}
+            </div>
+          ) : null}
+        </div>
+
+        <aside
+          className={styles.volumePanel}
+          aria-label={`Volumes acheteur et vendeur estimés — ${period.label}`}
+        >
+          <div className={styles.volumeHeading}>
+            <span>Volume · {period.label}</span>
+            <strong>{formatVolume(volume.total)}</strong>
           </div>
-        ) : null}
+
+          <div className={styles.volumeBar} aria-hidden="true">
+            <span
+              className={styles.buyerBar}
+              style={{ width: `${volumeShare(volume.buyer, volume.total)}%` }}
+            />
+            <span
+              className={styles.sellerBar}
+              style={{ width: `${volumeShare(volume.seller, volume.total)}%` }}
+            />
+            <span
+              className={styles.neutralBar}
+              style={{ width: `${volumeShare(volume.neutral, volume.total)}%` }}
+            />
+          </div>
+
+          <div className={styles.volumeMetric}>
+            <span><i className={styles.buyerDot} />Acheteur estimé</span>
+            <strong>{formatVolume(volume.buyer)}</strong>
+            <small>{volumeShare(volume.buyer, volume.total).toFixed(1)} %</small>
+          </div>
+
+          <div className={styles.volumeMetric}>
+            <span><i className={styles.sellerDot} />Vendeur estimé</span>
+            <strong>{formatVolume(volume.seller)}</strong>
+            <small>{volumeShare(volume.seller, volume.total).toFixed(1)} %</small>
+          </div>
+
+          {volume.neutral > 0 ? (
+            <div className={`${styles.volumeMetric} ${styles.neutralMetric}`}>
+              <span><i className={styles.neutralDot} />Indéterminé</span>
+              <strong>{formatVolume(volume.neutral)}</strong>
+              <small>{volumeShare(volume.neutral, volume.total).toFixed(1)} %</small>
+            </div>
+          ) : null}
+
+          <p className={styles.volumeMethod}>
+            Estimation OHLCV : volume des bougies haussières ou baissières,
+            et non transactions bid/ask exactes.
+          </p>
+        </aside>
       </div>
 
       <p className={styles.note}>
