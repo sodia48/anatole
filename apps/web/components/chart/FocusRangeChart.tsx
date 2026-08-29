@@ -23,6 +23,8 @@ import {
   useState,
 } from "react";
 
+import { pick } from "@/lib/i18n";
+
 import styles from "./FocusRangeChart.module.css";
 
 type Candle = {
@@ -449,9 +451,11 @@ function createSeries(chart: IChartApi): Omit<ChartRefs, "chart"> {
 export function FocusRangeChart({
   ticker,
   initialSnapshot,
+  language,
 }: {
   ticker: string;
   initialSnapshot?: FocusSnapshot;
+  language: "fr" | "en";
 }) {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRefs = useRef<ChartRefs | null>(null);
@@ -687,6 +691,17 @@ export function FocusRangeChart({
 
   return (
     <section className={styles.root} aria-label="Performance du titre">
+      <header className={styles.heading}>
+        <span>
+          {pick(
+            language,
+            "COURS ET PERFORMANCE",
+            "PROFESSIONAL CHART",
+          )}
+        </span>
+        <h1>{ticker} · {period.label}</h1>
+      </header>
+
       <div className={styles.toolbar}>
         <div
           className={styles.periods}
