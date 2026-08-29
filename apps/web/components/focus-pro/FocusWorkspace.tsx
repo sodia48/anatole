@@ -11,6 +11,7 @@ import {
 
 import { useAccount } from "@/components/providers/AccountProvider";
 import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem";
+import { FocusRangeChart } from "@/components/chart/FocusRangeChart";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { FocusFundamentals, type FundamentalView } from "@/components/stock/FocusFundamentals";
 import { KeyLevels } from "@/components/stock/KeyLevels";
@@ -70,10 +71,11 @@ import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
 import styles from "./FocusPro.module.css";
 
 type Panel = "indicators" | "compare" | "alerts" | "layouts" | "strategy" | "paper" | null;
-type Section = "chart" | "ecosystem" | FundamentalView;
+type Section = "overview" | "chart" | "ecosystem" | FundamentalView;
 
 const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
-  { id: "chart", fr: "Workstation", en: "Workstation" },
+  { id: "overview", fr: "Cours", en: "Price" },
+  { id: "chart", fr: "Workstation pro", en: "Pro workstation" },
   { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" },
   { id: "financials", fr: "Résultats", en: "Financials" },
   { id: "analysts", fr: "Analystes", en: "Analysts" },
@@ -85,7 +87,7 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
   const { user } = useAccount();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
-  const [section, setSection] = useState<Section>("chart");
+  const [section, setSection] = useState<Section>("overview");
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -181,6 +183,7 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
   }, [ticker]);
 
   useEffect(() => {
+    if (section !== "chart") return;
     const controller = new AbortController();
     let active = true;
     const load = async (silent: boolean) => {
@@ -211,10 +214,11 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
       controller.abort();
       if (interval) window.clearInterval(interval);
     };
-  }, [initialSnapshot, layout.timeframe, ticker, timeframe.providerInterval, timeframe.range, timeframe.refreshMs]);
+  }, [initialSnapshot, layout.timeframe, section, ticker, timeframe.providerInterval, timeframe.range, timeframe.refreshMs]);
 
   useEffect(() => {
     const controller = new AbortController();
+    if (section !== "chart") return () => controller.abort();
     if (!layout.comparisons.length) {
       const timer = window.setTimeout(() => setComparisons([]), 0);
       return () => {
@@ -233,10 +237,10 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
       if (!(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : "Comparison unavailable");
     });
     return () => controller.abort();
-  }, [layout.comparisons, timeframe.aggregate, timeframe.providerInterval, timeframe.range]);
+  }, [layout.comparisons, section, timeframe.aggregate, timeframe.providerInterval, timeframe.range]);
 
   useEffect(() => {
-    if (!layout.fundamentals_visible) return;
+    if (section !== "chart" || !layout.fundamentals_visible) return;
     const controller = new AbortController();
     let active = true;
     const timer = window.setTimeout(() => {
@@ -256,7 +260,7 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [layout.fundamentals_visible, ticker]);
+  }, [layout.fundamentals_visible, section, ticker]);
 
   const saveLayout = useCallback((candidate = layout) => {
     const next = {
@@ -326,7 +330,7 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
     <div className="focus-page" data-focus-ready={clientReady ? "true" : "false"}>
       <QuoteHeader quote={quote} liveState={liveState} />
       <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button></nav>
-      {section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : section !== "chart" ? <FocusFundamentals ticker={ticker} view={section} /> : (
+      {section === "overview" ? <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} /> : section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : section !== "chart" ? <FocusFundamentals ticker={ticker} view={section} /> : (
         <div className={styles.workspace}>
           <FocusToolbar ticker={ticker} timeframe={layout.timeframe} chartType={layout.chart_type} language={language} onTimeframe={(value) => setLayout({ ...layout, timeframe: value })} onChartType={(value) => setLayout({ ...layout, chart_type: value })} onToggleIndicators={() => togglePanel("indicators")} onToggleCompare={() => togglePanel("compare")} onCreateAlert={() => togglePanel("alerts")} onToggleLayouts={() => togglePanel("layouts")} onToggleStrategy={() => togglePanel("strategy")} onTogglePaper={() => togglePanel("paper")} onSaveLayout={() => saveLayout()} />
           <div className={`${styles.mainGrid} ${panel ? "" : styles.mainGridNoSide}`}>

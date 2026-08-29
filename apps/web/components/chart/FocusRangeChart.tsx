@@ -49,6 +49,7 @@ type FocusSnapshot = {
 
 type PeriodKey =
   | "live"
+  | "1w"
   | "ytd"
   | "3mo"
   | "6mo"
@@ -72,6 +73,14 @@ const PERIODS: PeriodDefinition[] = [
     range: "1d",
     interval: "1m",
     refreshMs: 15_000,
+    movingAverageUnit: "bougies",
+  },
+  {
+    key: "1w",
+    label: "1S",
+    range: "5d",
+    interval: "5m",
+    refreshMs: 60_000,
     movingAverageUnit: "bougies",
   },
   {
@@ -404,7 +413,7 @@ export function FocusRangeChart({
   const priceLinesRef = useRef<IPriceLine[]>([]);
   const previousPeriodRef = useRef<PeriodKey | null>(null);
 
-  const [periodKey, setPeriodKey] = useState<PeriodKey>("1y");
+  const [periodKey, setPeriodKey] = useState<PeriodKey>("live");
   const [snapshot, setSnapshot] = useState<FocusSnapshot | null>(
     initialSnapshot ?? null,
   );
@@ -414,7 +423,7 @@ export function FocusRangeChart({
 
   const period =
     PERIODS.find((candidate) => candidate.key === periodKey) ??
-    PERIODS[4];
+    PERIODS[0];
 
   const candles = useMemo(
     () => normalizedCandles(snapshot?.history ?? []),
@@ -631,7 +640,7 @@ export function FocusRangeChart({
     performance !== null && performance >= 0;
 
   return (
-    <section className={styles.root}>
+    <section className={styles.root} aria-label="Performance du titre">
       <div className={styles.toolbar}>
         <div
           className={styles.periods}

@@ -72,6 +72,7 @@ test.describe("contrôles fonctionnels Anatole", () => {
 
   test("Focus change de période avec des données réelles de démonstration", async ({ page }) => {
     await gotoReady(page, "/focus/RY");
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     const timeframe = page.getByLabel(/Unité de temps|Timeframe/i);
     const focusRequest = page.waitForRequest((request) => {
       const url = new URL(request.url());
