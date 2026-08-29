@@ -40,16 +40,6 @@
   font-size: 9px;
 }
 
-.notice {
-  padding: 11px 14px;
-  border: 1px solid rgba(229, 174, 63, 0.42);
-  border-radius: 10px;
-  background: rgba(93, 68, 18, 0.16);
-  color: #d9b96d;
-  font-size: 10px;
-  line-height: 1.5;
-}
-
 .controls {
   padding: 13px;
   display: flex;
@@ -133,34 +123,6 @@
   background: transparent;
 }
 
-.statuses {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
-}
-
-.status {
-  padding: 11px 13px;
-  display: grid;
-  gap: 3px;
-}
-
-.status span {
-  color: #6f8da1;
-  font-size: 9px;
-  font-weight: 850;
-  text-transform: uppercase;
-}
-
-.status strong {
-  font-size: 11px;
-}
-
-.status small {
-  color: var(--muted);
-  font-size: 9px;
-}
-
 .groups {
   display: grid;
   gap: 18px;
@@ -188,7 +150,7 @@
   min-width: 0;
   padding: 14px;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 32px;
+  grid-template-columns: 58px minmax(0, 1fr);
   align-items: start;
   gap: 11px;
 }
@@ -229,19 +191,38 @@
   color: #d4aa59;
 }
 
-.eventActions {
+.consensus {
+  margin-top: 5px;
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
 }
 
-.eventActions a {
-  width: 32px;
-  height: 32px;
+.consensus > div {
+  min-width: 0;
+  padding: 8px 9px;
   display: grid;
-  place-items: center;
+  gap: 2px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 7px;
+  background: rgba(4, 19, 30, 0.42);
+}
+
+.consensus span,
+.consensus small {
   color: var(--muted);
+  font-size: 8px;
+}
+
+.consensus span {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.consensus strong {
+  color: var(--text);
+  font-size: 12px;
 }
 
 .empty,

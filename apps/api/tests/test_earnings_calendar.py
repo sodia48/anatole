@@ -42,6 +42,79 @@ def test_events_only_keep_future_constituent_dates() -> None:
     assert events[0].starts_at == datetime.fromtimestamp(future, UTC)
 
 
+def test_consensus_is_parsed_and_matched_to_reporting_period() -> None:
+    service = EarningsCalendarService()
+    payload = {
+        "quoteSummary": {
+            "result": [{
+                "earningsTrend": {
+                    "trend": [
+                        {
+                            "period": "0q",
+                            "endDate": "2026-07-31",
+                            "earningsEstimate": {
+                                "avg": {"raw": 4.07478},
+                                "numberOfAnalysts": {"raw": 12},
+                                "earningsCurrency": "CAD",
+                            },
+                            "revenueEstimate": {
+                                "avg": {"raw": 18_179_364_940},
+                                "numberOfAnalysts": {"raw": 9},
+                                "revenueCurrency": "CAD",
+                            },
+                        },
+                        {
+                            "period": "+1q",
+                            "endDate": "2026-10-31",
+                            "earningsEstimate": {"avg": {"raw": 4.08}},
+                            "revenueEstimate": {
+                                "avg": {"raw": 18_279_526_620}
+                            },
+                        },
+                    ]
+                }
+            }]
+        }
+    }
+    rows = service._parse_consensus(payload)
+    event = service._events(
+        [{
+            "symbol": "RY.TO",
+            "earningsTimestamp": int(
+                datetime(2026, 11, 25, tzinfo=UTC).timestamp()
+            ),
+        }],
+        [EarningsConstituent("RY", "Royal Bank", "Financials", 10.0)],
+        now=datetime(2026, 8, 29, tzinfo=UTC),
+    )[0]
+
+    enriched = service._with_consensus([event], {"RY.TO": rows})[0]
+
+    assert len(rows) == 2
+    assert enriched.eps_estimate == 4.08
+    assert enriched.revenue_estimate == 18_279_526_620
+
+
+def test_missing_consensus_does_not_remove_earnings_event() -> None:
+    service = EarningsCalendarService()
+    event = service._events(
+        [{
+            "symbol": "RY.TO",
+            "earningsTimestamp": int(
+                datetime(2026, 9, 10, tzinfo=UTC).timestamp()
+            ),
+        }],
+        [EarningsConstituent("RY", "Royal Bank", "Financials", 10.0)],
+        now=datetime(2026, 8, 29, tzinfo=UTC),
+    )[0]
+
+    enriched = service._with_consensus([event], {})
+
+    assert enriched == [event]
+    assert enriched[0].eps_estimate is None
+    assert enriched[0].revenue_estimate is None
+
+
 def test_snapshot_cache_is_single_flight(monkeypatch) -> None:
     service = EarningsCalendarService()
     calls = 0

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
@@ -26,6 +27,9 @@ from app.services.tsx_composite_universe import (
 Universe = Literal["composite", "tsx60"]
 TORONTO = ZoneInfo("America/Toronto")
 YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+YAHOO_SUMMARY_URL = (
+    "https://query2.finance.yahoo.com/v10/finance/quoteSummary/{symbol}"
+)
 YAHOO_CRUMB_URL = "https://query1.finance.yahoo.com/v1/test/getcrumb"
 YAHOO_COOKIE_URL = "https://fc.yahoo.com"
 
@@ -36,6 +40,17 @@ class EarningsConstituent:
     name: str
     sector: str | None
     weight: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class EarningsConsensus:
+    period: str
+    end_date: date | None
+    eps_estimate: float | None
+    revenue_estimate: float | None
+    currency: str | None
+    eps_analyst_count: int | None
+    revenue_analyst_count: int | None
 
 
 class EarningsCalendarService:
@@ -55,6 +70,10 @@ class EarningsCalendarService:
             str,
             EarningsCalendarSnapshot,
         ] = AsyncStaleCache(max_entries=4)
+        self._consensus_cache: AsyncStaleCache[
+            str,
+            tuple[EarningsConsensus, ...],
+        ] = AsyncStaleCache(max_entries=512)
 
     @staticmethod
     def _tsx60_constituents() -> list[EarningsConstituent]:
@@ -181,7 +200,7 @@ class EarningsCalendarService:
     async def _fetch_quotes(
         self,
         symbols: list[str],
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[dict[str, Any]], int, str]:
         crumb = await self._credentials()
         batches = [
             symbols[index : index + self.batch_size]
@@ -200,7 +219,168 @@ class EarningsCalendarService:
                 rows.extend(result)
         if not rows and failed:
             raise RuntimeError("Yahoo earnings batches unavailable")
-        return rows, failed
+        return rows, failed, crumb
+
+    @staticmethod
+    def _number(value: Any) -> float | None:
+        if isinstance(value, dict):
+            value = value.get("raw")
+        if value is None or isinstance(value, bool):
+            return None
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            return None
+        return parsed if math.isfinite(parsed) else None
+
+    @classmethod
+    def _integer(cls, value: Any) -> int | None:
+        parsed = cls._number(value)
+        return int(parsed) if parsed is not None else None
+
+    @staticmethod
+    def _date(value: Any) -> date | None:
+        if not isinstance(value, str):
+            return None
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            return None
+
+    @classmethod
+    def _parse_consensus(
+        cls,
+        payload: dict[str, Any],
+    ) -> tuple[EarningsConsensus, ...]:
+        results = payload.get("quoteSummary", {}).get("result") or []
+        root = results[0] if results and isinstance(results[0], dict) else {}
+        rows = root.get("earningsTrend", {}).get("trend") or []
+        output: list[EarningsConsensus] = []
+
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            earnings = row.get("earningsEstimate") or {}
+            revenue = row.get("revenueEstimate") or {}
+            if not isinstance(earnings, dict) or not isinstance(revenue, dict):
+                continue
+            eps_estimate = cls._number(earnings.get("avg"))
+            revenue_estimate = cls._number(revenue.get("avg"))
+            if eps_estimate is None and revenue_estimate is None:
+                continue
+            output.append(
+                EarningsConsensus(
+                    period=str(row.get("period") or ""),
+                    end_date=cls._date(row.get("endDate")),
+                    eps_estimate=eps_estimate,
+                    revenue_estimate=revenue_estimate,
+                    currency=str(
+                        earnings.get("earningsCurrency")
+                        or revenue.get("revenueCurrency")
+                        or ""
+                    ).upper()
+                    or None,
+                    eps_analyst_count=cls._integer(
+                        earnings.get("numberOfAnalysts")
+                    ),
+                    revenue_analyst_count=cls._integer(
+                        revenue.get("numberOfAnalysts")
+                    ),
+                )
+            )
+
+        return tuple(output)
+
+    async def _fetch_symbol_consensus(
+        self,
+        symbol: str,
+        crumb: str,
+    ) -> tuple[EarningsConsensus, ...]:
+        response = await shared_http_client.request(
+            "GET",
+            YAHOO_SUMMARY_URL.format(symbol=symbol),
+            params={
+                "modules": "earningsTrend",
+                "crumb": crumb,
+                "formatted": "false",
+                "lang": "en-CA",
+                "region": "CA",
+            },
+            attempts=2,
+        )
+        return self._parse_consensus(response.json())
+
+    async def _fetch_consensus(
+        self,
+        symbols: list[str],
+        crumb: str,
+    ) -> tuple[dict[str, tuple[EarningsConsensus, ...]], int]:
+        unique_symbols = list(dict.fromkeys(symbols))
+
+        async def load(symbol: str) -> tuple[EarningsConsensus, ...]:
+            return await self._consensus_cache.get_or_load(
+                symbol,
+                lambda: self._fetch_symbol_consensus(symbol, crumb),
+                fresh_seconds=float(self.refresh_after_seconds),
+                stale_seconds=float(self.stale_seconds),
+            )
+
+        results = await asyncio.gather(
+            *(load(symbol) for symbol in unique_symbols),
+            return_exceptions=True,
+        )
+        output: dict[str, tuple[EarningsConsensus, ...]] = {}
+        failed = 0
+        for symbol, result in zip(unique_symbols, results, strict=True):
+            if isinstance(result, Exception):
+                failed += 1
+            else:
+                output[symbol] = result
+        return output, failed
+
+    @staticmethod
+    def _consensus_for_event(
+        event: EarningsCalendarEvent,
+        rows: tuple[EarningsConsensus, ...],
+    ) -> EarningsConsensus | None:
+        event_date = event.starts_at.astimezone(TORONTO).date()
+        eligible = [
+            row
+            for row in rows
+            if row.end_date is not None and row.end_date <= event_date
+        ]
+        if eligible:
+            return max(eligible, key=lambda row: row.end_date or date.min)
+        return next((row for row in rows if row.period == "0q"), None)
+
+    def _with_consensus(
+        self,
+        events: list[EarningsCalendarEvent],
+        consensus: dict[str, tuple[EarningsConsensus, ...]],
+    ) -> list[EarningsCalendarEvent]:
+        output: list[EarningsCalendarEvent] = []
+        for event in events:
+            match = self._consensus_for_event(
+                event,
+                consensus.get(event.symbol, ()),
+            )
+            if match is None:
+                output.append(event)
+                continue
+            output.append(
+                event.model_copy(
+                    update={
+                        "eps_estimate": match.eps_estimate,
+                        "revenue_estimate": match.revenue_estimate,
+                        "estimate_currency": match.currency,
+                        "eps_analyst_count": match.eps_analyst_count,
+                        "revenue_analyst_count": (
+                            match.revenue_analyst_count
+                        ),
+                    }
+                )
+            )
+        return output
 
     @staticmethod
     def _datetime(value: Any) -> datetime | None:
@@ -323,10 +503,17 @@ class EarningsCalendarService:
             session_quote_service.normalize_ticker(item.ticker)
             for item in constituents
         ]
-        rows, failed_batches = await self._fetch_quotes(symbols)
+        rows, failed_batches, crumb = await self._fetch_quotes(symbols)
         now = datetime.now(UTC)
         events = self._events(rows, constituents, now=now)
-        quote_status = "partial" if failed_batches else "ok"
+        consensus, failed_consensus = await self._fetch_consensus(
+            [event.symbol for event in events],
+            crumb,
+        )
+        events = self._with_consensus(events, consensus)
+        quote_status = (
+            "partial" if failed_batches or failed_consensus else "ok"
+        )
 
         return EarningsCalendarSnapshot(
             universe=universe_label,
@@ -341,7 +528,8 @@ class EarningsCalendarService:
                     status=quote_status,
                     detail=(
                         f"{len(events)} upcoming earnings dates; "
-                        f"{failed_batches} failed batches"
+                        f"{failed_batches} failed batches; "
+                        f"{failed_consensus} failed consensus requests"
                     ),
                 ),
             ],

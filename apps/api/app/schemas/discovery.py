@@ -90,6 +90,11 @@ class EarningsCalendarEvent(BaseModel):
     window_start: datetime
     window_end: datetime
     time_is_estimated: bool = True
+    eps_estimate: float | None = None
+    revenue_estimate: float | None = None
+    estimate_currency: str | None = None
+    eps_analyst_count: int | None = None
+    revenue_analyst_count: int | None = None
     source: str
     url: str
 

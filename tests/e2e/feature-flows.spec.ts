@@ -79,6 +79,11 @@ test.describe("contrôles fonctionnels Anatole", () => {
             window_start: startsAt,
             window_end: startsAt,
             time_is_estimated: true,
+            eps_estimate: 4.07,
+            revenue_estimate: 18179364940,
+            estimate_currency: "CAD",
+            eps_analyst_count: 12,
+            revenue_analyst_count: 9,
             source: "Yahoo Finance public quote calendar",
             url: "https://finance.yahoo.com/quote/RY.TO/calendar/",
           }],
@@ -98,6 +103,11 @@ test.describe("contrôles fonctionnels Anatole", () => {
     const earnings = page.getByRole("region", { name: /Résultats TSX à venir|Upcoming TSX earnings/i });
     await expect(earnings).toBeVisible();
     await expect(earnings.getByText("Royal Bank of Canada")).toBeVisible();
+    await expect(earnings.getByText(/EPS estimé|Estimated EPS/i)).toBeVisible();
+    await expect(earnings.getByText(/Revenus estimés|Estimated revenue/i)).toBeVisible();
+    await expect(earnings.getByText(/4[,.]07 CAD/)).toBeVisible();
+    await expect(earnings.getByText(/18[,.]18.*CAD/i)).toBeVisible();
+    await expect(earnings.getByText("Yahoo Finance public quote calendar")).toHaveCount(0);
     await earnings.getByRole("button", { name: "TSX 60" }).click();
     await expect.poll(() => requestedUniverses).toContain("tsx60");
   });

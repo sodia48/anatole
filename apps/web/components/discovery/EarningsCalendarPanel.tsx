@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Search, TrendingUp } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { getEarningsCalendarSnapshot } from "@/lib/api";
@@ -106,6 +106,22 @@ export function EarningsCalendarPanel({
       }),
     [language],
   );
+  const epsFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(localeFor(language), {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+      }),
+    [language],
+  );
+  const revenueFormatter = useMemo(
+    () =>
+      new Intl.NumberFormat(localeFor(language), {
+        notation: "compact",
+        maximumFractionDigits: 2,
+      }),
+    [language],
+  );
 
   const grouped = useMemo(() => {
     const output = new Map<string, EarningsCalendarEvent[]>();
@@ -144,14 +160,6 @@ export function EarningsCalendarPanel({
         </div>
       </header>
 
-      <div className={styles.notice}>
-        {pick(
-          language,
-          "Aucune date n’est inventée. Cette vue relaie un calendrier de marché public; vérifiez toujours la page Relations investisseurs de la société avant d’agir.",
-          "No dates are fabricated. This view relays a public market calendar; always verify the company’s Investor Relations page before acting.",
-        )}
-      </div>
-
       <section className={`panel ${styles.controls}`} aria-label={pick(language, "Filtres des résultats", "Earnings filters")}>
         <div className={styles.universeButtons} role="group" aria-label={pick(language, "Univers TSX", "TSX universe")}>
           <button type="button" aria-pressed={universe === "composite"} onClick={() => setUniverse("composite")}>TSX Composite</button>
@@ -186,18 +194,6 @@ export function EarningsCalendarPanel({
 
       {error ? <div className="cockpit-warning">{error}</div> : null}
 
-      {data ? (
-        <section className={styles.statuses}>
-          {data.source_statuses.map((item) => (
-            <article className={`panel ${styles.status}`} key={item.source}>
-              <span>{item.status === "ok" ? pick(language, "Disponible", "Available") : item.status === "partial" ? pick(language, "Partielle", "Partial") : pick(language, "Indisponible", "Unavailable")}</span>
-              <strong>{item.source}</strong>
-              <small>{item.detail ?? "—"}</small>
-            </article>
-          ))}
-        </section>
-      ) : null}
-
       {!data && !error ? <div className={`panel ${styles.loading}`}>{pick(language, "Synchronisation des résultats TSX…", "Synchronizing TSX earnings…")}</div> : null}
 
       {data ? (
@@ -213,9 +209,34 @@ export function EarningsCalendarPanel({
                       <strong>{event.company}</strong>
                       <span className={styles.meta}>{event.sector ?? pick(language, "Secteur non publié", "Sector not published")} · {timeFormatter.format(new Date(event.starts_at))}</span>
                       <span className={styles.estimate}>{pick(language, "Date et heure indicatives", "Indicative date and time")}</span>
-                    </div>
-                    <div className={styles.eventActions}>
-                      <a href={event.url} target="_blank" rel="noreferrer" aria-label={pick(language, `Ouvrir la source pour ${event.ticker}`, `Open source for ${event.ticker}`)}><ExternalLink size={15} /></a>
+                      <div className={styles.consensus}>
+                        <div>
+                          <span>{pick(language, "EPS estimé", "Estimated EPS")}</span>
+                          <strong>
+                            {typeof event.eps_estimate !== "number"
+                              ? "—"
+                              : `${epsFormatter.format(event.eps_estimate)}${event.estimate_currency ? ` ${event.estimate_currency}` : ""}`}
+                          </strong>
+                          <small>
+                            {event.eps_analyst_count
+                              ? `${event.eps_analyst_count} ${pick(language, "analystes", "analysts")}`
+                              : pick(language, "Consensus indisponible", "Consensus unavailable")}
+                          </small>
+                        </div>
+                        <div>
+                          <span>{pick(language, "Revenus estimés", "Estimated revenue")}</span>
+                          <strong>
+                            {typeof event.revenue_estimate !== "number"
+                              ? "—"
+                              : `${revenueFormatter.format(event.revenue_estimate)}${event.estimate_currency ? ` ${event.estimate_currency}` : ""}`}
+                          </strong>
+                          <small>
+                            {event.revenue_analyst_count
+                              ? `${event.revenue_analyst_count} ${pick(language, "analystes", "analysts")}`
+                              : pick(language, "Consensus indisponible", "Consensus unavailable")}
+                          </small>
+                        </div>
+                      </div>
                     </div>
                   </article>
                 ))}

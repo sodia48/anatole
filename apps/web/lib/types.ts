@@ -394,6 +394,11 @@ export type EarningsCalendarEvent = {
   window_start: string;
   window_end: string;
   time_is_estimated: boolean;
+  eps_estimate: number | null;
+  revenue_estimate: number | null;
+  estimate_currency: string | null;
+  eps_analyst_count: number | null;
+  revenue_analyst_count: number | null;
   source: string;
   url: string;
 };
