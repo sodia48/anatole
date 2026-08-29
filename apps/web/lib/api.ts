@@ -1,5 +1,6 @@
 import type {
   CalendarSnapshot,
+  EarningsCalendarSnapshot,
   ComparisonRange,
   ComparisonSnapshot,
   CockpitSnapshot,
@@ -196,6 +197,18 @@ export function getCalendarSnapshot(
 ): Promise<CalendarSnapshot> {
   return apiRequest<CalendarSnapshot>(
     `/api/v1/discovery/calendar?lang=${language}`,
+    {},
+    signal,
+    35_000,
+  );
+}
+
+export function getEarningsCalendarSnapshot(
+  universe: "composite" | "tsx60" = "composite",
+  signal?: AbortSignal,
+): Promise<EarningsCalendarSnapshot> {
+  return apiRequest<EarningsCalendarSnapshot>(
+    `/api/v1/discovery/earnings-calendar?universe=${universe}`,
     {},
     signal,
     35_000,

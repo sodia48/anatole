@@ -2,12 +2,14 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.discovery import (
     CalendarSnapshot,
+    EarningsCalendarSnapshot,
     EtfDirectorySnapshot,
     NewsSnapshot,
     PsychologySnapshot,
     ScreenerSnapshot,
 )
 from app.services.calendar import calendar_service
+from app.services.earnings_calendar import earnings_calendar_service
 from app.services.etf import etf_service
 from app.services.news import news_service
 from app.services.psychology import psychology_service
@@ -56,6 +58,24 @@ async def calendar(
     return await calendar_service.get_snapshot(
         lang
     )
+
+
+@router.get(
+    "/earnings-calendar",
+    response_model=EarningsCalendarSnapshot,
+)
+async def earnings_calendar(
+    universe: str = Query("composite"),
+) -> EarningsCalendarSnapshot:
+    try:
+        return await earnings_calendar_service.get_snapshot(universe)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Univers invalide. Utilise 'composite' ou 'tsx60'."
+            ),
+        ) from exc
 
 
 @router.get("/etfs", response_model=EtfDirectorySnapshot)

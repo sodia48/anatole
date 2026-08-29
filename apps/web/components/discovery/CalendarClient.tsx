@@ -9,6 +9,7 @@ import {
   CalendarDays,
   ExternalLink,
   Search,
+  TrendingUp,
 } from "lucide-react";
 
 import {
@@ -40,6 +41,9 @@ import {
   regionSummary,
   type RegionCode,
 } from "@/lib/regions";
+
+import { EarningsCalendarPanel } from "./EarningsCalendarPanel";
+import styles from "./CalendarClient.module.css";
 
 type CalendarDisplayEvent = {
   id: string;
@@ -109,10 +113,13 @@ export function CalendarClient() {
     useState("Toutes");
   const [region, setRegion] =
     useState<RegionCode>("ALL");
+  const [calendarSection, setCalendarSection] =
+    useState<"economic" | "earnings">("economic");
   const provinceMode =
     isProvinceRegion(region);
 
   useEffect(() => {
+    if (calendarSection !== "economic") return;
     let active = true;
     let controller =
       new AbortController();
@@ -191,7 +198,7 @@ export function CalendarClient() {
       controller.abort();
       window.clearInterval(timer);
     };
-  }, [language, provinceMode, region]);
+  }, [calendarSection, language, provinceMode, region]);
 
   const events = useMemo<CalendarDisplayEvent[]>(() => {
     if (provinceMode) {
@@ -341,32 +348,46 @@ export function CalendarClient() {
         }),
       );
 
+  const sectionTabs = (
+    <nav className={styles.sectionTabs} aria-label={pick(language, "Sections du calendrier", "Calendar sections")}>
+      <button type="button" aria-pressed={calendarSection === "economic"} onClick={() => setCalendarSection("economic")}>
+        <CalendarDays size={15} />
+        {pick(language, "Économie", "Economy")}
+      </button>
+      <button type="button" aria-pressed={calendarSection === "earnings"} onClick={() => setCalendarSection("earnings")}>
+        <TrendingUp size={15} />
+        {pick(language, "Résultats TSX", "TSX earnings")}
+      </button>
+    </nav>
+  );
+
+  if (calendarSection === "earnings") {
+    return (
+      <div className="discovery-page">
+        {sectionTabs}
+        <EarningsCalendarPanel language={language} />
+      </div>
+    );
+  }
+
   if (!activeData && !error) {
     return (
-      <section className="panel discovery-loading">
-        <span className="live-dot" />
-        <div>
-          <h1>
-            {pick(
-              language,
-              "Préparation du calendrier",
-              "Preparing calendar",
-            )}
-          </h1>
-          <p>
-            {pick(
-              language,
-              "Synchronisation des dates nationales et des indicateurs offrant une lecture provinciale.",
-              "Synchronizing national dates and indicators with provincial coverage.",
-            )}
-          </p>
-        </div>
-      </section>
+      <div className="discovery-page">
+        {sectionTabs}
+        <section className="panel discovery-loading">
+          <span className="live-dot" />
+          <div>
+            <h1>{pick(language, "Préparation du calendrier", "Preparing calendar")}</h1>
+            <p>{pick(language, "Synchronisation des dates nationales et des indicateurs offrant une lecture provinciale.", "Synchronizing national dates and indicators with provincial coverage.")}</p>
+          </div>
+        </section>
+      </div>
     );
   }
 
   return (
     <div className="discovery-page">
+      {sectionTabs}
       <header className="panel discovery-hero">
         <div>
           <span className="eyebrow">

@@ -80,6 +80,31 @@ class CalendarSnapshot(BaseModel):
     refresh_after_seconds: int = 1800
 
 
+class EarningsCalendarEvent(BaseModel):
+    ticker: str
+    symbol: str
+    company: str
+    sector: str | None = None
+    weight: float | None = None
+    starts_at: datetime
+    window_start: datetime
+    window_end: datetime
+    time_is_estimated: bool = True
+    source: str
+    url: str
+
+
+class EarningsCalendarSnapshot(BaseModel):
+    universe: str
+    universe_as_of: str | None = None
+    constituent_count: int
+    companies_with_dates: int
+    events: list[EarningsCalendarEvent]
+    source_statuses: list[FeedStatus]
+    generated_at: datetime
+    refresh_after_seconds: int = 10_800
+
+
 class EtfDirectoryItem(BaseModel):
     ticker: str
     symbol: str

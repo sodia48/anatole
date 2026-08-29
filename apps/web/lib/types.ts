@@ -384,6 +384,31 @@ export type CalendarSnapshot = {
   refresh_after_seconds: number;
 };
 
+export type EarningsCalendarEvent = {
+  ticker: string;
+  symbol: string;
+  company: string;
+  sector: string | null;
+  weight: number | null;
+  starts_at: string;
+  window_start: string;
+  window_end: string;
+  time_is_estimated: boolean;
+  source: string;
+  url: string;
+};
+
+export type EarningsCalendarSnapshot = {
+  universe: string;
+  universe_as_of: string | null;
+  constituent_count: number;
+  companies_with_dates: number;
+  events: EarningsCalendarEvent[];
+  source_statuses: FeedStatus[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
 export type EtfDirectoryItem = {
   ticker: string;
   symbol: string;

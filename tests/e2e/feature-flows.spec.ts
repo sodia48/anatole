@@ -54,6 +54,54 @@ test.describe("contrôles fonctionnels Anatole", () => {
     await Promise.all([onRequest, calendarRegion.selectOption("ON")]);
   });
 
+  test("le Calendrier affiche les résultats à venir des composantes TSX", async ({ page }) => {
+    const requestedUniverses: string[] = [];
+    const startsAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
+
+    await page.route("**/api/anatole/api/v1/discovery/earnings-calendar?**", async (route) => {
+      const url = new URL(route.request().url());
+      const universe = url.searchParams.get("universe") ?? "composite";
+      requestedUniverses.push(universe);
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({
+          universe: universe === "tsx60" ? "S&P/TSX 60" : "S&P/TSX Composite",
+          universe_as_of: "2026-08-29",
+          constituent_count: universe === "tsx60" ? 60 : 220,
+          companies_with_dates: 1,
+          events: [{
+            ticker: "RY",
+            symbol: "RY.TO",
+            company: "Royal Bank of Canada",
+            sector: "Financials",
+            weight: 10.0,
+            starts_at: startsAt,
+            window_start: startsAt,
+            window_end: startsAt,
+            time_is_estimated: true,
+            source: "Yahoo Finance public quote calendar",
+            url: "https://finance.yahoo.com/quote/RY.TO/calendar/",
+          }],
+          source_statuses: [{
+            source: "Yahoo Finance public quote calendar",
+            status: "ok",
+            detail: "1 upcoming earnings date",
+          }],
+          generated_at: new Date().toISOString(),
+          refresh_after_seconds: 10800,
+        }),
+      });
+    });
+
+    await gotoReady(page, "/calendrier");
+    await page.getByRole("button", { name: /Résultats TSX|TSX earnings/i }).click();
+    const earnings = page.getByRole("region", { name: /Résultats TSX à venir|Upcoming TSX earnings/i });
+    await expect(earnings).toBeVisible();
+    await expect(earnings.getByText("Royal Bank of Canada")).toBeVisible();
+    await earnings.getByRole("button", { name: "TSX 60" }).click();
+    await expect.poll(() => requestedUniverses).toContain("tsx60");
+  });
+
   test("le répertoire ETF recherche et ouvre XIC", async ({ page }) => {
     await gotoReady(page, "/etf");
     await page.getByLabel("Rechercher un ETF").fill("XIC");

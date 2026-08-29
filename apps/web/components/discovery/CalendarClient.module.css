@@ -1,0 +1,32 @@
+.sectionTabs {
+  display: flex;
+  gap: 5px;
+  padding: 5px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: rgba(4, 18, 29, 0.82);
+}
+
+.sectionTabs button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sectionTabs button[aria-pressed="true"] {
+  border-color: rgba(50, 157, 236, 0.68);
+  background: rgba(30, 102, 153, 0.62);
+  color: #fff;
+}
