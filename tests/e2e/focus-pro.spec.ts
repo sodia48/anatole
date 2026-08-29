@@ -20,6 +20,41 @@ test.describe("Focus Pro workstation", () => {
     }));
     await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await expect(page.getByRole("region", { name: "Performance du titre" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "LIVE", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "1S", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "3M", exact: true })).toBeVisible();
+    const volumePanel = page.getByRole("complementary", { name: /Volumes acheteur et vendeur estimés/i });
+    await expect(volumePanel).toBeVisible();
+    await expect(volumePanel.getByText("Acheteur estimé", { exact: true })).toBeVisible();
+    await expect(volumePanel.getByText("Vendeur estimé", { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Focus Pro chart" })).toHaveCount(0);
+
+    const oneWeekRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith("/api/v1/stocks/RY/focus")
+        && url.searchParams.get("range") === "5d"
+        && url.searchParams.get("interval") === "5m";
+    });
+    await Promise.all([
+      oneWeekRequest,
+      page.getByRole("button", { name: "1S", exact: true }).click(),
+    ]);
+    await expect(page.getByRole("button", { name: "1S", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+    const threeMonthRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith("/api/v1/stocks/RY/focus")
+        && url.searchParams.get("range") === "3mo"
+        && url.searchParams.get("interval") === "1d";
+    });
+    await Promise.all([
+      threeMonthRequest,
+      page.getByRole("button", { name: "3M", exact: true }).click(),
+    ]);
+    await expect(page.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByRole("region", { name: "Focus Pro chart" })).toBeVisible();
     await expect(page.getByText(/FOCUS PRO/).first()).toBeVisible();
 
@@ -52,6 +87,8 @@ test.describe("Focus Pro workstation", () => {
     await expect(page.getByText("1/50")).toBeVisible();
     await page.getByRole("button", { name: /Sauvegarder le layout|Save layout/i }).click();
     await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByText("1/50")).toBeVisible();
 
     await page.getByRole("button", { name: /^Alerte$|^Alert$/i }).click();
@@ -72,6 +109,8 @@ test.describe("Focus Pro workstation", () => {
       localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({ ...preferences, language: "en" }));
     });
     await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByText(/PROFESSIONAL CHART/).first()).toBeVisible();
   });
 
@@ -89,6 +128,7 @@ test.describe("Focus Pro workstation", () => {
     expect(registration.status()).toBe(201);
     await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByRole("region", { name: "Focus Pro chart" })).toBeVisible();
     await page.getByRole("navigation", { name: "Focus Pro toolbar" }).getByRole("button", { name: "PAPER", exact: true }).click();
     const ticket = page.getByRole("region", { name: "Paper trading ticket" });
