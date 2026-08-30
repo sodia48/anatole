@@ -10,14 +10,19 @@ test.describe("Focus Pro workstation", () => {
         ticker: "RY",
         symbol: "RY.TO",
         company: "Royal Bank of Canada",
-        items: [{
-          id: "royal-bank-news",
-          title: "Royal Bank of Canada announces a strategic investment",
-          url: "https://example.com/royal-bank-news",
+        items: Array.from({ length: 10 }, (_, index) => ({
+          id: `royal-bank-news-${index}`,
+          title: index === 0
+            ? "Royal Bank of Canada announces a strategic investment"
+            : `Royal Bank of Canada update ${index + 1}`,
+          summary: index === 0
+            ? "The bank announced a new strategic investment for its Canadian operations."
+            : `Verified article summary ${index + 1}.`,
+          url: `https://example.com/royal-bank-news-${index}`,
           publisher: "Canadian Business Wire",
           published_at: recentNewsDate,
           related_tickers: ["RY.TO", "RY"],
-        }],
+        })),
         status: "ok",
         detail: null,
         generated_at: new Date().toISOString(),
@@ -31,8 +36,11 @@ test.describe("Focus Pro workstation", () => {
     const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
+    await expect(stockNews.getByRole("link")).toHaveCount(10);
+    await expect(stockNews.getByText("10 articles")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
-    await expect(stockNews.getByText("Canadian Business Wire")).toBeVisible();
+    await expect(stockNews.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
+    await expect(stockNews.getByText("Canadian Business Wire").first()).toBeVisible();
     const [performanceBox, stockNewsBox] = await Promise.all([performance.boundingBox(), stockNews.boundingBox()]);
     expect(stockNewsBox?.y).toBeGreaterThan(performanceBox?.y ?? Number.POSITIVE_INFINITY);
   });

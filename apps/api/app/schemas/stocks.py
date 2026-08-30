@@ -72,6 +72,7 @@ class FocusSnapshot(BaseModel):
 class StockNewsItem(BaseModel):
     id: str
     title: str
+    summary: str
     url: str
     publisher: str
     published_at: datetime

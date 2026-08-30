@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import html
 import logging
 import re
 import unicodedata
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlparse
 
@@ -75,14 +78,70 @@ def _safe_url(value: Any) -> str | None:
     return value.strip()
 
 
+def _clean_summary(value: str) -> str:
+    summary = re.sub(r"\s+", " ", html.unescape(value or "")).strip()
+    boilerplate = re.search(r"\s+The post .+ appeared first on .+$", summary, re.I)
+    if boilerplate and boilerplate.start() >= 40:
+        summary = summary[: boilerplate.start()].rstrip()
+    return summary[:520].rstrip()
+
+
+class _DescriptionParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.descriptions: dict[str, str] = {}
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if tag.casefold() != "meta":
+            return
+        values = {
+            key.casefold(): value or ""
+            for key, value in attrs
+        }
+        marker = (
+            values.get("property") or values.get("name") or ""
+        ).casefold()
+        if marker in {"og:description", "description", "twitter:description"}:
+            content = _clean_summary(values.get("content", ""))
+            if content:
+                self.descriptions.setdefault(marker, content)
+
+    @property
+    def summary(self) -> str:
+        for marker in ("og:description", "description", "twitter:description"):
+            if value := self.descriptions.get(marker):
+                return value
+        return ""
+
+
+def _description_from_html(value: str) -> str:
+    parser = _DescriptionParser()
+    try:
+        parser.feed(value[:250_000])
+        parser.close()
+    except (ValueError, TypeError):
+        return ""
+    return parser.summary
+
+
 class StockNewsService:
     refresh_after_seconds = 900
     stale_seconds = 86_400
-    max_items = 8
+    minimum_items = 10
+    max_items = 10
+    summary_fresh_seconds = 21_600
+    summary_stale_seconds = 604_800
 
     def __init__(self) -> None:
         self._cache: AsyncStaleCache[str, StockNewsSnapshot] = (
             AsyncStaleCache(max_entries=1000)
+        )
+        self._summary_cache: AsyncStaleCache[str, str] = AsyncStaleCache(
+            max_entries=4000
         )
 
     @staticmethod
@@ -143,6 +202,8 @@ class StockNewsService:
     ) -> list[StockNewsItem]:
         items: list[StockNewsItem] = []
         seen: set[str] = set()
+        seen_titles: set[str] = set()
+        seen_urls: set[str] = set()
 
         for row in payload.get("news") or []:
             if not isinstance(row, dict) or not cls._relevant(
@@ -162,6 +223,10 @@ class StockNewsService:
                 continue
             if not title or url is None:
                 continue
+            title_key = _normalise_text(title)
+            url_key = url.casefold().rstrip("/")
+            if title_key in seen_titles or url_key in seen_urls:
+                continue
 
             identifier = str(row.get("uuid") or "").strip() or hashlib.sha1(
                 f"{url}|{title.casefold()}".encode("utf-8")
@@ -169,10 +234,15 @@ class StockNewsService:
             if identifier in seen:
                 continue
             seen.add(identifier)
+            seen_titles.add(title_key)
+            seen_urls.add(url_key)
             items.append(
                 StockNewsItem(
                     id=identifier,
                     title=title,
+                    summary=_clean_summary(
+                        str(row.get("summary") or row.get("description") or "")
+                    ),
                     url=url,
                     publisher=str(row.get("publisher") or "Actualité").strip(),
                     published_at=published_at,
@@ -194,19 +264,25 @@ class StockNewsService:
         *,
         query: str,
         language: str,
+        region: str = "CA",
     ) -> dict[str, Any]:
+        region = "US" if region.strip().upper() == "US" else "CA"
         response = await shared_http_client.request(
             "GET",
             YAHOO_SEARCH_URL,
             params={
                 "q": query,
                 "quotesCount": "10",
-                "newsCount": "12",
+                "newsCount": "10",
                 "enableFuzzyQuery": "false",
                 "quotesQueryId": "tss_match_phrase_query",
                 "newsQueryId": "news_cie_vespa",
-                "lang": "fr-CA" if language == "fr" else "en-CA",
-                "region": "CA",
+                "lang": (
+                    "en-US"
+                    if region == "US"
+                    else "fr-CA" if language == "fr" else "en-CA"
+                ),
+                "region": region,
             },
             attempts=2,
         )
@@ -214,6 +290,98 @@ class StockNewsService:
         if not isinstance(payload, dict):
             raise RuntimeError("Stock news payload is invalid")
         return payload
+
+    @staticmethod
+    def _fallback_summary(
+        item: StockNewsItem,
+        *,
+        language: str,
+    ) -> str:
+        if language == "fr":
+            return (
+                f"Selon {item.publisher}, cette nouvelle porte sur : "
+                f"« {item.title} »"
+            )
+        return f"According to {item.publisher}, this article covers: “{item.title}”"
+
+    @staticmethod
+    async def _load_article_summary(url: str) -> str:
+        response = await shared_http_client.request(
+            "GET",
+            url,
+            headers={"Accept": "text/html,application/xhtml+xml"},
+            attempts=1,
+        )
+        content_type = response.headers.get("content-type", "").casefold()
+        if "html" not in content_type:
+            return ""
+        return _description_from_html(response.text)
+
+    async def _summary_for_item(
+        self,
+        item: StockNewsItem,
+        *,
+        language: str,
+    ) -> str:
+        if item.summary:
+            return item.summary
+        try:
+            summary = await self._summary_cache.get_or_load(
+                item.url,
+                lambda: self._load_article_summary(item.url),
+                fresh_seconds=float(self.summary_fresh_seconds),
+                stale_seconds=float(self.summary_stale_seconds),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.info(
+                "stock_news_summary_unavailable url=%s exception=%s",
+                item.url,
+                type(exc).__name__,
+            )
+            summary = ""
+        return summary or self._fallback_summary(item, language=language)
+
+    async def _enrich_summaries(
+        self,
+        items: list[StockNewsItem],
+        *,
+        language: str,
+    ) -> list[StockNewsItem]:
+        summaries = await asyncio.gather(
+            *(
+                self._summary_for_item(item, language=language)
+                for item in items
+            )
+        )
+        return [
+            item.model_copy(update={"summary": summary})
+            for item, summary in zip(items, summaries, strict=True)
+        ]
+
+    @classmethod
+    def _items_from_payloads(
+        cls,
+        payloads: list[dict[str, Any]],
+        *,
+        symbol: str,
+        company: str,
+    ) -> list[StockNewsItem]:
+        aliases = {symbol}
+        for payload in payloads:
+            aliases.update(
+                cls._aliases(payload, symbol=symbol, company=company)
+            )
+        return cls._parse_items(
+            {
+                "news": [
+                    row
+                    for payload in payloads
+                    for row in payload.get("news") or []
+                ]
+            },
+            aliases=aliases,
+            company=company,
+        )
 
     async def _load(
         self,
@@ -223,19 +391,37 @@ class StockNewsService:
         language: str,
     ) -> StockNewsSnapshot:
         query = company or self._ticker(symbol)
-        payload = await self._search(query=query, language=language)
-        if language == "fr" and not (payload.get("news") or []):
-            payload = await self._search(query=query, language="en")
-        aliases = self._aliases(
-            payload,
+        canadian = await self._search(
+            query=query,
+            language=language,
+            region="CA",
+        )
+        if language == "fr" and not (canadian.get("news") or []):
+            canadian = await self._search(
+                query=query,
+                language="en",
+                region="CA",
+            )
+        payloads = [canadian]
+        items = self._items_from_payloads(
+            payloads,
             symbol=symbol,
             company=company,
         )
-        items = self._parse_items(
-            payload,
-            aliases=aliases,
-            company=company,
-        )
+        if len(items) < self.minimum_items:
+            payloads.append(
+                await self._search(
+                    query=query,
+                    language="en",
+                    region="US",
+                )
+            )
+            items = self._items_from_payloads(
+                payloads,
+                symbol=symbol,
+                company=company,
+            )
+        items = await self._enrich_summaries(items, language=language)
         return StockNewsSnapshot(
             ticker=self._ticker(symbol),
             symbol=symbol,

@@ -38,13 +38,13 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 9px;
 }
 
 .card {
   min-width: 0;
-  min-height: 132px;
+  min-height: 210px;
   padding: 13px;
   display: flex;
   flex-direction: column;
@@ -100,7 +100,18 @@
   font-size: 12px;
   line-height: 1.5;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
+}
+
+.summary {
+  margin: 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #91aebe;
+  font-size: 10px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
 }
 
 .open {
