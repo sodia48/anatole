@@ -1,0 +1,89 @@
+export type AccountUser = {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+  last_login_at: string | null;
+  is_admin: boolean;
+};
+
+export type PortfolioPositionInput = { symbol: string; quantity: number; average_cost: number };
+export type AlertRule = {
+  id: string;
+  symbol: string;
+  metric: "price" | "change_percent" | "rsi_14" | "momentum_20d" | "relative_volume" | "score";
+  operator: "above" | "below";
+  threshold: number;
+  enabled: boolean;
+  label?: string | null;
+};
+
+export type SyncedWorkspaceData = {
+  watchlist: string[];
+  portfolio: PortfolioPositionInput[];
+  alerts: AlertRule[];
+  preferences: {
+    theme: "dark" | "blue";
+    density: "comfortable" | "compact";
+    decimals: 2 | 3;
+    default_range: "1m" | "3m" | "6m" | "1y" | "5y";
+    default_universe: "tsx60" | "composite";
+    language: "fr" | "en";
+  };
+  advisor_profile?: unknown;
+  cockpit_universe: "tsx60" | "composite";
+  comparator_symbols: string[];
+  focus_layouts: unknown[];
+  focus_scripts: unknown[];
+};
+
+export type WorkspaceSnapshot = { revision: number; data: SyncedWorkspaceData; updated_at: string | null };
+export type AccountSession = { token: string; token_type: "bearer"; expires_at: string; user: AccountUser; workspace: WorkspaceSnapshot };
+export type AccountStatus = { user: AccountUser; workspace_revision: number; workspace_updated_at: string | null };
+
+export type Quote = {
+  ticker: string;
+  symbol: string;
+  name: string;
+  exchange: string;
+  price: number;
+  previous_close: number;
+  change: number;
+  change_percent: number;
+  volume: number;
+  day_high: number;
+  day_low: number;
+  currency: string;
+  source: string;
+  delayed: boolean;
+  timestamp: string;
+};
+export type Candle = { time: string | number; open: number; high: number; low: number; close: number; volume: number };
+export type FocusSnapshot = { quote: Quote; history: Candle[]; technicals: Record<string, unknown>; profile: { name: string; sector: string | null }; generated_at: string };
+export type MarketTile = { ticker: string; symbol: string; name: string; sector: string; weight: number; price: number; change: number; change_percent: number; volume: number; timestamp: string; source: string; delayed: boolean };
+export type SectorSnapshot = { sector: string; change_percent: number; weight: number; advancers: number; decliners: number; unchanged: number };
+export type CockpitSnapshot = {
+  universe: string;
+  weighted_change_percent: number;
+  breadth: { advancers: number; decliners: number; unchanged: number; advance_ratio: number };
+  sectors: SectorSnapshot[];
+  constituents: MarketTile[];
+  top_gainers: MarketTile[];
+  top_losers: MarketTile[];
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+export type WatchlistSnapshot = { tickers: string[]; items: Quote[]; summary: { advancers: number; decliners: number; unchanged: number; average_change_percent: number }; generated_at: string; refresh_after_seconds: number };
+export type NewsItem = { id: string; title: string; summary: string; url: string; source?: string; publisher?: string; published_at: string };
+export type NewsSnapshot = { items: NewsItem[]; generated_at: string };
+export type StockNewsSnapshot = { ticker: string; company: string; items: NewsItem[]; status: string; detail: string | null; generated_at: string };
+export type EarningsItem = { ticker: string; symbol: string; company: string; sector: string | null; starts_at: string; window_start: string; window_end: string; time_is_estimated: boolean; eps_estimate: number | null; revenue_estimate: number | null; estimate_currency: string | null };
+export type EarningsSnapshot = { events: EarningsItem[]; companies_with_dates: number; generated_at: string };
+export type CalendarEvent = { id: string; title: string; starts_at: string; importance: string; category: string; country: string };
+export type CalendarSnapshot = { events: CalendarEvent[]; generated_at: string };
+export type PortfolioAllocation = { key: string; label: string; value: number; weight_percent: number };
+export type PortfolioSnapshot = { total_market_value: number; total_day_pnl: number; total_day_change_percent: number; total_unrealized_pnl: number; sector_allocation: PortfolioAllocation[]; positions: (PortfolioPositionInput & { ticker: string; name: string; price: number; market_value: number; unrealized_pnl: number; unrealized_pnl_percent: number; day_change_percent: number })[] };
+export type AlertSnapshot = { items: { id: string; symbol: string; status: string; message: string; current_value: number | null; triggered: boolean }[]; triggered_count: number; monitored_count: number; unavailable_count: number };
+export type NotificationItem = { id: string; kind: string; title: string; message: string; severity: "info" | "attention" | "important"; symbol: string | null; route: string | null; created_at: string; read_at: string | null };
+export type NotificationFeed = { items: NotificationItem[]; unread_count: number; generated_at: string };
+export type MobileDevice = { id: string; platform: "ios" | "android"; device_name: string | null; app_version: string | null; push_enabled: boolean; created_at: string; updated_at: string; last_seen_at: string };

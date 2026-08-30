@@ -13,6 +13,7 @@ from app.api.routes import (
     institutions,
     ipo_insiders,
     market,
+    mobile,
     notifications,
     paper_trading,
     provincial_macro,
@@ -144,6 +145,13 @@ api_router.include_router(
     notifications.router,
     prefix="/api/v1/notifications",
     tags=["notifications"],
+)
+
+# Appareils iOS et Android associés au compte pour les notifications push
+api_router.include_router(
+    mobile.router,
+    prefix="/api/v1/account",
+    tags=["mobile"],
 )
 
 # Compte de simulation Focus Pro; aucun courtier réel n’est activé
