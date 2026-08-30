@@ -135,6 +135,7 @@ export function FocusStockNews({
                 </time>
               </div>
               <h3>{item.title}</h3>
+              <p className={styles.summary}>{item.summary}</p>
               <span className={styles.open}>
                 {pick(language, "Lire l’article", "Read article")}
                 <ArrowUpRight size={14} aria-hidden="true" />

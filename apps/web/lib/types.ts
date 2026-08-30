@@ -60,6 +60,7 @@ export type FocusSnapshot = {
 export type StockNewsItem = {
   id: string;
   title: string;
+  summary: string;
   url: string;
   publisher: string;
   published_at: string;
