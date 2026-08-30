@@ -1,0 +1,13 @@
+appId: com.anatole.mobile.dev
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Aujourd’hui"
+- tapOn: "Marchés"
+- assertVisible: "Marchés canadiens"
+- tapOn: "Focus"
+- assertVisible: "Analyse d’un titre"
+- tapOn: "Portefeuille"
+- assertVisible: "Portefeuille"
+- tapOn: "Plus"
+- assertVisible: "Watchlist"

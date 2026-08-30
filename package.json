@@ -7,12 +7,20 @@
   },
   "scripts": {
     "dev:web": "pnpm --dir apps/web dev",
+    "dev:mobile": "pnpm --dir apps/mobile start",
+    "start:mobile": "pnpm --dir apps/mobile start",
+    "android:mobile": "pnpm --dir apps/mobile android",
+    "ios:mobile": "pnpm --dir apps/mobile ios",
     "build:web": "pnpm --dir apps/web build",
     "lint:web": "pnpm --dir apps/web lint",
     "typecheck:web": "pnpm --dir apps/web typecheck",
+    "lint:mobile": "pnpm --dir apps/mobile lint",
+    "typecheck:mobile": "pnpm --dir apps/mobile typecheck",
+    "test:mobile": "pnpm --dir apps/mobile test:ci",
     "test:api": "python -m pytest apps/api/tests -q",
     "test:e2e": "playwright test",
-    "quality": "pnpm test:api && pnpm typecheck:web && pnpm build:web && pnpm test:e2e"
+    "quality:mobile": "pnpm typecheck:mobile && pnpm lint:mobile && pnpm test:mobile",
+    "quality": "pnpm test:api && pnpm typecheck:web && pnpm build:web && pnpm quality:mobile && pnpm test:e2e"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.2",

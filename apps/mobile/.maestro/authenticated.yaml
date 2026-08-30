@@ -1,0 +1,24 @@
+appId: com.anatole.mobile.dev
+---
+- launchApp:
+    clearState: true
+- tapOn: "Plus"
+- tapOn: "Se connecter"
+- tapOn: "Courriel"
+- inputText: ${MAESTRO_TEST_EMAIL}
+- tapOn: "Mot de passe"
+- inputText: ${MAESTRO_TEST_PASSWORD}
+- tapOn: "Se connecter"
+- assertVisible: "Aujourd’hui"
+- tapOn: "Marchés"
+- assertVisible: "Cockpit"
+- tapOn: "Focus"
+- tapOn: "Symbole TSX"
+- inputText: "RY"
+- tapOn: "Ouvrir Focus"
+- assertVisible: "Graphique"
+- tapOn: "Suivre"
+- tapOn: "Portefeuille"
+- assertVisible: "Portefeuille"
+- tapOn: "Plus"
+- tapOn: "Se déconnecter"

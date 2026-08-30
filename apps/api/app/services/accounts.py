@@ -190,6 +190,20 @@ class AccountService:
             Column("payload", Text, nullable=False),
             Column("updated_at", String(40), nullable=False),
         )
+        self.mobile_devices = Table(
+            "mobile_devices",
+            self.metadata,
+            Column("id", String(36), primary_key=True),
+            Column("user_id", String(36), nullable=False, index=True),
+            Column("push_token", String(500), nullable=False, unique=True, index=True),
+            Column("platform", String(16), nullable=False),
+            Column("device_name", String(120), nullable=True),
+            Column("app_version", String(40), nullable=True),
+            Column("push_enabled", Boolean, nullable=False, default=True),
+            Column("created_at", String(40), nullable=False),
+            Column("updated_at", String(40), nullable=False),
+            Column("last_seen_at", String(40), nullable=False),
+        )
         self.invites = Table(
             "account_invites",
             self.metadata,
@@ -627,11 +641,120 @@ class AccountService:
                 delete(self.workspaces).where(self.workspaces.c.user_id == user_id)
             )
             connection.execute(
+                delete(self.mobile_devices).where(
+                    self.mobile_devices.c.user_id == user_id
+                )
+            )
+            connection.execute(
                 delete(self.sessions).where(self.sessions.c.user_id == user_id)
             )
             connection.execute(
                 delete(self.users).where(self.users.c.id == user_id)
             )
+
+    async def register_mobile_device(
+        self,
+        *,
+        user_id: str,
+        push_token: str,
+        platform: str,
+        device_name: str | None,
+        app_version: str | None,
+    ) -> dict[str, Any]:
+        await self.start()
+        return await asyncio.to_thread(
+            self._register_mobile_device_sync,
+            user_id,
+            push_token,
+            platform,
+            device_name,
+            app_version,
+        )
+
+    def _register_mobile_device_sync(
+        self,
+        user_id: str,
+        push_token: str,
+        platform: str,
+        device_name: str | None,
+        app_version: str | None,
+    ) -> dict[str, Any]:
+        now = _utc_now()
+        now_iso = _to_iso(now)
+        with self.engine.begin() as connection:
+            existing = connection.execute(
+                select(self.mobile_devices).where(
+                    self.mobile_devices.c.push_token == push_token
+                )
+            ).mappings().first()
+            if existing is None:
+                device_id = str(uuid.uuid4())
+                connection.execute(
+                    insert(self.mobile_devices).values(
+                        id=device_id,
+                        user_id=user_id,
+                        push_token=push_token,
+                        platform=platform,
+                        device_name=device_name,
+                        app_version=app_version,
+                        push_enabled=True,
+                        created_at=now_iso,
+                        updated_at=now_iso,
+                        last_seen_at=now_iso,
+                    )
+                )
+            else:
+                device_id = existing.id
+                connection.execute(
+                    update(self.mobile_devices)
+                    .where(self.mobile_devices.c.id == device_id)
+                    .values(
+                        user_id=user_id,
+                        platform=platform,
+                        device_name=device_name,
+                        app_version=app_version,
+                        push_enabled=True,
+                        updated_at=now_iso,
+                        last_seen_at=now_iso,
+                    )
+                )
+            row = connection.execute(
+                select(self.mobile_devices).where(
+                    self.mobile_devices.c.id == device_id
+                )
+            ).mappings().one()
+        return dict(row)
+
+    async def list_mobile_devices(self, user_id: str) -> list[dict[str, Any]]:
+        await self.start()
+        return await asyncio.to_thread(self._list_mobile_devices_sync, user_id)
+
+    def _list_mobile_devices_sync(self, user_id: str) -> list[dict[str, Any]]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(self.mobile_devices)
+                .where(self.mobile_devices.c.user_id == user_id)
+                .order_by(self.mobile_devices.c.updated_at.desc())
+            ).mappings().all()
+        return [dict(row) for row in rows]
+
+    async def delete_mobile_device(self, *, user_id: str, device_id: str) -> bool:
+        await self.start()
+        return await asyncio.to_thread(
+            self._delete_mobile_device_sync,
+            user_id,
+            device_id,
+        )
+
+    def _delete_mobile_device_sync(self, user_id: str, device_id: str) -> bool:
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                delete(self.mobile_devices).where(
+                    (self.mobile_devices.c.user_id == user_id)
+                    & (self.mobile_devices.c.id == device_id)
+                )
+            )
+        return result.rowcount > 0
 
 
     def _invite_active(self, row: Any, now: datetime | None = None) -> bool:
