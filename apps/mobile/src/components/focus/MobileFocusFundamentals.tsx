@@ -20,18 +20,18 @@ const groups: { fr: string; en: string; items: Metric[] }[] = [
   { fr: "Flux de trésorerie", en: "Cash flow", items: [{ key: "operating_cash_flow", fr: "Flux opérationnel", en: "Operating cash flow", format: "money" }, { key: "free_cash_flow", fr: "Flux disponible", en: "Free cash flow", format: "money" }] },
 ];
 
-function display(value: number | null, format: Metric["format"], currency: string): string {
-  if (format === "money") return moneyOrNd(value, currency, true);
-  if (format === "percent") return percentOrNd(value);
-  return valueOrNd(value);
+function display(value: number | null, format: Metric["format"], currency: string, language: "fr" | "en"): string {
+  if (format === "money") return moneyOrNd(value, currency, true, language);
+  if (format === "percent") return percentOrNd(value, language);
+  return valueOrNd(value, 2, language);
 }
 
 export function MobileFocusFundamentals({ snapshot, loading, error, onRetry }: { snapshot?: FundamentalSnapshot; loading: boolean; error: Error | null; onRetry: () => void }) {
-  const { pick } = useLocale();
+  const { language, pick } = useLocale();
   const currency = snapshot?.financial_currency ?? snapshot?.currency ?? "CAD";
   return <View style={styles.stack} testID="focus-fundamentals-section"><QueryState error={!snapshot ? error : null} loading={loading} onRetry={onRetry} />{snapshot ? <>
-    {groups.map((group) => <Card key={group.en} title={pick(group.fr, group.en)}>{group.items.map((item) => <View key={item.key} style={uiStyles.row}><Text style={uiStyles.label}>{pick(item.fr, item.en)}</Text><Text style={styles.value}>{display(snapshot.metrics[item.key], item.format, currency)}</Text></View>)}</Card>)}
-    <Card title="TTM"><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Revenus", "Revenue")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.total_revenue, snapshot.ttm.currency ?? currency, true)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>BAIIA / EBITDA</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.ebitda, snapshot.ttm.currency ?? currency, true)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Bénéfice net", "Net income")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.net_income, snapshot.ttm.currency ?? currency, true)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>FCF</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.free_cash_flow, snapshot.ttm.currency ?? currency, true)}</Text></View></Card>
+    {groups.map((group) => <Card key={group.en} title={pick(group.fr, group.en)}>{group.items.map((item) => <View key={item.key} style={uiStyles.row}><Text style={uiStyles.label}>{pick(item.fr, item.en)}</Text><Text style={styles.value}>{display(snapshot.metrics[item.key], item.format, currency, language)}</Text></View>)}</Card>)}
+    <Card title="TTM"><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Revenus", "Revenue")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.total_revenue, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>BAIIA / EBITDA</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.ebitda, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Bénéfice net", "Net income")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.net_income, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>FCF</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.free_cash_flow, snapshot.ttm.currency ?? currency, true, language)}</Text></View></Card>
     <Card title={pick("Couverture et provenance", "Coverage and provenance")}><Text style={styles.status}>{snapshot.status.toUpperCase()} · {snapshot.official_coverage.status.toUpperCase()}</Text><Text style={styles.source}>{snapshot.source}</Text>{snapshot.official_coverage.message || snapshot.message ? <Text style={styles.source}>{snapshot.official_coverage.message ?? snapshot.message}</Text> : null}<Text style={styles.source}>{pick("Périodes officielles", "Official periods")}: {snapshot.official_coverage.official_periods} · {pick("Champs officiels", "Official fields")}: {snapshot.official_coverage.official_fields}</Text></Card>
   </> : null}</View>;
 }
