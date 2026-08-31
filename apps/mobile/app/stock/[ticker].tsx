@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MobileFocusActions } from "@/src/components/focus/MobileFocusActions";
 import { MobileFocusAnalysts } from "@/src/components/focus/MobileFocusAnalysts";
@@ -26,8 +26,13 @@ export default function StockDetailScreen() {
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [section, setSection] = useState<MobileFocusSection>("overview");
-  const [period, setPeriod] = useState<FocusPeriod>(focusPeriods[3]);
-  const focus = useQuery({ queryKey: ["focus", ticker, period.range, period.interval], queryFn: ({ signal }) => marketApi.focus(ticker, period.range, period.interval, signal) });
+  const [period, setPeriod] = useState<FocusPeriod>(focusPeriods[0]);
+  const [appActive, setAppActive] = useState(AppState.currentState === "active");
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
+    return () => subscription.remove();
+  }, []);
+  const focus = useQuery({ queryKey: ["focus", ticker, period.range, period.interval], queryFn: ({ signal }) => marketApi.focus(ticker, period.range, period.interval, signal), refetchInterval: appActive && section === "overview" && period.label === "LIVE" ? 15_000 : false, refetchIntervalInBackground: false });
   const company = focus.data?.profile.name ?? ticker;
   const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: () => marketApi.stockNews(ticker, company, language), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
   const needsFundamentals = ["fundamentals", "financials", "analysts"].includes(section);
@@ -41,7 +46,7 @@ export default function StockDetailScreen() {
     {focus.data && live.quote ? <>
       <MobileFocusHeader company={company} followed={followed} liveState={live.state} onFollow={() => void toggleWatchlist()} quote={live.quote} />
       <MobileFocusNavigation onChange={setSection} section={section} />
-      {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview news={news.data} newsError={!news.data ? news.error : null} newsLoading={news.isLoading} period={period} snapshot={{ ...focus.data, quote: live.quote }} ticker={ticker} /></> : null}
+      {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview liveState={live.state} news={news.data} newsError={!news.data ? news.error : null} newsLoading={news.isLoading} period={period} snapshot={{ ...focus.data, quote: live.quote }} ticker={ticker} /></> : null}
       {section === "pro" ? <MobileFocusPro ticker={ticker} /> : null}
       {section === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}

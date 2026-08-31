@@ -3,14 +3,17 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Quote } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { compactSessionVolume, liveQuoteStatus, type LiveQuoteState } from "./liveStatus";
 
-export function MobileFocusHeader({ quote, company, followed, liveState, onFollow }: { quote: Quote; company: string; followed: boolean; liveState: "connecting" | "live" | "offline"; onFollow: () => void }) {
+export function MobileFocusHeader({ quote, company, followed, liveState, onFollow }: { quote: Quote; company: string; followed: boolean; liveState: LiveQuoteState; onFollow: () => void }) {
   const { language, pick } = useLocale();
   const positive = quote.change_percent >= 0;
+  const isLive = liveState === "live" && !quote.delayed;
+  const status = liveQuoteStatus(liveState, quote.delayed, pick);
   return <View style={styles.shell}>
     <View style={styles.instrument}><View style={styles.badge}><Text style={styles.badgeText}>{quote.symbol}</Text></View><View style={styles.copy}><Text numberOfLines={1} style={styles.company}>{company}</Text><Text style={styles.meta}>{quote.exchange} · {quote.currency}</Text></View><Pressable onPress={onFollow} style={[styles.follow, followed && styles.followed]}><Text style={styles.followText}>{followed ? "★" : "☆"}</Text></Pressable></View>
     <View style={styles.quote}><Text style={styles.price}>{quote.price.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {quote.currency}</Text><Text style={[styles.change, { color: positive ? colors.positive : colors.negative }]}>{positive ? "+" : ""}{quote.change.toFixed(2)} ({positive ? "+" : ""}{quote.change_percent.toFixed(2)} %)</Text></View>
-    <View style={styles.status}><Text style={[styles.live, liveState === "live" ? styles.liveOn : liveState === "offline" ? styles.liveOff : undefined]}>{liveState === "live" ? "LIVE" : liveState === "connecting" ? pick("CONNEXION", "CONNECTING") : pick("HORS LIGNE", "OFFLINE")}</Text><Text style={styles.meta}>{pick("Volume", "Volume")} {quote.volume.toLocaleString(language === "fr" ? "fr-CA" : "en-CA")} · {quote.delayed ? pick("donnée potentiellement différée", "potentially delayed data") : pick("temps réel", "real time")}</Text></View>
+    <View style={styles.status}><Text style={[styles.live, isLive ? styles.liveOn : liveState === "offline" ? styles.liveOff : undefined]}>{status}</Text><Text style={styles.meta}>{pick("Volume", "Volume")} {compactSessionVolume(quote.volume, language)} · {quote.delayed ? pick("donnée potentiellement différée", "potentially delayed data") : pick("temps réel", "real time")}</Text></View>
   </View>;
 }
 
