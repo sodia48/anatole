@@ -5,6 +5,7 @@ import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field, QueryState, ScreenHeader } from "@/src/components/ui";
+import { EtfHeatmap } from "@/src/components/etf/EtfHeatmap";
 import { marketApi } from "@/src/lib/api/market";
 import type { EtfDirectoryItem } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
@@ -51,6 +52,7 @@ function Chip({ active, label, onPress }: { active: boolean; label: string; onPr
 
 export default function EtfDirectoryScreen() {
   const { pick } = useLocale();
+  const [view, setView] = useState<"map" | "list">("map");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [provider, setProvider] = useState("all");
@@ -64,20 +66,27 @@ export default function EtfDirectoryScreen() {
   const header = <View style={styles.header}>
     <ScreenHeader eyebrow="ETF" title={pick("ETF canadiens", "Canadian ETFs")} subtitle={pick(`${items.length} ETF suivis · ${activeQuotes} cotations actives`, `${items.length} tracked ETFs · ${activeQuotes} active quotes`)} />
     {query.data && query.isError ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
-    <Field autoCapitalize="characters" label={pick("Rechercher", "Search")} onChangeText={setSearch} placeholder={pick("Ticker, nom, exposition…", "Ticker, name, exposure…")} value={search} />
-    <Text style={styles.filterLabel}>{pick("Catégorie", "Category")}</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}><Chip active={category === "all"} label={pick("Tous", "All")} onPress={() => setCategory("all")} />{categories.map((value) => <Chip active={category === value} key={value} label={value} onPress={() => setCategory(value)} />)}</ScrollView>
-    <Text style={styles.filterLabel}>{pick("Fournisseur", "Provider")}</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}><Chip active={provider === "all"} label={pick("Tous", "All")} onPress={() => setProvider("all")} />{providers.map((value) => <Chip active={provider === value} key={value} label={value} onPress={() => setProvider(value)} />)}</ScrollView>
+    <View style={styles.viewSwitch}>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === "map" }} onPress={() => setView("map")} style={[styles.viewButton, view === "map" && styles.viewButtonActive]} testID="etf-view-map"><Text style={[styles.viewText, view === "map" && styles.viewTextActive]}>{pick("Carte", "Map")}</Text></Pressable>
+      <Pressable accessibilityRole="tab" accessibilityState={{ selected: view === "list" }} onPress={() => setView("list")} style={[styles.viewButton, view === "list" && styles.viewButtonActive]} testID="etf-view-list"><Text style={[styles.viewText, view === "list" && styles.viewTextActive]}>{pick("Liste", "List")}</Text></Pressable>
+    </View>
+    {view === "list" ? <>
+      <Field autoCapitalize="characters" label={pick("Rechercher", "Search")} onChangeText={setSearch} placeholder={pick("Ticker, nom, exposition…", "Ticker, name, exposure…")} value={search} />
+      <Text style={styles.filterLabel}>{pick("Catégorie", "Category")}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}><Chip active={category === "all"} label={pick("Tous", "All")} onPress={() => setCategory("all")} />{categories.map((value) => <Chip active={category === value} key={value} label={value} onPress={() => setCategory(value)} />)}</ScrollView>
+      <Text style={styles.filterLabel}>{pick("Fournisseur", "Provider")}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}><Chip active={provider === "all"} label={pick("Tous", "All")} onPress={() => setProvider("all")} />{providers.map((value) => <Chip active={provider === value} key={value} label={value} onPress={() => setProvider(value)} />)}</ScrollView>
+    </> : null}
     <QueryState error={!query.data ? query.error : null} loading={query.isLoading} onRetry={() => void query.refetch()} />
+    {view === "map" && items.length > 0 ? <EtfHeatmap items={items} onOpen={(ticker) => router.push({ pathname: "/etf/[ticker]", params: { ticker } })} /> : null}
   </View>;
 
   return <SafeAreaView edges={["bottom"]} style={styles.safe} testID="etf-directory-screen">
     <FlatList
-      ListEmptyComponent={!query.isLoading && !query.error ? <Text style={styles.empty}>{pick("Aucun ETF ne correspond aux filtres.", "No ETF matches these filters.")}</Text> : null}
+      ListEmptyComponent={view === "list" && !query.isLoading && !query.error ? <Text style={styles.empty}>{pick("Aucun ETF ne correspond aux filtres.", "No ETF matches these filters.")}</Text> : null}
       ListHeaderComponent={header}
       contentContainerStyle={styles.content}
-      data={rows}
+      data={view === "list" ? rows : EMPTY_ETF_ITEMS}
       initialNumToRender={16}
       keyExtractor={(item) => item.ticker}
       maxToRenderPerBatch={20}
@@ -94,6 +103,9 @@ const styles = StyleSheet.create({
   content: { padding: spacing.lg, paddingBottom: 80 },
   header: { gap: spacing.md, marginBottom: spacing.md },
   stale: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm },
+  viewSwitch: { flexDirection: "row", padding: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
+  viewButton: { minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm },
+  viewButtonActive: { backgroundColor: "#12588b" }, viewText: { ...typography.label, color: colors.textMuted }, viewTextActive: { color: colors.text },
   filterLabel: { ...typography.label, color: colors.textMuted, textTransform: "uppercase" },
   chip: { minHeight: 40, justifyContent: "center", marginRight: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, backgroundColor: colors.surface },
   chipActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" },

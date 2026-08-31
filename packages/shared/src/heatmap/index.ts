@@ -213,3 +213,118 @@ export function heatmapTileDetailLevel(
   if (rect.width < 58 || rect.height < 34 || area < 2100) return 2;
   return 3;
 }
+
+export type EtfHeatmapGroupingMode = "sector" | "provider" | "direction";
+
+export type EtfHeatmapInput = {
+  ticker: string;
+  symbol?: string;
+  name: string;
+  provider?: string;
+  category?: string;
+  exposure?: string;
+  price: number;
+  change_percent: number;
+  volume: number;
+  currency?: string;
+  delayed?: boolean;
+  source?: string;
+};
+
+export type NormalizedEtfHeatmapTile = {
+  ticker: string;
+  name: string;
+  provider: string;
+  sector: string;
+  exposure: string;
+  price: number | null;
+  changePercent: number;
+  volume: number;
+  currency: string;
+  delayed: boolean;
+  source: string;
+  available: boolean;
+  liquidityWeight: number;
+};
+
+export type EtfHeatmapGroup = {
+  key: string;
+  label: string;
+  tiles: NormalizedEtfHeatmapTile[];
+  weight: number;
+  weightedChange: number;
+};
+
+export type EtfHeatmapLabels = {
+  otherProviders: string;
+  otherExposures: string;
+  fullMarket: string;
+  gainers: string;
+  unchanged: string;
+  decliners: string;
+};
+
+/** Mirrors the ETF web heatmap weighting: logarithmic liquidity with a 0.65 floor. */
+export function etfLiquidityWeight(volume: number): number {
+  if (!Number.isFinite(volume) || volume <= 0) return 0.65;
+  return Math.max(1 + Math.log10(volume + 1), 0.65);
+}
+
+export function normalizeEtfHeatmapTile(
+  item: EtfHeatmapInput,
+  labels: Pick<EtfHeatmapLabels, "otherProviders" | "otherExposures">,
+): NormalizedEtfHeatmapTile {
+  const price = Number.isFinite(item.price) && item.price > 0 ? item.price : null;
+  const volume = Number.isFinite(item.volume) && item.volume > 0 ? item.volume : 0;
+  const ticker = (item.ticker || item.symbol || "N/D").trim().toUpperCase();
+  return {
+    ticker,
+    name: item.name?.trim() || ticker,
+    provider: item.provider?.trim() || labels.otherProviders,
+    sector: item.category?.trim() || labels.otherExposures,
+    exposure: item.exposure?.trim() || labels.otherExposures,
+    price,
+    changePercent: Number.isFinite(item.change_percent) ? item.change_percent : 0,
+    volume,
+    currency: item.currency?.trim() || "CAD",
+    delayed: Boolean(item.delayed),
+    source: item.source?.trim() || "unavailable",
+    available: price !== null && item.source?.toLowerCase() !== "unavailable",
+    liquidityWeight: etfLiquidityWeight(volume),
+  };
+}
+
+export function weightedEtfHeatmapChange(tiles: NormalizedEtfHeatmapTile[]): number {
+  const quoted = tiles.filter((tile) => tile.price !== null);
+  const totalWeight = quoted.reduce((sum, tile) => sum + tile.liquidityWeight, 0);
+  if (totalWeight <= 0) return 0;
+  return quoted.reduce((sum, tile) => sum + tile.changePercent * tile.liquidityWeight, 0) / totalWeight;
+}
+
+export function groupEtfHeatmapTiles(
+  tiles: NormalizedEtfHeatmapTile[],
+  mode: EtfHeatmapGroupingMode,
+  labels: EtfHeatmapLabels,
+): EtfHeatmapGroup[] {
+  const buckets = new Map<string, NormalizedEtfHeatmapTile[]>();
+  const add = (key: string, tile: NormalizedEtfHeatmapTile) => buckets.set(key, [...(buckets.get(key) ?? []), tile]);
+
+  for (const tile of tiles) {
+    if (mode === "sector") add(tile.sector || labels.otherExposures, tile);
+    else if (mode === "provider") add(tile.provider || labels.otherProviders, tile);
+    else if (tile.price === null || Math.abs(tile.changePercent) <= 0.005) add(labels.unchanged, tile);
+    else if (tile.changePercent > 0.005) add(labels.gainers, tile);
+    else add(labels.decliners, tile);
+  }
+
+  if (buckets.size === 0 && tiles.length > 0) buckets.set(labels.fullMarket, tiles);
+  return [...buckets.entries()]
+    .map(([key, grouped]) => ({
+      key,
+      label: key,
+      tiles: grouped,
+      weight: grouped.reduce((sum, tile) => sum + tile.liquidityWeight, 0),
+      weightedChange: weightedEtfHeatmapChange(grouped),
+    }))
+    .sort((left, right) => right.weight - left.weight);
+}
