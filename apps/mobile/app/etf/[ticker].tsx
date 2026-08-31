@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
+import { calculateEtfXRay } from "@anatole/shared/etf-xray";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ChartWebView } from "@/src/components/ChartWebView";
+import { EtfRiskPanel, EtfXRay } from "@/src/components/etf/EtfXRay";
 import { compactNumberOrNd, moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { Card, QueryState, Screen, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
-import type { EtfAllocationItem, EtfHistoryRange, EtfHoldingDriver } from "@/src/lib/api/types";
+import type { EtfHistoryRange, EtfHoldingDriver } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
@@ -21,13 +23,7 @@ const ranges: { key: EtfHistoryRange; label: string }[] = [
   { key: "5y", label: "5A" },
   { key: "10y", label: "10A" },
 ];
-
-function Allocation({ item }: { item: EtfAllocationItem }) {
-  return <View style={styles.allocation}>
-    <View style={styles.allocationLine}><Text style={styles.itemName}>{item.label}</Text><Text style={styles.itemValue}>{percentOrNd(item.weight_percent)}</Text></View>
-    <View style={styles.allocationTrack}><View style={[styles.allocationFill, { width: `${Math.max(0, Math.min(100, item.weight_percent))}%` }]} /></View>
-  </View>;
-}
+type DetailSection = "overview" | "xray" | "holdings" | "risk";
 
 function Holding({ item }: { item: EtfHoldingDriver }) {
   const { language, pick } = useLocale();
@@ -51,6 +47,7 @@ export default function EtfDetailScreen() {
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [range, setRange] = useState<EtfHistoryRange>("1y");
+  const [section, setSection] = useState<DetailSection>("overview");
   const holdings = useQuery({ queryKey: ["etf-holdings", ticker], queryFn: ({ signal }) => marketApi.etfHoldings(ticker, 25, signal), enabled: Boolean(ticker), staleTime: 600_000 });
   const history = useQuery({ queryKey: ["etf-history", ticker, range], queryFn: ({ signal }) => marketApi.etfHistory(ticker, range, signal), enabled: Boolean(ticker), staleTime: 60_000 });
   const snapshot = holdings.data;
@@ -59,6 +56,7 @@ export default function EtfDetailScreen() {
   const change = snapshot?.change_percent ?? null;
   const watched = workspace.data.watchlist.includes(ticker);
   const contributors = snapshot?.holdings.filter((item) => item.contribution_percent_points !== null).sort((left, right) => Math.abs(right.contribution_percent_points ?? 0) - Math.abs(left.contribution_percent_points ?? 0)) ?? [];
+  const analytics = useMemo(() => snapshot ? calculateEtfXRay(snapshot, history.data?.points ?? []) : null, [history.data?.points, snapshot]);
   const status = history.data ? (history.data.delayed ? pick("DIFFÉRÉ", "DELAYED") : "LIVE") : "N/D";
 
   async function toggleWatchlist() {
@@ -91,12 +89,27 @@ export default function EtfDetailScreen() {
       </> : null}
     </Card>
 
-    {snapshot ? <Card title={pick("Informations", "Information")}><View style={styles.infoGrid}><View><Text style={styles.itemMeta}>{pick("Fournisseur", "Provider")}</Text><Text style={styles.itemValue}>{snapshot.provider}</Text></View><View><Text style={styles.itemMeta}>{pick("Catégorie", "Category")}</Text><Text style={styles.itemValue}>{snapshot.category}</Text></View><View><Text style={styles.itemMeta}>{pick("Exposition", "Exposure")}</Text><Text style={styles.itemValue}>{snapshot.exposure}</Text></View><View><Text style={styles.itemMeta}>{pick("Poids des principales positions", "Top holdings weight")}</Text><Text style={styles.itemValue}>{percentOrNd(snapshot.top_holdings_weight_percent, language)}</Text></View></View></Card> : null}
+    {snapshot ? <>
+      <View accessibilityRole="tablist" style={styles.sectionTabs}>
+        {([
+          ["overview", pick("Aperçu", "Overview")],
+          ["xray", "X-Ray"],
+          ["holdings", "Holdings"],
+          ["risk", pick("Risque", "Risk")],
+        ] as [DetailSection, string][]).map(([key, label]) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: section === key }} key={key} onPress={() => setSection(key)} style={[styles.sectionTab, section === key && styles.sectionTabActive]} testID={`etf-section-${key}`}><Text style={[styles.sectionTabText, section === key && styles.sectionTabTextActive]}>{label}</Text></Pressable>)}
+      </View>
 
-    {snapshot?.holdings.length ? <Card title={pick("Composition", "Holdings")}><Text style={styles.sectionNote}>{snapshot.total_holdings_returned} {pick("positions retournées", "holdings returned")} · {snapshot.quoted_holdings} {pick("cotées", "quoted")}</Text>{snapshot.holdings.map((item) => <Holding item={item} key={`${item.rank}-${item.symbol}`} />)}</Card> : null}
-    {snapshot?.sectors.length ? <Card title={pick("Secteurs", "Sectors")}>{snapshot.sectors.map((item) => <Allocation item={item} key={item.key} />)}</Card> : null}
-    {snapshot?.asset_classes.length ? <Card title={pick("Catégories d’actifs", "Asset classes")}>{snapshot.asset_classes.map((item) => <Allocation item={item} key={item.key} />)}</Card> : null}
-    {contributors.length ? <Card title={pick("Principaux contributeurs", "Top contributors")}><Text style={styles.sectionNote}>{pick("Contribution estimée fournie par Anatole à partir du poids et de la variation.", "Estimated contribution provided by Anatole from weight and change.")}</Text>{contributors.map((item) => <View key={item.symbol} style={styles.contributor}><View><Text style={styles.itemName}>{item.display_symbol}</Text><Text style={styles.itemMeta}>{percentOrNd(item.weight_percent, language)} {pick("poids", "weight")} · {item.change_percent === null ? "N/D" : percentOrNd(item.change_percent, language)}</Text></View><Text style={[styles.contribution, { color: (item.contribution_percent_points ?? 0) >= 0 ? colors.positive : colors.negative }]}>{(item.contribution_percent_points ?? 0) >= 0 ? "+" : ""}{valueOrNd(item.contribution_percent_points, 3, language)} pt</Text></View>)}</Card> : null}
+      {section === "overview" ? <Card title={pick("Informations", "Information")}><View style={styles.infoGrid}><View><Text style={styles.itemMeta}>{pick("Fournisseur", "Provider")}</Text><Text style={styles.itemValue}>{snapshot.provider}</Text></View><View><Text style={styles.itemMeta}>{pick("Catégorie", "Category")}</Text><Text style={styles.itemValue}>{snapshot.category}</Text></View><View><Text style={styles.itemMeta}>{pick("Exposition", "Exposure")}</Text><Text style={styles.itemValue}>{snapshot.exposure}</Text></View><View><Text style={styles.itemMeta}>{pick("Poids des principales positions", "Top holdings weight")}</Text><Text style={styles.itemValue}>{percentOrNd(snapshot.top_holdings_weight_percent, language)}</Text></View></View></Card> : null}
+
+      {section === "xray" && analytics ? <EtfXRay analytics={analytics} onOpen={(symbol) => router.push({ pathname: "/stock/[ticker]", params: { ticker: symbol } })} snapshot={snapshot} /> : null}
+
+      {section === "holdings" ? <>
+        {snapshot.holdings.length ? <Card title={pick("Composition", "Holdings")}><Text style={styles.sectionNote}>{snapshot.total_holdings_returned} {pick("positions retournées", "holdings returned")} · {snapshot.quoted_holdings} {pick("cotées", "quoted")}</Text>{snapshot.holdings.map((item) => <Holding item={item} key={`${item.rank}-${item.symbol}`} />)}</Card> : <Card title="Holdings"><Text style={styles.sectionNote}>N/D</Text></Card>}
+        {contributors.length ? <Card title={pick("Principaux contributeurs", "Top contributors")}><Text style={styles.sectionNote}>{pick("Contribution calculée comme poids × variation avec les cotations déjà disponibles.", "Contribution calculated as weight × change from already available quotes.")}</Text>{contributors.map((item) => <View key={item.symbol} style={styles.contributor}><View><Text style={styles.itemName}>{item.display_symbol}</Text><Text style={styles.itemMeta}>{percentOrNd(item.weight_percent, language)} {pick("poids", "weight")} · {item.change_percent === null ? "N/D" : percentOrNd(item.change_percent, language)}</Text></View><Text style={[styles.contribution, { color: (item.contribution_percent_points ?? 0) >= 0 ? colors.positive : colors.negative }]}>{(item.contribution_percent_points ?? 0) >= 0 ? "+" : ""}{valueOrNd(item.contribution_percent_points, 3, language)} pt</Text></View>)}</Card> : null}
+      </> : null}
+
+      {section === "risk" && analytics ? <EtfRiskPanel analytics={analytics} /> : null}
+    </> : null}
   </Screen>;
 }
 
@@ -115,6 +128,9 @@ const styles = StyleSheet.create({
   rangeText: { ...typography.caption, color: colors.textMuted },
   rangeTextActive: { color: colors.text, fontWeight: "800" },
   periodStats: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
+  sectionTabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, padding: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
+  sectionTab: { minWidth: 70, minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm },
+  sectionTabActive: { backgroundColor: "#12588b" }, sectionTabText: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, sectionTabTextActive: { color: colors.text },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg },
   sectionNote: { ...typography.caption, color: colors.textMuted },
   holding: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
@@ -126,10 +142,6 @@ const styles = StyleSheet.create({
   itemName: { ...typography.body, color: colors.text, fontWeight: "700" },
   itemMeta: { ...typography.caption, color: colors.textMuted },
   itemValue: { ...typography.label, color: colors.text },
-  allocation: { gap: spacing.xs },
-  allocationLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  allocationTrack: { height: 7, overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.surfaceRaised },
-  allocationFill: { height: "100%", backgroundColor: colors.primary },
   contributor: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   contribution: { ...typography.label },
 });
