@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, InteractionManager, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { MobileFocusActions } from "@/src/components/focus/MobileFocusActions";
 import { MobileFocusAnalysts } from "@/src/components/focus/MobileFocusAnalysts";
@@ -26,6 +26,7 @@ export default function StockDetailScreen() {
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [section, setSection] = useState<MobileFocusSection>("overview");
+  const [preloadedProTicker, setPreloadedProTicker] = useState<string | null>(null);
   const [period, setPeriod] = useState<FocusPeriod>(focusPeriods[0]);
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
   useEffect(() => {
@@ -34,6 +35,11 @@ export default function StockDetailScreen() {
   }, []);
   const focus = useQuery({ queryKey: ["focus", ticker, period.range, period.interval], queryFn: ({ signal }) => marketApi.focus(ticker, period.range, period.interval, signal), refetchInterval: appActive && section === "overview" && period.label === "LIVE" ? 15_000 : false, refetchIntervalInBackground: false });
   const company = focus.data?.profile.name ?? ticker;
+  useEffect(() => {
+    if (!focus.data) return;
+    const task = InteractionManager.runAfterInteractions(() => setPreloadedProTicker(ticker));
+    return () => task.cancel();
+  }, [focus.data, ticker]);
   const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: () => marketApi.stockNews(ticker, company, language), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
   const needsFundamentals = ["fundamentals", "financials", "analysts"].includes(section);
   const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: needsFundamentals, staleTime: 10 * 60_000 });
@@ -41,13 +47,14 @@ export default function StockDetailScreen() {
   const followed = workspace.data.watchlist.includes(ticker);
   async function toggleWatchlist() { await saveWorkspace({ ...workspace.data, watchlist: followed ? workspace.data.watchlist.filter((item) => item !== ticker) : [...workspace.data.watchlist, ticker] }); }
   const refresh = () => { if (section === "overview") void Promise.all([focus.refetch(), news.refetch()]); else if (needsFundamentals) void fundamentals.refetch(); };
+  const changeSection = (next: MobileFocusSection) => { if (next === "pro") setPreloadedProTicker(ticker); setSection(next); };
   return <Screen onRefresh={refresh} refreshing={focus.isRefetching || fundamentals.isRefetching || news.isRefetching} testID="stock-detail-screen">
     <QueryState error={!focus.data ? focus.error : null} loading={focus.isLoading} onRetry={() => void focus.refetch()} />
     {focus.data && live.quote ? <>
       <MobileFocusHeader company={company} followed={followed} liveState={live.state} onFollow={() => void toggleWatchlist()} quote={live.quote} />
-      <MobileFocusNavigation onChange={setSection} section={section} />
+      <MobileFocusNavigation onChange={changeSection} section={section} />
       {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview liveState={live.state} news={news.data} newsError={!news.data ? news.error : null} newsLoading={news.isLoading} period={period} snapshot={{ ...focus.data, quote: live.quote }} ticker={ticker} /></> : null}
-      {section === "pro" ? <MobileFocusPro ticker={ticker} /> : null}
+      {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
       {section === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
@@ -57,4 +64,4 @@ export default function StockDetailScreen() {
     <Text style={styles.disclaimer}>{pick("Les données peuvent être différées. Information générale seulement; aucune recommandation de placement.", "Data may be delayed. General information only; not investment advice.")}</Text>
   </Screen>;
 }
-const styles = StyleSheet.create({ periods: { flexDirection: "row", gap: spacing.xs }, period: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, periodActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" }, periodText: { ...typography.label, color: colors.textMuted }, periodTextActive: { color: colors.text }, disclaimer: { ...typography.caption, color: colors.textSubtle, textAlign: "center", padding: spacing.lg } });
+const styles = StyleSheet.create({ periods: { flexDirection: "row", gap: spacing.xs }, period: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, periodActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" }, periodText: { ...typography.label, color: colors.textMuted }, periodTextActive: { color: colors.text }, proVisible: { width: "100%" }, proPreloaded: { position: "absolute", top: 0, left: -10_000, width: 1, height: 1, opacity: 0, overflow: "hidden" }, disclaimer: { ...typography.caption, color: colors.textSubtle, textAlign: "center", padding: spacing.lg } });

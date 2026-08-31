@@ -165,7 +165,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   }, [hydrateWorkspace]);
 
   useEffect(() => {
-    if (!embedded) return;
+    if (!embedded || !clientReady) return;
     document.documentElement.dataset.focusEmbed = "true";
     const sendHeight = () => postNative({ type: "heightChanged", height: document.documentElement.scrollHeight });
     const observer = new ResizeObserver(sendHeight);
@@ -174,14 +174,17 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
       try {
         const message = JSON.parse(String(event.data)) as { type?: string; value?: string; command?: string; timeframe?: string; chartType?: string; language?: "fr" | "en"; sessionToken?: string };
         if (message.type === "configure") {
+          const configuredTimeframe: FocusTimeframe = TIMEFRAMES.some((item) => item.id === message.timeframe) ? message.timeframe as FocusTimeframe : "1D";
+          const configuredChartType: FocusChartType = ["candles", "bars", "line", "area", "heikin_ashi"].includes(message.chartType ?? "") ? message.chartType as FocusChartType : "candles";
           if (message.language) updatePreferences({ language: message.language });
-          if (TIMEFRAMES.some((item) => item.id === message.timeframe)) setLayout((current) => ({ ...current, timeframe: message.timeframe as FocusTimeframe }));
-          if (["candles", "bars", "line", "area", "heikin_ashi"].includes(message.chartType ?? "")) setLayout((current) => ({ ...current, chart_type: message.chartType as FocusChartType }));
+          if (TIMEFRAMES.some((item) => item.id === message.timeframe)) setLayout((current) => ({ ...current, timeframe: configuredTimeframe }));
+          if (["candles", "bars", "line", "area", "heikin_ashi"].includes(message.chartType ?? "")) setLayout((current) => ({ ...current, chart_type: configuredChartType }));
           if (message.sessionToken) {
             void fetch("/api/account/mobile-session", { method: "POST", headers: { Authorization: `Bearer ${message.sessionToken}` }, credentials: "same-origin" })
               .then(async (response) => { if (!response.ok) throw new Error("Mobile session bootstrap failed"); await refreshAccount(); })
               .catch((reason: unknown) => postNative({ type: "error", message: reason instanceof Error ? reason.message : "Mobile session unavailable" }));
           }
+          postNative({ type: "configured", ticker, timeframe: configuredTimeframe, chartType: configuredChartType });
         }
         if (message.type === "timeframe" && TIMEFRAMES.some((item) => item.id === message.value)) setLayout((current) => ({ ...current, timeframe: message.value as FocusTimeframe }));
         if (message.type === "chartType" && ["candles", "bars", "line", "area", "heikin_ashi"].includes(message.value ?? "")) setLayout((current) => ({ ...current, chart_type: message.value as FocusChartType }));
@@ -206,7 +209,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
       window.removeEventListener("message", receive);
       delete document.documentElement.dataset.focusEmbed;
     };
-  }, [embedded, postNative, refreshAccount, ticker, updatePreferences]);
+  }, [clientReady, embedded, postNative, refreshAccount, ticker, updatePreferences]);
 
   useEffect(() => {
     let stopped = false;
