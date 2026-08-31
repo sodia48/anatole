@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { render, userEvent, waitFor } from "@testing-library/react-native";
 
 import MarketsScreen from "@/app/(tabs)/markets";
 import PortfolioScreen from "@/app/(tabs)/portfolio";
@@ -49,6 +49,20 @@ describe("critical native screens", () => {
     const view = await render(<StockDetailScreen />);
     expect(view.getByTestId("focus-overview-section")).toBeTruthy();
     expect(view.getByTestId("focus-chart-webview")).toBeTruthy();
+    expect(view.getByText("RY · LIVE")).toBeTruthy();
+    await view.unmount();
+  }, 30_000);
+
+  it("preloads Focus Pro once and keeps its bridge state across section switches", async () => {
+    const view = await render(<StockDetailScreen />);
+    await waitFor(() => expect(view.getAllByTestId("focus-pro-webview")).toHaveLength(1));
+    const webview = view.getByTestId("focus-pro-webview");
+    const user = userEvent.setup();
+    await user.press(view.getByText("Pro"));
+    await user.press(view.getByText("Fondamentaux"));
+    await user.press(view.getByText("Pro"));
+    expect(view.getAllByTestId("focus-pro-webview")).toHaveLength(1);
+    expect(view.getByTestId("focus-pro-webview")).toBe(webview);
     await view.unmount();
   }, 30_000);
 

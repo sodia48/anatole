@@ -13,8 +13,14 @@ jest.mock("expo-localization", () => ({
 jest.mock("expo-haptics", () => ({ selectionAsync: jest.fn() }));
 
 jest.mock("react-native-webview", () => {
+  const React = jest.requireActual("react");
   const { View } = jest.requireActual("react-native");
-  return { WebView: View };
+  const WebView = React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
+    React.useImperativeHandle(ref, () => ({ injectJavaScript: jest.fn(), postMessage: jest.fn(), reload: jest.fn() }), []);
+    return React.createElement(View, props);
+  });
+  WebView.displayName = "MockWebView";
+  return { WebView };
 });
 
 jest.mock("@react-native-community/netinfo", () => ({
