@@ -17,6 +17,15 @@ export function filterInsiderTrades(trades: InsiderTrade[], type: InsiderTypeFil
   return trades.filter((trade) => type === "all" || trade.transaction_type === type);
 }
 
+export function dedupeInsiderTradesForRender(trades: InsiderTrade[]): InsiderTrade[] {
+  const seenIds = new Set<string>();
+  return trades.filter((trade) => {
+    if (seenIds.has(trade.id)) return false;
+    seenIds.add(trade.id);
+    return true;
+  });
+}
+
 export function insiderPreviewScanLimit(market: InsiderMarket, ticker: string): number {
   if (ticker.trim()) return 1;
   return market === "canada" ? 8 : 10;

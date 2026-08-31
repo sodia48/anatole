@@ -11,6 +11,7 @@ import { useLocale, type Language } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import {
   filterInsiderTrades,
+  dedupeInsiderTradesForRender,
   filterIpoItems,
   formatIpoPrice,
   insiderCoverageUnavailable,
@@ -144,7 +145,7 @@ function InsiderPanel() {
   useEffect(() => () => { void queryClient.cancelQueries({ queryKey: ["insiders"] }); }, [days, market, queryClient, ticker]);
 
   const snapshot = (!ticker && enriched.data) || preview.data;
-  const trades = useMemo(() => filterInsiderTrades(snapshot?.trades ?? [], type), [snapshot?.trades, type]);
+  const trades = useMemo(() => filterInsiderTrades(dedupeInsiderTradesForRender(snapshot?.trades ?? []), type), [snapshot?.trades, type]);
   const unavailable = snapshot ? insiderCoverageUnavailable(snapshot, preview.isLoading || enriched.isLoading) : false;
   const stale = Boolean(snapshot && (preview.isError || enriched.isError));
   const summary = snapshot?.summary;
