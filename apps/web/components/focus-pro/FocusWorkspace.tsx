@@ -65,6 +65,8 @@ import type {
   FocusLayout,
   FocusScript,
   FundamentalMarker,
+  FocusChartType,
+  FocusTimeframe,
   SnapMode,
 } from "./types";
 import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
@@ -82,12 +84,12 @@ const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
   { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
 
-export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnapshot }) {
-  const { preferences } = usePreferences();
-  const { user } = useAccount();
+export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialSnapshot: FocusSnapshot; embedded?: boolean }) {
+  const { preferences, updatePreferences } = usePreferences();
+  const { user, refreshAccount } = useAccount();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
-  const [section, setSection] = useState<Section>("overview");
+  const [section, setSection] = useState<Section>(embedded ? "chart" : "overview");
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -107,7 +109,14 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
   const [selectedMarker, setSelectedMarker] = useState<FundamentalMarker | null>(null);
   const [paperAccount, setPaperAccount] = useState<PaperAccount | null>(null);
-  const onPaperAccount = useCallback((value: PaperAccount | null) => setPaperAccount(value), []);
+  const postNative = useCallback((payload: object) => {
+    if (!embedded) return;
+    window.ReactNativeWebView?.postMessage(JSON.stringify(payload));
+  }, [embedded]);
+  const onPaperAccount = useCallback((value: PaperAccount | null) => {
+    setPaperAccount(value);
+    postNative({ type: "paperOrderChanged" });
+  }, [postNative]);
   const [scriptValidation, setScriptValidation] = useState<AnatoleScriptValidation | null>(null);
   const [validating, setValidating] = useState(false);
   const [backtest, setBacktest] = useState<BacktestResult | null>(null);
@@ -154,6 +163,49 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
       window.removeEventListener(WORKSPACE_SYNC_EVENT, hydrateWorkspace);
     };
   }, [hydrateWorkspace]);
+
+  useEffect(() => {
+    if (!embedded) return;
+    document.documentElement.dataset.focusEmbed = "true";
+    const sendHeight = () => postNative({ type: "heightChanged", height: document.documentElement.scrollHeight });
+    const observer = new ResizeObserver(sendHeight);
+    observer.observe(document.body);
+    const receive = (event: MessageEvent) => {
+      try {
+        const message = JSON.parse(String(event.data)) as { type?: string; value?: string; command?: string; timeframe?: string; chartType?: string; language?: "fr" | "en"; sessionToken?: string };
+        if (message.type === "configure") {
+          if (message.language) updatePreferences({ language: message.language });
+          if (TIMEFRAMES.some((item) => item.id === message.timeframe)) setLayout((current) => ({ ...current, timeframe: message.timeframe as FocusTimeframe }));
+          if (["candles", "bars", "line", "area", "heikin_ashi"].includes(message.chartType ?? "")) setLayout((current) => ({ ...current, chart_type: message.chartType as FocusChartType }));
+          if (message.sessionToken) {
+            void fetch("/api/account/mobile-session", { method: "POST", headers: { Authorization: `Bearer ${message.sessionToken}` }, credentials: "same-origin" })
+              .then(async (response) => { if (!response.ok) throw new Error("Mobile session bootstrap failed"); await refreshAccount(); })
+              .catch((reason: unknown) => postNative({ type: "error", message: reason instanceof Error ? reason.message : "Mobile session unavailable" }));
+          }
+        }
+        if (message.type === "timeframe" && TIMEFRAMES.some((item) => item.id === message.value)) setLayout((current) => ({ ...current, timeframe: message.value as FocusTimeframe }));
+        if (message.type === "chartType" && ["candles", "bars", "line", "area", "heikin_ashi"].includes(message.value ?? "")) setLayout((current) => ({ ...current, chart_type: message.value as FocusChartType }));
+        if (message.type === "command") {
+          const panelByCommand: Record<string, Exclude<Panel, null>> = { indicators: "indicators", compare: "compare", alert: "alerts", layouts: "layouts", strategy: "strategy", paper: "paper" };
+          if (message.command && panelByCommand[message.command]) setPanel(panelByCommand[message.command]);
+          if (message.command === "draw") setActiveTool("trendline");
+          if (message.command === "fundamentals") setLayout((current) => ({ ...current, fundamentals_visible: !current.fundamentals_visible }));
+          if (message.command === "undo") dispatchDrawing({ type: "undo" });
+          if (message.command === "redo") dispatchDrawing({ type: "redo" });
+        }
+      } catch (reason) {
+        postNative({ type: "error", message: reason instanceof Error ? reason.message : "Invalid native bridge message" });
+      }
+    };
+    window.addEventListener("message", receive);
+    postNative({ type: "ready", ticker });
+    sendHeight();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("message", receive);
+      delete document.documentElement.dataset.focusEmbed;
+    };
+  }, [embedded, postNative, refreshAccount, ticker, updatePreferences]);
 
   useEffect(() => {
     let stopped = false;
@@ -273,12 +325,14 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
     writeLocalWorkspace({ ...workspace, focus_layouts: nextLayouts });
     setLayout(next);
     setLayouts(nextLayouts);
-  }, [drawingState.items, layout]);
+    postNative({ type: "layoutSaved" });
+  }, [drawingState.items, layout, postNative]);
 
   const saveAlert = (rule: AlertRule) => {
     const workspace = readLocalWorkspace().data;
     writeLocalWorkspace({ ...workspace, alerts: [rule, ...workspace.alerts].slice(0, 50) });
     setPanel(null);
+    postNative({ type: "alertCreated" });
   };
   const saveScript = () => {
     const source = backtestRequest.script ?? "";
@@ -327,9 +381,9 @@ export function FocusWorkspace({ initialSnapshot }: { initialSnapshot: FocusSnap
     }));
 
   return (
-    <div className="focus-page" data-focus-ready={clientReady ? "true" : "false"}>
-      <QuoteHeader quote={quote} liveState={liveState} />
-      <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button></nav>
+    <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
+      {!embedded ? <QuoteHeader quote={quote} liveState={liveState} /> : null}
+      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button></nav> : null}
       {section === "overview" ? <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} /> : section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : section !== "chart" ? <FocusFundamentals ticker={ticker} view={section} /> : (
         <div className={styles.workspace}>
           <FocusToolbar ticker={ticker} timeframe={layout.timeframe} chartType={layout.chart_type} language={language} onTimeframe={(value) => setLayout({ ...layout, timeframe: value })} onChartType={(value) => setLayout({ ...layout, chart_type: value })} onToggleIndicators={() => togglePanel("indicators")} onToggleCompare={() => togglePanel("compare")} onCreateAlert={() => togglePanel("alerts")} onToggleLayouts={() => togglePanel("layouts")} onToggleStrategy={() => togglePanel("strategy")} onTogglePaper={() => togglePanel("paper")} onSaveLayout={() => saveLayout()} />

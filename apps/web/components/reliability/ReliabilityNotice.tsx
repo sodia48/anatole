@@ -51,7 +51,7 @@ export function ReliabilityNotice() {
   if (!notice) return null;
 
   return (
-    <aside className={styles.notice} role="status" aria-live="polite">
+    <aside className={styles.notice} data-reliability-notice role="status" aria-live="polite">
       <WifiOff size={17} aria-hidden="true" />
       <span>
         <b>{pick(language, "Mode résilient", "Resilient mode")}</b>

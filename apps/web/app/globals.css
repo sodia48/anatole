@@ -16,6 +16,15 @@ body { margin: 0; font-family: Inter, system-ui, sans-serif; color: var(--text);
 a { color: inherit; text-decoration: none; }
 button { font: inherit; }
 
+html[data-focus-embed="true"] body { background: #050d15; }
+html[data-focus-embed="true"] .app-shell { display: block; min-height: 100vh; }
+html[data-focus-embed="true"] .sidebar,
+html[data-focus-embed="true"] [data-feedback-trigger],
+html[data-focus-embed="true"] [data-reliability-notice] { display: none !important; }
+html[data-focus-embed="true"] .app-main { padding: 0; }
+html[data-focus-embed="true"] .focus-page { max-width: none; gap: 6px; }
+html[data-focus-embed="true"] .focus-page[data-focus-embedded="true"] { min-width: 0; }
+
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 230px minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; height: 100vh; border-right: 1px solid var(--border); background: rgba(5, 13, 21, .92); backdrop-filter: blur(20px); padding: 24px 16px; display: flex; flex-direction: column; z-index: 20; }
 .brand { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 800; padding: 0 10px 28px; }

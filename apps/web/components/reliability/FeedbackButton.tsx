@@ -139,6 +139,7 @@ export function FeedbackButton() {
   return (
     <>
       <button
+        data-feedback-trigger
         ref={triggerRef}
         type="button"
         className={styles.trigger}
