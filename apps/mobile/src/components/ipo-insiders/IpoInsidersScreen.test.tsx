@@ -25,6 +25,17 @@ const insiderSnapshot = {
   summary: { transactions: 1, companies: 1, buys: 1, sells: 0, grants_and_exercises: 0, buy_value: 200000, sell_value: 0, net_value: 200000, buy_ratio_percent: 100, unusual_transactions: 1 }, sources: [{ source: "Finnhub", status: "available", count: 1, detail: null, url: "https://example.com" }], market: "Canada", requested_ticker: null, scanned_symbols: 8, generated_at: "2026-08-31T12:00:00Z", refresh_after_seconds: 900, message: null,
 };
 
+ipoSnapshot.items.push({
+  ...ipoSnapshot.items[0]!,
+  id: "ipo-2",
+  company: "Maple Two",
+  symbol: "MAP2",
+  symbols: ["MAP2"],
+  source_url: "https://tsx.example/map2",
+  focus_available: false,
+});
+insiderSnapshot.trades.push({ ...insiderSnapshot.trades[0]! });
+
 let currentInsiders: any = insiderSnapshot;
 
 function resultFor(options: { queryKey: unknown[]; enabled?: boolean }) {
@@ -54,16 +65,22 @@ describe("mobile IPO and insider radar", () => {
   });
 
   it("renders IPOs, then applies the complete progressive insider flow", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const view = await render(<IpoInsidersScreen />);
     const user = userEvent.setup();
+    expect(new Set(ipoSnapshot.items.map((item) => item.id)).size).toBe(ipoSnapshot.items.length);
+    expect(view.getByTestId("ipo-card-ipo-1")).toBeTruthy();
+    expect(view.getByTestId("ipo-card-ipo-2")).toBeTruthy();
     expect(view.getByText("Maple Corp")).toBeTruthy();
-    expect(view.getByText(/12,00/)).toBeTruthy();
-    expect(view.getByText("Source : TSX")).toBeTruthy();
+    expect(view.getAllByText(/12,00/)).toHaveLength(2);
+    expect(view.getAllByText("Source : TSX")).toHaveLength(2);
     await user.press(view.getByTestId("ipo-focus-MAP"));
     expect(router.push).toHaveBeenCalledWith({ pathname: "/focus/[ticker]", params: { ticker: "MAP" } });
     await user.press(view.getByTestId("ipo-source-ipo-1"));
     expect(Linking.openURL).toHaveBeenCalledWith("https://tsx.example/map");
     await user.press(view.getByTestId("insiders-tab"));
+    expect(view.getAllByTestId("insider-card-trade-1")).toHaveLength(1);
+    expect(consoleError.mock.calls.flat().join(" ")).not.toMatch(/same key|duplicate key/i);
     expect(view.getByText("Royal Bank")).toBeTruthy();
     expect(view.getByText("Source : Finnhub")).toBeTruthy();
     const previewOptions = mockUseQuery.mock.calls.map(([value]) => value).find((value) => value.queryKey?.[1] === "preview");

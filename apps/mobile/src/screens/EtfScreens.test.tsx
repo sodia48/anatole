@@ -110,17 +110,30 @@ describe("Canadian ETF mobile experience", () => {
     await act(async () => view.unmount());
   });
 
-  it("renders real backend detail sections, N/D nulls and opens a holding in Focus", async () => {
+  it("renders ETF X-Ray tabs from one holdings query and opens heatmap holdings in Focus", async () => {
     const view = await render(<EtfDetailScreen />);
     expect(mockUseQuery.mock.calls.map(([options]) => options.queryKey[0])).toEqual(expect.arrayContaining(["etf-holdings", "etf-history"]));
+    expect(mockUseQuery.mock.calls.filter(([options]) => options.queryKey[0] === "etf-holdings")).toHaveLength(1);
     expect(await view.findByTestId("etf-chart")).toBeTruthy();
-    expect(await view.findByText("Composition")).toBeTruthy();
+    expect(view.getByTestId("etf-section-overview").props.accessibilityState.selected).toBe(true);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("etf-section-xray"));
+    expect(await view.findByTestId("etf-xray-panel")).toBeTruthy();
+    expect(view.getByTestId("etf-holdings-heatmap")).toBeTruthy();
+    expect(view.getByText("Exposition")).toBeTruthy();
+    expect(view.getByText("Scores X-Ray")).toBeTruthy();
     expect(view.getByText("Secteurs")).toBeTruthy();
     expect(view.getByText("Catégories d’actifs")).toBeTruthy();
-    expect(view.getByText("Principaux contributeurs")).toBeTruthy();
     expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
     expect(view.queryByText("FAKE")).toBeNull();
-    const user = userEvent.setup();
+    await user.press(view.getByTestId("etf-xray-tile-RY"));
+    expect(router.push).toHaveBeenCalledWith({ pathname: "/stock/[ticker]", params: { ticker: "RY" } });
+    await user.press(view.getByTestId("etf-section-risk"));
+    expect(view.getByTestId("etf-risk-panel")).toBeTruthy();
+    expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
+    await user.press(view.getByTestId("etf-section-holdings"));
+    expect(await view.findByText("Composition")).toBeTruthy();
+    expect(view.getByText("Principaux contributeurs")).toBeTruthy();
     await user.press(view.getByTestId("etf-holding-RY"));
     expect(router.push).toHaveBeenCalledWith({ pathname: "/stock/[ticker]", params: { ticker: "RY" } });
     await act(async () => view.unmount());

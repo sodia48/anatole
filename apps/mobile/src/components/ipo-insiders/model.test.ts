@@ -1,5 +1,5 @@
-import type { InsiderSnapshot, IpoItem } from "@/src/lib/api/types";
-import { filterIpoItems, formatIpoPrice, insiderCoverageUnavailable, insiderPreviewScanLimit } from "./model";
+import type { InsiderSnapshot, InsiderTrade, IpoItem } from "@/src/lib/api/types";
+import { dedupeInsiderTradesForRender, filterIpoItems, formatIpoPrice, insiderCoverageUnavailable, insiderPreviewScanLimit } from "./model";
 
 function ipo(overrides: Partial<IpoItem>): IpoItem {
   return {
@@ -12,6 +12,10 @@ const emptyInsiders: InsiderSnapshot = {
   trades: [], summary: { transactions: 0, companies: 0, buys: 0, sells: 0, grants_and_exercises: 0, buy_value: 0, sell_value: 0, net_value: 0, buy_ratio_percent: 0, unusual_transactions: 0 },
   sources: [{ source: "Finnhub", status: "unavailable", count: 0, detail: "offline", url: "https://example.com" }], market: "Canada", requested_ticker: null, scanned_symbols: 0, generated_at: "2026-08-31T12:00:00Z", refresh_after_seconds: 900, message: "offline",
 };
+
+function trade(id: string, shares: number): InsiderTrade {
+  return { id, ticker: "RY", company: "Royal Bank", market: "Canada", insider_name: "Jane Doe", role: "Director", transaction_type: "buy", transaction_label: "Achat", transaction_code: "P", trade_date: "2026-08-20", filing_date: "2026-08-21", shares, price: 200, value: shares * 200, holdings_after: 5000, ownership: "Direct", unusual: false, source_name: "Test", source_url: "https://example.com", official_verification_url: "https://example.com/official", official_source: false };
+}
 
 describe("IPO and insider mobile model", () => {
   it("filters IPOs by search, country and instrument", () => {
@@ -33,5 +37,11 @@ describe("IPO and insider mobile model", () => {
     expect(insiderPreviewScanLimit("canada", "RY")).toBe(1);
     expect(insiderCoverageUnavailable(emptyInsiders, false)).toBe(true);
     expect(insiderCoverageUnavailable({ ...emptyInsiders, sources: [{ ...emptyInsiders.sources[0]!, status: "available" }] }, false)).toBe(false);
+  });
+
+  it("deduplicates identical insider IDs for render while preserving order and distinct transactions", () => {
+    const result = dedupeInsiderTradesForRender([trade("same", 100), trade("same", 250), trade("distinct", 500)]);
+    expect(result.map((item) => item.id)).toEqual(["same", "distinct"]);
+    expect(result[0]?.shares).toBe(100);
   });
 });
