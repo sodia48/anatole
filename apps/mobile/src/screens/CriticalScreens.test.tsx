@@ -12,6 +12,7 @@ jest.mock("@/src/components/ChartWebView", () => {
   const { View } = jest.requireActual("react-native");
   return { ChartWebView: () => <View testID="focus-chart-webview" /> };
 });
+jest.mock("@/src/hooks/useLiveQuote", () => ({ useLiveQuote: (_ticker: string, quote: unknown) => ({ quote, state: "live" }) }));
 jest.mock("@/src/providers/MobileAccountProvider", () => ({
   useMobileAccount: () => ({
     state: "authenticated", user: { email: "mobile@example.com" }, saveWorkspace: jest.fn(),
@@ -37,15 +38,16 @@ jest.mock("@tanstack/react-query", () => ({
 }));
 
 describe("critical native screens", () => {
-  it("renders the Cockpit mobile sector map", async () => {
+  it("renders the Cockpit mobile heatmap", async () => {
     const view = await render(<MarketsScreen />);
-    expect(view.getByTestId("cockpit-sector-map")).toBeTruthy();
+    expect(view.getByTestId("cockpit-heatmap")).toBeTruthy();
+    expect(view.getByTestId("market-heatmap-svg")).toBeTruthy();
     await view.unmount();
   }, 30_000);
 
   it("renders the native Focus shell with its specialized chart", async () => {
     const view = await render(<StockDetailScreen />);
-    expect(view.getByTestId("focus-chart-section")).toBeTruthy();
+    expect(view.getByTestId("focus-overview-section")).toBeTruthy();
     expect(view.getByTestId("focus-chart-webview")).toBeTruthy();
     await view.unmount();
   }, 30_000);

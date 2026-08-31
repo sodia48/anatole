@@ -185,6 +185,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
         }
         if (message.type === "timeframe" && TIMEFRAMES.some((item) => item.id === message.value)) setLayout((current) => ({ ...current, timeframe: message.value as FocusTimeframe }));
         if (message.type === "chartType" && ["candles", "bars", "line", "area", "heikin_ashi"].includes(message.value ?? "")) setLayout((current) => ({ ...current, chart_type: message.value as FocusChartType }));
+        if (message.type === "drawingTool" && ["cursor", "trendline", "horizontal_line", "vertical_line", "ray", "rectangle", "parallel_channel", "fib_retracement", "fib_extension", "price_range", "date_range", "text"].includes(message.value ?? "")) setActiveTool(message.value as DrawingTool);
         if (message.type === "command") {
           const panelByCommand: Record<string, Exclude<Panel, null>> = { indicators: "indicators", compare: "compare", alert: "alerts", layouts: "layouts", strategy: "strategy", paper: "paper" };
           if (message.command && panelByCommand[message.command]) setPanel(panelByCommand[message.command]);

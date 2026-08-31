@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 jest.mock("expo-secure-store", () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
 }));
 
 jest.mock("expo-localization", () => ({
@@ -11,6 +11,11 @@ jest.mock("expo-localization", () => ({
 }));
 
 jest.mock("expo-haptics", () => ({ selectionAsync: jest.fn() }));
+
+jest.mock("react-native-webview", () => {
+  const { View } = jest.requireActual("react-native");
+  return { WebView: View };
+});
 
 jest.mock("@react-native-community/netinfo", () => ({
   __esModule: true,
