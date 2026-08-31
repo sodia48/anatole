@@ -11,6 +11,8 @@ import { useLocale } from "@/src/lib/i18n";
 import { compactNumberOrNd, moneyOrNd } from "@/src/components/focus/format";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 
+const EMPTY_ETF_ITEMS: EtfDirectoryItem[] = [];
+
 export function filterEtfDirectory(items: EtfDirectoryItem[], search: string, category: string, provider: string): EtfDirectoryItem[] {
   const needle = search.trim().toLowerCase();
   return items.filter((item) => category === "all" || item.category === category)
@@ -53,7 +55,7 @@ export default function EtfDirectoryScreen() {
   const [category, setCategory] = useState("all");
   const [provider, setProvider] = useState("all");
   const query = useQuery({ queryKey: ["etf-directory"], queryFn: ({ signal }) => marketApi.etfDirectory(signal), staleTime: 300_000 });
-  const items = query.data?.items ?? [];
+  const items = query.data?.items ?? EMPTY_ETF_ITEMS;
   const categories = useMemo(() => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(), [items]);
   const providers = useMemo(() => [...new Set(items.map((item) => item.provider).filter(Boolean))].sort(), [items]);
   const rows = useMemo(() => filterEtfDirectory(items, search, category, provider), [category, items, provider, search]);

@@ -17,9 +17,10 @@ describe("mobile Focus price chart", () => {
 
   it("keeps the complete OHLCV selection through the native bridge", async () => {
     const view = await render(<ChartWebView candles={candles} currency="CAD" label="RY LIVE" ticker="RY" timeframe="1d:1m" />);
-    await act(async () => view.getByTestId("focus-chart-webview").props.onMessage({ nativeEvent: { data: JSON.stringify({ type: "point-selected", ...candles[0] }) } }));
+    await act(async () => view.getByTestId("focus-chart-webview").props.onMessage({ nativeEvent: { data: JSON.stringify({ type: "point-selected", ...candles[0], buy: 1_240_000, sell: 0, delta: 1_240_000 }) } }));
     expect(view.getByText(/O 58\.10/)).toBeTruthy();
     expect(view.getByText(/H 58\.52/)).toBeTruthy();
     expect(view.getByText(/Vol 1,24 M/)).toBeTruthy();
+    expect(view.getByText(/Achat est\. 1,24 M/)).toBeTruthy();
   });
 });
