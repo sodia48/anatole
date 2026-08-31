@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { Field, QueryState, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
-import type { InsiderSnapshot, InsiderTrade, InsiderTransactionType, IpoInstrumentType, IpoItem } from "@/src/lib/api/types";
+import type { InsiderTrade, InsiderTransactionType, IpoInstrumentType, IpoItem } from "@/src/lib/api/types";
 import { useLocale, type Language } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./model";
 
 type MainTab = "ipo" | "insiders";
+const EMPTY_IPO_ITEMS: IpoItem[] = [];
 
 function FilterChip({ active, label, onPress, testID }: { active: boolean; label: string; onPress: () => void; testID?: string }) {
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.chip, active && styles.chipActive]} testID={testID}><Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text></Pressable>;
@@ -55,6 +56,7 @@ function IpoCard({ item }: { item: IpoItem }) {
   return <View style={styles.card} testID={`ipo-card-${item.id}`}>
     <View style={styles.cardTop}><View style={styles.symbol}><Text style={styles.symbolText}>{item.symbol || "—"}</Text></View><View style={styles.cardCopy}><Text style={styles.cardTitle}>{item.company}</Text><Text style={styles.meta}>{item.exchange || "—"} · {item.country} · {item.instrument_label}</Text></View>{item.official ? <Text style={styles.official}>{pick("Officiel", "Official")}</Text> : null}</View>
     <View style={styles.cardGrid}><View><Text style={styles.caption}>{item.event_type} · {item.status}</Text><Text style={styles.body}>{formatDate(item.event_date, language)}</Text></View><View style={styles.priceBlock}><Text style={styles.caption}>{ipoPriceCaption(item, language)}</Text><Text style={styles.price}>{formatIpoPrice(item, language)}</Text></View></View>
+    <Text style={styles.meta}>{pick("Source", "Source")} : {item.source_name}</Text>
     <View style={styles.actions}>
       {item.focus_available && item.symbol ? <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/focus/[ticker]", params: { ticker: item.symbol } })} style={styles.action} testID={`ipo-focus-${item.symbol}`}><Text style={styles.actionText}>Focus</Text></Pressable> : null}
       <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(item.source_url)} style={styles.actionSecondary} testID={`ipo-source-${item.id}`}><Text style={styles.actionText}>{pick("Source officielle", "Official source")}</Text></Pressable>
@@ -68,7 +70,7 @@ function IpoPanel() {
   const [country, setCountry] = useState<IpoCountryFilter>("all");
   const [instrument, setInstrument] = useState<IpoTypeFilter>("all");
   const query = useQuery({ queryKey: ["ipo"], queryFn: ({ signal }) => marketApi.ipo(signal), staleTime: 30 * 60_000 });
-  const items = query.data?.items ?? [];
+  const items = query.data?.items ?? EMPTY_IPO_ITEMS;
   const filtered = useMemo(() => filterIpoItems(items, search, country, instrument), [country, instrument, items, search]);
   const summary = query.data?.summary;
   const header = <View style={styles.headerStack}>
@@ -92,6 +94,7 @@ function InsiderCard({ trade }: { trade: InsiderTrade }) {
     <View style={styles.cardTop}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/focus/[ticker]", params: { ticker: trade.ticker } })} style={styles.symbol} testID={`insider-focus-${trade.ticker}`}><Text style={styles.symbolText}>{trade.ticker}</Text></Pressable><View style={styles.cardCopy}><Text style={styles.cardTitle}>{trade.company}</Text><Text style={styles.meta}>{trade.insider_name}{trade.role ? ` · ${trade.role}` : ""}</Text></View>{trade.unusual ? <Text style={styles.unusual}>{pick("Inhabituelle", "Unusual")}</Text> : null}</View>
     <View style={styles.cardGrid}><View><Text style={[styles.transaction, tone]}>{trade.transaction_label}</Text><Text style={styles.meta}>{pick("Transaction", "Trade")}: {formatDate(trade.trade_date, language)}</Text><Text style={styles.meta}>{pick("Dépôt", "Filing")}: {formatDate(trade.filing_date, language)}</Text></View><View style={styles.priceBlock}><Text style={styles.body}>{formatNumber(trade.shares, language)} {pick("actions", "shares")}</Text><Text style={styles.meta}>{pick("Prix", "Price")}: {trade.price === null ? "N/D" : formatMoney(trade.price, language)}</Text><Text style={styles.price}>{trade.value === null ? "N/D" : formatMoney(trade.value, language)}</Text></View></View>
     <Text style={styles.meta}>{pick("Détention après", "Holdings after")}: {formatNumber(trade.holdings_after, language)}</Text>
+    <Text style={styles.meta}>{pick("Source", "Source")} : {trade.source_name}</Text>
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(trade.official_verification_url)} style={styles.actionSecondary} testID={`insider-source-${trade.id}`}><Text style={styles.actionText}>{pick("Vérification officielle", "Official verification")}</Text></Pressable>
   </View>;
 }
@@ -105,7 +108,7 @@ function InsiderPanel() {
   const [ticker, setTicker] = useState("");
   const [type, setType] = useState<InsiderTypeFilter>("all");
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
-  const [enrich, setEnrich] = useState(false);
+  const [enabledEnrichmentKey, setEnabledEnrichmentKey] = useState<string | null>(null);
   const previewLimit = insiderPreviewScanLimit(market, ticker);
   const preview = useQuery({
     queryKey: ["insiders", "preview", market, days, ticker],
@@ -114,17 +117,18 @@ function InsiderPanel() {
     staleTime: 15 * 60_000,
   });
 
+  const enrichmentKey = `${market}:${days}:${preview.dataUpdatedAt ?? 0}`;
   useEffect(() => {
-    setEnrich(false);
     if (!appActive || ticker || !preview.data) return;
-    const timer = setTimeout(() => setEnrich(true), 700);
+    const timer = setTimeout(() => setEnabledEnrichmentKey(enrichmentKey), 700);
     return () => clearTimeout(timer);
-  }, [appActive, days, market, preview.data, ticker]);
+  }, [appActive, enrichmentKey, preview.data, ticker]);
+  const enrichmentEnabled = appActive && !ticker && enabledEnrichmentKey === enrichmentKey;
 
   const enriched = useQuery({
     queryKey: ["insiders", "enriched", market, days],
     queryFn: ({ signal }) => marketApi.insiders({ market, days, scanLimit: 24 }, signal),
-    enabled: appActive && enrich && !ticker,
+    enabled: enrichmentEnabled,
     staleTime: 15 * 60_000,
   });
 
@@ -163,7 +167,7 @@ function InsiderPanel() {
     <QueryState error={error} loading={loading} onRetry={() => void preview.refetch()} />
     {unavailable ? <Text accessibilityRole="alert" style={styles.unavailable}>{pick("Indisponible — les sources automatisées ne répondent pas.", "Unavailable — automated sources are not responding.")}</Text> : null}
   </View>;
-  const refresh = () => { void preview.refetch(); if (!ticker && enrich) void enriched.refetch(); };
+  const refresh = () => { void preview.refetch(); if (enrichmentEnabled) void enriched.refetch(); };
   return <FlatList ListEmptyComponent={snapshot && !loading && !unavailable ? <Text style={styles.empty}>{pick("Aucune transaction observée pour ces critères.", "No transaction observed for these filters.")}</Text> : null} ListHeaderComponent={header} contentContainerStyle={styles.content} data={trades} initialNumToRender={14} keyExtractor={(trade) => trade.id} maxToRenderPerBatch={18} refreshControl={<RefreshControl onRefresh={refresh} refreshing={preview.isRefetching || enriched.isRefetching} tintColor={colors.primary} />} removeClippedSubviews renderItem={({ item }) => <InsiderCard trade={item} />} windowSize={7} />;
 }
 

@@ -1,4 +1,4 @@
-import { act, render, userEvent } from "@testing-library/react-native";
+import { act, fireEvent, render, userEvent } from "@testing-library/react-native";
 import { router } from "expo-router";
 
 import EtfDetailScreen from "@/app/etf/[ticker]";
@@ -67,12 +67,15 @@ describe("Canadian ETF mobile experience", () => {
     mockUseQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => queryResult(queryKey));
   });
 
-  it("renders the virtualized directory and filters locally by search, provider and category", async () => {
+  it("opens on the heatmap by default and keeps the virtualized list secondary", async () => {
     expect(filterEtfDirectory(directory.items, "bond", "all", "all").map((item) => item.ticker)).toEqual(["ZAG"]);
     expect(filterEtfDirectory(directory.items, "", "Actions", "BlackRock").map((item) => item.ticker)).toEqual(["XIU"]);
     expect(filterEtfDirectory(directory.items, "", "Obligations", "BMO").map((item) => item.ticker)).toEqual(["ZAG"]);
     const view = await render(<EtfDirectoryScreen />);
     expect(view.getByTestId("etf-directory-screen")).toBeTruthy();
+    expect(view.getByTestId("etf-heatmap")).toBeTruthy();
+    expect(view.queryByTestId("etf-row-XIU")).toBeNull();
+    await act(async () => { fireEvent.press(view.getByTestId("etf-view-list")); });
     expect(view.getByTestId("etf-row-XIU")).toBeTruthy();
     expect(view.getByPlaceholderText("Ticker, nom, exposition…")).toBeTruthy();
     expect(view.getByText("BMO")).toBeTruthy();
@@ -86,7 +89,24 @@ describe("Canadian ETF mobile experience", () => {
     expect(mockUseQuery.mock.calls.map(([options]) => options.queryKey)).toContainEqual(["etf-directory"]);
     expect(mockUseQuery.mock.results.at(-1)?.value.isError).toBe(true);
     expect(await view.findByText("Dernières données disponibles")).toBeTruthy();
-    expect(await view.findByTestId("etf-row-XIU")).toBeTruthy();
+    expect(await view.findByTestId("etf-heatmap")).toBeTruthy();
+    await act(async () => view.unmount());
+  });
+
+  it("supports sector, provider and direction modes, drill-down, ETF tap and N/D details", async () => {
+    const view = await render(<EtfDirectoryScreen />);
+    expect(view.getByTestId("etf-heatmap-mode-sector").props.accessibilityState.selected).toBe(true);
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-mode-provider")); });
+    expect(view.getByTestId("etf-heatmap-mode-provider").props.accessibilityState.selected).toBe(true);
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-group-BlackRock")); });
+    expect(view.getByTestId("etf-heatmap-back")).toBeTruthy();
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-back")); });
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-mode-direction")); });
+    expect(view.getByTestId("etf-heatmap-mode-direction").props.accessibilityState.selected).toBe(true);
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-tile-XIU")); });
+    expect(router.push).toHaveBeenCalledWith({ pathname: "/etf/[ticker]", params: { ticker: "XIU" } });
+    await act(async () => { fireEvent(view.getByTestId("etf-heatmap-tile-CGL"), "onLongPress"); });
+    expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
     await act(async () => view.unmount());
   });
 
