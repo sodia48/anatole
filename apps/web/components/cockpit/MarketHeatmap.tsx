@@ -10,26 +10,19 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  binaryTreemap as sharedBinaryTreemap,
+  groupHeatmapTiles,
+  heatmapTileDetailLevel,
+  layoutTileWeight as sharedLayoutTileWeight,
+  normalizeHeatmapTile,
+} from "@anatole/shared/heatmap";
 
 import styles from "./MarketHeatmap.module.css";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 type GroupingMode = "sector" | "flat" | "direction";
-
-type HeatmapTile = {
-  ticker?: unknown;
-  symbol?: unknown;
-  name?: unknown;
-  sector?: unknown;
-  weight?: unknown;
-  price?: unknown;
-  change?: unknown;
-  change_percent?: unknown;
-  volume?: unknown;
-  source?: unknown;
-  delayed?: unknown;
-};
 
 type NormalizedTile = {
   ticker: string;
@@ -106,151 +99,22 @@ const SHORT_SECTOR_LABELS: Record<string, string> = {
   Autres: "Autres",
 };
 
-function text(value: unknown, fallback = ""): string {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
-}
-
-function number(value: unknown, fallback = 0): number {
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number.parseFloat(value)
-        : Number.NaN;
-
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function normalizeTile(raw: unknown): NormalizedTile | null {
-  if (!raw || typeof raw !== "object") {
-    return null;
-  }
-
-  const tile = raw as HeatmapTile;
-  const ticker = text(tile.ticker, text(tile.symbol)).toUpperCase();
-
-  if (!ticker) {
-    return null;
-  }
-
-  const symbol = text(tile.symbol, ticker.replace(/\.TO$/i, "")).toUpperCase();
-
-  return {
-    ticker,
-    symbol,
-    name: text(tile.name, symbol),
-    sector: text(tile.sector, UNKNOWN_SECTOR),
-    weight: Math.max(number(tile.weight, 0), 0),
-    price: Math.max(number(tile.price, 0), 0),
-    changePercent: number(tile.change_percent, 0),
-    volume: Math.max(number(tile.volume, 0), 0),
-    available: text(tile.source, "available") !== "unavailable",
-    delayed: Boolean(tile.delayed),
-  };
-}
-
-function marketWeight(tile: NormalizedTile): number {
-  return Math.max(tile.weight, 0.05);
+  return normalizeHeatmapTile(raw, UNKNOWN_SECTOR) as NormalizedTile | null;
 }
 
 function layoutTileWeight(tile: NormalizedTile, totalTiles: number): number {
-  const exponent = totalTiles > 150 ? 0.31 : totalTiles > 90 ? 0.4 : 0.58;
-  const floor = totalTiles > 150 ? 0.42 : totalTiles > 90 ? 0.32 : 0.22;
-  return Math.pow(Math.max(tile.weight, floor), exponent);
-}
-
-function weightedChange(tiles: NormalizedTile[]): number {
-  const totalWeight = tiles.reduce((total, tile) => total + marketWeight(tile), 0);
-
-  if (totalWeight <= 0) {
-    return 0;
-  }
-
-  return (
-    tiles.reduce(
-      (total, tile) => total + tile.changePercent * marketWeight(tile),
-      0,
-    ) / totalWeight
-  );
-}
-
-function buildGroup(
-  key: string,
-  label: string,
-  tiles: NormalizedTile[],
-  totalTiles: number,
-): TileGroup {
-  const sorted = [...tiles].sort(
-    (left, right) =>
-      layoutTileWeight(right, totalTiles) - layoutTileWeight(left, totalTiles),
-  );
-
-  return {
-    key,
-    label,
-    tiles: sorted,
-    marketWeight: sorted.reduce((total, tile) => total + marketWeight(tile), 0),
-    layoutWeight: sorted.reduce(
-      (total, tile) => total + layoutTileWeight(tile, totalTiles),
-      0,
-    ),
-    changePercent: weightedChange(sorted),
-    advancers: sorted.filter((tile) => tile.changePercent > 0.005).length,
-    decliners: sorted.filter((tile) => tile.changePercent < -0.005).length,
-  };
+  return sharedLayoutTileWeight(tile, totalTiles);
 }
 
 function groupTiles(tiles: NormalizedTile[], mode: GroupingMode, language: AnatoleLanguage): TileGroup[] {
-  const totalTiles = tiles.length;
-
-  if (mode === "flat") {
-    return [buildGroup("market", pick(language, "Marché complet", "Full market"), tiles, totalTiles)];
-  }
-
-  if (mode === "direction") {
-    return [
-      {
-        key: "gainers",
-        label: pick(language, "Hausses", "Gainers"),
-        tiles: tiles.filter((tile) => tile.changePercent > 0.005),
-      },
-      {
-        key: "unchanged",
-        label: pick(language, "Inchangées", "Unchanged"),
-        tiles: tiles.filter(
-          (tile) => tile.changePercent >= -0.005 && tile.changePercent <= 0.005,
-        ),
-      },
-      {
-        key: "losers",
-        label: pick(language, "Baisses", "Decliners"),
-        tiles: tiles.filter((tile) => tile.changePercent < -0.005),
-      },
-    ]
-      .filter((definition) => definition.tiles.length > 0)
-      .map((definition) =>
-        buildGroup(
-          definition.key,
-          definition.label,
-          definition.tiles,
-          totalTiles,
-        ),
-      );
-  }
-
-  const sectors = new Map<string, NormalizedTile[]>();
-
-  for (const tile of tiles) {
-    const current = sectors.get(tile.sector) ?? [];
-    current.push(tile);
-    sectors.set(tile.sector, current);
-  }
-
-  return [...sectors.entries()]
-    .map(([sector, sectorTiles]) =>
-      buildGroup(sector, sector, sectorTiles, totalTiles),
-    )
-    .sort((left, right) => right.layoutWeight - left.layoutWeight);
+  return groupHeatmapTiles(tiles, mode, {
+    fullMarket: pick(language, "Marché complet", "Full market"),
+    gainers: pick(language, "Hausses", "Gainers"),
+    unchanged: pick(language, "Inchangées", "Unchanged"),
+    decliners: pick(language, "Baisses", "Decliners"),
+    unknownSector: UNKNOWN_SECTOR,
+  }) as TileGroup[];
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -261,75 +125,7 @@ function binaryTreemap<T>(
   items: WeightedItem<T>[],
   rect: Rect,
 ): PositionedItem<T>[] {
-  if (items.length === 0 || rect.width <= 0 || rect.height <= 0) {
-    return [];
-  }
-
-  if (items.length === 1) {
-    return [{ item: items[0].item, rect }];
-  }
-
-  const sorted = [...items].sort((left, right) => right.weight - left.weight);
-  const totalWeight = sorted.reduce(
-    (total, entry) => total + Math.max(entry.weight, 0.001),
-    0,
-  );
-
-  let firstWeight = 0;
-  let splitIndex = 1;
-  let bestDistance = Number.POSITIVE_INFINITY;
-
-  for (let index = 1; index < sorted.length; index += 1) {
-    firstWeight += Math.max(sorted[index - 1].weight, 0.001);
-    const distance = Math.abs(totalWeight / 2 - firstWeight);
-
-    if (distance < bestDistance) {
-      bestDistance = distance;
-      splitIndex = index;
-    }
-  }
-
-  const first = sorted.slice(0, splitIndex);
-  const second = sorted.slice(splitIndex);
-  const firstTotal = first.reduce(
-    (total, entry) => total + Math.max(entry.weight, 0.001),
-    0,
-  );
-  const ratio = totalWeight > 0 ? firstTotal / totalWeight : 0.5;
-
-  if (rect.width >= rect.height) {
-    const firstWidth = rect.width * ratio;
-    return [
-      ...binaryTreemap(first, {
-        x: rect.x,
-        y: rect.y,
-        width: firstWidth,
-        height: rect.height,
-      }),
-      ...binaryTreemap(second, {
-        x: rect.x + firstWidth,
-        y: rect.y,
-        width: rect.width - firstWidth,
-        height: rect.height,
-      }),
-    ];
-  }
-
-  const firstHeight = rect.height * ratio;
-  return [
-    ...binaryTreemap(first, {
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: firstHeight,
-    }),
-    ...binaryTreemap(second, {
-      x: rect.x,
-      y: rect.y + firstHeight,
-      width: rect.width,
-      height: rect.height - firstHeight,
-    }),
-  ];
+  return sharedBinaryTreemap(items, rect);
 }
 
 function tileBackground(
@@ -392,24 +188,7 @@ function tileDetailLevel(
   totalTiles: number,
   mobile: boolean,
 ): 0 | 1 | 2 | 3 {
-  const area = rect.width * rect.height;
-  const densityFactor = totalTiles > 150 ? 0.78 : totalTiles > 90 ? 0.9 : 1;
-  const minimumWidth = (mobile ? 12 : 18) * densityFactor;
-  const minimumHeight = (mobile ? 10 : 15) * densityFactor;
-
-  if (rect.width < minimumWidth || rect.height < minimumHeight) {
-    return 0;
-  }
-
-  if (rect.width < 30 || rect.height < 19 || area < 720) {
-    return 1;
-  }
-
-  if (rect.width < 58 || rect.height < 34 || area < 2100) {
-    return 2;
-  }
-
-  return 3;
+  return heatmapTileDetailLevel(rect, totalTiles, mobile);
 }
 
 function directionLabel(tile: NormalizedTile, language: AnatoleLanguage): string {
