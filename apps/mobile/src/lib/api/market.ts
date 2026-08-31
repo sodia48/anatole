@@ -12,6 +12,8 @@ import type {
   EtfHoldingsSnapshot,
   FocusSnapshot,
   FundamentalSnapshot,
+  InsiderSnapshot,
+  IpoSnapshot,
   NewsSnapshot,
   StockNewsSnapshot,
   WatchlistSnapshot,
@@ -32,4 +34,11 @@ export const marketApi = {
   etfDirectory: (signal?: AbortSignal) => apiRequest<EtfDirectorySnapshot>("/api/v1/discovery/etfs", { timeoutMs: 45_000, signal }),
   etfHoldings: (ticker: string, limit = 25, signal?: AbortSignal) => apiRequest<EtfHoldingsSnapshot>(`/api/v1/discovery/etfs/${encodeURIComponent(ticker)}/holdings?limit=${limit}`, { timeoutMs: 55_000, signal }),
   etfHistory: (ticker: string, range: EtfHistoryRange, signal?: AbortSignal) => apiRequest<EtfHistorySnapshot>(`/api/v1/discovery/etfs/${encodeURIComponent(ticker)}/history?range=${encodeURIComponent(range)}`, { timeoutMs: 55_000, signal }),
+  ipo: (signal?: AbortSignal, refresh = false) => apiRequest<IpoSnapshot>(`/api/v1/discovery/ipo?country=all&instrument=all&limit=220${refresh ? "&refresh=true" : ""}`, { timeoutMs: 60_000, signal }),
+  insiders: ({ market, ticker, days, scanLimit, refresh = false }: { market: "canada" | "us"; ticker?: string; days: number; scanLimit: number; refresh?: boolean }, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ market, days: String(days), scan_limit: String(scanLimit), limit: "220" });
+    if (ticker?.trim()) query.set("ticker", ticker.trim().toUpperCase());
+    if (refresh) query.set("refresh", "true");
+    return apiRequest<InsiderSnapshot>(`/api/v1/discovery/insiders?${query.toString()}`, { timeoutMs: scanLimit <= 10 ? 20_000 : 70_000, signal });
+  },
 };
