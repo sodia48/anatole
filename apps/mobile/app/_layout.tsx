@@ -49,6 +49,8 @@ function AppStack() {
     <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: "modal" }} />
     <Stack.Screen name="stock/[ticker]" options={{ title: "Focus", orientation: "all" }} />
     <Stack.Screen name="focus/[ticker]" options={{ title: "Focus" }} />
+    <Stack.Screen name="etf/index" options={{ title: pick("ETF canadiens", "Canadian ETFs") }} />
+    <Stack.Screen name="etf/[ticker]" options={{ title: "ETF" }} />
     <Stack.Screen name="notifications" options={{ title: pick("Notifications", "Notifications") }} />
     <Stack.Screen name="alerts" options={{ title: pick("Alertes", "Alerts") }} />
     <Stack.Screen name="watchlist" options={{ title: "Watchlist" }} />

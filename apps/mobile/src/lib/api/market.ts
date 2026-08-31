@@ -6,6 +6,10 @@ import type {
   CompanyNetworkSnapshot,
   CompanyRelationshipPath,
   EarningsSnapshot,
+  EtfDirectorySnapshot,
+  EtfHistoryRange,
+  EtfHistorySnapshot,
+  EtfHoldingsSnapshot,
   FocusSnapshot,
   FundamentalSnapshot,
   NewsSnapshot,
@@ -25,4 +29,7 @@ export const marketApi = {
   stockNews: (ticker: string, company: string, language: "fr" | "en") => apiRequest<StockNewsSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/news?company=${encodeURIComponent(company)}&lang=${language}`, { timeoutMs: 35_000 }),
   earnings: () => apiRequest<EarningsSnapshot>("/api/v1/discovery/earnings-calendar?universe=composite", { timeoutMs: 40_000 }),
   calendar: (language: "fr" | "en") => apiRequest<CalendarSnapshot>(`/api/v1/discovery/calendar?lang=${language}`, { timeoutMs: 40_000 }),
+  etfDirectory: (signal?: AbortSignal) => apiRequest<EtfDirectorySnapshot>("/api/v1/discovery/etfs", { timeoutMs: 45_000, signal }),
+  etfHoldings: (ticker: string, limit = 25, signal?: AbortSignal) => apiRequest<EtfHoldingsSnapshot>(`/api/v1/discovery/etfs/${encodeURIComponent(ticker)}/holdings?limit=${limit}`, { timeoutMs: 55_000, signal }),
+  etfHistory: (ticker: string, range: EtfHistoryRange, signal?: AbortSignal) => apiRequest<EtfHistorySnapshot>(`/api/v1/discovery/etfs/${encodeURIComponent(ticker)}/history?range=${encodeURIComponent(range)}`, { timeoutMs: 55_000, signal }),
 };

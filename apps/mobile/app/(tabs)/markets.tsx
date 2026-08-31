@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -70,7 +70,7 @@ export default function MarketsScreen() {
     <Screen onRefresh={refresh} refreshing={refreshing} testID="markets-screen">
       <ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("Marchés canadiens", "Canadian markets")} subtitle={pick("La même donnée et les mêmes calculs que le Cockpit web.", "The same data and calculations as the web Cockpit.")} />
       <View style={styles.hubs}>
-        {hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => setHub(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}
+        {hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => item.id === "etf" ? router.push("/etf" as Href) : setHub(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}
       </View>
 
       {hub === "cockpit" ? <>

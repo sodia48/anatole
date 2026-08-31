@@ -11,6 +11,39 @@ export type CockpitSnapshot = {
   generated_at: string; refresh_after_seconds: number;
 };
 
+export type EtfDirectoryItem = {
+  ticker: string; symbol: string; name: string; provider: string; category: string; exposure: string;
+  currency: string; price: number; change_percent: number; volume: number; source: string; delayed: boolean;
+};
+export type EtfDirectorySnapshot = {
+  items: EtfDirectoryItem[]; categories: string[]; generated_at: string; refresh_after_seconds: number;
+};
+export type EtfHoldingDriver = {
+  rank: number; symbol: string; display_symbol: string; name: string;
+  instrument_type: "equity" | "etf" | "other"; weight_percent: number;
+  price: number | null; currency: string | null; change_percent: number | null;
+  contribution_percent_points: number | null; source: string; delayed: boolean;
+};
+export type EtfAllocationItem = { key: string; label: string; weight_percent: number };
+export type EtfHoldingsSnapshot = {
+  ticker: string; normalized_symbol: string; name: string; provider: string; category: string; exposure: string;
+  description: string | null; currency: string; price: number | null; change_percent: number | null;
+  holdings: EtfHoldingDriver[]; sectors: EtfAllocationItem[]; asset_classes: EtfAllocationItem[];
+  top_holdings_weight_percent: number; net_driver_contribution_percent_points: number | null;
+  positive_driver_contribution_percent_points: number | null; negative_driver_contribution_percent_points: number | null;
+  quoted_holdings: number; total_holdings_returned: number; status: "available" | "partial" | "unavailable";
+  message: string | null; source_name: string; source_url: string | null; generated_at: string; refresh_after_seconds: number;
+};
+export type EtfHistoryRange = "5d" | "1mo" | "ytd" | "6mo" | "1y" | "5y" | "10y";
+export type EtfHistoryPoint = { timestamp: string; open: number; high: number; low: number; close: number; volume: number };
+export type EtfHistorySnapshot = {
+  ticker: string; normalized_symbol: string; range: EtfHistoryRange; range_label: string; currency: string; interval: string;
+  points: EtfHistoryPoint[]; first_close: number | null; last_close: number | null; change: number | null;
+  change_percent: number | null; period_high: number | null; period_low: number | null;
+  status: "available" | "unavailable"; message: string | null; delayed: boolean;
+  source_name: string; source_url: string | null; generated_at: string; refresh_after_seconds: number;
+};
+
 export type FundamentalMetrics = {
   market_cap: number | null; enterprise_value: number | null; trailing_pe: number | null;
   forward_pe: number | null; price_to_book: number | null; price_to_sales: number | null;
