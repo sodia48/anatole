@@ -46,12 +46,16 @@ describe("critical native screens", () => {
     await view.unmount();
   }, 30_000);
 
-  it("opens the active Screener route from Markets", async () => {
+  it("opens the active Screener, Terminal and Psychology routes from Markets", async () => {
     jest.mocked(router.push).mockClear();
     const view = await render(<MarketsScreen />);
     const user = userEvent.setup();
     await user.press(view.getByText("Screener"));
     expect(router.push).toHaveBeenCalledWith("/screener");
+    await user.press(view.getByText("Terminal Pro"));
+    expect(router.push).toHaveBeenCalledWith("/terminal");
+    await user.press(view.getByText("Psychologie"));
+    expect(router.push).toHaveBeenCalledWith("/psychology");
     expect(view.queryByText("Bientôt sur mobile. La migration utilisera le même backend que le web.")).toBeNull();
     await view.unmount();
   }, 30_000);
