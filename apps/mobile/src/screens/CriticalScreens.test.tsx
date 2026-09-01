@@ -1,4 +1,5 @@
 import { render, userEvent, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 
 import MarketsScreen from "@/app/(tabs)/markets";
 import PortfolioScreen from "@/app/(tabs)/portfolio";
@@ -42,6 +43,16 @@ describe("critical native screens", () => {
     const view = await render(<MarketsScreen />);
     expect(view.getByTestId("cockpit-heatmap")).toBeTruthy();
     expect(view.getByTestId("market-heatmap-svg")).toBeTruthy();
+    await view.unmount();
+  }, 30_000);
+
+  it("opens the active Screener route from Markets", async () => {
+    jest.mocked(router.push).mockClear();
+    const view = await render(<MarketsScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByText("Screener"));
+    expect(router.push).toHaveBeenCalledWith("/screener");
+    expect(view.queryByText("Bientôt sur mobile. La migration utilisera le même backend que le web.")).toBeNull();
     await view.unmount();
   }, 30_000);
 

@@ -80,6 +80,19 @@ describe("Canadian ETF mobile experience", () => {
     expect(view.getByPlaceholderText("Ticker, nom, exposition…")).toBeTruthy();
     expect(view.getByText("BMO")).toBeTruthy();
     expect(view.getByTestId("etf-row-ZAG")).toBeTruthy();
+    expect(view.getByTestId("etf-row-CGL")).toBeTruthy();
+    await act(async () => view.unmount());
+  });
+
+  it("explains the sector Top 10 and opens the complete sector in the existing list", async () => {
+    const view = await render(<EtfDirectoryScreen />);
+    expect(view.getByText("Top 10 par secteur selon la liquidité disponible")).toBeTruthy();
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-group-Actions")); });
+    expect(view.getByTestId("etf-heatmap-view-all-sector")).toBeTruthy();
+    await act(async () => { fireEvent.press(view.getByTestId("etf-heatmap-view-all-sector")); });
+    expect(view.getByTestId("etf-view-list").props.accessibilityState.selected).toBe(true);
+    expect(view.getByTestId("etf-row-XIU")).toBeTruthy();
+    expect(view.queryByTestId("etf-row-ZAG")).toBeNull();
     await act(async () => view.unmount());
   });
 
