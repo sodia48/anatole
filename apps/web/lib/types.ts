@@ -1,3 +1,5 @@
+import type { ScreenerRow as SharedScreenerRow, ScreenerSnapshot as SharedScreenerSnapshot } from "@anatole/shared";
+
 export type Quote = {
   ticker: string;
   symbol: string;
@@ -327,36 +329,8 @@ export type SymbolSearchResponse = {
   count: number;
 };
 
-export type ScreenerRow = {
-  ticker: string;
-  symbol: string;
-  name: string;
-  sector: string;
-  price: number;
-  change_percent: number;
-  volume: number;
-  average_volume_20d: number;
-  relative_volume: number;
-  momentum_20d: number;
-  rsi_14: number | null;
-  sma_20: number | null;
-  sma_50: number | null;
-  trend: string;
-  score: number;
-  signal: string;
-  source: string;
-  delayed: boolean;
-};
-
-export type ScreenerSnapshot = {
-  universe: string;
-  items: ScreenerRow[];
-  sectors: string[];
-  generated_at: string;
-  refresh_after_seconds: number;
-  live_items: number;
-  fallback_items: number;
-};
+export type ScreenerRow = SharedScreenerRow;
+export type ScreenerSnapshot = SharedScreenerSnapshot;
 
 export type FeedStatus = {
   source: string;

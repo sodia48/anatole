@@ -45,7 +45,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       persister,
       maxAge: 1000 * 60 * 60 * 24,
       dehydrateOptions: {
-        shouldDehydrateQuery: (query) => ["cockpit", "focus", "news", "earnings", "calendar", "stock-news", "etf-directory", "etf-holdings", "etf-history", "ipo", "insiders"].includes(String(query.queryKey[0])),
+        shouldDehydrateQuery: (query) => ["cockpit", "screener", "focus", "news", "earnings", "calendar", "stock-news", "etf-directory", "etf-holdings", "etf-history", "ipo", "insiders"].includes(String(query.queryKey[0])),
       },
     }}>
       <LocaleProvider>
