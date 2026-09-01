@@ -436,18 +436,18 @@ export function TerminalClient() {
             <div
               className={styles.scoreRing}
               style={{
-                background: `conic-gradient(#20caa3 0 ${snapshot.regime_score}%, rgba(52,83,102,.32) ${snapshot.regime_score}% 100%)`,
+                background: `conic-gradient(#20caa3 0 ${snapshot.regime_score ?? 0}%, rgba(52,83,102,.32) ${snapshot.regime_score ?? 0}% 100%)`,
               }}
             >
               <span>
-                <strong>{snapshot.regime_score.toFixed(0)}</strong>
+                <strong>{snapshot.regime_score?.toFixed(0) ?? "N/D"}</strong>
                 <small>/100</small>
               </span>
             </div>
             <div className={styles.regimeCopy}>
               <span>{pick(language, "Régime", "Regime")}</span>
-              <strong>{regimeLabel(snapshot.regime, language)}</strong>
-              <small>{pick(language, "Risque", "Risk")} {riskLabel(snapshot.risk_level, language).toLowerCase()}</small>
+              <strong>{snapshot.regime ? regimeLabel(snapshot.regime, language) : "N/D"}</strong>
+              <small>{pick(language, "Risque", "Risk")} {snapshot.risk_level ? riskLabel(snapshot.risk_level, language).toLowerCase() : "N/D"}</small>
             </div>
           </div>
         ) : null}
@@ -468,7 +468,7 @@ export function TerminalClient() {
             <div className={styles.marketEventCopy}>
               <span>{pick(language, "Événements de marché", "Market events")}</span>
               <strong>
-                {snapshot.alerts.length} {pick(language, "alertes", "alerts")} · {snapshot.high_relative_volume_count} {pick(language, "volumes inhabituels", "unusual volumes")}
+                {snapshot.alerts.length} {pick(language, "alertes", "alerts")} · {snapshot.high_relative_volume_count ?? "N/D"} {pick(language, "volumes inhabituels", "unusual volumes")}
               </strong>
             </div>
             <a href="#terminal-alerts">
@@ -479,21 +479,21 @@ export function TerminalClient() {
           <section className={styles.terminalKpiStrip}>
             <article>
               <span>TSX 60</span>
-              <strong className={valueClass(snapshot.weighted_change_percent)}>
-                {formatPercent(snapshot.weighted_change_percent, 2, language)}
+              <strong className={valueClass(snapshot.weighted_change_percent ?? 0)}>
+                {snapshot.weighted_change_percent == null ? "N/D" : formatPercent(snapshot.weighted_change_percent, 2, language)}
               </strong>
             </article>
             <article>
               <span>{pick(language, "Largeur", "Breadth")}</span>
-              <strong>{snapshot.advance_ratio.toFixed(0)} %</strong>
+              <strong>{snapshot.advance_ratio == null ? "N/D" : `${snapshot.advance_ratio.toFixed(0)} %`}</strong>
             </article>
             <article>
               <span>{pick(language, "Au-dessus MM50", "Above 50-session average")}</span>
-              <strong>{snapshot.above_sma50_percent.toFixed(0)} %</strong>
+              <strong>{snapshot.above_sma50_percent == null ? "N/D" : `${snapshot.above_sma50_percent.toFixed(0)} %`}</strong>
             </article>
             <article>
               <span>{pick(language, "Score moyen", "Average score")}</span>
-              <strong>{snapshot.average_anatole_score.toFixed(0)}</strong>
+              <strong>{snapshot.average_anatole_score?.toFixed(0) ?? "N/D"}</strong>
             </article>
           </section>
 
@@ -655,10 +655,10 @@ export function TerminalClient() {
                   <article className={styles.componentCard} key={component.key}>
                     <div className={styles.componentTop}>
                       <span>{component.label}</span>
-                      <strong>{component.score.toFixed(0)}</strong>
+                      <strong>{component.score?.toFixed(0) ?? "N/D"}</strong>
                     </div>
                     <div className={styles.componentTrack}>
-                      <span style={{ width: `${component.score}%` }} />
+                      <span style={{ width: `${component.score ?? 0}%` }} />
                     </div>
                     <b>{component.value}</b>
                     <p>{component.description}</p>
@@ -693,7 +693,7 @@ export function TerminalClient() {
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Impulsion moyenne", "Average momentum")}</strong><br />
-                  {pick(language, "Le momentum 20 jours transversal est de", "Cross-sectional 20-day momentum is")} {formatPercent(snapshot.average_momentum_20d, 2, language)}.
+                  {pick(language, "Le momentum 20 jours transversal est de", "Cross-sectional 20-day momentum is")} {snapshot.average_momentum_20d == null ? "N/D" : formatPercent(snapshot.average_momentum_20d, 2, language)}.
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Actualisation", "Refresh")}</strong><br />

@@ -149,6 +149,17 @@ class TerminalOpportunity(BaseModel):
     reasons: list[str]
 
 
+class TerminalRadarItem(TerminalOpportunity):
+    volume: int
+    average_volume_20d: int
+    sma_20: float | None = None
+    sma_50: float | None = None
+    trend: str
+    source: str
+    delayed: bool
+    anomaly_types: list[str] = Field(default_factory=list)
+
+
 class TerminalAlert(BaseModel):
     id: str
     severity: Literal["info", "watch", "high"]
@@ -322,7 +333,7 @@ class TerminalSnapshot(BaseModel):
     sector_rotation: list[TerminalSectorRotation] = Field(default_factory=list)
     anomalies: list[TerminalAnomaly] = Field(default_factory=list)
     market_drivers: list[TerminalMarketDriver] = Field(default_factory=list)
-    radar_items: list[TerminalOpportunity] = Field(default_factory=list)
+    radar_items: list[TerminalRadarItem] = Field(default_factory=list)
     methodology_sections: list[TerminalMethodologySection] = Field(default_factory=list)
     methodology: str
     generated_at: datetime

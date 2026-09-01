@@ -27,6 +27,7 @@ const emptyWorkspaceData = (): SyncedWorkspaceData => ({
   comparator_symbols: [],
   focus_layouts: [],
   focus_scripts: [],
+  terminal_presets: [],
 });
 
 type MobileAccountValue = {

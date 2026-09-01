@@ -601,6 +601,26 @@ export type TerminalSector = SharedTerminalSector;
 export type TerminalOpportunity = SharedTerminalOpportunity;
 export type TerminalAlert = SharedTerminalAlert;
 export type TerminalSnapshot = SharedTerminalSnapshot;
+export type {
+  TerminalAnomaly,
+  TerminalAnomalyType,
+  TerminalBreadthDivergence,
+  TerminalBreadthPoint,
+  TerminalBreadthPro,
+  TerminalDataQuality,
+  TerminalMarketDriver,
+  TerminalMethodologySection,
+  TerminalRadarFilters,
+  TerminalRadarItem,
+  TerminalRadarPreset,
+  TerminalRadarSort,
+  TerminalRegime,
+  TerminalRegimeHistoryPoint,
+  TerminalRegimeHorizon,
+  TerminalRisk,
+  TerminalSectorQuadrant,
+  TerminalSectorRotation,
+} from "@anatole/shared";
 
 export type PortfolioPositionInput = {
   symbol: string;

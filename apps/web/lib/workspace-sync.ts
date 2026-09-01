@@ -7,6 +7,7 @@ import type {
   FocusLayout,
   FocusScript,
 } from "@/components/focus-pro/types";
+import type { TerminalRadarPreset } from "@anatole/shared";
 
 export const WORKSPACE_SYNC_EVENT = "anatole-workspace-sync-applied";
 
@@ -29,6 +30,7 @@ export type SyncedWorkspaceData = {
   comparator_symbols: string[];
   focus_layouts: FocusLayout[];
   focus_scripts: FocusScript[];
+  terminal_presets: TerminalRadarPreset[];
 };
 
 export type LocalWorkspaceSnapshot = {
@@ -46,6 +48,7 @@ const KEYS = {
   comparator_symbols: "anatole:comparison-symbols:v1",
   focus_layouts: "anatole:focus-layouts:v1",
   focus_scripts: "anatole:focus-scripts:v1",
+  terminal_presets: "anatole:terminal-presets:v1",
 } as const;
 
 const DEFAULT_PREFERENCES: SyncedPreferences = {
@@ -190,6 +193,30 @@ function focusScripts(value: unknown): FocusScript[] {
   return output.slice(0, 10);
 }
 
+function terminalPresets(value: unknown): TerminalRadarPreset[] {
+  if (!Array.isArray(value)) return [];
+  const output: TerminalRadarPreset[] = [];
+  const seen = new Set<string>();
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const item = raw as Partial<TerminalRadarPreset>;
+    const id = String(item.id ?? "").trim().slice(0, 80);
+    const name = String(item.name ?? "").trim().slice(0, 80);
+    const allowedSorts = new Set(["score_desc", "score_asc", "volume_desc", "momentum_desc", "change_desc", "change_asc"]);
+    if (!id || !name || seen.has(id) || !allowedSorts.has(String(item.sort))) continue;
+    seen.add(id);
+    output.push({
+      id,
+      name,
+      filters: item.filters && typeof item.filters === "object" ? item.filters : {},
+      sort: item.sort as TerminalRadarPreset["sort"],
+      created_at: typeof item.created_at === "string" ? item.created_at : null,
+      updated_at: typeof item.updated_at === "string" ? item.updated_at : null,
+    });
+  }
+  return output.slice(0, 10);
+}
+
 function preferences(value: unknown): SyncedPreferences {
   if (!value || typeof value !== "object") return DEFAULT_PREFERENCES;
   const raw = value as Partial<{
@@ -227,6 +254,7 @@ export function emptyWorkspace(): SyncedWorkspaceData {
     comparator_symbols: [],
     focus_layouts: [],
     focus_scripts: [],
+    terminal_presets: [],
   };
 }
 
@@ -257,6 +285,7 @@ export function readLocalWorkspace(): LocalWorkspaceSnapshot {
       comparator_symbols: symbols(parseJson(raw.comparator_symbols, []), 5),
       focus_layouts: focusLayouts(parseJson(raw.focus_layouts, [])),
       focus_scripts: focusScripts(parseJson(raw.focus_scripts, [])),
+      terminal_presets: terminalPresets(parseJson(raw.terminal_presets, [])),
     },
     present: Object.fromEntries(
       Object.entries(raw).map(([key, value]) => [key, value !== null]),
@@ -310,6 +339,9 @@ export function mergeWorkspace(
     focus_scripts: local.present.focus_scripts
       ? mergeById(remote.focus_scripts ?? [], local.data.focus_scripts, 10)
       : remote.focus_scripts ?? [],
+    terminal_presets: local.present.terminal_presets
+      ? mergeById(remote.terminal_presets ?? [], local.data.terminal_presets, 10)
+      : remote.terminal_presets ?? [],
   };
 }
 
@@ -346,6 +378,7 @@ export function writeLocalWorkspace(data: SyncedWorkspaceData): void {
   window.localStorage.setItem(KEYS.comparator_symbols, JSON.stringify(data.comparator_symbols));
   window.localStorage.setItem(KEYS.focus_layouts, JSON.stringify((data.focus_layouts ?? []).slice(0, 10)));
   window.localStorage.setItem(KEYS.focus_scripts, JSON.stringify((data.focus_scripts ?? []).slice(0, 10)));
+  window.localStorage.setItem(KEYS.terminal_presets, JSON.stringify((data.terminal_presets ?? []).slice(0, 10)));
   window.dispatchEvent(new Event("anatole-watchlist-change"));
   window.dispatchEvent(new CustomEvent(WORKSPACE_SYNC_EVENT));
 }

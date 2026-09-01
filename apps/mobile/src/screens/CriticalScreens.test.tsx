@@ -17,7 +17,7 @@ jest.mock("@/src/hooks/useLiveQuote", () => ({ useLiveQuote: (_ticker: string, q
 jest.mock("@/src/providers/MobileAccountProvider", () => ({
   useMobileAccount: () => ({
     state: "authenticated", user: { email: "mobile@example.com" }, saveWorkspace: jest.fn(),
-    workspace: { revision: 1, data: { watchlist: ["RY"], portfolio: [{ symbol: "RY", quantity: 2, average_cost: 100 }], alerts: [], preferences: {}, comparator_symbols: [], focus_layouts: [], focus_scripts: [] } },
+    workspace: { revision: 1, data: { watchlist: ["RY"], portfolio: [{ symbol: "RY", quantity: 2, average_cost: 100 }], alerts: [], preferences: {}, comparator_symbols: [], focus_layouts: [], focus_scripts: [], terminal_presets: [] } },
   }),
 }));
 jest.mock("@/src/lib/api/market", () => ({ marketApi: { cockpit: jest.fn(), focus: jest.fn(), stockNews: jest.fn(), watchlist: jest.fn() } }));

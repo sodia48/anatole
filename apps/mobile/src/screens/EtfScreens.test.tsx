@@ -16,7 +16,7 @@ jest.mock("@/src/components/ChartWebView", () => {
 jest.mock("@/src/providers/MobileAccountProvider", () => ({
   useMobileAccount: () => ({
     saveWorkspace: mockSaveWorkspace,
-    workspace: { revision: 1, updated_at: null, data: { watchlist: [], portfolio: [], alerts: [], preferences: {}, cockpit_universe: "tsx60", comparator_symbols: [], focus_layouts: [], focus_scripts: [] } },
+    workspace: { revision: 1, updated_at: null, data: { watchlist: [], portfolio: [], alerts: [], preferences: {}, cockpit_universe: "tsx60", comparator_symbols: [], focus_layouts: [], focus_scripts: [], terminal_presets: [] } },
   }),
 }));
 jest.mock("@/src/lib/api/market", () => ({ marketApi: { etfDirectory: jest.fn(), etfHoldings: jest.fn(), etfHistory: jest.fn() } }));

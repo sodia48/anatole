@@ -84,6 +84,7 @@ function fullyPresent(data: SyncedWorkspaceData) {
       comparator_symbols: true,
       focus_layouts: true,
       focus_scripts: true,
+      terminal_presets: true,
     },
   } as const;
 }

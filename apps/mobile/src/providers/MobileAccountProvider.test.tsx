@@ -41,7 +41,7 @@ describe("MobileAccountProvider", () => {
   });
 
   it("logs in, stores the session, then logs out and clears private state", async () => {
-    const workspace = { revision: 1, updated_at: null, data: { watchlist: [], portfolio: [], alerts: [], preferences: { theme: "dark" as const, density: "comfortable" as const, decimals: 2 as const, default_range: "1y" as const, default_universe: "tsx60" as const, language: "fr" as const }, advisor_profile: null, cockpit_universe: "tsx60" as const, comparator_symbols: [], focus_layouts: [], focus_scripts: [] } };
+    const workspace = { revision: 1, updated_at: null, data: { watchlist: [], portfolio: [], alerts: [], preferences: { theme: "dark" as const, density: "comfortable" as const, decimals: 2 as const, default_range: "1y" as const, default_universe: "tsx60" as const, language: "fr" as const }, advisor_profile: null, cockpit_universe: "tsx60" as const, comparator_symbols: [], focus_layouts: [], focus_scripts: [], terminal_presets: [] } };
     jest.mocked(sessionStore.get).mockResolvedValue(null);
     jest.mocked(accountApi.login).mockResolvedValue({ token: "token", token_type: "bearer", expires_at: "2030-01-01T00:00:00Z", user, workspace });
     jest.mocked(accountApi.logout).mockResolvedValue(undefined);

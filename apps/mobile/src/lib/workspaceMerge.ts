@@ -22,5 +22,6 @@ export function mergeWorkspaceData(remote: SyncedWorkspaceData, local: SyncedWor
     comparator_symbols: [...new Set([...remote.comparator_symbols, ...local.comparator_symbols].map(normalizeTicker).filter(Boolean))].slice(0, 5),
     focus_layouts: local.focus_layouts.length ? local.focus_layouts : remote.focus_layouts,
     focus_scripts: local.focus_scripts.length ? local.focus_scripts : remote.focus_scripts,
+    terminal_presets: mergeBy(remote.terminal_presets ?? [], local.terminal_presets ?? [], (item) => item.id, 10),
   };
 }

@@ -23,7 +23,7 @@ export type ScreenerSnapshot = {
   refresh_after_seconds: number; live_items: number; fallback_items: number;
 };
 
-export type TerminalComponent = { key: string; label: string; score: number; value: string; description: string };
+export type TerminalComponent = { key: string; label: string; score: number | null; value: string; description: string };
 export type TerminalSectorState = "Leadership" | "Accumulation" | "Neutre" | "Distribution" | "Faiblesse";
 export type TerminalSector = {
   sector: string; change_percent: number; momentum_20d: number; average_score: number;
@@ -36,14 +36,71 @@ export type TerminalOpportunity = {
 export type TerminalAlert = {
   id: string; severity: "info" | "watch" | "high"; category: string; symbol: string | null; title: string; detail: string;
 };
+export type TerminalDataQuality = {
+  expected_symbols: number; real_symbols: number; unavailable_symbols: string[]; coverage_percent: number;
+  history_symbols: number; history_coverage_percent: number; warnings: string[]; source_statuses: Record<string, string>;
+};
+export type TerminalRegime = "Haussier" | "Constructif" | "Neutre" | "Fragile" | "Baissier";
+export type TerminalRisk = "Faible" | "Modéré" | "Élevé" | "Critique";
+export type TerminalRegimeHorizon = {
+  key: "session" | "5d" | "20d" | "3m"; label: string; regime: TerminalRegime | null; score: number | null;
+  risk_level: TerminalRisk | null; change_percent: number | null; breadth_percent: number | null;
+  above_sma20_percent: number | null; above_sma50_percent: number | null; average_momentum_percent: number | null;
+  coverage_percent: number; as_of: string;
+};
+export type TerminalRegimeHistoryPoint = { timestamp: number; regime_score: number | null; regime: TerminalRegime | null; benchmark_value: number | null; breadth_percent: number | null; coverage_percent: number };
+export type TerminalBreadthPoint = { timestamp: number; value: number };
+export type TerminalBreadthDivergence = { active: boolean; severity: "info" | "watch" | "high"; title: string; explanation: string };
+export type TerminalBreadthPro = {
+  advancers: number | null; decliners: number | null; unchanged: number | null; advance_ratio: number | null;
+  above_sma20_percent: number | null; above_sma50_percent: number | null; above_sma200_percent: number | null;
+  new_highs_52w: number | null; new_lows_52w: number | null; up_volume: number | null; down_volume: number | null;
+  neutral_volume: number | null; up_volume_ratio_percent: number | null; equal_weight_change_percent: number | null;
+  cap_weight_change_percent: number | null; concentration_spread_percent_points: number | null;
+  positive_sectors: number | null; negative_sectors: number | null; positive_sectors_percent: number | null;
+  advance_decline_line: TerminalBreadthPoint[]; coverage_percent: number; divergence: TerminalBreadthDivergence;
+};
+export type TerminalSectorQuadrant = "LEADERSHIP" | "AMÉLIORATION" | "AFFAIBLISSEMENT" | "SOUS PRESSION" | "N/D";
+export type TerminalSectorRotation = {
+  sector: string; momentum_20d: number | null; relative_strength_20d: number | null; breadth_percent: number | null;
+  average_score: number | null; relative_volume: number | null; member_count: number; x: number | null; y: number | null;
+  previous_x: number | null; previous_y: number | null; quadrant: TerminalSectorQuadrant; state: string; leadership_score: number | null;
+};
+export type TerminalAnomalyType = "volume_spike" | "gap" | "momentum_acceleration" | "rsi_extreme" | "sma_cross" | "price_volume_divergence" | "sector_dislocation" | "score_shift";
+export type TerminalAnomaly = {
+  id: string; symbol: string | null; sector: string | null; type: TerminalAnomalyType; severity: "info" | "watch" | "high";
+  direction: "positive" | "negative" | "neutral"; rarity_score: number; z_score: number | null; observed_value: number | null;
+  baseline_value: number | null; unit: string; title: string; detail: string; reasons: string[]; source: string; generated_at: string;
+};
+export type TerminalMarketDriver = {
+  key: string; label: string; category: string; value: number | null; unit: string; change_1d: number | null;
+  change_5d: number | null; change_20d: number | null; change_unit: string; correlation_60d_to_tsx: number | null;
+  relationship_label: string | null; status: "available" | "stale" | "unavailable"; source_name: string;
+  source_url: string; delayed: boolean; as_of: string | null;
+};
+export type TerminalMethodologySection = { key: string; title: string; description: string };
+export type TerminalRadarFilters = {
+  score_min?: number | null; score_max?: number | null; momentum_20d_min?: number | null; momentum_20d_max?: number | null;
+  relative_volume_min?: number | null; rsi_min?: number | null; rsi_max?: number | null; change_percent_min?: number | null;
+  change_percent_max?: number | null; sector?: string | null; trend?: string | null; signal?: string | null;
+  anomaly_types?: TerminalAnomalyType[];
+};
+export type TerminalRadarSort = "score_desc" | "score_asc" | "volume_desc" | "momentum_desc" | "change_desc" | "change_asc";
+export type TerminalRadarPreset = { id: string; name: string; filters: TerminalRadarFilters; sort: TerminalRadarSort; created_at?: string | null; updated_at?: string | null };
+export type TerminalRadarItem = TerminalOpportunity & {
+  volume: number; average_volume_20d: number; sma_20: number | null; sma_50: number | null; trend: string;
+  source: string; delayed: boolean; anomaly_types: TerminalAnomalyType[];
+};
 export type TerminalSnapshot = {
-  universe: string; regime: "Haussier" | "Constructif" | "Neutre" | "Fragile" | "Baissier";
-  regime_score: number; risk_level: "Faible" | "Modéré" | "Élevé" | "Critique";
-  weighted_change_percent: number; advance_ratio: number; average_anatole_score: number;
-  average_momentum_20d: number; above_sma20_percent: number; above_sma50_percent: number;
-  high_relative_volume_count: number; components: TerminalComponent[]; sectors: TerminalSector[];
+  universe: string; regime: TerminalRegime | null; regime_score: number | null; risk_level: TerminalRisk | null;
+  weighted_change_percent: number | null; advance_ratio: number | null; average_anatole_score: number | null;
+  average_momentum_20d: number | null; above_sma20_percent: number | null; above_sma50_percent: number | null;
+  high_relative_volume_count: number | null; components: TerminalComponent[]; sectors: TerminalSector[];
   opportunities: TerminalOpportunity[]; alerts: TerminalAlert[]; leaders: TerminalOpportunity[];
-  laggards: TerminalOpportunity[]; methodology: string; generated_at: string; refresh_after_seconds: number;
+  laggards: TerminalOpportunity[]; data_quality: TerminalDataQuality; regime_horizons: TerminalRegimeHorizon[];
+  regime_history: TerminalRegimeHistoryPoint[]; breadth_pro: TerminalBreadthPro; sector_rotation: TerminalSectorRotation[];
+  anomalies: TerminalAnomaly[]; market_drivers: TerminalMarketDriver[]; radar_items: TerminalRadarItem[];
+  methodology_sections: TerminalMethodologySection[]; methodology: string; generated_at: string; refresh_after_seconds: number;
 };
 
 export type PsychologyComponent = { key: string; label: string; score: number; description: string };

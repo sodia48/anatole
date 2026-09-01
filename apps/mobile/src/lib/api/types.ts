@@ -37,9 +37,27 @@ export type {
   SectorSnapshot,
   TTMSummary,
   TerminalAlert,
+  TerminalAnomaly,
+  TerminalAnomalyType,
+  TerminalBreadthDivergence,
+  TerminalBreadthPoint,
+  TerminalBreadthPro,
   TerminalComponent,
+  TerminalDataQuality,
+  TerminalMarketDriver,
+  TerminalMethodologySection,
   TerminalOpportunity,
+  TerminalRadarFilters,
+  TerminalRadarItem,
+  TerminalRadarPreset,
+  TerminalRadarSort,
+  TerminalRegime,
+  TerminalRegimeHistoryPoint,
+  TerminalRegimeHorizon,
+  TerminalRisk,
   TerminalSector,
+  TerminalSectorQuadrant,
+  TerminalSectorRotation,
   TerminalSectorState,
   TerminalSnapshot,
 } from "@anatole/shared";
@@ -81,6 +99,7 @@ export type SyncedWorkspaceData = {
   comparator_symbols: string[];
   focus_layouts: unknown[];
   focus_scripts: unknown[];
+  terminal_presets: import("@anatole/shared").TerminalRadarPreset[];
 };
 
 export type WorkspaceSnapshot = { revision: number; data: SyncedWorkspaceData; updated_at: string | null };

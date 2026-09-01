@@ -25,7 +25,7 @@ const ry = item({});
 const shop = item({ symbol: "SHOP", name: "Shopify", sector: "Technology", score: 92, change_percent: 3, momentum_20d: 14, relative_volume: 0.8 });
 const enb = item({ symbol: "ENB", name: "Enbridge", sector: "Energy", score: 45, change_percent: -2, momentum_20d: 20, relative_volume: 3, rsi_14: null, opportunity_type: "Sous pression" });
 
-const terminalSnapshot: TerminalSnapshot = {
+const terminalSnapshot = {
   universe: "S&P/TSX 60", regime: "Constructif", regime_score: 72, risk_level: "Modéré", weighted_change_percent: 0.7,
   advance_ratio: 63, average_anatole_score: 68, average_momentum_20d: 4.5, above_sma20_percent: 61,
   above_sma50_percent: 58, high_relative_volume_count: 4,
@@ -40,7 +40,7 @@ const terminalSnapshot: TerminalSnapshot = {
     { id: "market-breadth", severity: "watch", category: "Marché", symbol: null, title: "Largeur fragile", detail: "Largeur à surveiller." },
   ],
   methodology: "Méthodologie complète du Terminal.", generated_at: "2026-09-01T12:00:00Z", refresh_after_seconds: 30,
-};
+} as TerminalSnapshot;
 
 function queryResult() {
   return { data: terminalSnapshot, isLoading: false, isError: refreshError, isRefetching: false, error: refreshError ? new Error("offline") : null, refetch: jest.fn(async () => ({ data: terminalSnapshot })) };

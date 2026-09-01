@@ -49,6 +49,7 @@ def test_old_workspace_payload_remains_backward_compatible() -> None:
     assert workspace.watchlist == ["RY"]
     assert workspace.focus_layouts == []
     assert workspace.focus_scripts == []
+    assert workspace.terminal_presets == []
 
 
 def test_focus_layouts_are_normalized_and_deduplicated() -> None:
@@ -97,3 +98,36 @@ def test_focus_workspace_rejects_payload_above_500_kb() -> None:
                 for index in range(50)
             ],
         })
+
+
+def test_terminal_presets_create_edit_delete_and_keep_other_workspace_fields() -> None:
+    base = {
+        "watchlist": ["RY"],
+        "terminal_presets": [{
+            "id": "leaders", "name": "Leaders", "filters": {"score_min": 72}, "sort": "score_desc",
+        }],
+    }
+    created = SyncedWorkspaceData.model_validate(base)
+    assert created.watchlist == ["RY"]
+    assert created.terminal_presets[0].filters.score_min == 72
+    edited = SyncedWorkspaceData.model_validate({
+        **base,
+        "terminal_presets": [{
+            "id": "leaders", "name": "Mes leaders", "filters": {"score_min": 78, "sector": "Financials"}, "sort": "score_desc",
+        }],
+    })
+    assert edited.terminal_presets[0].name == "Mes leaders"
+    assert edited.terminal_presets[0].filters.sector == "Financials"
+    deleted = SyncedWorkspaceData.model_validate({**base, "terminal_presets": []})
+    assert deleted.terminal_presets == []
+    assert deleted.watchlist == ["RY"]
+
+
+@pytest.mark.parametrize("terminal_presets", [
+    [{"id": str(index), "name": str(index), "filters": {}, "sort": "score_desc"} for index in range(11)],
+    [{"id": "bad-range", "name": "Bad", "filters": {"score_min": 80, "score_max": 20}, "sort": "score_desc"}],
+    [{"id": "bad-sort", "name": "Bad", "filters": {}, "sort": "random"}],
+])
+def test_terminal_presets_enforce_limits_and_valid_filters(terminal_presets: list[dict]) -> None:
+    with pytest.raises(ValidationError):
+        SyncedWorkspaceData.model_validate({"terminal_presets": terminal_presets})

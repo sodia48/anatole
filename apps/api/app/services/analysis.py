@@ -22,6 +22,7 @@ from app.schemas.analysis import (
     TerminalDataQuality,
     TerminalMethodologySection,
     TerminalOpportunity,
+    TerminalRadarItem,
     TerminalRegimeHorizon,
     TerminalSector,
     TerminalSnapshot,
@@ -893,7 +894,24 @@ class AnalysisService:
             anomalies = build_anomalies(rows, equity_histories) if sufficient else []
             sectors = legacy_sectors(rotation, rows)
             ranked = sorted(rows, key=lambda row: row.score, reverse=True)
-            radar_items = [opportunity(row, "Radar") for row in ranked]
+            anomaly_types_by_symbol: dict[str, list[str]] = defaultdict(list)
+            for anomaly in anomalies:
+                if anomaly.symbol and anomaly.type not in anomaly_types_by_symbol[anomaly.symbol]:
+                    anomaly_types_by_symbol[anomaly.symbol].append(anomaly.type)
+            radar_items = [
+                TerminalRadarItem(
+                    **opportunity(row, "Radar").model_dump(),
+                    volume=row.volume,
+                    average_volume_20d=row.average_volume_20d,
+                    sma_20=row.sma_20,
+                    sma_50=row.sma_50,
+                    trend=row.trend,
+                    source=row.source,
+                    delayed=row.delayed,
+                    anomaly_types=anomaly_types_by_symbol.get(row.symbol, []),
+                )
+                for row in ranked
+            ]
             leaders = [opportunity(row, "Leadership") for row in ranked[:8]]
             laggards = [opportunity(row, "Sous pression") for row in sorted(rows, key=lambda row: row.score)[:8]]
             opportunities = [
