@@ -23,6 +23,29 @@ export type ScreenerSnapshot = {
   refresh_after_seconds: number; live_items: number; fallback_items: number;
 };
 
+export type TerminalComponent = { key: string; label: string; score: number; value: string; description: string };
+export type TerminalSectorState = "Leadership" | "Accumulation" | "Neutre" | "Distribution" | "Faiblesse";
+export type TerminalSector = {
+  sector: string; change_percent: number; momentum_20d: number; average_score: number;
+  relative_volume: number; advancers: number; decliners: number; leadership_score: number; state: TerminalSectorState;
+};
+export type TerminalOpportunity = {
+  symbol: string; name: string; sector: string; price: number; change_percent: number; momentum_20d: number;
+  rsi_14: number | null; relative_volume: number; score: number; signal: string; opportunity_type: string; reasons: string[];
+};
+export type TerminalAlert = {
+  id: string; severity: "info" | "watch" | "high"; category: string; symbol: string | null; title: string; detail: string;
+};
+export type TerminalSnapshot = {
+  universe: string; regime: "Haussier" | "Constructif" | "Neutre" | "Fragile" | "Baissier";
+  regime_score: number; risk_level: "Faible" | "Modéré" | "Élevé" | "Critique";
+  weighted_change_percent: number; advance_ratio: number; average_anatole_score: number;
+  average_momentum_20d: number; above_sma20_percent: number; above_sma50_percent: number;
+  high_relative_volume_count: number; components: TerminalComponent[]; sectors: TerminalSector[];
+  opportunities: TerminalOpportunity[]; alerts: TerminalAlert[]; leaders: TerminalOpportunity[];
+  laggards: TerminalOpportunity[]; methodology: string; generated_at: string; refresh_after_seconds: number;
+};
+
 export type EtfDirectoryItem = {
   ticker: string; symbol: string; name: string; provider: string; category: string; exposure: string;
   currency: string; price: number; change_percent: number; volume: number; source: string; delayed: boolean;

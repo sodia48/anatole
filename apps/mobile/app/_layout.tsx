@@ -52,6 +52,7 @@ function AppStack() {
     <Stack.Screen name="etf/index" options={{ title: pick("ETF canadiens", "Canadian ETFs") }} />
     <Stack.Screen name="etf/[ticker]" options={{ title: "ETF" }} />
     <Stack.Screen name="screener/index" options={{ title: "Screener" }} />
+    <Stack.Screen name="terminal/index" options={{ title: "Terminal Pro" }} />
     <Stack.Screen name="ipo-insiders/index" options={{ title: pick("IPO & initiés", "IPOs & insiders") }} />
     <Stack.Screen name="notifications" options={{ title: pick("Notifications", "Notifications") }} />
     <Stack.Screen name="alerts" options={{ title: pick("Alertes", "Alerts") }} />

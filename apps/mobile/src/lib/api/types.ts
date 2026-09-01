@@ -34,6 +34,12 @@ export type {
   ScreenerUniverse,
   SectorSnapshot,
   TTMSummary,
+  TerminalAlert,
+  TerminalComponent,
+  TerminalOpportunity,
+  TerminalSector,
+  TerminalSectorState,
+  TerminalSnapshot,
 } from "@anatole/shared";
 
 export type AccountUser = {

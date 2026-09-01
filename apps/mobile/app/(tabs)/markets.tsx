@@ -16,6 +16,7 @@ import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 const hubs = [
   { id: "cockpit", fr: "Cockpit", en: "Cockpit" },
   { id: "screener", fr: "Screener", en: "Screener" },
+  { id: "terminal", fr: "Terminal Pro", en: "Terminal Pro" },
   { id: "etf", fr: "ETF", en: "ETF" },
   { id: "institutions", fr: "Institutions", en: "Institutions" },
   { id: "ipo", fr: "IPO & initiés", en: "IPOs & insiders" },
@@ -70,7 +71,7 @@ export default function MarketsScreen() {
     <Screen onRefresh={refresh} refreshing={refreshing} testID="markets-screen">
       <ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("Marchés canadiens", "Canadian markets")} subtitle={pick("La même donnée et les mêmes calculs que le Cockpit web.", "The same data and calculations as the web Cockpit.")} />
       <View style={styles.hubs}>
-        {hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => item.id === "screener" ? router.push("/screener" as Href) : item.id === "etf" ? router.push("/etf" as Href) : item.id === "ipo" ? router.push("/ipo-insiders" as Href) : setHub(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}
+        {hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => item.id === "terminal" ? router.push("/terminal" as Href) : item.id === "screener" ? router.push("/screener" as Href) : item.id === "etf" ? router.push("/etf" as Href) : item.id === "ipo" ? router.push("/ipo-insiders" as Href) : setHub(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}
       </View>
 
       {hub === "cockpit" ? <>

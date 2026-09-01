@@ -18,12 +18,14 @@ import type {
   ScreenerSnapshot,
   ScreenerUniverse,
   StockNewsSnapshot,
+  TerminalSnapshot,
   WatchlistSnapshot,
 } from "./types";
 
 export const marketApi = {
   cockpit: (universe: "tsx60" | "composite" = "tsx60") => apiRequest<CockpitSnapshot>(`/api/v1/market/cockpit?universe=${universe}`, { timeoutMs: universe === "composite" ? 95_000 : 35_000 }),
   screener: (universe: ScreenerUniverse = "composite", signal?: AbortSignal) => apiRequest<ScreenerSnapshot>(`/api/v1/discovery/screener?universe=${universe}`, { timeoutMs: universe === "composite" ? 95_000 : 45_000, signal }),
+  terminal: (signal?: AbortSignal) => apiRequest<TerminalSnapshot>("/api/v1/analysis/terminal", { timeoutMs: 95_000, signal }),
   focus: (ticker: string, range = "1y", interval = "1d", signal?: AbortSignal) => apiRequest<FocusSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/focus?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`, { timeoutMs: 45_000, signal }),
   fundamentals: (ticker: string, signal?: AbortSignal) => apiRequest<FundamentalSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamentals`, { timeoutMs: 75_000, signal }),
   companyNetwork: (ticker: string, depth: 1 | 2 = 1, signal?: AbortSignal) => apiRequest<CompanyNetworkSnapshot>(`/api/v1/discovery/company-network/${encodeURIComponent(ticker)}?depth=${depth}`, { timeoutMs: 90_000, signal }),
