@@ -17,18 +17,37 @@ from app.schemas.analysis import (
     ComparisonSnapshot,
     CorrelationMatrix,
     TerminalAlert,
+    TerminalBreadthPro,
     TerminalComponent,
+    TerminalDataQuality,
+    TerminalMethodologySection,
     TerminalOpportunity,
+    TerminalRegimeHorizon,
     TerminalSector,
     TerminalSnapshot,
 )
 from app.schemas.fundamentals import FundamentalSnapshot
 from app.schemas.stocks import Candle, Quote
 from app.services.cockpit import cockpit_service
+from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
 from app.services.screener import screener_service
 from app.services.tsx60 import TSX60
+from app.services.terminal_drivers import YAHOO_DRIVERS, rate_market_drivers, yahoo_market_drivers
+from app.services.terminal_engine import (
+    COVERAGE_THRESHOLD_PERCENT,
+    build_anomalies,
+    build_breadth,
+    build_regime_history,
+    build_regime_horizons,
+    build_sector_rotation,
+    data_quality,
+    legacy_sectors,
+    methodology_sections,
+    opportunity,
+    rebuild_real_rows,
+)
 
 
 RANGE_LABELS = {
@@ -88,6 +107,10 @@ class _TimedCache:
 
     def set(self, key: object, value: object) -> None:
         self._values[key] = (monotonic(), value)
+
+    def peek(self, key: object) -> object | None:
+        cached = self._values.get(key)
+        return None if cached is None else cached[1]
 
     def lock(self, key: object) -> asyncio.Lock:
         lock = self._locks.get(key)
@@ -564,7 +587,7 @@ class AnalysisService:
             self._cache.set(cache_key, snapshot)
             return snapshot
 
-    async def terminal(self) -> TerminalSnapshot:
+    async def _terminal_legacy(self) -> TerminalSnapshot:
         cache_key = "terminal:tsx60"
         cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
         if isinstance(cached, TerminalSnapshot):
@@ -802,6 +825,161 @@ class AnalysisService:
                     "Le régime combine largeur de marché, position par rapport aux moyennes mobiles, "
                     "score Anatole moyen, momentum transversal et variation pondérée. Les radars sont "
                     "des signaux de recherche, pas des recommandations d'achat ou de vente."
+                ),
+                generated_at=datetime.now(UTC),
+                refresh_after_seconds=60,
+            )
+            self._cache.set(cache_key, snapshot)
+            return snapshot
+
+    async def terminal(self) -> TerminalSnapshot:
+        cache_key = "terminal:v2:tsx60"
+        cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
+        if isinstance(cached, TerminalSnapshot):
+            return cached
+
+        async with self._cache.lock(cache_key):
+            cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
+            if isinstance(cached, TerminalSnapshot):
+                return cached
+            previous = self._cache.peek(cache_key)
+            symbols = [item.symbol for item in TSX60]
+            driver_symbols = [definition[3] for definition in YAHOO_DRIVERS]
+            screener_result, histories_result, rates_result = await asyncio.gather(
+                screener_service.get_tsx60(),
+                market_data_service.get_history_many_strict(
+                    [*symbols, "^GSPTSE", *driver_symbols],
+                    range_="1y",
+                    interval="1d",
+                    concurrency=8,
+                ),
+                bank_of_canada_valet_service.yields(),
+                return_exceptions=True,
+            )
+            if isinstance(screener_result, Exception):
+                if isinstance(previous, TerminalSnapshot):
+                    return previous
+                raise screener_result
+            histories = histories_result if isinstance(histories_result, dict) else {}
+            rates = rates_result if isinstance(rates_result, dict) else None
+            raw_rows = screener_result.items
+            quality = data_quality(raw_rows, histories, symbols, explicit_demo=market_data_service.demo_mode)
+            rows = rebuild_real_rows(raw_rows, histories, explicit_demo=market_data_service.demo_mode)
+            equity_histories = {row.symbol: histories[row.symbol] for row in rows if row.symbol in histories}
+            weights = {item.symbol: item.weight for item in TSX60}
+            benchmark = histories.get("^GSPTSE", [])
+            sufficient = quality.history_coverage_percent >= COVERAGE_THRESHOLD_PERCENT
+
+            if (
+                not sufficient
+                and isinstance(previous, TerminalSnapshot)
+                and previous.data_quality.history_coverage_percent >= COVERAGE_THRESHOLD_PERCENT
+            ):
+                stale_quality = previous.data_quality.model_copy(
+                    update={
+                        "warnings": [
+                            *previous.data_quality.warnings,
+                            "Dernier snapshot réel conservé: la couverture fournisseur actuelle est insuffisante.",
+                        ],
+                        "source_statuses": {**previous.data_quality.source_statuses, "terminal_cache": "stale-real"},
+                    }
+                )
+                return previous.model_copy(update={"data_quality": stale_quality})
+
+            horizons = build_regime_horizons(rows, equity_histories, weights, len(symbols))
+            session = next((item for item in horizons if item.key == "session"), None)
+            breadth = build_breadth(rows, equity_histories, weights, len(symbols))
+            rotation = build_sector_rotation(rows, equity_histories, benchmark, len(symbols)) if sufficient else []
+            anomalies = build_anomalies(rows, equity_histories) if sufficient else []
+            sectors = legacy_sectors(rotation, rows)
+            ranked = sorted(rows, key=lambda row: row.score, reverse=True)
+            radar_items = [opportunity(row, "Radar") for row in ranked]
+            leaders = [opportunity(row, "Leadership") for row in ranked[:8]]
+            laggards = [opportunity(row, "Sous pression") for row in sorted(rows, key=lambda row: row.score)[:8]]
+            opportunities = [
+                opportunity(row, "Accélération" if row.relative_volume >= 1.4 else "Tendance")
+                for row in ranked
+                if row.score >= 62 and row.momentum_20d > 0 and (row.rsi_14 is None or row.rsi_14 < 75)
+            ][:12]
+            alerts = [
+                TerminalAlert(
+                    id=item.id,
+                    severity=item.severity,
+                    category="Anomalie statistique",
+                    symbol=item.symbol,
+                    title=item.title,
+                    detail=item.detail,
+                )
+                for item in anomalies[:16]
+            ]
+            if breadth.divergence.active:
+                alerts.insert(0, TerminalAlert(
+                    id="breadth-divergence",
+                    severity=breadth.divergence.severity,
+                    category="Marché",
+                    title=breadth.divergence.title,
+                    detail=breadth.divergence.explanation,
+                ))
+            components = [
+                TerminalComponent(
+                    key="breadth", label="Largeur du marché", score=breadth.advance_ratio,
+                    value=(f"{breadth.advancers} hausses / {breadth.decliners} baisses" if breadth.advancers is not None else "N/D"),
+                    description="Part des titres en hausse parmi les mouvements directionnels sur données réelles éligibles.",
+                ),
+                TerminalComponent(
+                    key="trend", label="Structure de tendance",
+                    score=(None if breadth.above_sma20_percent is None or breadth.above_sma50_percent is None else round(breadth.above_sma20_percent * 0.45 + breadth.above_sma50_percent * 0.55, 1)),
+                    value=(f"{breadth.above_sma50_percent:.0f} % au-dessus de la MM50" if breadth.above_sma50_percent is not None else "N/D"),
+                    description="Proportion des titres au-dessus des MM20 et MM50, sans historique de démonstration implicite.",
+                ),
+                TerminalComponent(
+                    key="momentum", label="Impulsion 20 jours",
+                    score=(None if session is None or session.average_momentum_percent is None else max(0, min(100, 50 + session.average_momentum_percent * 4))),
+                    value=(f"{session.average_momentum_percent:+.2f} % en moyenne" if session and session.average_momentum_percent is not None else "N/D"),
+                    description="Momentum transversal moyen des composantes disposant d'un historique réel suffisant.",
+                ),
+                TerminalComponent(
+                    key="quality", label="Qualité des signaux",
+                    score=(round(statistics.fmean(row.score for row in rows), 1) if sufficient and rows else None),
+                    value=(f"{statistics.fmean(row.score for row in rows):.1f}/100" if sufficient and rows else "N/D"),
+                    description="Moyenne du score Anatole reconstruit à partir du jeu historique strict.",
+                ),
+            ]
+            drivers = yahoo_market_drivers(histories, benchmark) + rate_market_drivers(rates)
+            source_statuses = dict(quality.source_statuses)
+            source_statuses["bank_of_canada"] = "available" if rates else "unavailable"
+            source_statuses["benchmark"] = "available" if benchmark else "unavailable"
+            quality = quality.model_copy(update={"source_statuses": source_statuses})
+            snapshot = TerminalSnapshot(
+                universe=screener_result.universe,
+                regime=session.regime if session else None,
+                regime_score=session.score if session else None,
+                risk_level=session.risk_level if session else None,
+                weighted_change_percent=session.change_percent if session else None,
+                advance_ratio=breadth.advance_ratio,
+                average_anatole_score=(round(statistics.fmean(row.score for row in rows), 1) if sufficient and rows else None),
+                average_momentum_20d=(round(statistics.fmean(row.momentum_20d for row in rows), 2) if sufficient and rows else None),
+                above_sma20_percent=breadth.above_sma20_percent,
+                above_sma50_percent=breadth.above_sma50_percent,
+                high_relative_volume_count=(sum(row.relative_volume >= 1.5 for row in rows) if sufficient else None),
+                components=components,
+                sectors=sectors,
+                opportunities=opportunities,
+                alerts=alerts[:16],
+                leaders=leaders,
+                laggards=laggards,
+                data_quality=quality,
+                regime_horizons=horizons,
+                regime_history=build_regime_history(equity_histories, benchmark, len(symbols)) if sufficient else [],
+                breadth_pro=breadth,
+                sector_rotation=rotation,
+                anomalies=anomalies,
+                market_drivers=drivers,
+                radar_items=radar_items,
+                methodology_sections=methodology_sections(),
+                methodology=(
+                    "Régime: largeur 30 %, tendance 30 %, score Anatole moyen 22 %, momentum 12 % et tape/performance 6 %. "
+                    "Les calculs utilisent uniquement les données réelles disponibles, ou demo-explicit lorsque ce mode est demandé."
                 ),
                 generated_at=datetime.now(UTC),
                 refresh_after_seconds=60,
