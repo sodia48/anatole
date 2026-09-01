@@ -1,4 +1,4 @@
-import type { ScreenerRow as SharedScreenerRow, ScreenerSnapshot as SharedScreenerSnapshot, TerminalAlert as SharedTerminalAlert, TerminalComponent as SharedTerminalComponent, TerminalOpportunity as SharedTerminalOpportunity, TerminalSector as SharedTerminalSector, TerminalSnapshot as SharedTerminalSnapshot } from "@anatole/shared";
+import type { PsychologyComponent as SharedPsychologyComponent, PsychologySnapshot as SharedPsychologySnapshot, ScreenerRow as SharedScreenerRow, ScreenerSnapshot as SharedScreenerSnapshot, TerminalAlert as SharedTerminalAlert, TerminalComponent as SharedTerminalComponent, TerminalOpportunity as SharedTerminalOpportunity, TerminalSector as SharedTerminalSector, TerminalSnapshot as SharedTerminalSnapshot } from "@anatole/shared";
 
 export type Quote = {
   ticker: string;
@@ -524,25 +524,8 @@ export type InstitutionsSnapshot = {
   message: string | null;
 };
 
-export type PsychologyComponent = {
-  key: string;
-  label: string;
-  score: number;
-  description: string;
-};
-
-export type PsychologySnapshot = {
-  score: number;
-  label: string;
-  change_20d: number;
-  change_50d: number;
-  volatility_20d: number;
-  advance_ratio: number;
-  components: PsychologyComponent[];
-  generated_at: string;
-  refresh_after_seconds: number;
-  source: string;
-};
+export type PsychologyComponent = SharedPsychologyComponent;
+export type PsychologySnapshot = SharedPsychologySnapshot;
 
 export type ComparisonRange =
   | "1mo"

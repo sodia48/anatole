@@ -28,6 +28,8 @@ export type {
   IpoSnapshot,
   MarketTile,
   OfficialCoverage,
+  PsychologyComponent,
+  PsychologySnapshot,
   RelationshipEvidence,
   ScreenerRow,
   ScreenerSnapshot,

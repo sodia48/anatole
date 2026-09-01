@@ -46,6 +46,12 @@ export type TerminalSnapshot = {
   laggards: TerminalOpportunity[]; methodology: string; generated_at: string; refresh_after_seconds: number;
 };
 
+export type PsychologyComponent = { key: string; label: string; score: number; description: string };
+export type PsychologySnapshot = {
+  score: number; label: string; change_20d: number; change_50d: number; volatility_20d: number;
+  advance_ratio: number; components: PsychologyComponent[]; generated_at: string; refresh_after_seconds: number; source: string;
+};
+
 export type EtfDirectoryItem = {
   ticker: string; symbol: string; name: string; provider: string; category: string; exposure: string;
   currency: string; price: number; change_percent: number; volume: number; source: string; delayed: boolean;
