@@ -2023,3 +2023,32 @@
     transition: none;
   }
 }
+
+.v2Stack { display: grid; gap: 14px; }
+.v2Section { padding: 18px; }
+.v2Heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.v2Heading h2 { margin: 3px 0 0; }
+.v2Heading small { color: var(--text-muted); }
+.horizonGrid, .v2MetricGrid, .driverGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
+.horizonGrid article, .v2MetricGrid article, .driverGrid article { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(7,31,45,.72); }
+.horizonGrid span, .v2MetricGrid span, .driverGrid span { color: var(--text-muted); font-size: 11px; }
+.horizonGrid strong, .v2MetricGrid strong, .driverGrid strong { font-size: 18px; }
+.horizonGrid b, .driverGrid b { color: #2c9cff; }
+.v2Warning { margin: 10px 0 0; padding: 9px 11px; border: 1px solid rgba(246,185,74,.5); border-radius: 9px; color: #f6c86d; }
+.v2Actions, .presetBar, .radarControls, .sectorLinks { display: flex; flex-wrap: wrap; gap: 7px; }
+.v2Actions button, .presetBar button, .radarControls button { min-height: 36px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(10,39,56,.8); color: var(--text); }
+.v2Active { border-color: #2c9cff !important; background: rgba(44,156,255,.18) !important; }
+.pulseChart, .rotationMatrix { display: block; width: 100%; max-height: 390px; border: 1px solid var(--border); border-radius: 12px; background: #061925; }
+.v2Empty { min-height: 140px; display: grid; place-items: center; color: var(--text-muted); }
+.sectorLinks { margin-top: 10px; }
+.sectorLinks a { padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; color: #8ecfff; }
+.anomalyGrid, .radarTable { display: grid; gap: 8px; }
+.anomalyGrid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.anomalyGrid a, .radarTable a { display: grid; gap: 4px; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: rgba(7,31,45,.72); color: var(--text); }
+.anomalyGrid span, .anomalyGrid small, .radarTable span, .radarTable small { color: var(--text-muted); }
+.anomalyGrid b, .radarTable b { color: #2c9cff; }
+.radarControls { align-items: end; margin: 10px 0; }
+.radarControls label { display: grid; gap: 4px; color: var(--text-muted); font-size: 10px; }
+.radarControls input { min-height: 36px; width: 125px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #071f2d; color: var(--text); }
+.radarTable { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+@media (max-width: 700px) { .v2Heading { flex-direction: column; } .horizonGrid { grid-template-columns: repeat(2, 1fr); } .v2Section { padding: 12px; } }

@@ -28,6 +28,7 @@ import type {
 } from "@/lib/types";
 
 import styles from "./Analysis.module.css";
+import { TerminalV2Sections } from "./TerminalV2Sections";
 
 type FeedMode = "all" | "volume" | "momentum" | "pressure";
 
@@ -496,6 +497,8 @@ export function TerminalClient() {
               <strong>{snapshot.average_anatole_score?.toFixed(0) ?? "N/D"}</strong>
             </article>
           </section>
+
+          <TerminalV2Sections language={language} snapshot={snapshot} />
 
           <section className={`panel ${styles.terminalFeedPanel}`}>
             <div className={styles.terminalFeedHeading}>

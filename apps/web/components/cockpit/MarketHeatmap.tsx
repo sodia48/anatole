@@ -207,9 +207,11 @@ function directionLabel(tile: NormalizedTile, language: AnatoleLanguage): string
 export function MarketHeatmap({
   tiles,
   universeLabel = "S&P/TSX 60",
+  initialSector = null,
 }: {
   tiles: readonly unknown[];
   universeLabel?: string;
+  initialSector?: string | null;
 }) {
   const { preferences } = usePreferences();
   const language = preferences.language;
@@ -242,6 +244,17 @@ export function MarketHeatmap({
     () => normalizedTiles.find((tile) => tile.ticker === selectedTicker) ?? null,
     [normalizedTiles, selectedTicker],
   );
+
+  useEffect(() => {
+    if (!initialSector) return;
+    const match = normalizedTiles.find((tile) => tile.sector.toLowerCase() === initialSector.toLowerCase());
+    if (!match) return;
+    const timer = window.setTimeout(() => {
+      setMode("sector");
+      setExpandedGroup(match.sector);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [initialSector, normalizedTiles]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setExpandedGroup(null), 0);
@@ -489,6 +502,7 @@ export function MarketHeatmap({
         </form>
 
         <div className={styles.actionButtons}>
+          {expandedGroup ? <Link className={styles.utilityButton} href={`/screener?universe=tsx60&sector=${encodeURIComponent(expandedGroup)}`}>{pick(language, "Ouvrir dans Screener", "Open in Screener")}</Link> : null}
           <button
             type="button"
             className={styles.utilityButton}

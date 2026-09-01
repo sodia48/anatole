@@ -9,7 +9,7 @@ import {
   type HeatmapRect,
   type NormalizedHeatmapTile,
 } from "@anatole/shared/heatmap";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -70,12 +70,16 @@ export function MarketHeatmap({
   onOpen,
   onWatchlist,
   onAlert,
+  initialSector = null,
+  onOpenSector,
 }: {
   tiles: MarketTile[];
   height?: number;
   onOpen: (ticker: string) => void;
   onWatchlist: (ticker: string) => void;
   onAlert: (ticker: string) => void;
+  initialSector?: string | null;
+  onOpenSector?: (sector: string) => void;
 }) {
   const { pick } = useLocale();
   const window = useWindowDimensions();
@@ -88,6 +92,16 @@ export function MarketHeatmap({
     () => tiles.map((tile) => normalizeHeatmapTile(tile, pick("Autres", "Other"))).filter((tile): tile is NormalizedHeatmapTile => tile !== null),
     [pick, tiles],
   );
+  useEffect(() => {
+    if (!initialSector) return;
+    const match = normalized.find((tile) => tile.sector.toLowerCase() === initialSector.toLowerCase());
+    if (!match) return;
+    const timer = setTimeout(() => {
+      setMode("sector");
+      setSector(match.sector);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initialSector, normalized]);
   const visible = useMemo(() => sector ? normalized.filter((tile) => tile.sector === sector) : normalized, [normalized, sector]);
   const groups = useMemo(() => groupHeatmapTiles(visible, sector ? "flat" : mode, {
     fullMarket: sector ?? pick("Marché complet", "Full market"),
@@ -139,7 +153,7 @@ export function MarketHeatmap({
         {modeOptions.map((option) => <Pressable accessibilityRole="button" key={option.id} onPress={() => { setSector(null); setMode(option.id); }} style={[styles.mode, mode === option.id && !sector && styles.modeActive]}><Text style={styles.modeText}>{option.label}</Text></Pressable>)}
         <Pressable accessibilityRole="button" onPress={() => setFullscreen(true)} style={styles.mode}><Text style={styles.modeText}>⛶</Text></Pressable>
       </View>
-      {sector ? <Pressable onPress={() => setSector(null)} style={styles.back}><Text style={styles.backText}>‹ {pick("Retour au marché", "Back to market")} · {sector}</Text></Pressable> : null}
+      {sector ? <View style={styles.sectorActions}><Pressable onPress={() => setSector(null)} style={styles.back}><Text style={styles.backText}>‹ {pick("Retour au marché", "Back to market")} · {sector}</Text></Pressable>{onOpenSector ? <Pressable onPress={() => onOpenSector(sector)} style={styles.screenerLink} testID="heatmap-open-sector-screener"><Text style={styles.backText}>{pick("Ouvrir dans Screener", "Open in Screener")} →</Text></Pressable> : null}</View> : null}
       <View onLayout={(event) => setWidth(Math.max(280, event.nativeEvent.layout.width))} style={styles.canvas}>{renderMap(width, height)}</View>
       <Text style={styles.help}>{pick("Touchez pour ouvrir Focus · appui long pour les détails", "Tap to open Focus · long press for details")}</Text>
 
@@ -175,7 +189,7 @@ const styles = StyleSheet.create({
   mode: { minHeight: 44, minWidth: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   modeActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
   modeText: { ...typography.caption, color: colors.text, fontWeight: "800" },
-  back: { minHeight: 44, justifyContent: "center" }, backText: { ...typography.label, color: colors.primary },
+  sectorActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.xs }, back: { minHeight: 44, flexGrow: 1, justifyContent: "center" }, screenerLink: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm }, backText: { ...typography.label, color: colors.primary },
   canvas: { width: "100%", overflow: "hidden", borderRadius: radius.sm, backgroundColor: "#07141e" },
   help: { ...typography.caption, color: colors.textSubtle, textAlign: "center", marginTop: spacing.xs },
   scrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.58)" },

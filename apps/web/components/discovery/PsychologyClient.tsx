@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Activity, Gauge } from "lucide-react";
+import Link from "next/link";
 import { getPsychologySnapshot } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import type { PsychologySnapshot } from "@/lib/types";
@@ -52,7 +53,7 @@ export function PsychologyClient() {
   return (
     <div className="discovery-page">
       <header className="panel discovery-hero">
-        <div><span className="eyebrow">{pick(language, "PSYCHOLOGIE DU MARCHÉ", "MARKET PSYCHOLOGY")}</span><h1>{pick(language, "Indice Anatole Canada", "Anatole Canada Index")}</h1><p>{pick(language, "Un indicateur explicable construit à partir de données du S&P/TSX Composite et de la largeur du TSX 60.", "An explainable indicator built from S&P/TSX Composite data and TSX 60 market breadth.")}</p></div>
+        <div><span className="eyebrow">{pick(language, "PSYCHOLOGIE DU MARCHÉ", "MARKET PSYCHOLOGY")}</span><h1>{pick(language, "Indice Anatole Canada", "Anatole Canada Index")}</h1><p>{pick(language, "Un indicateur explicable construit à partir de données du S&P/TSX Composite et de la largeur du TSX 60.", "An explainable indicator built from S&P/TSX Composite data and TSX 60 market breadth.")}</p><Link href="/terminal">{pick(language, "Ouvrir Terminal Pro", "Open Pro Terminal")} →</Link></div>
         <div className="discovery-score"><Activity size={20} /><strong>{data?.score.toFixed(0) ?? "—"}</strong><span>{data ? psychologyLabel(data.label, language) : pick(language, "Indisponible", "Unavailable")}</span><small>{pick(language, "Actualisation automatique toutes les 45 secondes", "Refreshes automatically every 45 seconds")}</small></div>
       </header>
 

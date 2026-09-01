@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { AppState, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -53,11 +53,21 @@ function FiltersModal({ filters, sectors, signals, visible, onChange, onClose, o
 }
 
 export function ScreenerScreen() {
+  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[] }>();
   const { pick } = useLocale();
   const [universe, setUniverse] = useState<ScreenerUniverse>("composite");
   const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_SCREENER_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
+  const requestedSector = Array.isArray(params.sector) ? params.sector[0] : params.sector;
+  const requestedUniverse = Array.isArray(params.universe) ? params.universe[0] : params.universe;
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse(requestedUniverse);
+      if (requestedSector) setFilters((current) => ({ ...current, sector: requestedSector }));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [requestedSector, requestedUniverse]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
     return () => subscription.remove();

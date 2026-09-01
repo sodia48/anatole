@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { router, type Href } from "expo-router";
-import { useMemo, useState } from "react";
+import { router, type Href, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -50,11 +50,22 @@ function ConstituentsModal({ visible, onClose, items }: { visible: boolean; onCl
 }
 
 export default function MarketsScreen() {
+  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[] }>();
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [hub, setHub] = useState<Hub>("cockpit");
   const [universe, setUniverse] = useState<"tsx60" | "composite">("tsx60");
   const [constituentsOpen, setConstituentsOpen] = useState(false);
+  const requestedSector = Array.isArray(params.sector) ? params.sector[0] : params.sector;
+  const requestedUniverse = Array.isArray(params.universe) ? params.universe[0] : params.universe;
+  useEffect(() => {
+    if (!requestedSector && requestedUniverse !== "tsx60" && requestedUniverse !== "composite") return;
+    const timer = setTimeout(() => {
+      setHub("cockpit");
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse(requestedUniverse);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [requestedSector, requestedUniverse]);
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: () => marketApi.cockpit(universe), staleTime: 20_000 });
   const news = useQuery({ queryKey: ["news", language], queryFn: () => marketApi.news(language), enabled: hub === "news", staleTime: 300_000 });
   const calendar = useQuery({ queryKey: ["calendar", language], queryFn: () => marketApi.calendar(language), enabled: hub === "calendar", staleTime: 300_000 });
@@ -81,8 +92,10 @@ export default function MarketsScreen() {
         {cockpit.data ? <>
           <Card action={<Pressable onPress={() => setConstituentsOpen(true)} style={styles.link}><Text style={styles.linkText}>{pick("Voir les constituants", "View constituents")}</Text></Pressable>} title={pick("Carte du marché", "Market map")} testID="cockpit-heatmap">
             <MarketHeatmap
+              initialSector={requestedSector ?? null}
               onAlert={() => router.push("/alerts")}
               onOpen={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })}
+              onOpenSector={(selectedSector) => router.push({ pathname: "/screener", params: { universe, sector: selectedSector } } as Href)}
               onWatchlist={(ticker) => void addWatchlist(ticker)}
               tiles={cockpit.data.constituents}
             />

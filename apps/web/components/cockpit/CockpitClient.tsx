@@ -60,6 +60,7 @@ export function CockpitClient() {
   const language = preferences.language;
   const [universe, setUniverse] = useState<CockpitUniverse>("tsx60");
   const [ready, setReady] = useState(false);
+  const [initialSector, setInitialSector] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<
     Partial<Record<CockpitUniverse, CockpitSnapshot>>
   >({});
@@ -77,8 +78,12 @@ export function CockpitClient() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedUniverse = params.get("universe");
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (isCockpitUniverse(stored)) setUniverse(stored);
+      if (isCockpitUniverse(requestedUniverse)) setUniverse(requestedUniverse);
+      else if (isCockpitUniverse(stored)) setUniverse(stored);
+      setInitialSector(params.get("sector"));
       setReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -282,6 +287,7 @@ export function CockpitClient() {
       </section>
 
       <MarketHeatmap
+        initialSector={initialSector}
         tiles={snapshot.constituents}
         universeLabel={snapshot.universe}
       />
