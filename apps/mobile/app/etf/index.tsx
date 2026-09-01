@@ -78,7 +78,7 @@ export default function EtfDirectoryScreen() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}><Chip active={provider === "all"} label={pick("Tous", "All")} onPress={() => setProvider("all")} />{providers.map((value) => <Chip active={provider === value} key={value} label={value} onPress={() => setProvider(value)} />)}</ScrollView>
     </> : null}
     <QueryState error={!query.data ? query.error : null} loading={query.isLoading} onRetry={() => void query.refetch()} />
-    {view === "map" && items.length > 0 ? <EtfHeatmap items={items} onOpen={(ticker) => router.push({ pathname: "/etf/[ticker]", params: { ticker } })} /> : null}
+    {view === "map" && items.length > 0 ? <EtfHeatmap items={items} onOpen={(ticker) => router.push({ pathname: "/etf/[ticker]", params: { ticker } })} onViewAllSector={(sector) => { setCategory(sector); setProvider("all"); setView("list"); }} /> : null}
   </View>;
 
   return <SafeAreaView edges={["bottom"]} style={styles.safe} testID="etf-directory-screen">

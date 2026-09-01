@@ -8,6 +8,7 @@ import {
   type HeatmapRect,
   type NormalizedEtfHeatmapTile,
 } from "@anatole/shared/heatmap";
+import { selectRepresentativeEtfsBySector } from "@anatole/shared/etf-ranking";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Svg, { G, Rect, Text as SvgText } from "react-native-svg";
@@ -43,7 +44,7 @@ function layoutGroups(groups: EtfHeatmapGroup[], width: number, height: number):
   });
 }
 
-export function EtfHeatmap({ items, height = 500, onOpen }: { items: EtfDirectoryItem[]; height?: number; onOpen: (ticker: string) => void }) {
+export function EtfHeatmap({ items, height = 500, onOpen, onViewAllSector }: { items: EtfDirectoryItem[]; height?: number; onOpen: (ticker: string) => void; onViewAllSector?: (sector: string) => void }) {
   const { language, pick } = useLocale();
   const window = useWindowDimensions();
   const [width, setWidth] = useState(Math.max(320, window.width - spacing.lg * 2));
@@ -59,7 +60,9 @@ export function EtfHeatmap({ items, height = 500, onOpen }: { items: EtfDirector
     unchanged: pick("Inchangés / N/D", "Unchanged / N/A"),
     decliners: pick("Baisses", "Decliners"),
   }), [pick]);
-  const normalized = useMemo(() => items.map((item) => normalizeEtfHeatmapTile(item, labels)), [items, labels]);
+  const sectorRepresentatives = useMemo(() => selectRepresentativeEtfsBySector(items), [items]);
+  const mappedItems = useMemo(() => mode === "sector" ? [...sectorRepresentatives.values()].flat() : items, [items, mode, sectorRepresentatives]);
+  const normalized = useMemo(() => mappedItems.map((item) => normalizeEtfHeatmapTile(item, labels)), [labels, mappedItems]);
   const allGroups = useMemo(() => groupEtfHeatmapTiles(normalized, mode, labels), [labels, mode, normalized]);
   const groups = useMemo(() => drilldown ? allGroups.filter((group) => group.key === drilldown) : allGroups, [allGroups, drilldown]);
   const visibleCount = groups.reduce((sum, group) => sum + group.tiles.length, 0);
@@ -95,7 +98,8 @@ export function EtfHeatmap({ items, height = 500, onOpen }: { items: EtfDirector
       {modes.map((option) => <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === option.id && !drilldown }} key={option.id} onPress={() => { setMode(option.id); setDrilldown(null); }} style={[styles.mode, mode === option.id && !drilldown && styles.modeActive]} testID={`etf-heatmap-mode-${option.id}`}><Text numberOfLines={2} style={styles.modeText}>{option.label}</Text></Pressable>)}
       <Pressable accessibilityLabel={pick("Plein écran", "Full screen")} accessibilityRole="button" onPress={() => setFullscreen(true)} style={styles.fullscreenButton} testID="etf-heatmap-fullscreen"><Text style={styles.modeText}>⛶</Text></Pressable>
     </View>
-    {drilldown ? <Pressable accessibilityRole="button" onPress={() => setDrilldown(null)} style={styles.back} testID="etf-heatmap-back"><Text style={styles.backText}>‹ {pick("Retour au marché", "Back to market")} · {drilldown}</Text></Pressable> : null}
+    {mode === "sector" ? <Text style={styles.representativeNote}>{pick("Top 10 par secteur selon la liquidité disponible", "Top 10 per sector by available liquidity")}</Text> : null}
+    {drilldown ? <View style={styles.drilldownActions}><Pressable accessibilityRole="button" onPress={() => setDrilldown(null)} style={styles.back} testID="etf-heatmap-back"><Text style={styles.backText}>‹ {pick("Retour au marché", "Back to market")} · {drilldown}</Text></Pressable>{mode === "sector" && onViewAllSector ? <Pressable accessibilityRole="button" onPress={() => onViewAllSector(drilldown)} style={styles.viewAll} testID="etf-heatmap-view-all-sector"><Text style={styles.viewAllText}>{pick("Voir tous les ETF du secteur", "View all ETFs in this sector")}</Text></Pressable> : null}</View> : null}
     <View onLayout={(event) => setWidth(Math.max(280, event.nativeEvent.layout.width))} style={styles.canvas}>{renderMap(width, height)}</View>
     <Text style={styles.help}>{pick("Touchez pour ouvrir l’ETF · appui long pour les détails", "Tap to open ETF · long press for details")}</Text>
 
@@ -130,7 +134,11 @@ const styles = StyleSheet.create({
   modeActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
   fullscreenButton: { minHeight: 44, minWidth: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   modeText: { ...typography.caption, color: colors.text, fontWeight: "800", textAlign: "center" },
+  representativeNote: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  drilldownActions: { gap: spacing.xs, marginBottom: spacing.xs },
   back: { minHeight: 44, justifyContent: "center" }, backText: { ...typography.label, color: colors.primary },
+  viewAll: { minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
+  viewAllText: { ...typography.label, color: colors.text },
   canvas: { width: "100%", overflow: "hidden", borderRadius: radius.sm, backgroundColor: "#07141e" },
   help: { ...typography.caption, color: colors.textSubtle, textAlign: "center", marginTop: spacing.xs },
   scrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.58)" },

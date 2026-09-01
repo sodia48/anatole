@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./heatmap": "./src/heatmap/index.ts",
-    "./etf-xray": "./src/etf-xray.ts"
+    "./etf-xray": "./src/etf-xray.ts",
+    "./etf-ranking": "./src/etf-ranking.ts"
   }
 }
