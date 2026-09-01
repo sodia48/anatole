@@ -88,11 +88,14 @@ def yahoo_market_drivers(histories: dict[str, list[Candle]], benchmark: list[Can
 
 
 def rate_market_drivers(series: dict[str, list[tuple[int, float]]] | None) -> list[TerminalMarketDriver]:
-    definitions = (("canada_2y", "Canada 2 ans", "V39051"), ("canada_10y", "Canada 10 ans", "V39055"))
+    definitions = (
+        ("canada_2y", "Canada 2 ans", "V39051", "BD.CDN.2YR.DQ.YLD"),
+        ("canada_10y", "Canada 10 ans", "V39055", "BD.CDN.10YR.DQ.YLD"),
+    )
     output: list[TerminalMarketDriver] = []
-    for key, label, series_key in definitions:
+    for key, label, series_key, active_series in definitions:
         points = (series or {}).get(series_key, [])
-        source_url = f"https://www.bankofcanada.ca/valet/observations/{series_key}"
+        source_url = f"https://www.bankofcanada.ca/valet/observations/{active_series}/json"
         if len(points) < 2:
             output.append(TerminalMarketDriver(
                 key=key, label=label, category="Taux", unit="%", change_unit="bps", status="unavailable",

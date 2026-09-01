@@ -538,11 +538,20 @@ def build_anomalies(rows: list[ScreenerRow], histories: dict[str, list[Candle]])
             add(row, "momentum_acceleration", "watch", "positive" if acceleration > 0 else "negative", acceleration, prior, "points %", f"Accélération du momentum — {row.symbol}", f"Le rendement 5J a varié de {acceleration:+.2f} points face à la fenêtre 5J précédente.", magnitude=acceleration)
         if row.rsi_14 is not None and (row.rsi_14 >= 75 or row.rsi_14 <= 25):
             add(row, "rsi_extreme", "watch", "positive" if row.rsi_14 >= 75 else "negative", row.rsi_14, 50, "RSI", f"RSI extrême — {row.symbol}", f"RSI 14 observé à {row.rsi_14:.1f}; rareté statistique, pas probabilité directionnelle.", magnitude=(row.rsi_14 - 50) / 10)
-        previous_sma20 = _sma(candles, 20, len(candles) - 2)
-        current_sma20 = _sma(candles, 20)
+        previous_sma20, current_sma20 = _sma(candles, 20, len(candles) - 2), _sma(candles, 20)
+        previous_sma50, current_sma50 = _sma(candles, 50, len(candles) - 2), _sma(candles, 50)
+        previous_sma200, current_sma200 = _sma(candles, 200, len(candles) - 2), _sma(candles, 200)
+        crosses: list[tuple[str, bool, float]] = []
         if previous_sma20 is not None and current_sma20 is not None and (previous.close - previous_sma20) * (latest.close - current_sma20) < 0:
-            direction = "positive" if latest.close > current_sma20 else "negative"
-            add(row, "sma_cross", "watch", direction, latest.close, current_sma20, "CAD", f"Traversée prix/MM20 — {row.symbol}", "Le prix a réellement traversé sa MM20 entre les deux dernières séances.", magnitude=(latest.close / current_sma20 - 1) * 100)
+            crosses.append(("prix/MM20", latest.close > current_sma20, current_sma20))
+        if all(value is not None for value in (previous_sma20, current_sma20, previous_sma50, current_sma50)) and ((previous_sma20 or 0) - (previous_sma50 or 0)) * ((current_sma20 or 0) - (current_sma50 or 0)) < 0:
+            crosses.append(("MM20/MM50", (current_sma20 or 0) > (current_sma50 or 0), current_sma50 or 0))
+        if previous_sma200 is not None and current_sma200 is not None and (previous.close - previous_sma200) * (latest.close - current_sma200) < 0:
+            crosses.append(("prix/MM200", latest.close > current_sma200, current_sma200))
+        if crosses:
+            label, positive, baseline = crosses[0]
+            direction = "positive" if positive else "negative"
+            add(row, "sma_cross", "watch", direction, latest.close, baseline, "CAD", f"Traversée {label} — {row.symbol}", f"Une vraie traversée {label} est observée entre les deux dernières séances.", magnitude=(latest.close / baseline - 1) * 100 if baseline else 0)
         if (row.change_percent >= 2 and volume_ratio < 0.7) or (row.change_percent <= -2 and volume_ratio >= 1.8):
             add(row, "price_volume_divergence", "watch", "negative", row.change_percent, volume_ratio, "% / ×", f"Divergence prix-volume — {row.symbol}", "Le mouvement du prix et le niveau de volume divergent selon les seuils documentés.", volume_z, row.change_percent)
         dislocation = row.change_percent - sector_change.get(row.sector, row.change_percent)
