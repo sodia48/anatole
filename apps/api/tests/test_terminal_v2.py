@@ -9,6 +9,7 @@ from app.schemas.discovery import ScreenerRow
 from app.schemas.stocks import Candle
 from app.services.market_data import market_data_service
 from app.services.terminal_engine import (
+    build_anomalies,
     build_breadth,
     build_regime_history,
     build_regime_horizons,
@@ -49,6 +50,17 @@ def test_demo_fallback_is_excluded_from_every_terminal_input() -> None:
     assert quality.unavailable_symbols == ["TD"]
     assert quality.source_statuses["demo_fallback_excluded"] == "1"
     assert all(item.symbol != "TD" for item in rebuilt)
+    assert sum(item.member_count for item in build_sector_rotation(rebuilt, {"RY": histories["RY"]}, candles(start=1_000), 2)) == 1
+    assert all(item.symbol != "TD" for item in build_anomalies(rebuilt, {"RY": histories["RY"]}))
+
+
+@pytest.mark.parametrize(("score", "expected"), [
+    (72, "Haussier"), (71.9, "Constructif"), (60, "Constructif"),
+    (59.9, "Neutre"), (45, "Neutre"), (44.9, "Fragile"),
+    (32, "Fragile"), (31.9, "Baissier"),
+])
+def test_regime_thresholds_are_exact(score: float, expected: str) -> None:
+    assert regime_label(score) == expected
 
 
 def test_multi_horizon_uses_one_formula_and_real_coverage() -> None:
@@ -87,10 +99,24 @@ def test_breadth_pro_real_history_metrics_and_rotation() -> None:
     assert breadth.down_volume == 800
     assert breadth.equal_weight_change_percent != breadth.cap_weight_change_percent
     assert breadth.advance_decline_line
+    assert breadth.positive_sectors == 1
+    assert breadth.negative_sectors == 0
+    assert breadth.positive_sectors_percent == 100
     rotation = build_sector_rotation(rows, histories, candles(start=1_000, drift=0.5), 2)
     assert rotation[0].relative_strength_20d is not None
     assert rotation[0].previous_x is not None
     assert rotation[0].quadrant in {"LEADERSHIP", "AMÉLIORATION", "AFFAIBLISSEMENT", "SOUS PRESSION"}
+
+
+def test_low_coverage_returns_null_cross_sectional_metrics_not_zero() -> None:
+    histories = {"RY": candles()}
+    rows = rebuild_real_rows([row("RY")], histories, explicit_demo=False)
+    horizons = build_regime_horizons(rows, histories, {"RY": 100}, 2)
+    breadth = build_breadth(rows, histories, {"RY": 100}, 2)
+    assert all(item.score is None and item.regime is None for item in horizons)
+    assert breadth.advancers is None
+    assert breadth.advance_ratio is None
+    assert breadth.up_volume is None
 
 
 @pytest.mark.asyncio

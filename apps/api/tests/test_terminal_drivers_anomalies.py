@@ -66,6 +66,10 @@ def test_momentum_acceleration_sma_cross_and_score_shift() -> None:
     assert "momentum_acceleration" in types
     assert "sma_cross" in types
     assert "score_shift" in types
+    first = build_anomalies([terminal_row("SHOP", change=2.5, score=95)], {"SHOP": candles})
+    second = build_anomalies([terminal_row("SHOP", change=2.5, score=95)], {"SHOP": candles})
+    assert [(item.id, item.rarity_score, item.z_score) for item in first] == [(item.id, item.rarity_score, item.z_score) for item in second]
+    assert all(0 <= item.rarity_score <= 100 for item in first)
 
 
 def test_rotation_relative_strength_and_previous_coordinates_are_deterministic() -> None:

@@ -70,6 +70,13 @@ def test_terminal_route_with_demo_provider() -> None:
         assert len(payload["sectors"]) >= 8
         assert len(payload["leaders"]) == 8
         assert len(payload["laggards"]) == 8
+        assert [item["key"] for item in payload["regime_horizons"]] == ["session", "5d", "20d", "3m"]
+        assert payload["regime_history"] == sorted(payload["regime_history"], key=lambda item: item["timestamp"])
+        radar_symbols = [item["symbol"] for item in payload["radar_items"]]
+        assert len(radar_symbols) == payload["data_quality"]["real_symbols"]
+        assert len(radar_symbols) == len(set(radar_symbols))
+        assert payload["breadth_pro"]["coverage_percent"] >= 70
+        assert payload["methodology_sections"]
     finally:
         settings.market_data_provider = original
         _reset()

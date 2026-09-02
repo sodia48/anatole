@@ -1,5 +1,5 @@
 import type { TerminalOpportunity, TerminalSnapshot } from "@/src/lib/api/types";
-import { filterAndSortRadar, uniqueRadarItems } from "./model";
+import { filterAndSortRadar, opportunityLabel, regimeLabel, riskLabel, sectorStateLabel, uniqueRadarItems } from "./model";
 
 function opportunity(overrides: Partial<TerminalOpportunity>): TerminalOpportunity {
   return { symbol: "RY", name: "Royal Bank", sector: "Financials", price: 200, change_percent: 1, momentum_20d: 5, rsi_14: 55, relative_volume: 1.2, score: 70, signal: "Constructif", opportunity_type: "Leadership", reasons: ["Score élevé"], ...overrides };
@@ -29,5 +29,13 @@ describe("Terminal radar Web-parity model", () => {
 
   it("filters sectors locally without another snapshot", () => {
     expect(filterAndSortRadar(uniqueRadarItems(snapshot), "all", "Financials").map((item) => item.symbol)).toEqual(["RY"]);
+  });
+
+  it("keeps French labels and translates the deterministic Terminal vocabulary to English", () => {
+    expect(regimeLabel("Haussier", "fr")).toBe("Haussier");
+    expect(regimeLabel("Haussier", "en")).toBe("Bullish");
+    expect(riskLabel("Modéré", "en")).toBe("Moderate");
+    expect(sectorStateLabel("Faiblesse", "en")).toBe("Weakness");
+    expect(opportunityLabel("Sous pression", "en")).toBe("Under pressure");
   });
 });
