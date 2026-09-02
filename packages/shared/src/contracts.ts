@@ -24,10 +24,10 @@ export type ScreenerSnapshot = {
 };
 
 export type TerminalComponent = { key: string; label: string; score: number | null; value: string; description: string };
-export type TerminalSectorState = "Leadership" | "Accumulation" | "Neutre" | "Distribution" | "Faiblesse";
+export type TerminalSectorState = "Leadership" | "Accumulation" | "Neutre" | "Distribution" | "Faiblesse" | "N/D";
 export type TerminalSector = {
-  sector: string; change_percent: number; momentum_20d: number; average_score: number;
-  relative_volume: number; advancers: number; decliners: number; leadership_score: number; state: TerminalSectorState;
+  sector: string; change_percent: number; momentum_20d: number | null; average_score: number | null;
+  relative_volume: number | null; advancers: number; decliners: number; leadership_score: number | null; state: TerminalSectorState;
 };
 export type TerminalOpportunity = {
   symbol: string; name: string; sector: string; price: number; change_percent: number; momentum_20d: number;

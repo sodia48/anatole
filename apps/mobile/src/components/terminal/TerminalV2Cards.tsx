@@ -28,7 +28,7 @@ export function PulseCard({ snapshot, range, onRange }: { snapshot: TerminalSnap
     return snapshot.regime_history.filter((point) => point.timestamp >= cutoff && point.regime_score != null);
   }, [range, snapshot.regime_history]);
   const width = 340, height = 170;
-  const scorePath = points.map((point, index) => `${index ? "L" : "M"}${index / Math.max(points.length - 1, 1) * width},${height - (point.regime_score ?? 0) / 100 * height}`).join(" ");
+  const scorePath = points.map((point, index) => `${index ? "L" : "M"}${index / Math.max(points.length - 1, 1) * width},${height - point.regime_score! / 100 * height}`).join(" ");
   const benchmark = points.map((point) => point.benchmark_value).filter((value): value is number => value != null);
   const benchmarkMin = benchmark.length ? Math.min(...benchmark) : 0;
   const benchmarkMax = benchmark.length ? Math.max(...benchmark) : 0;

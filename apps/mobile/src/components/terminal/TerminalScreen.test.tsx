@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { AppState } from "react-native";
 
 import type { TerminalOpportunity, TerminalRadarItem, TerminalRadarPreset, TerminalSnapshot } from "@/src/lib/api/types";
-import { TerminalScreen } from "./TerminalScreen";
+import { advancedRadarItems, TerminalScreen } from "./TerminalScreen";
 
 const mockUseQuery = jest.fn();
 const mockCancelQueries = jest.fn(async () => undefined);
@@ -39,7 +39,11 @@ const terminalSnapshot = {
   universe: "S&P/TSX 60", regime: "Constructif", regime_score: 72, risk_level: "Modéré", weighted_change_percent: 0.7,
   advance_ratio: 63, average_anatole_score: 68, average_momentum_20d: 4.5, above_sma20_percent: 61,
   above_sma50_percent: 58, high_relative_volume_count: 4,
-  components: [{ key: "breadth", label: "Largeur du marché", score: 70, value: "38 hausses", description: "38 hausses contre 22 baisses." }],
+  components: [
+    { key: "breadth", label: "Largeur du marché", score: 70, value: "38 hausses", description: "38 hausses contre 22 baisses." },
+    { key: "quality", label: "Qualité", score: null, value: "N/D", description: "Couverture insuffisante." },
+    { key: "zero", label: "Score zéro", score: 0, value: "0", description: "Score réellement observé à zéro." },
+  ],
   sectors: [
     { sector: "Financials", change_percent: 1, momentum_20d: 5, average_score: 72, relative_volume: 1.3, advancers: 8, decliners: 2, leadership_score: 84, state: "Leadership" },
     { sector: "Technology", change_percent: -0.5, momentum_20d: 2, average_score: 60, relative_volume: 0.9, advancers: 2, decliners: 3, leadership_score: 55, state: "Neutre" },
@@ -153,6 +157,31 @@ describe("mobile Pro Terminal", () => {
     await user.press(view.getByTestId("terminal-details-toggle"));
     expect(view.getByTestId("terminal-component-breadth")).toBeTruthy();
     expect(view.getByText("Méthodologie complète du Terminal.")).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("keeps null component scores as N/D without drawing a synthetic zero-width bar", async () => {
+    const view = await render(<TerminalScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("terminal-filter-sector-Financials"));
+    await user.press(view.getByTestId("terminal-details-toggle"));
+    expect(view.getByTestId("terminal-component-quality")).toHaveTextContent(/N\/D/);
+    expect(view.queryByTestId("terminal-component-bar-quality")).toBeNull();
+    expect(view.getByTestId("terminal-component-zero")).toHaveTextContent(/0\/100/);
+    expect(view.getByTestId("terminal-component-bar-zero")).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("uses the legacy visual radar without fabricating V2 volume fields for an old snapshot", async () => {
+    const legacySnapshot = { ...terminalSnapshot } as Partial<TerminalSnapshot>;
+    delete legacySnapshot.radar_items;
+    expect(advancedRadarItems(legacySnapshot as TerminalSnapshot)).toBeNull();
+    mockUseQuery.mockReturnValue({ ...queryResult(), data: legacySnapshot });
+    const view = await render(<TerminalScreen />);
+    expect(view.getByTestId("terminal-advanced-radar-unavailable")).toHaveTextContent("Radar avancé indisponible avec ce snapshot.");
+    expect(view.queryByTestId("terminal-advanced-filters-open")).toBeNull();
+    expect(view.getAllByTestId("terminal-radar-RY")).toHaveLength(1);
+    expect(view.getByText("Radar · 3/3")).toBeTruthy();
     await view.unmount();
   });
 

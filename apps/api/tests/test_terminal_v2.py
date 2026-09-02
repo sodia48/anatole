@@ -17,6 +17,7 @@ from app.services.terminal_engine import (
     build_regime_horizons,
     build_sector_rotation,
     data_quality,
+    legacy_sectors,
     rebuild_real_rows,
     regime_label,
 )
@@ -122,6 +123,21 @@ def test_low_coverage_returns_null_cross_sectional_metrics_not_zero() -> None:
     assert breadth.advancers is None
     assert breadth.advance_ratio is None
     assert breadth.up_volume is None
+
+
+def test_missing_rotation_values_remain_unknown_in_legacy_sectors() -> None:
+    rows = [row("RY")]
+    rotation = build_sector_rotation(rows, {}, [], 1)
+    sectors = legacy_sectors(rotation, rows)
+    assert len(sectors) == 1
+    sector = sectors[0]
+    assert sector.momentum_20d is None
+    assert sector.average_score is None
+    assert sector.relative_volume is None
+    assert sector.leadership_score is None
+    assert sector.state == "N/D"
+    assert "Faiblesse" not in sector.model_dump().values()
+    assert not any(value == 0 for key, value in sector.model_dump().items() if key in {"momentum_20d", "average_score", "relative_volume", "leadership_score"})
 
 
 def test_52_week_depth_uses_elapsed_time_and_low_coverage_is_unknown() -> None:

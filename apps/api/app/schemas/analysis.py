@@ -119,18 +119,19 @@ class TerminalComponent(BaseModel):
 class TerminalSector(BaseModel):
     sector: str
     change_percent: float
-    momentum_20d: float
-    average_score: float
-    relative_volume: float
+    momentum_20d: float | None = None
+    average_score: float | None = None
+    relative_volume: float | None = None
     advancers: int
     decliners: int
-    leadership_score: float = Field(ge=0, le=100)
+    leadership_score: float | None = Field(default=None, ge=0, le=100)
     state: Literal[
         "Leadership",
         "Accumulation",
         "Neutre",
         "Distribution",
         "Faiblesse",
+        "N/D",
     ]
 
 

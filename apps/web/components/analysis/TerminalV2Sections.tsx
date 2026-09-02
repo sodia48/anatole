@@ -73,7 +73,7 @@ function PulseChart({ snapshot, range }: { snapshot: TerminalSnapshot; range: "3
   }, [range, snapshot.regime_history]);
   if (points.length < 2) return <div className={styles.v2Empty}>N/D</div>;
   const x = (index: number) => index / Math.max(points.length - 1, 1) * 1000;
-  const scorePath = points.map((point, index) => `${index ? "L" : "M"}${x(index)},${300 - (point.regime_score ?? 0) * 3}`).join(" ");
+  const scorePath = points.map((point, index) => `${index ? "L" : "M"}${x(index)},${300 - point.regime_score! * 3}`).join(" ");
   const benchmark = points.filter((point) => point.benchmark_value != null);
   const min = Math.min(...benchmark.map((point) => point.benchmark_value ?? 100));
   const max = Math.max(...benchmark.map((point) => point.benchmark_value ?? 100));

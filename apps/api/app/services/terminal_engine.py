@@ -482,7 +482,7 @@ def build_sector_rotation(
             previous_y=round(previous_y, 2) if previous_y is not None else None, quadrant=quadrant, state=state,
             leadership_score=round(leadership, 1),
         ))
-    return sorted(output, key=lambda item: item.leadership_score or -1, reverse=True)
+    return sorted(output, key=lambda item: item.leadership_score if item.leadership_score is not None else -1, reverse=True)
 
 
 def legacy_sectors(rotation: list[TerminalSectorRotation], rows: list[ScreenerRow]) -> list[TerminalSector]:
@@ -492,12 +492,13 @@ def legacy_sectors(rotation: list[TerminalSectorRotation], rows: list[ScreenerRo
     output: list[TerminalSector] = []
     for item in rotation:
         members = grouped[item.sector]
+        leadership = item.leadership_score
         output.append(TerminalSector(
             sector=item.sector, change_percent=round(statistics.fmean(row.change_percent for row in members), 3),
-            momentum_20d=item.momentum_20d or 0, average_score=item.average_score or 0,
-            relative_volume=item.relative_volume or 0, advancers=sum(row.change_percent > 0 for row in members),
-            decliners=sum(row.change_percent < 0 for row in members), leadership_score=item.leadership_score or 0,
-            state="Leadership" if (item.leadership_score or 0) >= 72 else "Accumulation" if (item.leadership_score or 0) >= 60 else "Neutre" if (item.leadership_score or 0) >= 44 else "Distribution" if (item.leadership_score or 0) >= 30 else "Faiblesse",
+            momentum_20d=item.momentum_20d, average_score=item.average_score,
+            relative_volume=item.relative_volume, advancers=sum(row.change_percent > 0 for row in members),
+            decliners=sum(row.change_percent < 0 for row in members), leadership_score=leadership,
+            state="N/D" if leadership is None else "Leadership" if leadership >= 72 else "Accumulation" if leadership >= 60 else "Neutre" if leadership >= 44 else "Distribution" if leadership >= 30 else "Faiblesse",
         ))
     return output
 

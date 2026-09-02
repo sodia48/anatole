@@ -56,8 +56,8 @@ function formatPrice(value: number, language: AnatoleLanguage): string {
   }).format(value);
 }
 
-function valueClass(value: number): string {
-  if (value === 0) {
+function valueClass(value: number | null): string {
+  if (value == null || value === 0) {
     return "";
   }
   return value > 0 ? "positive" : "negative";
@@ -393,8 +393,9 @@ export function TerminalClient() {
     return items.sort((left, right) => right.score - left.score);
   }, [feedMode, radarItems, sectorFilter]);
 
-  const strongestSector = snapshot?.sectors[0];
-  const weakestSector = snapshot?.sectors.at(-1);
+  const scoredSectors = snapshot?.sectors.filter((sector) => sector.leadership_score != null) ?? [];
+  const strongestSector = scoredSectors[0];
+  const weakestSector = scoredSectors.at(-1);
   const generatedAt = useMemo(() => {
     if (!snapshot) {
       return "";
@@ -437,7 +438,7 @@ export function TerminalClient() {
             <div
               className={styles.scoreRing}
               style={{
-                background: `conic-gradient(#20caa3 0 ${snapshot.regime_score ?? 0}%, rgba(52,83,102,.32) ${snapshot.regime_score ?? 0}% 100%)`,
+                background: snapshot.regime_score == null ? "rgba(52,83,102,.32)" : `conic-gradient(#20caa3 0 ${snapshot.regime_score}%, rgba(52,83,102,.32) ${snapshot.regime_score}% 100%)`,
               }}
             >
               <span>
@@ -480,7 +481,7 @@ export function TerminalClient() {
           <section className={styles.terminalKpiStrip}>
             <article>
               <span>TSX 60</span>
-              <strong className={valueClass(snapshot.weighted_change_percent ?? 0)}>
+              <strong className={valueClass(snapshot.weighted_change_percent)}>
                 {snapshot.weighted_change_percent == null ? "N/D" : formatPercent(snapshot.weighted_change_percent, 2, language)}
               </strong>
             </article>
@@ -503,7 +504,7 @@ export function TerminalClient() {
           <section className={`panel ${styles.terminalFeedPanel}`}>
             <div className={styles.terminalFeedHeading}>
               <div>
-                <span className="eyebrow">{pick(language, "RADAR INSTITUTIONNEL", "INSTITUTIONAL RADAR")}</span>
+                <span className="eyebrow">{pick(language, "RADAR PRO", "PRO RADAR")}</span>
                 <h2>{pick(language, "Signaux à surveiller", "Signals to monitor")}</h2>
                 <p>
                   {pick(language, "Les cartes classent les configurations selon le score, le volume, le momentum et la pression observée.", "Cards rank configurations by score, volume, momentum, and observed pressure.")}
@@ -571,10 +572,10 @@ export function TerminalClient() {
                       {stateLabel(sector.state, language)}
                     </span>
                   </div>
-                  <div className={styles.terminalSectorScore}>
+                  {sector.leadership_score != null ? <div className={styles.terminalSectorScore} data-testid={`terminal-sector-score-${sector.sector}`}>
                     <span style={{ width: `${sector.leadership_score}%` }} />
                     <i style={{ left: `calc(${sector.leadership_score}% - 4px)` }} />
-                  </div>
+                  </div> : null}
                   <div className={styles.terminalSectorMetrics}>
                     <div>
                       <span>{pick(language, "Séance", "Session")}</span>
@@ -585,7 +586,7 @@ export function TerminalClient() {
                     <div>
                       <span>Momentum</span>
                       <strong className={valueClass(sector.momentum_20d)}>
-                        {formatPercent(sector.momentum_20d, 1, language)}
+                        {sector.momentum_20d == null ? "N/D" : formatPercent(sector.momentum_20d, 1, language)}
                       </strong>
                     </div>
                     <div>
@@ -660,9 +661,9 @@ export function TerminalClient() {
                       <span>{component.label}</span>
                       <strong>{component.score?.toFixed(0) ?? "N/D"}</strong>
                     </div>
-                    <div className={styles.componentTrack}>
-                      <span style={{ width: `${component.score ?? 0}%` }} />
-                    </div>
+                    {component.score != null ? <div className={styles.componentTrack} data-testid={`terminal-component-score-${component.key}`}>
+                      <span style={{ width: `${component.score}%` }} />
+                    </div> : null}
                     <b>{component.value}</b>
                     <p>{component.description}</p>
                   </article>
@@ -688,11 +689,11 @@ export function TerminalClient() {
               <section className={styles.kpiGrid}>
                 <article className={styles.notice}>
                   <strong>Leadership</strong><br />
-                  {pick(language, `${strongestSector?.sector ?? "—"} domine avec un score de ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${strongestSector?.sector ?? "—"} leads with a score of ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
+                  {pick(language, `${strongestSector?.sector ?? "N/D"} domine avec un score de ${strongestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`, `${strongestSector?.sector ?? "N/D"} leads with a score of ${strongestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`)}
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Faiblesse", "Weakness")}</strong><br />
-                  {pick(language, `${weakestSector?.sector ?? "—"} ferme la marche à ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${weakestSector?.sector ?? "—"} trails at ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
+                  {pick(language, `${weakestSector?.sector ?? "N/D"} ferme la marche à ${weakestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`, `${weakestSector?.sector ?? "N/D"} trails at ${weakestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`)}
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Impulsion moyenne", "Average momentum")}</strong><br />
