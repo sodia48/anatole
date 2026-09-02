@@ -362,8 +362,19 @@ def build_breadth(
     coverage = len(rows) / max(expected, 1) * 100
     unavailable = coverage < COVERAGE_THRESHOLD_PERCENT
     divergence = TerminalBreadthDivergence(active=False, severity="info", title="Aucune divergence", explanation="Aucune divergence déterministe détectée entre l'indice et sa largeur.")
+    eligible_52w: dict[str, list[Candle]] = {}
+    for row in rows:
+        sample = histories.get(row.symbol, [])[-252:]
+        if len(sample) >= 200 and sample[-1].time - sample[0].time >= 330 * 86_400:
+            eligible_52w[row.symbol] = sample
+    high_low_coverage = len(eligible_52w) / max(expected, 1) * 100
     if unavailable:
-        return TerminalBreadthPro(coverage_percent=round(coverage, 1), divergence=divergence)
+        return TerminalBreadthPro(
+            coverage_percent=round(coverage, 1),
+            high_low_52w_eligible_symbols=len(eligible_52w),
+            high_low_52w_coverage_percent=round(high_low_coverage, 1),
+            divergence=divergence,
+        )
     advancers = sum(row.change_percent > 0.001 for row in rows)
     decliners = sum(row.change_percent < -0.001 for row in rows)
     unchanged = len(rows) - advancers - decliners
@@ -377,8 +388,8 @@ def build_breadth(
         sma200 = _sma(candles, 200)
         if sma200 is not None:
             above200.append(candles[-1].close > sma200)
-        sample = candles[-252:]
-        if len(sample) >= 200:
+        sample = eligible_52w.get(row.symbol)
+        if sample:
             highs += sample[-1].high >= max(item.high for item in sample[:-1])
             lows += sample[-1].low <= min(item.low for item in sample[:-1])
     up_volume = sum(row.volume for row in rows if row.change_percent > 0.001)
@@ -420,7 +431,10 @@ def build_breadth(
         above_sma20_percent=round(sum(row.price > (row.sma_20 or math.inf) for row in above20_rows) / max(len(above20_rows), 1) * 100, 1),
         above_sma50_percent=round(sum(row.price > (row.sma_50 or math.inf) for row in above50_rows) / max(len(above50_rows), 1) * 100, 1),
         above_sma200_percent=round(sum(above200) / len(above200) * 100, 1) if above200 else None,
-        new_highs_52w=highs, new_lows_52w=lows, up_volume=up_volume, down_volume=down_volume,
+        new_highs_52w=highs if high_low_coverage >= COVERAGE_THRESHOLD_PERCENT else None,
+        new_lows_52w=lows if high_low_coverage >= COVERAGE_THRESHOLD_PERCENT else None,
+        high_low_52w_eligible_symbols=len(eligible_52w), high_low_52w_coverage_percent=round(high_low_coverage, 1),
+        up_volume=up_volume, down_volume=down_volume,
         neutral_volume=neutral_volume, up_volume_ratio_percent=round(up_volume / max(up_volume + down_volume, 1) * 100, 1),
         equal_weight_change_percent=round(equal_weight, 3), cap_weight_change_percent=round(cap_weight, 3),
         concentration_spread_percent_points=round(cap_weight - equal_weight, 3), positive_sectors=positive_sectors,

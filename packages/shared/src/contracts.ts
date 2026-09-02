@@ -54,7 +54,8 @@ export type TerminalBreadthDivergence = { active: boolean; severity: "info" | "w
 export type TerminalBreadthPro = {
   advancers: number | null; decliners: number | null; unchanged: number | null; advance_ratio: number | null;
   above_sma20_percent: number | null; above_sma50_percent: number | null; above_sma200_percent: number | null;
-  new_highs_52w: number | null; new_lows_52w: number | null; up_volume: number | null; down_volume: number | null;
+  new_highs_52w: number | null; new_lows_52w: number | null; high_low_52w_eligible_symbols: number;
+  high_low_52w_coverage_percent: number; up_volume: number | null; down_volume: number | null;
   neutral_volume: number | null; up_volume_ratio_percent: number | null; equal_weight_change_percent: number | null;
   cap_weight_change_percent: number | null; concentration_spread_percent_points: number | null;
   positive_sectors: number | null; negative_sectors: number | null; positive_sectors_percent: number | null;

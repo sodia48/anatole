@@ -8,7 +8,7 @@ from app.core.resilience import shared_http_client
 from app.schemas.discovery import ScreenerRow
 from app.schemas.stocks import Candle
 from app.services.bank_of_canada import bank_of_canada_valet_service
-from app.services.terminal_drivers import correlation, rate_market_drivers, yahoo_market_drivers
+from app.services.terminal_drivers import correlation, correlation_yield_changes_to_equity_returns, rate_market_drivers, yahoo_market_drivers
 from app.services.terminal_engine import build_anomalies, build_sector_rotation
 
 
@@ -84,7 +84,8 @@ def test_rotation_relative_strength_and_previous_coordinates_are_deterministic()
 
 def test_yahoo_driver_normalization_correlation_and_unavailable_nulls() -> None:
     benchmark = history(drift=0.2)
-    drivers = yahoo_market_drivers({"CL=F": history(drift=0.3)}, benchmark)
+    observed_now = datetime.fromtimestamp(benchmark[-1].time, UTC)
+    drivers = yahoo_market_drivers({"CL=F": history(drift=0.3)}, benchmark, now=observed_now)
     wti = next(item for item in drivers if item.key == "wti")
     brent = next(item for item in drivers if item.key == "brent")
     assert wti.status == "available"
@@ -111,13 +112,55 @@ async def test_bank_of_canada_valet_fixture_and_yield_changes_are_bps(monkeypatc
     bank_of_canada_valet_service._cache._entries.clear()
     monkeypatch.setattr(shared_http_client, "get_json", fixture)
     series = await bank_of_canada_valet_service.yields()
-    drivers = rate_market_drivers(series)
+    drivers = rate_market_drivers(series, history(count=25), now=datetime(2026, 1, 25, tzinfo=UTC))
     two_year = next(item for item in drivers if item.key == "canada_2y")
     ten_year = next(item for item in drivers if item.key == "canada_10y")
     assert len(series["V39051"]) == 25 and len(series["V39055"]) == 25
     assert two_year.change_unit == "bps" and two_year.change_5d == 5
     assert ten_year.change_20d == 40
     assert two_year.source_name == "Banque du Canada / Bank of Canada"
+
+
+def test_canada_2y_and_10y_correlate_yield_changes_to_aligned_tsx_returns() -> None:
+    benchmark = history(count=70, drift=0.35)
+    level = 3.0
+    points: list[tuple[int, float]] = []
+    for index, candle in enumerate(benchmark):
+        if index:
+            level += (candle.close / benchmark[index - 1].close - 1) * 10
+        points.append((candle.time, level))
+    value = correlation_yield_changes_to_equity_returns(points, benchmark)
+    drivers = rate_market_drivers({"V39051": points, "V39055": points}, benchmark, now=datetime.fromtimestamp(points[-1][0], UTC))
+    assert value is not None and value > 0.99
+    for key in ("canada_2y", "canada_10y"):
+        driver = next(item for item in drivers if item.key == key)
+        assert driver.correlation_60d_to_tsx is not None and driver.correlation_60d_to_tsx > 0.99
+        assert driver.relationship_label == "Corrélation fortement positive entre variations du taux et rendements du TSX"
+
+
+def test_yield_correlation_requires_twenty_common_observations() -> None:
+    benchmark = history(count=20)
+    points = [(candle.time, 3 + index * 0.01) for index, candle in enumerate(benchmark)]
+    assert correlation_yield_changes_to_equity_returns(points, benchmark) is None
+    assert all(item.correlation_60d_to_tsx is None for item in rate_market_drivers({"V39051": points, "V39055": points}, benchmark, now=datetime.fromtimestamp(points[-1][0], UTC)))
+
+
+def test_driver_freshness_retains_real_stale_values_and_unavailable_is_null() -> None:
+    yahoo = history(count=30)
+    last = datetime.fromtimestamp(yahoo[-1].time, UTC)
+    fresh = next(item for item in yahoo_market_drivers({"CL=F": yahoo}, yahoo, now=last + timedelta(days=3)) if item.key == "wti")
+    stale = next(item for item in yahoo_market_drivers({"CL=F": yahoo}, yahoo, now=last + timedelta(days=8)) if item.key == "wti")
+    unavailable = next(item for item in yahoo_market_drivers({}, yahoo, now=last) if item.key == "wti")
+    single_yahoo = next(item for item in yahoo_market_drivers({"CL=F": yahoo[-1:]}, yahoo, now=last + timedelta(days=8)) if item.key == "wti")
+    points = [(item.time, 3 + index * 0.01) for index, item in enumerate(yahoo)]
+    stale_rate = next(item for item in rate_market_drivers({"V39051": points}, yahoo, now=last + timedelta(days=8)) if item.key == "canada_2y")
+    single_rate = next(item for item in rate_market_drivers({"V39051": points[-1:]}, yahoo, now=last + timedelta(days=8)) if item.key == "canada_2y")
+    assert fresh.status == "available"
+    assert stale.status == "stale" and stale.value == fresh.value and stale.as_of == fresh.as_of
+    assert stale_rate.status == "stale" and stale_rate.value == points[-1][1]
+    assert single_yahoo.status == "stale" and single_yahoo.value == round(yahoo[-1].close, 4) and single_yahoo.change_1d is None
+    assert single_rate.status == "stale" and single_rate.value == points[-1][1] and single_rate.change_1d is None
+    assert unavailable.status == "unavailable" and unavailable.value is None and unavailable.as_of is None
 
 
 def test_unavailable_bank_of_canada_is_null_not_demo() -> None:

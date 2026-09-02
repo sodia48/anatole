@@ -17,19 +17,12 @@ from app.schemas.analysis import (
     ComparisonSnapshot,
     CorrelationMatrix,
     TerminalAlert,
-    TerminalBreadthPro,
     TerminalComponent,
-    TerminalDataQuality,
-    TerminalMethodologySection,
-    TerminalOpportunity,
     TerminalRadarItem,
-    TerminalRegimeHorizon,
-    TerminalSector,
     TerminalSnapshot,
 )
 from app.schemas.fundamentals import FundamentalSnapshot
 from app.schemas.stocks import Candle, Quote
-from app.services.cockpit import cockpit_service
 from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
@@ -351,34 +344,6 @@ def _strengths_weaknesses(
     return strengths[:4], weaknesses[:4]
 
 
-def _opportunity_from_row(row, opportunity_type: str) -> TerminalOpportunity:
-    reasons: list[str] = []
-    if row.score >= 72:
-        reasons.append(f"Score Anatole élevé ({row.score:.0f}/100)")
-    if row.momentum_20d >= 5:
-        reasons.append(f"Momentum 20 j de {row.momentum_20d:+.1f} %")
-    if row.relative_volume >= 1.4:
-        reasons.append(f"Volume relatif {row.relative_volume:.1f}×")
-    if row.trend == "Haussière":
-        reasons.append("Cours au-dessus de ses moyennes clés")
-    if row.rsi_14 is not None and row.rsi_14 < 70:
-        reasons.append("RSI encore sous la zone de surachat")
-    return TerminalOpportunity(
-        symbol=row.symbol,
-        name=row.name,
-        sector=row.sector,
-        price=row.price,
-        change_percent=row.change_percent,
-        momentum_20d=row.momentum_20d,
-        rsi_14=row.rsi_14,
-        relative_volume=row.relative_volume,
-        score=row.score,
-        signal=row.signal,
-        opportunity_type=opportunity_type,
-        reasons=reasons[:4] or ["Profil à surveiller dans Focus"],
-    )
-
-
 class AnalysisService:
     comparison_ttl_seconds = 300.0
     terminal_ttl_seconds = 60.0
@@ -588,251 +553,6 @@ class AnalysisService:
             self._cache.set(cache_key, snapshot)
             return snapshot
 
-    async def _terminal_legacy(self) -> TerminalSnapshot:
-        cache_key = "terminal:tsx60"
-        cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
-        if isinstance(cached, TerminalSnapshot):
-            return cached
-
-        async with self._cache.lock(cache_key):
-            cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
-            if isinstance(cached, TerminalSnapshot):
-                return cached
-
-            screener, cockpit = await asyncio.gather(
-                screener_service.get_tsx60(),
-                cockpit_service.get_tsx60(),
-            )
-            rows = screener.items
-            count = max(len(rows), 1)
-            average_score = sum(row.score for row in rows) / count
-            average_momentum = sum(row.momentum_20d for row in rows) / count
-            above_sma20 = sum(
-                row.sma_20 is not None and row.price > row.sma_20
-                for row in rows
-            ) / count * 100
-            above_sma50 = sum(
-                row.sma_50 is not None and row.price > row.sma_50
-                for row in rows
-            ) / count * 100
-            high_relative_volume_count = sum(row.relative_volume >= 1.5 for row in rows)
-            breadth_score = cockpit.breadth.advance_ratio
-            trend_score = (above_sma20 * 0.45 + above_sma50 * 0.55)
-            momentum_score = max(0.0, min(100.0, 50 + average_momentum * 4))
-            tape_score = max(0.0, min(100.0, 50 + cockpit.weighted_change_percent * 16))
-            regime_score = round(
-                breadth_score * 0.30
-                + trend_score * 0.30
-                + average_score * 0.22
-                + momentum_score * 0.12
-                + tape_score * 0.06,
-                1,
-            )
-            if regime_score >= 72:
-                regime = "Haussier"
-            elif regime_score >= 60:
-                regime = "Constructif"
-            elif regime_score >= 45:
-                regime = "Neutre"
-            elif regime_score >= 32:
-                regime = "Fragile"
-            else:
-                regime = "Baissier"
-
-            if regime_score >= 68 and cockpit.breadth.advance_ratio >= 55:
-                risk_level = "Faible"
-            elif regime_score >= 48:
-                risk_level = "Modéré"
-            elif regime_score >= 30:
-                risk_level = "Élevé"
-            else:
-                risk_level = "Critique"
-
-            components = [
-                TerminalComponent(
-                    key="breadth",
-                    label="Largeur du marché",
-                    score=round(breadth_score, 1),
-                    value=f"{cockpit.breadth.advancers} hausses / {cockpit.breadth.decliners} baisses",
-                    description="Part des titres en hausse parmi les mouvements directionnels du TSX 60.",
-                ),
-                TerminalComponent(
-                    key="trend",
-                    label="Structure de tendance",
-                    score=round(trend_score, 1),
-                    value=f"{above_sma50:.0f} % au-dessus de la MM50",
-                    description="Proportion des titres soutenus par leurs moyennes mobiles à 20 et 50 séances.",
-                ),
-                TerminalComponent(
-                    key="momentum",
-                    label="Impulsion 20 jours",
-                    score=round(momentum_score, 1),
-                    value=f"{average_momentum:+.2f} % en moyenne",
-                    description="Momentum transversal moyen des composantes du TSX 60.",
-                ),
-                TerminalComponent(
-                    key="quality",
-                    label="Qualité des signaux",
-                    score=round(average_score, 1),
-                    value=f"{average_score:.1f}/100",
-                    description="Moyenne du score Anatole combinant prix, volume, momentum, RSI et tendance.",
-                ),
-            ]
-
-            sector_rows: dict[str, list] = defaultdict(list)
-            for row in rows:
-                sector_rows[row.sector].append(row)
-            cockpit_sector = {item.sector: item for item in cockpit.sectors}
-            sectors: list[TerminalSector] = []
-            for sector, members in sector_rows.items():
-                member_count = max(len(members), 1)
-                change = cockpit_sector.get(sector).change_percent if sector in cockpit_sector else sum(item.change_percent for item in members) / member_count
-                momentum = sum(item.momentum_20d for item in members) / member_count
-                score = sum(item.score for item in members) / member_count
-                relative_volume = sum(item.relative_volume for item in members) / member_count
-                advancers = sum(item.change_percent > 0 for item in members)
-                decliners = sum(item.change_percent < 0 for item in members)
-                leadership = max(
-                    0.0,
-                    min(
-                        100.0,
-                        score * 0.45
-                        + max(0, min(100, 50 + momentum * 4)) * 0.35
-                        + max(0, min(100, 50 + change * 12)) * 0.20,
-                    ),
-                )
-                if leadership >= 72:
-                    state = "Leadership"
-                elif leadership >= 60:
-                    state = "Accumulation"
-                elif leadership >= 44:
-                    state = "Neutre"
-                elif leadership >= 30:
-                    state = "Distribution"
-                else:
-                    state = "Faiblesse"
-                sectors.append(
-                    TerminalSector(
-                        sector=sector,
-                        change_percent=round(change, 3),
-                        momentum_20d=round(momentum, 2),
-                        average_score=round(score, 1),
-                        relative_volume=round(relative_volume, 2),
-                        advancers=advancers,
-                        decliners=decliners,
-                        leadership_score=round(leadership, 1),
-                        state=state,
-                    )
-                )
-            sectors.sort(key=lambda item: item.leadership_score, reverse=True)
-
-            ranked = sorted(rows, key=lambda row: row.score, reverse=True)
-            leaders = [_opportunity_from_row(row, "Leadership") for row in ranked[:8]]
-            laggards = [
-                _opportunity_from_row(row, "Sous pression")
-                for row in sorted(rows, key=lambda row: row.score)[:8]
-            ]
-            opportunity_rows = [
-                row
-                for row in ranked
-                if row.score >= 62
-                and row.momentum_20d > 0
-                and (row.rsi_14 is None or row.rsi_14 < 75)
-            ][:12]
-            opportunities = [
-                _opportunity_from_row(
-                    row,
-                    "Accélération" if row.relative_volume >= 1.4 else "Tendance",
-                )
-                for row in opportunity_rows
-            ]
-
-            alerts: list[TerminalAlert] = []
-            for row in rows:
-                if row.relative_volume >= 1.8 and abs(row.change_percent) >= 1.0:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"volume:{row.symbol}",
-                            severity="high" if abs(row.change_percent) >= 2.5 else "watch",
-                            category="Prix-volume",
-                            symbol=row.symbol,
-                            title=f"Activité inhabituelle sur {row.symbol}",
-                            detail=(
-                                f"Volume relatif {row.relative_volume:.1f}× avec une variation "
-                                f"de {row.change_percent:+.2f} %."
-                            ),
-                        )
-                    )
-                if row.rsi_14 is not None and row.rsi_14 >= 75:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"rsi:{row.symbol}",
-                            severity="watch",
-                            category="Extension",
-                            symbol=row.symbol,
-                            title=f"{row.symbol} techniquement étendu",
-                            detail=f"RSI 14 à {row.rsi_14:.1f}; le titre peut rester fort, mais le risque de consolidation augmente.",
-                        )
-                    )
-                if row.momentum_20d >= 5 and row.change_percent <= -1.5:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"pullback:{row.symbol}",
-                            severity="info",
-                            category="Dislocation",
-                            symbol=row.symbol,
-                            title=f"Repli dans une tendance positive — {row.symbol}",
-                            detail=f"Momentum 20 j de {row.momentum_20d:+.1f} % malgré une séance à {row.change_percent:+.2f} %.",
-                        )
-                    )
-            if cockpit.breadth.advance_ratio < 35:
-                alerts.insert(
-                    0,
-                    TerminalAlert(
-                        id="market-breadth",
-                        severity="high",
-                        category="Marché",
-                        title="Largeur de marché faible",
-                        detail=(
-                            f"Seulement {cockpit.breadth.advance_ratio:.0f} % des mouvements directionnels "
-                            "sont positifs; la hausse de l'indice peut être concentrée."
-                        ),
-                    ),
-                )
-            alerts = sorted(
-                alerts,
-                key=lambda item: {"high": 0, "watch": 1, "info": 2}[item.severity],
-            )[:16]
-
-            snapshot = TerminalSnapshot(
-                universe=screener.universe,
-                regime=regime,
-                regime_score=regime_score,
-                risk_level=risk_level,
-                weighted_change_percent=cockpit.weighted_change_percent,
-                advance_ratio=cockpit.breadth.advance_ratio,
-                average_anatole_score=round(average_score, 1),
-                average_momentum_20d=round(average_momentum, 2),
-                above_sma20_percent=round(above_sma20, 1),
-                above_sma50_percent=round(above_sma50, 1),
-                high_relative_volume_count=high_relative_volume_count,
-                components=components,
-                sectors=sectors,
-                opportunities=opportunities,
-                alerts=alerts,
-                leaders=leaders,
-                laggards=laggards,
-                methodology=(
-                    "Le régime combine largeur de marché, position par rapport aux moyennes mobiles, "
-                    "score Anatole moyen, momentum transversal et variation pondérée. Les radars sont "
-                    "des signaux de recherche, pas des recommandations d'achat ou de vente."
-                ),
-                generated_at=datetime.now(UTC),
-                refresh_after_seconds=60,
-            )
-            self._cache.set(cache_key, snapshot)
-            return snapshot
-
     async def terminal(self) -> TerminalSnapshot:
         cache_key = "terminal:v2:tsx60"
         cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
@@ -963,7 +683,7 @@ class AnalysisService:
                     description="Moyenne du score Anatole reconstruit à partir du jeu historique strict.",
                 ),
             ]
-            drivers = yahoo_market_drivers(histories, benchmark) + rate_market_drivers(rates)
+            drivers = yahoo_market_drivers(histories, benchmark) + rate_market_drivers(rates, benchmark)
             source_statuses = dict(quality.source_statuses)
             source_statuses["bank_of_canada"] = "available" if rates else "unavailable"
             source_statuses["benchmark"] = "available" if benchmark else "unavailable"

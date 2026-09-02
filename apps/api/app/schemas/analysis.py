@@ -226,6 +226,8 @@ class TerminalBreadthPro(BaseModel):
     above_sma200_percent: float | None = Field(default=None, ge=0, le=100)
     new_highs_52w: int | None = Field(default=None, ge=0)
     new_lows_52w: int | None = Field(default=None, ge=0)
+    high_low_52w_eligible_symbols: int = Field(default=0, ge=0)
+    high_low_52w_coverage_percent: float = Field(default=0, ge=0, le=100)
     up_volume: int | None = Field(default=None, ge=0)
     down_volume: int | None = Field(default=None, ge=0)
     neutral_volume: int | None = Field(default=None, ge=0)

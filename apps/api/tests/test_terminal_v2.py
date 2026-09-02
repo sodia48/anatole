@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -8,6 +9,7 @@ from app.core.config import settings
 from app.schemas.discovery import ScreenerRow
 from app.schemas.stocks import Candle
 from app.services.market_data import market_data_service
+from app.services.analysis import AnalysisService
 from app.services.terminal_engine import (
     build_anomalies,
     build_breadth,
@@ -20,13 +22,14 @@ from app.services.terminal_engine import (
 )
 
 
-def candles(*, start: float = 100, drift: float = 0.3, count: int = 260, volume: int = 1_000) -> list[Candle]:
+def candles(*, start: float = 100, drift: float = 0.3, count: int = 260, volume: int = 1_000, span_days: int | None = None) -> list[Candle]:
     first = datetime(2025, 1, 2, tzinfo=UTC)
     output: list[Candle] = []
     price = start
     for index in range(count):
         price += drift
-        timestamp = int((first + timedelta(days=index)).timestamp())
+        day = index if span_days is None or count < 2 else round(index * span_days / (count - 1))
+        timestamp = int((first + timedelta(days=day)).timestamp())
         output.append(Candle(time=timestamp, open=price - drift / 2, high=price + 1, low=price - 1, close=price, volume=volume + index))
     return output
 
@@ -86,7 +89,7 @@ def test_regime_history_is_chronological_normalized_and_has_no_future_leak() -> 
 
 
 def test_breadth_pro_real_history_metrics_and_rotation() -> None:
-    histories = {"RY": candles(drift=0.4, volume=2_000), "TD": candles(start=180, drift=-0.2, volume=1_000)}
+    histories = {"RY": candles(drift=0.4, volume=2_000, span_days=365), "TD": candles(start=180, drift=-0.2, volume=1_000, span_days=365)}
     rows = rebuild_real_rows([row("RY", change=1.5, volume=4_000), row("TD", change=-1, volume=800)], histories, explicit_demo=False)
     breadth = build_breadth(rows, histories, {"RY": 75, "TD": 25}, 2)
     assert (breadth.advancers, breadth.decliners, breadth.unchanged) == (1, 1, 0)
@@ -95,6 +98,8 @@ def test_breadth_pro_real_history_metrics_and_rotation() -> None:
     assert breadth.above_sma200_percent is not None
     assert breadth.new_highs_52w == 1
     assert breadth.new_lows_52w == 1
+    assert breadth.high_low_52w_eligible_symbols == 2
+    assert breadth.high_low_52w_coverage_percent == 100
     assert breadth.up_volume == 4_000
     assert breadth.down_volume == 800
     assert breadth.equal_weight_change_percent != breadth.cap_weight_change_percent
@@ -117,6 +122,25 @@ def test_low_coverage_returns_null_cross_sectional_metrics_not_zero() -> None:
     assert breadth.advancers is None
     assert breadth.advance_ratio is None
     assert breadth.up_volume is None
+
+
+def test_52_week_depth_uses_elapsed_time_and_low_coverage_is_unknown() -> None:
+    histories = {
+        "RY": candles(count=260, drift=0.4, span_days=365),
+        "TD": candles(count=200, drift=-0.1, span_days=199),
+    }
+    rows = rebuild_real_rows([row("RY"), row("TD", change=-1)], histories, explicit_demo=False)
+    breadth = build_breadth(rows, histories, {"RY": 50, "TD": 50}, 2)
+    assert breadth.high_low_52w_eligible_symbols == 1
+    assert breadth.high_low_52w_coverage_percent == 50
+    assert breadth.new_highs_52w is None
+    assert breadth.new_lows_52w is None
+
+
+def test_analysis_service_has_only_one_terminal_implementation() -> None:
+    source = inspect.getsource(AnalysisService)
+    assert source.count("async def terminal(") == 1
+    assert "_terminal_legacy" not in source
 
 
 @pytest.mark.asyncio

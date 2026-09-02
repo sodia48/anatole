@@ -1,4 +1,4 @@
-import { act, fireEvent, render, userEvent } from "@testing-library/react-native";
+import { act, fireEvent, render, userEvent, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 import { AppState } from "react-native";
 
@@ -8,7 +8,7 @@ import { TerminalScreen } from "./TerminalScreen";
 const mockUseQuery = jest.fn();
 const mockCancelQueries = jest.fn(async () => undefined);
 const mockTerminal = jest.fn();
-const mockSaveWorkspace = jest.fn(async () => undefined);
+const mockSaveWorkspace = jest.fn(async (_workspace: { terminal_presets?: TerminalRadarPreset[] }) => undefined);
 const mockUseLocale = jest.fn();
 let appStateHandler: ((state: string) => void) | undefined;
 let refreshError = false;
@@ -62,12 +62,17 @@ const terminalSnapshot = {
     { timestamp: latest - 60 * 86_400, regime_score: 65, regime: "Constructif", benchmark_value: 110, breadth_percent: 61, coverage_percent: 94 },
     { timestamp: latest, regime_score: 72, regime: "Constructif", benchmark_value: 113, breadth_percent: 63, coverage_percent: 95 },
   ],
-  breadth_pro: { advancers: 38, decliners: 20, unchanged: 2, advance_ratio: 63, above_sma20_percent: 61, above_sma50_percent: 58, above_sma200_percent: 52, new_highs_52w: 5, new_lows_52w: 1, up_volume: 9_000_000, down_volume: 4_000_000, neutral_volume: 100_000, up_volume_ratio_percent: 68.7, equal_weight_change_percent: 0.8, cap_weight_change_percent: 0.7, concentration_spread_percent_points: -0.1, positive_sectors: 7, negative_sectors: 4, positive_sectors_percent: 63.6, advance_decline_line: [{ timestamp: latest, value: 18 }], coverage_percent: 95, divergence: { active: true, severity: "watch", title: "Divergence", explanation: "Indice positif, largeur fragile." } },
-  sector_rotation: [{ sector: "Financials", momentum_20d: 5, relative_strength_20d: 2, breadth_percent: 70, average_score: 72, relative_volume: 1.3, member_count: 10, x: 5, y: 2, previous_x: 3, previous_y: 1, quadrant: "LEADERSHIP", state: "Leadership", leadership_score: 84 }],
+  breadth_pro: { advancers: 38, decliners: 20, unchanged: 2, advance_ratio: 63, above_sma20_percent: 61, above_sma50_percent: 58, above_sma200_percent: 52, new_highs_52w: 5, new_lows_52w: 1, high_low_52w_eligible_symbols: 55, high_low_52w_coverage_percent: 91.7, up_volume: 9_000_000, down_volume: 4_000_000, neutral_volume: 100_000, up_volume_ratio_percent: 68.7, equal_weight_change_percent: 0.8, cap_weight_change_percent: 0.7, concentration_spread_percent_points: -0.1, positive_sectors: 7, negative_sectors: 4, positive_sectors_percent: 63.6, advance_decline_line: [{ timestamp: latest, value: 18 }], coverage_percent: 95, divergence: { active: true, severity: "watch", title: "Divergence", explanation: "Indice positif, largeur fragile." } },
+  sector_rotation: [
+    { sector: "Financials", momentum_20d: 5, relative_strength_20d: 2, breadth_percent: 70, average_score: 72, relative_volume: 1.3, member_count: 10, x: 5, y: 2, previous_x: 3, previous_y: 1, quadrant: "LEADERSHIP", state: "Leadership", leadership_score: 84 },
+    { sector: "Energy", momentum_20d: null, relative_strength_20d: null, breadth_percent: null, average_score: null, relative_volume: null, member_count: 4, x: null, y: 2, previous_x: null, previous_y: null, quadrant: "N/D", state: "N/D", leadership_score: null },
+    { sector: "Materials", momentum_20d: null, relative_strength_20d: null, breadth_percent: null, average_score: null, relative_volume: null, member_count: 4, x: 2, y: null, previous_x: null, previous_y: null, quadrant: "N/D", state: "N/D", leadership_score: null },
+    { sector: "Technology", momentum_20d: 4, relative_strength_20d: 1, breadth_percent: 60, average_score: 70, relative_volume: 1.1, member_count: 5, x: 4, y: 1, previous_x: null, previous_y: null, quadrant: "LEADERSHIP", state: "Leadership", leadership_score: 78 },
+  ],
   anomalies: [{ id: "anomaly:RY", symbol: "RY", sector: "Financials", type: "volume_spike", severity: "high", direction: "positive", rarity_score: 91, z_score: 3.1, observed_value: 2.4, baseline_value: 1, unit: "x", title: "Volume inhabituel", detail: "Volume supérieur à la moyenne.", reasons: ["z-score 3,1"], source: "yahoo-public", generated_at: "2026-09-01T12:00:00Z" }],
   market_drivers: [
     { key: "wti", label: "WTI", category: "Commodité", value: 72.4, unit: "USD", change_1d: 1, change_5d: 2, change_20d: 4, change_unit: "%", correlation_60d_to_tsx: 0.5, relationship_label: "Corrélation récente positive avec le TSX", status: "available", source_name: "Yahoo", source_url: "https://example.com", delayed: true, as_of: "2026-09-01T12:00:00Z" },
-    { key: "canada_10y", label: "Canada 10Y", category: "Taux", value: 3.7, unit: "%", change_1d: 2, change_5d: 8, change_20d: 12, change_unit: "bps", correlation_60d_to_tsx: null, relationship_label: null, status: "available", source_name: "Banque du Canada", source_url: "https://example.com", delayed: true, as_of: "2026-09-01T12:00:00Z" },
+    { key: "canada_10y", label: "Canada 10Y", category: "Taux", value: 3.7, unit: "%", change_1d: 2, change_5d: 8, change_20d: 12, change_unit: "bps", correlation_60d_to_tsx: null, relationship_label: null, status: "stale", source_name: "Banque du Canada", source_url: "https://example.com", delayed: true, as_of: "2026-09-01T12:00:00Z" },
     { key: "vix", label: "VIX", category: "Volatilité", value: null, unit: "pts", change_1d: null, change_5d: null, change_20d: null, change_unit: "%", correlation_60d_to_tsx: null, relationship_label: null, status: "unavailable", source_name: "Yahoo", source_url: "https://example.com", delayed: true, as_of: null },
   ],
   radar_items: [radarItem(lowRy, ["volume_spike"]), radarItem(shop), radarItem(enb)],
@@ -151,6 +156,34 @@ describe("mobile Pro Terminal", () => {
     await view.unmount();
   });
 
+  it("never draws missing rotation coordinates and only draws trajectories with a previous point", async () => {
+    const view = await render(<TerminalScreen />);
+    expect(view.queryByTestId("terminal-rotation-Energy")).toBeNull();
+    expect(view.queryByTestId("terminal-rotation-Materials")).toBeNull();
+    expect(view.getByTestId("terminal-rotation-unavailable-Energy")).toBeTruthy();
+    expect(view.getByTestId("terminal-rotation-unavailable-Materials")).toBeTruthy();
+    expect(view.getByTestId("terminal-rotation-bubble-Technology")).toBeTruthy();
+    expect(view.queryByTestId("terminal-rotation-path-Technology")).toBeNull();
+    expect(view.getByTestId("terminal-rotation-bubble-Financials")).toBeTruthy();
+    expect(view.getByTestId("terminal-rotation-path-Financials")).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("shows localized freshness badges without converting unavailable values to zero", async () => {
+    const view = await render(<TerminalScreen />);
+    expect(view.getByTestId("terminal-driver-status-wti").props.children).toBe("À jour");
+    expect(view.getByTestId("terminal-driver-status-canada_10y").props.children).toBe("Dernières données");
+    expect(view.getByTestId("terminal-driver-status-vix").props.children).toBe("Indisponible");
+    expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
+    await view.unmount();
+    mockUseLocale.mockReturnValue({ language: "en", pick: (_fr: string, en: string) => en, t: (key: string) => key });
+    const english = await render(<TerminalScreen />);
+    expect(english.getByTestId("terminal-driver-status-wti").props.children).toBe("Up to date");
+    expect(english.getByTestId("terminal-driver-status-canada_10y").props.children).toBe("Latest available");
+    expect(english.getByTestId("terminal-driver-status-vix").props.children).toBe("Unavailable");
+    await english.unmount();
+  });
+
   it("keeps stale data, enforces the 60-second minimum and cancels in background", async () => {
     refreshError = true;
     const view = await render(<TerminalScreen />);
@@ -177,19 +210,23 @@ describe("mobile Pro Terminal", () => {
     await view.unmount();
   });
 
-  it("applies custom radar filters and saves, updates and deletes a workspace preset", async () => {
-    mockTerminalPresets = [{ id: "custom", name: "Mon radar", filters: { score_min: 70 }, sort: "score_desc" }];
+  it("reloads, edits and deletes a preset containing every advanced filter kind", async () => {
+    mockTerminalPresets = [{ id: "complete", name: "Radar complet", filters: { rsi_max: 40, trend: "Haussière", relative_volume_min: 1.5, anomaly_types: ["volume_spike"] }, sort: "score_desc" }];
     const view = await render(<TerminalScreen />);
     const user = userEvent.setup();
-    await user.press(view.getByTestId("terminal-preset-custom"));
-    expect(view.queryByTestId("terminal-radar-RY")).toBeNull();
-    expect(view.getByTestId("terminal-radar-SHOP")).toBeTruthy();
-    fireEvent.changeText(view.getByLabelText("Score minimum"), "80");
-    fireEvent.changeText(view.getByLabelText("Nom du preset"), "Radar modifié");
-    await user.press(view.getByTestId("terminal-preset-save"));
-    expect(mockSaveWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ terminal_presets: [expect.objectContaining({ id: "custom", name: "Radar modifié", filters: expect.objectContaining({ score_min: 80 }) })] }));
-    await user.press(view.getByTestId("terminal-preset-delete"));
-    expect(mockSaveWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ terminal_presets: [] }));
+    await user.press(view.getByTestId("terminal-preset-complete"));
+    await user.press(view.getByTestId("terminal-advanced-filters-open"));
+    expect(view.getByTestId("terminal-filter-rsi_max").props.value).toBe("40");
+    expect(view.getByTestId("terminal-filter-relative_volume_min").props.value).toBe("1.5");
+    expect(view.getByTestId("terminal-filter-trend-Haussière").props.accessibilityState.selected).toBe(true);
+    expect(view.getByTestId("terminal-filter-anomaly-volume_spike").props.accessibilityState.selected).toBe(true);
+    fireEvent.changeText(view.getByTestId("terminal-filter-rsi_max"), "45");
+    await user.press(view.getByTestId("terminal-advanced-filters-apply"));
+    expect(view.getByTestId("terminal-active-filters")).toBeTruthy();
+    fireEvent.press(view.getByTestId("terminal-preset-save"));
+    await waitFor(() => expect(mockSaveWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ terminal_presets: [expect.objectContaining({ id: "complete", name: "Radar complet", filters: expect.objectContaining({ rsi_max: 45, trend: "Haussière", relative_volume_min: 1.5, anomaly_types: ["volume_spike"] }) })] })));
+    fireEvent.press(view.getByTestId("terminal-preset-delete"));
+    await waitFor(() => expect(mockSaveWorkspace).toHaveBeenLastCalledWith(expect.objectContaining({ terminal_presets: [] })));
     await view.unmount();
   });
 
