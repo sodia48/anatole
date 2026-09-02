@@ -21,7 +21,7 @@ function row(overrides: Partial<ScreenerRow>): ScreenerRow {
     ticker: "RY", symbol: "RY.TO", name: "Royal Bank of Canada", sector: "Financials", price: 284.17,
     change_percent: 0.25, volume: 1_000_000, average_volume_20d: 900_000, relative_volume: 1.32,
     momentum_20d: 4.12, rsi_14: 58.4, sma_20: 280, sma_50: 270, trend: "bullish", score: 74,
-    signal: "Constructif", source: "yahoo-public", delayed: true, ...overrides,
+    signal: "Constructif", source: "yahoo-public", delayed: true, quote_as_of: null, ...overrides,
   };
 }
 

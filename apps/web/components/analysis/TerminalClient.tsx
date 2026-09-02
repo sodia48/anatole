@@ -1,5 +1,6 @@
 "use client";
 
+import { isTerminalV2Snapshot } from "@anatole/shared";
 import Link from "next/link";
 import {
   Activity,
@@ -97,6 +98,15 @@ function alertIcon(alert: TerminalAlert) {
     return <AlertTriangle size={16} />;
   }
   return <Activity size={16} />;
+}
+
+function formatAsOf(value: string | null, language: AnatoleLanguage, dateOnly = false): string {
+  if (!value) return "N/D";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/D";
+  return new Intl.DateTimeFormat(localeFor(language), dateOnly
+    ? { year: "numeric", month: "2-digit", day: "2-digit" }
+    : { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function regimeLabel(value: string, language: AnatoleLanguage): string {
@@ -316,6 +326,9 @@ export function TerminalClient() {
 
       try {
         const response = await getTerminalSnapshot(signal);
+        if (!isTerminalV2Snapshot(response)) {
+          throw new Error(pick(language, "Le backend connecté ne fournit pas le contrat Terminal V2.", "The connected backend does not provide the Terminal V2 contract."));
+        }
         setSnapshot(response);
       } catch (reason) {
         if ((reason as Error).name !== "AbortError") {
@@ -463,6 +476,13 @@ export function TerminalClient() {
 
       {snapshot ? (
         <>
+          <section className={styles.marketEventStrip} data-testid="terminal-freshness">
+            <div className={styles.marketEventCopy}>
+              <span>{pick(language, "Données marché", "Market data")} · {formatAsOf(snapshot.data_quality.quotes_as_of, language)}</span>
+              <strong>{pick(language, "Historique quotidien", "Daily history")} · {formatAsOf(snapshot.data_quality.history_as_of, language, true)}</strong>
+            </div>
+            {snapshot.radar_items.some((item) => item.delayed) ? <strong>{pick(language, "Différé", "Delayed")}</strong> : null}
+          </section>
           <section className={styles.marketEventStrip}>
             <div className={styles.marketEventIcon}>
               <Bell size={18} />

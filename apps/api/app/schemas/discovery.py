@@ -21,6 +21,7 @@ class ScreenerRow(BaseModel):
     signal: str
     source: str
     delayed: bool
+    quote_as_of: datetime | None = None
 
 
 class ScreenerSnapshot(BaseModel):

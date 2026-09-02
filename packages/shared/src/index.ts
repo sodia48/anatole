@@ -5,3 +5,4 @@ export * from "./heatmap/index";
 export * from "./session-flow";
 export * from "./ticker";
 export * from "./terminal-radar";
+export * from "./terminal-contract";

@@ -1,9 +1,10 @@
 import { act, fireEvent, render, userEvent, waitFor } from "@testing-library/react-native";
+import { isTerminalV2Snapshot } from "@anatole/shared";
 import { router } from "expo-router";
 import { AppState } from "react-native";
 
 import type { TerminalOpportunity, TerminalRadarItem, TerminalRadarPreset, TerminalSnapshot } from "@/src/lib/api/types";
-import { advancedRadarItems, TerminalScreen } from "./TerminalScreen";
+import { legacyTerminalSummary, terminalApiHost, TerminalScreen } from "./TerminalScreen";
 
 const mockUseQuery = jest.fn();
 const mockCancelQueries = jest.fn(async () => undefined);
@@ -36,6 +37,7 @@ function radarItem(value: TerminalOpportunity, anomalyTypes: TerminalRadarItem["
 const latest = Date.UTC(2026, 8, 1) / 1_000;
 
 const terminalSnapshot = {
+  schema_version: 2,
   universe: "S&P/TSX 60", regime: "Constructif", regime_score: 72, risk_level: "Modéré", weighted_change_percent: 0.7,
   advance_ratio: 63, average_anatole_score: 68, average_momentum_20d: 4.5, above_sma20_percent: 61,
   above_sma50_percent: 58, high_relative_volume_count: 4,
@@ -53,7 +55,7 @@ const terminalSnapshot = {
     { id: "volume:RY", severity: "high", category: "Prix-volume", symbol: "RY", title: "Activité inhabituelle", detail: "Volume relatif élevé." },
     { id: "market-breadth", severity: "watch", category: "Marché", symbol: null, title: "Largeur fragile", detail: "Largeur à surveiller." },
   ],
-  data_quality: { expected_symbols: 60, real_symbols: 57, unavailable_symbols: ["X"], coverage_percent: 95, history_symbols: 55, history_coverage_percent: 91.7, warnings: ["Couverture affichée"], source_statuses: { yahoo: "available" } },
+  data_quality: { expected_symbols: 60, real_symbols: 57, unavailable_symbols: ["X"], coverage_percent: 95, history_symbols: 55, history_coverage_percent: 91.7, warnings: ["Couverture affichée"], source_statuses: { yahoo: "available" }, quotes_as_of: "2026-09-02T20:00:00Z", history_as_of: "2026-09-02T00:00:00Z" },
   regime_horizons: [
     { key: "session", label: "Séance", regime: "Constructif", score: 72, risk_level: "Modéré", change_percent: 0.7, breadth_percent: 63, above_sma20_percent: 61, above_sma50_percent: 58, average_momentum_percent: 4.5, coverage_percent: 95, as_of: "2026-09-01T12:00:00Z" },
     { key: "5d", label: "5J", regime: "Neutre", score: 56, risk_level: "Modéré", change_percent: 1.2, breadth_percent: 55, above_sma20_percent: 58, above_sma50_percent: 54, average_momentum_percent: 2.5, coverage_percent: 92, as_of: "2026-09-01T12:00:00Z" },
@@ -113,6 +115,8 @@ describe("mobile Pro Terminal", () => {
     const user = userEvent.setup();
     const options = mockUseQuery.mock.calls.at(-1)?.[0];
     expect(options.queryKey).toEqual(["terminal"]);
+    expect(isTerminalV2Snapshot(terminalSnapshot)).toBe(true);
+    expect(terminalApiHost("http://192.168.1.25:8000")).toBe("192.168.1.25:8000");
     const controller = new AbortController();
     await options.queryFn({ signal: controller.signal });
     expect(mockTerminal).toHaveBeenCalledWith(controller.signal);
@@ -120,6 +124,10 @@ describe("mobile Pro Terminal", () => {
     expect(view.getAllByText("Constructif").length).toBeGreaterThan(0);
     expect(view.getByText("Risque · Modéré")).toBeTruthy();
     expect(view.getByText("S&P/TSX 60")).toBeTruthy();
+    expect(view.getByText("Schema · V2")).toBeTruthy();
+    expect(view.getByTestId("terminal-freshness")).toHaveTextContent(/Données marché/);
+    expect(view.getByTestId("terminal-freshness")).toHaveTextContent(/Historique quotidien/);
+    expect(view.getByText("Différé")).toBeTruthy();
     expect(view.getByText("Au-dessus MM20")).toBeTruthy();
     expect(view.getByTestId("terminal-horizons")).toBeTruthy();
     expect(view.getByTestId("terminal-market-pulse")).toBeTruthy();
@@ -172,16 +180,37 @@ describe("mobile Pro Terminal", () => {
     await view.unmount();
   });
 
-  it("uses the legacy visual radar without fabricating V2 volume fields for an old snapshot", async () => {
+  it("rejects a V1 snapshot before rendering V2 cards and never fabricates zero coverage", async () => {
     const legacySnapshot = { ...terminalSnapshot } as Partial<TerminalSnapshot>;
-    delete legacySnapshot.radar_items;
-    expect(advancedRadarItems(legacySnapshot as TerminalSnapshot)).toBeNull();
+    delete legacySnapshot.schema_version;
+    delete legacySnapshot.data_quality;
+    expect(isTerminalV2Snapshot(legacySnapshot)).toBe(false);
+    expect(legacyTerminalSummary(legacySnapshot)?.regimeScore).toBe(72);
     mockUseQuery.mockReturnValue({ ...queryResult(), data: legacySnapshot });
     const view = await render(<TerminalScreen />);
-    expect(view.getByTestId("terminal-advanced-radar-unavailable")).toHaveTextContent("Radar avancé indisponible avec ce snapshot.");
+    expect(view.getByTestId("terminal-v1-notice")).toHaveTextContent(/version antérieure du Terminal/);
     expect(view.queryByTestId("terminal-advanced-filters-open")).toBeNull();
-    expect(view.getAllByTestId("terminal-radar-RY")).toHaveLength(1);
-    expect(view.getByText("Radar · 3/3")).toBeTruthy();
+    expect(view.queryByTestId("terminal-horizons")).toBeNull();
+    expect(view.queryByTestId("terminal-market-pulse")).toBeNull();
+    expect(view.queryByTestId("terminal-breadth-pro")).toBeNull();
+    expect(view.queryByTestId("terminal-rotation-matrix")).toBeNull();
+    expect(view.queryByTestId("terminal-drivers")).toBeNull();
+    expect(view.queryByTestId("terminal-anomalies")).toBeNull();
+    expect(view.queryByText(/0\/60/)).toBeNull();
+    await view.unmount();
+  });
+
+  it("rejects an incomplete V2 sub-object before any V2 card can read it", async () => {
+    const incompleteSnapshot = {
+      ...terminalSnapshot,
+      breadth_pro: { ...terminalSnapshot.breadth_pro, divergence: undefined },
+    };
+    expect(isTerminalV2Snapshot(incompleteSnapshot)).toBe(false);
+    mockUseQuery.mockReturnValue({ ...queryResult(), data: incompleteSnapshot });
+    const view = await render(<TerminalScreen />);
+    expect(view.getByTestId("terminal-v1-notice")).toBeTruthy();
+    expect(view.queryByTestId("terminal-breadth-pro")).toBeNull();
+    expect(view.queryByTestId("terminal-horizons")).toBeNull();
     await view.unmount();
   });
 

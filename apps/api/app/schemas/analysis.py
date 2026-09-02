@@ -179,6 +179,8 @@ class TerminalDataQuality(BaseModel):
     history_coverage_percent: float = Field(ge=0, le=100)
     warnings: list[str] = Field(default_factory=list)
     source_statuses: dict[str, str] = Field(default_factory=dict)
+    quotes_as_of: datetime | None = None
+    history_as_of: datetime | None = None
 
 
 class TerminalRegimeHorizon(BaseModel):
@@ -306,6 +308,7 @@ class TerminalMethodologySection(BaseModel):
 
 
 class TerminalSnapshot(BaseModel):
+    schema_version: Literal[2] = 2
     universe: str
     regime: Literal[
         "Haussier",

@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import asyncio
 import inspect
+import logging
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 
 from app.core.config import settings
 from app.schemas.discovery import ScreenerRow
-from app.schemas.stocks import Candle
+from app.schemas.stocks import Candle, Quote
 from app.services.market_data import market_data_service
 from app.services.analysis import AnalysisService
+from app.services.bank_of_canada import bank_of_canada_valet_service
+from app.services.screener import screener_service
+from app.services.terminal_drivers import YAHOO_DRIVERS
+from app.services.tsx60 import TSX60
 from app.services.terminal_engine import (
     build_anomalies,
     build_breadth,
@@ -56,6 +63,36 @@ def test_demo_fallback_is_excluded_from_every_terminal_input() -> None:
     assert all(item.symbol != "TD" for item in rebuilt)
     assert sum(item.member_count for item in build_sector_rotation(rebuilt, {"RY": histories["RY"]}, candles(start=1_000), 2)) == 1
     assert all(item.symbol != "TD" for item in build_anomalies(rebuilt, {"RY": histories["RY"]}))
+
+
+def test_rebuild_preserves_current_quote_price_change_volume_and_timestamp() -> None:
+    quote_time = datetime(2026, 9, 2, 16, 0, tzinfo=UTC)
+    history = candles(start=80, drift=0.3, count=60)
+    history[-1] = history[-1].model_copy(update={"close": 95})
+    source = row("RY", change=1.75, volume=9_876).model_copy(update={
+        "price": 100,
+        "quote_as_of": quote_time,
+    })
+    rebuilt = rebuild_real_rows([source], {"RY": history}, explicit_demo=False)
+    assert len(rebuilt) == 1
+    current = rebuilt[0]
+    assert current.price == 100
+    assert current.change_percent == 1.75
+    assert current.volume == 9_876
+    assert current.quote_as_of == quote_time
+    expected_momentum = (100 / history[-21].close - 1) * 100
+    assert current.momentum_20d == round(expected_momentum, 2)
+
+
+def test_rebuild_uses_current_quote_price_for_trend() -> None:
+    history = candles(start=80, drift=0.3, count=60)
+    history[-1] = history[-1].model_copy(update={"close": 90})
+    rebuilt = rebuild_real_rows(
+        [row("RY").model_copy(update={"price": 120})],
+        {"RY": history},
+        explicit_demo=False,
+    )
+    assert rebuilt[0].trend == "Haussière"
 
 
 @pytest.mark.parametrize(("score", "expected"), [
@@ -179,3 +216,82 @@ async def test_strict_history_never_calls_demo_fallback(monkeypatch: pytest.Monk
     result = await market_data_service.get_history_many_strict(["RY", "TD"], concurrency=2)
     assert set(result) == {"RY"}
     assert demo_called is False
+
+
+@pytest.mark.asyncio
+async def test_strict_history_times_out_one_symbol_without_blocking_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "market_data_provider", "yahoo")
+    monkeypatch.setattr(market_data_service, "strict_history_timeout_seconds", 0.01)
+
+    async def history(ticker: str, range_: str, interval: str) -> list[Candle]:
+        if ticker == "SLOW":
+            await asyncio.sleep(0.05)
+        return candles(count=30)
+
+    monkeypatch.setattr(market_data_service.yahoo, "history", history)
+    result = await market_data_service.get_history_many_strict(["RY", "SLOW"], concurrency=2)
+    assert set(result) == {"RY"}
+
+
+@pytest.mark.asyncio
+async def test_terminal_cold_path_fetches_quotes_history_and_rates_once(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_provider", "yahoo")
+    symbols = [item.symbol for item in TSX60]
+    history_symbols = list(dict.fromkeys([*symbols, "^GSPTSE", *(item[3] for item in YAHOO_DRIVERS)]))
+    quote_time = datetime(2026, 9, 2, 16, 0, tzinfo=UTC)
+    quotes = [Quote(
+        ticker=f"{symbol}.TO",
+        symbol=symbol,
+        name=symbol,
+        exchange="TSX",
+        currency="CAD",
+        price=100,
+        previous_close=99,
+        change=1,
+        change_percent=1.0101,
+        day_high=101,
+        day_low=98,
+        volume=2_000,
+        timestamp=quote_time,
+        source="yahoo-public",
+        delayed=True,
+    ) for symbol in symbols]
+    histories = {symbol: candles() for symbol in history_symbols}
+    quotes_mock = AsyncMock(return_value=quotes)
+    histories_mock = AsyncMock(return_value=histories)
+    rates_mock = AsyncMock(return_value={})
+    screener_mock = AsyncMock(side_effect=AssertionError("Terminal must not load the screener snapshot"))
+    legacy_history_mock = AsyncMock(side_effect=AssertionError("Terminal must not request a second 3mo history"))
+    monkeypatch.setattr(market_data_service, "get_quotes", quotes_mock)
+    monkeypatch.setattr(market_data_service, "get_history_many_strict", histories_mock)
+    monkeypatch.setattr(market_data_service, "get_history_many", legacy_history_mock)
+    monkeypatch.setattr(bank_of_canada_valet_service, "yields", rates_mock)
+    monkeypatch.setattr(screener_service, "get_tsx60", screener_mock)
+
+    with caplog.at_level(logging.INFO, logger="app.services.analysis"):
+        snapshot = await AnalysisService().terminal()
+
+    quotes_mock.assert_awaited_once_with(symbols)
+    histories_mock.assert_awaited_once_with(history_symbols, range_="1y", interval="1d", concurrency=8)
+    rates_mock.assert_awaited_once_with()
+    screener_mock.assert_not_awaited()
+    legacy_history_mock.assert_not_awaited()
+    assert snapshot.schema_version == 2
+    assert snapshot.data_quality.quotes_as_of == quote_time
+    assert snapshot.data_quality.history_as_of is not None
+    messages = " ".join(caplog.messages)
+    for field in (
+        "terminal_build_start",
+        "terminal_quotes_ms",
+        "terminal_histories_ms",
+        "terminal_rates_ms",
+        "terminal_compute_ms",
+        "terminal_total_ms",
+        "history_symbols_requested",
+        "history_symbols_received",
+        "real_quote_count",
+    ):
+        assert field in messages

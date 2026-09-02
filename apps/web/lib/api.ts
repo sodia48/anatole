@@ -18,7 +18,6 @@ import type {
   SymbolSearchResponse,
   StockHistoryResponse,
   StockNewsSnapshot,
-  TerminalSnapshot,
   WatchlistSnapshot,
   AlertRule,
   AdvisorPlan,
@@ -474,8 +473,8 @@ export function compareInstruments(
 
 export function getTerminalSnapshot(
   signal?: AbortSignal,
-): Promise<TerminalSnapshot> {
-  return apiRequest<TerminalSnapshot>(
+): Promise<unknown> {
+  return apiRequest<unknown>(
     "/api/v1/analysis/terminal",
     {},
     signal,

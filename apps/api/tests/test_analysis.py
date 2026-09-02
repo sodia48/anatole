@@ -64,6 +64,7 @@ def test_terminal_route_with_demo_provider() -> None:
         response = client.get("/api/v1/analysis/terminal")
         assert response.status_code == 200
         payload = response.json()
+        assert payload["schema_version"] == 2
         assert payload["universe"] == "S&P/TSX 60"
         assert 0 <= payload["regime_score"] <= 100
         assert len(payload["components"]) == 4
@@ -77,6 +78,8 @@ def test_terminal_route_with_demo_provider() -> None:
         assert len(radar_symbols) == len(set(radar_symbols))
         assert payload["breadth_pro"]["coverage_percent"] >= 70
         assert payload["methodology_sections"]
+        assert payload["data_quality"]["quotes_as_of"] is not None
+        assert payload["data_quality"]["history_as_of"] is not None
     finally:
         settings.market_data_provider = original
         _reset()

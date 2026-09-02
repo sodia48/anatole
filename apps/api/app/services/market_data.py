@@ -272,6 +272,8 @@ class YahooProvider:
 
 
 class MarketDataService:
+    strict_history_timeout_seconds = 10.0
+
     def __init__(self) -> None:
         self.demo = DemoProvider()
         self.yahoo = YahooProvider()
@@ -432,10 +434,14 @@ class MarketDataService:
         async def load(ticker: str) -> tuple[str, list[Candle] | None]:
             async with semaphore:
                 try:
-                    candles = (
-                        await self.demo.history(ticker, range_, interval)
+                    history_call = (
+                        self.demo.history(ticker, range_, interval)
                         if self.demo_mode
-                        else await self.yahoo.history(ticker, range_, interval)
+                        else self.yahoo.history(ticker, range_, interval)
+                    )
+                    candles = await asyncio.wait_for(
+                        history_call,
+                        timeout=self.strict_history_timeout_seconds,
                     )
                     return ticker, candles if len(candles) >= 2 else None
                 except asyncio.CancelledError:

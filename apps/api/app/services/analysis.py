@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import statistics
 from collections import defaultdict
 from datetime import UTC, datetime
 from time import monotonic
-from typing import Iterable
+from typing import Awaitable, Iterable, TypeVar
 
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.analysis import (
@@ -26,7 +27,7 @@ from app.schemas.stocks import Candle, Quote
 from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
-from app.services.screener import screener_service
+from app.services.screener import build_rows_from_quotes_and_histories, tsx60_constituents
 from app.services.tsx60 import TSX60
 from app.services.terminal_drivers import YAHOO_DRIVERS, rate_market_drivers, yahoo_market_drivers
 from app.services.terminal_engine import (
@@ -42,6 +43,22 @@ from app.services.terminal_engine import (
     opportunity,
     rebuild_real_rows,
 )
+
+
+logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+async def _measure_terminal_stage(
+    key: str,
+    operation: Awaitable[T],
+    timings: dict[str, float],
+) -> T:
+    started = monotonic()
+    try:
+        return await operation
+    finally:
+        timings[key] = (monotonic() - started) * 1_000
 
 
 RANGE_LABELS = {
@@ -566,24 +583,65 @@ class AnalysisService:
             previous = self._cache.peek(cache_key)
             symbols = [item.symbol for item in TSX60]
             driver_symbols = [definition[3] for definition in YAHOO_DRIVERS]
-            screener_result, histories_result, rates_result = await asyncio.gather(
-                screener_service.get_tsx60(),
-                market_data_service.get_history_many_strict(
-                    [*symbols, "^GSPTSE", *driver_symbols],
-                    range_="1y",
-                    interval="1d",
-                    concurrency=8,
+            history_symbols = list(dict.fromkeys([*symbols, "^GSPTSE", *driver_symbols]))
+            timings: dict[str, float] = {}
+            build_started = monotonic()
+            logger.info(
+                "terminal_build_start history_symbols_requested=%d",
+                len(history_symbols),
+            )
+            quotes_result, histories_result, rates_result = await asyncio.gather(
+                _measure_terminal_stage(
+                    "quotes",
+                    market_data_service.get_quotes(symbols),
+                    timings,
                 ),
-                bank_of_canada_valet_service.yields(),
+                _measure_terminal_stage(
+                    "histories",
+                    market_data_service.get_history_many_strict(
+                        history_symbols,
+                        range_="1y",
+                        interval="1d",
+                        concurrency=8,
+                    ),
+                    timings,
+                ),
+                _measure_terminal_stage(
+                    "rates",
+                    bank_of_canada_valet_service.yields(),
+                    timings,
+                ),
                 return_exceptions=True,
             )
-            if isinstance(screener_result, Exception):
+            if isinstance(quotes_result, Exception):
                 if isinstance(previous, TerminalSnapshot):
                     return previous
-                raise screener_result
+                raise quotes_result
             histories = histories_result if isinstance(histories_result, dict) else {}
             rates = rates_result if isinstance(rates_result, dict) else None
-            raw_rows = screener_result.items
+            quotes = quotes_result
+            raw_rows = build_rows_from_quotes_and_histories(
+                tsx60_constituents(),
+                quotes,
+                histories,
+            )
+            real_quote_count = sum(
+                quote.source != "demo-fallback"
+                and (market_data_service.demo_mode or quote.source != "demo-explicit")
+                for quote in quotes
+            )
+            logger.info(
+                "terminal_data_loaded terminal_quotes_ms=%.1f terminal_histories_ms=%.1f "
+                "terminal_rates_ms=%.1f history_symbols_requested=%d "
+                "history_symbols_received=%d real_quote_count=%d",
+                timings.get("quotes", 0.0),
+                timings.get("histories", 0.0),
+                timings.get("rates", 0.0),
+                len(history_symbols),
+                len(histories),
+                real_quote_count,
+            )
+            compute_started = monotonic()
             quality = data_quality(raw_rows, histories, symbols, explicit_demo=market_data_service.demo_mode)
             rows = rebuild_real_rows(raw_rows, histories, explicit_demo=market_data_service.demo_mode)
             equity_histories = {row.symbol: histories[row.symbol] for row in rows if row.symbol in histories}
@@ -604,6 +662,11 @@ class AnalysisService:
                         ],
                         "source_statuses": {**previous.data_quality.source_statuses, "terminal_cache": "stale-real"},
                     }
+                )
+                logger.info(
+                    "terminal_build_complete terminal_compute_ms=%.1f terminal_total_ms=%.1f stale_snapshot=true",
+                    (monotonic() - compute_started) * 1_000,
+                    (monotonic() - build_started) * 1_000,
                 )
                 return previous.model_copy(update={"data_quality": stale_quality})
 
@@ -689,7 +752,7 @@ class AnalysisService:
             source_statuses["benchmark"] = "available" if benchmark else "unavailable"
             quality = quality.model_copy(update={"source_statuses": source_statuses})
             snapshot = TerminalSnapshot(
-                universe=screener_result.universe,
+                universe="S&P/TSX 60",
                 regime=session.regime if session else None,
                 regime_score=session.score if session else None,
                 risk_level=session.risk_level if session else None,
@@ -723,6 +786,11 @@ class AnalysisService:
                 refresh_after_seconds=60,
             )
             self._cache.set(cache_key, snapshot)
+            logger.info(
+                "terminal_build_complete terminal_compute_ms=%.1f terminal_total_ms=%.1f stale_snapshot=false",
+                (monotonic() - compute_started) * 1_000,
+                (monotonic() - build_started) * 1_000,
+            )
             return snapshot
 
 

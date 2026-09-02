@@ -16,7 +16,7 @@ export type ScreenerRow = {
   ticker: string; symbol: string; name: string; sector: string; price: number; change_percent: number;
   volume: number; average_volume_20d: number; relative_volume: number; momentum_20d: number;
   rsi_14: number | null; sma_20: number | null; sma_50: number | null; trend: string;
-  score: number; signal: string; source: string; delayed: boolean;
+  score: number; signal: string; source: string; delayed: boolean; quote_as_of: string | null;
 };
 export type ScreenerSnapshot = {
   universe: string; items: ScreenerRow[]; sectors: string[]; generated_at: string;
@@ -39,6 +39,7 @@ export type TerminalAlert = {
 export type TerminalDataQuality = {
   expected_symbols: number; real_symbols: number; unavailable_symbols: string[]; coverage_percent: number;
   history_symbols: number; history_coverage_percent: number; warnings: string[]; source_statuses: Record<string, string>;
+  quotes_as_of: string | null; history_as_of: string | null;
 };
 export type TerminalRegime = "Haussier" | "Constructif" | "Neutre" | "Fragile" | "Baissier";
 export type TerminalRisk = "Faible" | "Modéré" | "Élevé" | "Critique";
@@ -93,7 +94,7 @@ export type TerminalRadarItem = TerminalOpportunity & {
   source: string; delayed: boolean; anomaly_types: TerminalAnomalyType[];
 };
 export type TerminalSnapshot = {
-  universe: string; regime: TerminalRegime | null; regime_score: number | null; risk_level: TerminalRisk | null;
+  schema_version: 2; universe: string; regime: TerminalRegime | null; regime_score: number | null; risk_level: TerminalRisk | null;
   weighted_change_percent: number | null; advance_ratio: number | null; average_anatole_score: number | null;
   average_momentum_20d: number | null; above_sma20_percent: number | null; above_sma50_percent: number | null;
   high_relative_volume_count: number | null; components: TerminalComponent[]; sectors: TerminalSector[];

@@ -66,6 +66,15 @@ def _return(candles: list[Candle], sessions: int, end: int | None = None) -> flo
     return (candles[end_index].close / candles[start_index].close - 1) * 100
 
 
+def _return_to_current_price(candles: list[Candle], sessions: int, current_price: float) -> float | None:
+    if len(candles) <= sessions:
+        return None
+    previous = candles[-sessions - 1]
+    if previous.close <= 0:
+        return None
+    return (current_price / previous.close - 1) * 100
+
+
 def _sma(candles: list[Candle], sessions: int, end: int | None = None) -> float | None:
     end_index = len(candles) - 1 if end is None else end
     start = end_index - sessions + 1
@@ -140,18 +149,16 @@ def rebuild_real_rows(
         candles = histories.get(row.symbol)
         if candles is None or len(candles) < 21:
             continue
-        latest = candles[-1]
         change = row.change_percent
-        momentum = _return(candles, 20) or 0.0
+        momentum = _return_to_current_price(candles, 20, row.price) or 0.0
         sma20 = _sma(candles, 20)
         sma50 = _sma(candles, 50)
         rsi = _rsi(candles)
         average_volume = _average_volume(candles) or 0.0
         relative_volume = row.volume / average_volume if average_volume > 0 else 0.0
-        trend = _trend(latest.close, sma20, sma50)
+        trend = _trend(row.price, sma20, sma50)
         score = _row_score(change, momentum, relative_volume, rsi, trend)
         output.append(row.model_copy(update={
-            "price": latest.close,
             "momentum_20d": round(momentum, 2),
             "average_volume_20d": round(average_volume),
             "relative_volume": round(relative_volume, 2),
@@ -179,6 +186,8 @@ def data_quality(
         if row.source != "demo-fallback" and (explicit_demo or row.source != "demo-explicit")
     }
     historical = {symbol for symbol in real if len(histories.get(symbol, [])) >= 21}
+    quote_times = [row.quote_as_of for row in rows if row.symbol in real and row.quote_as_of is not None]
+    history_times = [histories[symbol][-1].time for symbol in historical]
     coverage = len(real) / max(len(expected), 1) * 100
     history_coverage = len(historical) / max(len(expected), 1) * 100
     warnings: list[str] = []
@@ -201,6 +210,8 @@ def data_quality(
             "history": str(len(historical)),
             "demo_fallback_excluded": str(sum(row.source == "demo-fallback" for row in rows)),
         },
+        quotes_as_of=max(quote_times) if quote_times else None,
+        history_as_of=datetime.fromtimestamp(max(history_times), tz=UTC) if history_times else None,
     )
 
 
