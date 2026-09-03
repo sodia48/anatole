@@ -53,7 +53,7 @@ function FiltersModal({ filters, sectors, signals, visible, onChange, onClose, o
 }
 
 export function ScreenerScreen() {
-  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[] }>();
+  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[]; signal?: string | string[] }>();
   const { pick } = useLocale();
   const [universe, setUniverse] = useState<ScreenerUniverse>("composite");
   const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_SCREENER_FILTERS);
@@ -61,13 +61,15 @@ export function ScreenerScreen() {
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const requestedSector = Array.isArray(params.sector) ? params.sector[0] : params.sector;
   const requestedUniverse = Array.isArray(params.universe) ? params.universe[0] : params.universe;
+  const requestedSignal = Array.isArray(params.signal) ? params.signal[0] : params.signal;
   useEffect(() => {
     const timer = setTimeout(() => {
       if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse(requestedUniverse);
       if (requestedSector) setFilters((current) => ({ ...current, sector: requestedSector }));
+      if (requestedSignal) setFilters((current) => ({ ...current, signal: requestedSignal }));
     }, 0);
     return () => clearTimeout(timer);
-  }, [requestedSector, requestedUniverse]);
+  }, [requestedSector, requestedSignal, requestedUniverse]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
     return () => subscription.remove();

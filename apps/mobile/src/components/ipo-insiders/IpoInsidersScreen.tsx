@@ -100,13 +100,13 @@ function InsiderCard({ trade }: { trade: InsiderTrade }) {
   </View>;
 }
 
-function InsiderPanel() {
+function InsiderPanel({ initialTicker = "" }: { initialTicker?: string }) {
   const { language, pick } = useLocale();
   const queryClient = useQueryClient();
   const [market, setMarket] = useState<InsiderMarket>("canada");
   const [days, setDays] = useState(180);
-  const [tickerInput, setTickerInput] = useState("");
-  const [ticker, setTicker] = useState("");
+  const [tickerInput, setTickerInput] = useState(initialTicker);
+  const [ticker, setTicker] = useState(initialTicker);
   const [type, setType] = useState<InsiderTypeFilter>("all");
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const [enabledEnrichmentKey, setEnabledEnrichmentKey] = useState<string | null>(null);
@@ -172,7 +172,7 @@ function InsiderPanel() {
   return <FlatList ListEmptyComponent={snapshot && !loading && !unavailable ? <Text style={styles.empty}>{pick("Aucune transaction observée pour ces critères.", "No transaction observed for these filters.")}</Text> : null} ListHeaderComponent={header} contentContainerStyle={styles.content} data={trades} initialNumToRender={14} keyExtractor={(trade) => trade.id} maxToRenderPerBatch={18} refreshControl={<RefreshControl onRefresh={refresh} refreshing={preview.isRefetching || enriched.isRefetching} tintColor={colors.primary} />} removeClippedSubviews renderItem={({ item }) => <InsiderCard trade={item} />} windowSize={7} />;
 }
 
-export function IpoInsidersScreen({ initialTab = "ipo" }: { initialTab?: MainTab } = {}) {
+export function IpoInsidersScreen({ initialTab = "ipo", initialTicker = "" }: { initialTab?: MainTab; initialTicker?: string } = {}) {
   const { pick } = useLocale();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<MainTab>(initialTab);
@@ -184,7 +184,7 @@ export function IpoInsidersScreen({ initialTab = "ipo" }: { initialTab?: MainTab
   }
   return <SafeAreaView edges={["bottom"]} style={styles.safe} testID="ipo-insiders-screen">
     <View style={styles.top}><ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("IPO & initiés", "IPOs & insiders")} subtitle={pick("Événements publics et déclarations réglementaires vérifiables.", "Verifiable public events and regulatory filings.")} /><View style={styles.tabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "ipo" }} onPress={() => activate("ipo")} style={[styles.tab, tab === "ipo" && styles.tabActive]} testID="ipo-tab"><Text style={styles.tabText}>IPO</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "insiders" }} onPress={() => activate("insiders")} style={[styles.tab, tab === "insiders" && styles.tabActive]} testID="insiders-tab"><Text style={styles.tabText}>{pick("Initiés", "Insiders")}</Text></Pressable></View></View>
-    {tab === "ipo" ? <IpoPanel /> : <InsiderPanel />}
+    {tab === "ipo" ? <IpoPanel /> : <InsiderPanel initialTicker={initialTicker} />}
   </SafeAreaView>;
 }
 

@@ -50,7 +50,7 @@ function ConstituentsModal({ visible, onClose, items }: { visible: boolean; onCl
 }
 
 export default function MarketsScreen() {
-  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[] }>();
+  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[]; hub?: string | string[] }>();
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [hub, setHub] = useState<Hub>("cockpit");
@@ -58,14 +58,15 @@ export default function MarketsScreen() {
   const [constituentsOpen, setConstituentsOpen] = useState(false);
   const requestedSector = Array.isArray(params.sector) ? params.sector[0] : params.sector;
   const requestedUniverse = Array.isArray(params.universe) ? params.universe[0] : params.universe;
+  const requestedHub = Array.isArray(params.hub) ? params.hub[0] : params.hub;
   useEffect(() => {
-    if (!requestedSector && requestedUniverse !== "tsx60" && requestedUniverse !== "composite") return;
+    if (!requestedSector && requestedUniverse !== "tsx60" && requestedUniverse !== "composite" && requestedHub !== "news" && requestedHub !== "calendar") return;
     const timer = setTimeout(() => {
-      setHub("cockpit");
+      setHub(requestedHub === "news" || requestedHub === "calendar" ? requestedHub : "cockpit");
       if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse(requestedUniverse);
     }, 0);
     return () => clearTimeout(timer);
-  }, [requestedSector, requestedUniverse]);
+  }, [requestedHub, requestedSector, requestedUniverse]);
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: () => marketApi.cockpit(universe), staleTime: 20_000 });
   const news = useQuery({ queryKey: ["news", language], queryFn: () => marketApi.news(language), enabled: hub === "news", staleTime: 300_000 });
   const calendar = useQuery({ queryKey: ["calendar", language], queryFn: () => marketApi.calendar(language), enabled: hub === "calendar", staleTime: 300_000 });
