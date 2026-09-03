@@ -8,6 +8,7 @@ const mockCancelQueries = jest.fn(async () => undefined);
 let appStateHandler: ((state: string) => void) | undefined;
 let mockWorkspace = { data: { watchlist: [] as string[], portfolio: [] as { symbol: string; quantity: number; average_cost: number }[], alerts: [] as unknown[] } };
 const mockErrorRoots = new Set<string>();
+let preserveCachedData = false;
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr, t: (key: string) => key }) }));
@@ -46,7 +47,7 @@ const dataByRoot: Record<string, unknown> = {
 function result(options: { queryKey: unknown[]; enabled?: boolean }) {
   const root = String(options.queryKey[0]);
   const enabled = options.enabled !== false;
-  return { data: enabled ? dataByRoot[root] : undefined, isLoading: enabled && dataByRoot[root] == null, isError: enabled && mockErrorRoots.has(root), isRefetching: false, error: mockErrorRoots.has(root) ? new Error("offline") : null, refetch: jest.fn(async () => undefined) };
+  return { data: enabled || preserveCachedData ? dataByRoot[root] : undefined, isLoading: enabled && dataByRoot[root] == null, isError: enabled && mockErrorRoots.has(root), isRefetching: false, error: mockErrorRoots.has(root) ? new Error("offline") : null, refetch: jest.fn(async () => undefined) };
 }
 
 function latest(root: string) {
@@ -61,6 +62,7 @@ describe("Today 2.0 screen", () => {
     mockUseQuery.mockImplementation(result);
     mockCancelQueries.mockClear();
     mockErrorRoots.clear();
+    preserveCachedData = false;
     mockWorkspace = { data: { watchlist: [], portfolio: [], alerts: [] } };
     jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, handler: (state: string) => void) => {
       appStateHandler = handler;
@@ -80,6 +82,8 @@ describe("Today 2.0 screen", () => {
     expect(view.getByTestId("today-market-brief")).toBeTruthy();
     expect(view.getByText("S&P/TSX Composite")).toBeTruthy();
     expect(view.getByText("120↑ · 80↓")).toBeTruthy();
+    expect(view.getByText("Données de séance différées")).toBeTruthy();
+    expect(view.getByText("Secteur le moins fort")).toBeTruthy();
     expect(view.getByText(/^(Bonjour|Bon après-midi|Bonsoir) Ana$/)).toBeTruthy();
     await view.unmount();
   });
@@ -126,15 +130,36 @@ describe("Today 2.0 screen", () => {
     await view.unmount();
   });
 
-  it("disables and cancels heavy work in background while keeping the market section usable", async () => {
+  it("restarts tier scheduling after background while preserving cached content", async () => {
     const view = await render(<TodayScreen />);
-    await act(async () => jest.advanceTimersByTime(1_300));
+    await act(async () => jest.advanceTimersByTime(1_900));
     expect(latest("terminal").enabled).toBe(true);
+    expect(latest("screener").enabled).toBe(true);
+    expect(latest("insiders").enabled).toBe(true);
+    preserveCachedData = true;
     await act(async () => appStateHandler?.("background"));
     expect(latest("terminal").enabled).toBe(false);
     expect(latest("screener").enabled).toBe(false);
+    expect(latest("insiders").enabled).toBe(false);
     expect(mockCancelQueries).toHaveBeenCalledWith({ queryKey: ["terminal"] });
-    expect(view.getByTestId("today-market-brief")).toBeTruthy();
+    expect(view.getByTestId("today-market-brief")).toHaveTextContent(/Constructif.*70\/100/);
+    expect(view.getByTestId("today-drivers")).toHaveTextContent(/WTI/);
+
+    await act(async () => appStateHandler?.("active"));
+    expect(latest("cockpit").enabled).toBe(true);
+    expect(latest("terminal").enabled).toBe(false);
+    expect(latest("screener").enabled).toBe(false);
+    expect(latest("insiders").enabled).toBe(false);
+    expect(view.getByTestId("today-market-brief")).toHaveTextContent(/Constructif.*70\/100/);
+    await act(async () => jest.advanceTimersByTime(350));
+    expect(latest("psychology").enabled).toBe(true);
+    expect(latest("terminal").enabled).toBe(false);
+    await act(async () => jest.advanceTimersByTime(950));
+    expect(latest("terminal").enabled).toBe(true);
+    expect(latest("screener").enabled).toBe(true);
+    expect(latest("insiders").enabled).toBe(false);
+    await act(async () => jest.advanceTimersByTime(600));
+    expect(latest("insiders").enabled).toBe(true);
     await view.unmount();
   });
 

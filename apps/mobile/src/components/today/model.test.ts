@@ -4,6 +4,7 @@ import {
   buildTodayHeatmap,
   buildTodayMarketReading,
   buildTodayTimeline,
+  classifyTrailingSector,
   driverMove,
   driverRelationship,
   personalNewsTargets,
@@ -60,6 +61,37 @@ describe("Today intelligence model", () => {
     expect(result.phase).toBe("session");
     expect(result.marketStatus).toBe("Dernières données disponibles");
     expect(result.marketStatus.toLowerCase()).not.toContain("ouvert");
+  });
+
+  it("marks a recent delayed quote as delayed rather than current", () => {
+    const french = resolveTodayPhase(new Date("2026-09-02T15:00:00Z"), "2026-09-02T14:55:00Z", "fr", true);
+    const english = resolveTodayPhase(new Date("2026-09-02T15:00:00Z"), "2026-09-02T14:55:00Z", "en", true);
+    expect(french.quoteIsCurrent).toBe(false);
+    expect(french.marketStatus).toBe("Données de séance différées");
+    expect(english.quoteIsCurrent).toBe(false);
+    expect(english.marketStatus).toBe("Delayed session data");
+    expect(resolveTodayPhase(new Date("2026-09-02T15:00:00Z"), "2026-09-02T14:55:00Z", "fr", false).quoteIsCurrent).toBe(true);
+  });
+
+  it("classifies the trailing sector as least strong when every sector is positive", () => {
+    const trailing = { ...cockpit.sectors[1]!, change_percent: 0.2 };
+    expect(classifyTrailingSector(trailing, "fr")).toEqual(expect.objectContaining({ label: "Secteur le moins fort", underPressure: false }));
+    const reading = buildTodayMarketReading({ cockpit: { ...cockpit, sectors: [{ ...cockpit.sectors[0]!, change_percent: 0.8 }, trailing] }, terminal: null, universe: "composite", language: "fr" });
+    expect(reading.detail).toContain("Financials affiche la progression la plus faible (+0,20 %).");
+    expect(reading.detail).not.toContain("Financials est sous pression");
+  });
+
+  it("classifies a negative trailing sector as under pressure", () => {
+    expect(classifyTrailingSector(cockpit.sectors[1], "en")).toEqual(expect.objectContaining({ label: "Sector under pressure", underPressure: true }));
+  });
+
+  it("uses under-pressure wording in a mixed market and never infers regime persistence", () => {
+    const reading = buildTodayMarketReading({ cockpit, terminal, universe: "composite", language: "fr" });
+    expect(reading.detail).toContain("Financials est sous pression (-0,40 %).");
+    expect(reading.detail).toContain("Le régime Terminal · TSX 60 est actuellement constructif.");
+    expect(reading.detail).not.toMatch(/demeure|remains/i);
+    const english = buildTodayMarketReading({ cockpit, terminal, universe: "composite", language: "en" });
+    expect(english.detail).toContain("The Terminal · TSX 60 regime is currently constructive.");
   });
 
   it("builds positive, negative and partial readings without invented causality", () => {

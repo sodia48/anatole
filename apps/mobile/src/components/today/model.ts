@@ -27,6 +27,7 @@ export type TodayPhaseResult = {
 };
 
 export type TodayMarketReading = { headline: string; detail: string; tone: TodayTone };
+export type TrailingSectorClassification = { label: string; sentence: string; underPressure: boolean };
 
 export type TodayTarget =
   | { kind: "stock"; ticker: string }
@@ -117,7 +118,7 @@ export function isCurrentTorontoQuote(now: Date, quoteAsOf: string | null | unde
   return torontoDateKey(quote) === torontoDateKey(now) && now.getTime() - quote.getTime() <= 30 * 60_000;
 }
 
-export function resolveTodayPhase(now: Date, quoteAsOf?: string | null, language: TodayLanguage = "fr"): TodayPhaseResult {
+export function resolveTodayPhase(now: Date, quoteAsOf?: string | null, language: TodayLanguage = "fr", delayed = false): TodayPhaseResult {
   const parts = zonedParts(now);
   const weekend = parts.weekday === "Sat" || parts.weekday === "Sun";
   const minutes = parts.hour * 60 + parts.minute;
@@ -125,14 +126,17 @@ export function resolveTodayPhase(now: Date, quoteAsOf?: string | null, language
   const title = language === "fr"
     ? ({ pre_market: "À surveiller avant l’ouverture", session: "Ce qui se passe maintenant", post_market: "Résumé de la séance", off_hours: "Le prochain regard marché" } as const)[phase]
     : ({ pre_market: "Before the open", session: "What is happening now", post_market: "Session recap", off_hours: "The next market look" } as const)[phase];
-  const quoteIsCurrent = phase === "session" && isCurrentTorontoQuote(now, quoteAsOf);
+  const recentSessionQuote = phase === "session" && isCurrentTorontoQuote(now, quoteAsOf);
+  const quoteIsCurrent = recentSessionQuote && !delayed;
   return {
     phase,
     title,
     greeting: language === "fr" ? (parts.hour >= 18 ? "Bonsoir" : "Bonjour") : (parts.hour >= 18 ? "Good evening" : "Hello"),
     marketStatus: quoteIsCurrent
       ? (language === "fr" ? "Données de séance à jour" : "Current session data")
-      : (language === "fr" ? "Dernières données disponibles" : "Latest available data"),
+      : recentSessionQuote && delayed
+        ? (language === "fr" ? "Données de séance différées" : "Delayed session data")
+        : (language === "fr" ? "Dernières données disponibles" : "Latest available data"),
     quoteIsCurrent,
   };
 }
@@ -152,6 +156,28 @@ function pct(value: number, language: TodayLanguage): string {
 function regime(value: string, language: TodayLanguage): string {
   if (language === "fr") return value.toLowerCase();
   return ({ Haussier: "bullish", Constructif: "constructive", Neutre: "neutral", Fragile: "fragile", Baissier: "bearish" } as Record<string, string>)[value] ?? value.toLowerCase();
+}
+
+export function classifyTrailingSector(
+  trailing: CockpitSnapshot["sectors"][number] | null | undefined,
+  language: TodayLanguage,
+): TrailingSectorClassification | null {
+  if (!trailing) return null;
+  const underPressure = trailing.change_percent < 0;
+  if (underPressure) return {
+    label: language === "fr" ? "Secteur sous pression" : "Sector under pressure",
+    sentence: language === "fr"
+      ? `${trailing.sector} est sous pression (${pct(trailing.change_percent, language)}).`
+      : `${trailing.sector} is under pressure (${pct(trailing.change_percent, language)}).`,
+    underPressure,
+  };
+  return {
+    label: language === "fr" ? "Secteur le moins fort" : "Least strong sector",
+    sentence: language === "fr"
+      ? `${trailing.sector} affiche la progression la plus faible (${pct(trailing.change_percent, language)}).`
+      : `${trailing.sector} posts the smallest gain (${pct(trailing.change_percent, language)}).`,
+    underPressure,
+  };
 }
 
 export function buildTodayMarketReading(input: {
@@ -177,13 +203,17 @@ export function buildTodayMarketReading(input: {
   const sorted = [...cockpit.sectors].sort((left, right) => right.change_percent - left.change_percent);
   const leading = sorted[0];
   const trailing = sorted.at(-1);
+  const trailingClassification = classifyTrailingSector(trailing, language);
   const headline = language === "fr"
     ? `${label} ${change >= 0 ? "progresse" : "recule"} de ${pct(Math.abs(change), language)}.`
     : `${label} is ${change >= 0 ? "up" : "down"} ${pct(Math.abs(change), language)}.`;
   const observations: string[] = [];
   if (participation !== null) observations.push(language === "fr" ? `${participation} % des mouvements directionnels sont positifs.` : `${participation}% of directional moves are positive.`);
-  if (leading && trailing) observations.push(language === "fr" ? `${leading.sector} mène (${pct(leading.change_percent, language)}), tandis que ${trailing.sector} est sous pression (${pct(trailing.change_percent, language)}).` : `${leading.sector} leads (${pct(leading.change_percent, language)}), while ${trailing.sector} is under pressure (${pct(trailing.change_percent, language)}).`);
-  if (terminal?.regime) observations.push(language === "fr" ? `Le régime Terminal · TSX 60 demeure ${regime(terminal.regime, language)}.` : `The Terminal · TSX 60 regime remains ${regime(terminal.regime, language)}.`);
+  if (leading && trailingClassification) {
+    const leaderSentence = language === "fr" ? `${leading.sector} mène (${pct(leading.change_percent, language)}).` : `${leading.sector} leads (${pct(leading.change_percent, language)}).`;
+    observations.push(leading.sector === trailing?.sector ? leaderSentence : `${leaderSentence} ${trailingClassification.sentence}`);
+  }
+  if (terminal?.regime) observations.push(language === "fr" ? `Le régime Terminal · TSX 60 est actuellement ${regime(terminal.regime, language)}.` : `The Terminal · TSX 60 regime is currently ${regime(terminal.regime, language)}.`);
   if (psychology) observations.push(language === "fr" ? `La psychologie observée est ${psychology.label.toLowerCase()} (${Math.round(psychology.score)}/100).` : `Observed psychology is ${psychology.label.toLowerCase()} (${Math.round(psychology.score)}/100).`);
   return { headline, detail: observations.join(" "), tone };
 }

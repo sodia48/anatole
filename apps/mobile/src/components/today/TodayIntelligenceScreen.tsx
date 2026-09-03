@@ -41,6 +41,7 @@ export function TodayIntelligenceScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       const active = state === "active";
+      if (!active) setTier(1);
       setAppActive(active);
       if (!active) for (const root of QUERY_ROOTS) void queryClient.cancelQueries({ queryKey: [root] });
     });
@@ -81,7 +82,8 @@ export function TodayIntelligenceScreen() {
   const personalNewsOne = useQuery({ queryKey: ["stock-news", firstTarget?.symbol ?? "", language], queryFn: ({ signal }) => marketApi.stockNews(firstTarget!.symbol, firstTarget!.company, language, signal), enabled: appActive && tier >= 3 && Boolean(firstTarget), staleTime: 300_000 });
   const personalNewsTwo = useQuery({ queryKey: ["stock-news", secondTarget?.symbol ?? "", language], queryFn: ({ signal }) => marketApi.stockNews(secondTarget!.symbol, secondTarget!.company, language, signal), enabled: appActive && tier >= 3 && Boolean(secondTarget), staleTime: 300_000 });
 
-  const phase = resolveTodayPhase(now, latestCockpitQuoteTime(cockpit.data), language);
+  const cockpitDelayed = cockpit.data?.constituents.some((item) => item.delayed) ?? false;
+  const phase = resolveTodayPhase(now, latestCockpitQuoteTime(cockpit.data), language, cockpitDelayed);
   const sections = useMemo<Section[]>(() => {
     if (phase.phase === "pre_market" || phase.phase === "off_hours") return ["header", "market", "drivers", "timeline", "attention", "news", "heatmap", "personal", "links"];
     if (phase.phase === "post_market") return ["header", "market", "attention", "heatmap", "personal", "drivers", "timeline", "news", "links"];

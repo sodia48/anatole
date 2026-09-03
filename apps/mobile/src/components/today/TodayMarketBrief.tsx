@@ -5,7 +5,7 @@ import { Card, QueryState } from "@/src/components/ui";
 import type { CockpitSnapshot, PsychologySnapshot, TerminalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
-import { buildTodayMarketReading, latestCockpitQuoteTime, type TodayUniverse } from "./model";
+import { buildTodayMarketReading, classifyTrailingSector, latestCockpitQuoteTime, type TodayUniverse } from "./model";
 
 function Metric({ label, value, onPress, testID }: { label: string; value: string; onPress?: () => void; testID?: string }) {
   const content = <><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></>;
@@ -48,6 +48,7 @@ export function TodayMarketBrief({
   const sectors = [...(cockpit?.sectors ?? [])].sort((left, right) => right.change_percent - left.change_percent);
   const leader = sectors[0];
   const pressure = sectors.at(-1);
+  const trailingClassification = classifyTrailingSector(pressure, language);
   const delayed = cockpit?.constituents.some((item) => item.delayed) ?? false;
   const quoteTime = latestCockpitQuoteTime(cockpit);
   return <View style={styles.stack}>
@@ -62,7 +63,7 @@ export function TodayMarketBrief({
           <Metric label={pick("Régime Terminal · TSX 60", "Terminal regime · TSX 60")} onPress={onTerminal} testID="today-open-terminal" value={terminal?.regime && terminal.regime_score != null ? `${terminal.regime} · ${Math.round(terminal.regime_score)}/100` : "N/D"} />
           <Metric label={pick("Psychologie", "Psychology")} onPress={onPsychology} testID="today-open-psychology" value={psychology ? `${psychology.label} · ${Math.round(psychology.score)}/100` : "N/D"} />
           <Metric label={pick("Secteur leader", "Leading sector")} value={leader ? `${leader.sector} · ${percentOrNd(leader.change_percent, language)}` : "N/D"} />
-          <Metric label={pick("Secteur sous pression", "Sector under pressure")} value={pressure ? `${pressure.sector} · ${percentOrNd(pressure.change_percent, language)}` : "N/D"} />
+          <Metric label={trailingClassification?.label ?? pick("Secteur le moins fort", "Least strong sector")} value={pressure ? `${pressure.sector} · ${percentOrNd(pressure.change_percent, language)}` : "N/D"} />
           <Metric label="MM50 · TSX 60" value={percentOrNd(terminal?.above_sma50_percent, language)} />
           <Metric label={pick("Risque Terminal", "Terminal risk")} value={terminal?.risk_level ?? "N/D"} />
         </View>
