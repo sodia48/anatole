@@ -121,11 +121,11 @@ describe("Today intelligence model", () => {
     const result = buildTodayAttention({
       alerts: { items: [{ id: "rule", symbol: "RY", status: "triggered", message: "Seuil observé", current_value: 100, triggered: true }], triggered_count: 1, monitored_count: 1, unavailable_count: 0 },
       terminal,
-      calendar: { events: [{ id: "cpi", title: "IPC", starts_at: "2026-09-02T16:00:00Z", importance: "high", category: "Inflation", country: "Canada", regions: ["CA", "QC"] }], generated_at: "2026-09-02T10:00:00Z" },
-      earnings: { events: [{ ticker: "TD", symbol: "TD", company: "TD Bank", sector: "Financials", starts_at: "2026-09-03T12:00:00Z", window_start: "2026-09-03T12:00:00Z", window_end: "2026-09-03T13:00:00Z", time_is_estimated: true, eps_estimate: null, revenue_estimate: null, estimate_currency: null }], companies_with_dates: 1, generated_at: "2026-09-02T10:00:00Z" },
+      calendar: { events: [{ id: "cpi", title: "IPC", starts_at: "2026-09-02T16:00:00Z", importance: "high", category: "Inflation", country: "Canada", currency: "CAD", source: "StatCan", url: null, description: null, regions: ["CA", "QC"] }], source_statuses: [], generated_at: "2026-09-02T10:00:00Z", refresh_after_seconds: 1800 },
+      earnings: { universe: "composite", universe_as_of: null, constituent_count: 1, events: [{ ticker: "TD", symbol: "TD", company: "TD Bank", sector: "Financials", weight: null, starts_at: "2026-09-03T12:00:00Z", window_start: "2026-09-03T12:00:00Z", window_end: "2026-09-03T13:00:00Z", time_is_estimated: true, eps_estimate: null, revenue_estimate: null, estimate_currency: null, eps_analyst_count: null, revenue_analyst_count: null, source: "Public", url: "https://example.com" }], source_statuses: [], companies_with_dates: 1, generated_at: "2026-09-02T10:00:00Z", refresh_after_seconds: 10800 },
       screener: { universe: "Composite", items: [{ ticker: "RY", symbol: "RY", name: "RY", sector: "Financials", price: 100, change_percent: 3, volume: 100, average_volume_20d: 50, relative_volume: 2, momentum_20d: 12, rsi_14: 55, sma_20: 90, sma_50: 80, trend: "Haussière", score: 90, signal: "Fort", source: "public", delayed: true, quote_as_of: null }], sectors: ["Financials"], generated_at: "2026-09-02", refresh_after_seconds: 180, live_items: 1, fallback_items: 0 },
       insiders: { trades: [{ id: "i1", ticker: "CNQ", insider_name: "A", transaction_label: "Achat", unusual: true }], summary: {}, sources: [] } as never,
-      news: { items: Array.from({ length: 5 }, (_, index) => ({ id: `n${index}`, title: `News ${index}`, summary: "Résumé", url: "https://example.com", published_at: "2026-09-02" })), generated_at: "2026-09-02" },
+      news: { items: Array.from({ length: 5 }, (_, index) => ({ id: `n${index}`, title: `News ${index}`, summary: "Résumé", url: "https://example.com", source: "Public", category: "Macro", sentiment: "Neutre", sentiment_score: 0, regions: ["CA"], published_at: "2026-09-02" })), source_statuses: [], generated_at: "2026-09-02", refresh_after_seconds: 900 },
       watchlistSymbols: ["RY"], portfolioSymbols: [], universe: "composite", language: "fr", now: new Date("2026-09-02T15:00:00Z"),
     });
     expect(result).toHaveLength(5);
@@ -141,7 +141,7 @@ describe("Today intelligence model", () => {
   });
 
   it("keeps a high anomaly above lower priority screener and news observations", () => {
-    const result = buildTodayAttention({ terminal, news: { items: [{ id: "n", title: "N", summary: "D", url: "https://example.com", published_at: "2026-09-02" }], generated_at: "2026-09-02" }, universe: "composite", language: "en", now: new Date("2026-09-02T15:00:00Z") });
+    const result = buildTodayAttention({ terminal, news: { items: [{ id: "n", title: "N", summary: "D", url: "https://example.com", source: "Public", category: "Macro", sentiment: "Neutral", sentiment_score: 0, regions: ["CA"], published_at: "2026-09-02" }], source_statuses: [], generated_at: "2026-09-02", refresh_after_seconds: 900 }, universe: "composite", language: "en", now: new Date("2026-09-02T15:00:00Z") });
     expect(result[0]?.kind).toBe("anomaly");
   });
 
@@ -173,8 +173,8 @@ describe("Today intelligence model", () => {
   it("merges calendar and earnings chronologically, preserves provincial regions and labels market markers as usual", () => {
     const now = new Date("2026-09-02T14:00:00Z");
     const fr = buildTodayTimeline(
-      { events: [{ id: "qc", title: "Emploi Québec", starts_at: "2026-09-02T15:00:00Z", importance: "high", category: "Emploi", country: "Canada", regions: ["QC"] }], generated_at: now.toISOString() },
-      { events: [{ ticker: "RY", symbol: "RY", company: "Royal Bank", sector: null, starts_at: "2026-09-02T16:00:00Z", window_start: "2026-09-02T16:00:00Z", window_end: "2026-09-02T17:00:00Z", time_is_estimated: false, eps_estimate: null, revenue_estimate: null, estimate_currency: null }], companies_with_dates: 1, generated_at: now.toISOString() },
+      { events: [{ id: "qc", title: "Emploi Québec", starts_at: "2026-09-02T15:00:00Z", importance: "high", category: "Emploi", country: "Canada", currency: "CAD", source: "StatCan", url: null, description: null, regions: ["QC"] }], source_statuses: [], generated_at: now.toISOString(), refresh_after_seconds: 1800 },
+      { universe: "composite", universe_as_of: null, constituent_count: 1, events: [{ ticker: "RY", symbol: "RY", company: "Royal Bank", sector: null, weight: null, starts_at: "2026-09-02T16:00:00Z", window_start: "2026-09-02T16:00:00Z", window_end: "2026-09-02T17:00:00Z", time_is_estimated: false, eps_estimate: null, revenue_estimate: null, estimate_currency: null, eps_analyst_count: null, revenue_analyst_count: null, source: "Public", url: "https://example.com" }], source_statuses: [], companies_with_dates: 1, generated_at: now.toISOString(), refresh_after_seconds: 10800 },
       now, "fr",
     );
     expect(fr.length).toBeLessThanOrEqual(8);

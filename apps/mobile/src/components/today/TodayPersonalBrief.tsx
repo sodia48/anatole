@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { NewsCard } from "@/src/components/market";
 import { Card } from "@/src/components/ui";
-import type { AlertSnapshot, NewsItem, PortfolioSnapshot, TerminalSnapshot, WatchlistSnapshot } from "@/src/lib/api/types";
+import type { AlertSnapshot, PortfolioSnapshot, StockNewsItem, TerminalSnapshot, WatchlistSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { selectPersonalMovers, type TodayTarget } from "./model";
@@ -33,7 +33,7 @@ export function TodayPersonalBrief({
   portfolio?: PortfolioSnapshot;
   terminal: TerminalSnapshot | null;
   alerts?: AlertSnapshot;
-  personalNews: readonly NewsItem[];
+  personalNews: readonly StockNewsItem[];
   stale: boolean;
   onOpen: (target: TodayTarget) => void;
   onPersonalize: () => void;
@@ -60,7 +60,7 @@ export function TodayPersonalBrief({
       <Stat label={pick("Diversification", "Diversification")} value={portfolio.risk ? `${valueOrNd(portfolio.risk.diversification_score, 0, language)}/100 · ${portfolio.risk.risk_level}` : "N/D"} />
     </View></View> : null}
     {triggered.length ? <View style={styles.block}><Text style={styles.heading}>{pick("Alertes déclenchées", "Triggered alerts")}</Text>{triggered.map((item) => <Pressable accessibilityRole="button" key={item.id} onPress={() => onOpen({ kind: "stock", ticker: item.symbol })} style={styles.alert}><Text style={styles.symbol}>{item.symbol}</Text><Text style={styles.copy}>{item.message}</Text></Pressable>)}</View> : null}
-    {personalNews.length ? <View style={styles.block}><Text style={styles.heading}>{pick("Actualités de vos titres", "News for your securities")}</Text>{personalNews.map((item) => <NewsCard item={item} key={item.id} />)}</View> : null}
+    {personalNews.length ? <View style={styles.block}><Text style={styles.heading}>{pick("Actualités de vos titres", "News for your securities")}</Text>{personalNews.map((item) => <NewsCard compact item={item} key={item.id} />)}</View> : null}
   </Card>;
 }
 

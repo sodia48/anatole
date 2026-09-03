@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { MarketTile, NewsItem, Quote } from "@/src/lib/api/types";
+import type { MarketTile, NewsItem, Quote, StockNewsItem } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { normalizeTicker } from "@/src/lib/ticker";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
@@ -24,13 +24,43 @@ export function StockRow({ quote }: { quote: Quote | MarketTile }) {
   );
 }
 
-export function NewsCard({ item }: { item: NewsItem }) {
+export function NewsCard({
+  item,
+  compact = false,
+  showRegion = false,
+  showCategory = false,
+  showTone = false,
+  exploreLabel,
+  onExplore,
+}: {
+  item: NewsItem | StockNewsItem;
+  compact?: boolean;
+  showRegion?: boolean;
+  showCategory?: boolean;
+  showTone?: boolean;
+  exploreLabel?: string;
+  onExplore?: () => void;
+}) {
   const { language, pick } = useLocale();
+  const economic = "source" in item ? item : null;
+  const source = "source" in item ? item.source : item.publisher;
+  const published = new Date(item.published_at);
+  const date = Number.isNaN(published.getTime()) ? "N/D" : published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "medium", timeStyle: "short" });
+  const category = economic?.category;
+  const regions = economic?.regions ?? [];
+  const sentiment = economic?.sentiment.toLowerCase() ?? "";
+  const tone = sentiment.includes("posit") ? "Positive"
+    : sentiment.includes("négat") || sentiment.includes("negat") ? pick("Négative", "Negative")
+      : pick("Neutre", "Neutral");
+  const accessibility = [item.title, source, date, category].filter(Boolean).join(", ");
   return (
-    <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(item.url)} style={({ pressed }) => [styles.news, pressed && styles.pressed]}>
+    <Pressable accessibilityLabel={accessibility} accessibilityRole="link" onPress={() => void Linking.openURL(item.url)} style={({ pressed }) => [styles.news, compact && styles.newsCompact, pressed && styles.pressed]}>
       <Text style={styles.newsTitle}>{item.title}</Text>
-      {item.summary ? <Text numberOfLines={3} style={styles.summary}>{item.summary}</Text> : null}
-      <Text style={styles.meta}>{item.publisher ?? item.source ?? pick("Actualité", "News")} · {new Date(item.published_at).toLocaleDateString(language === "fr" ? "fr-CA" : "en-CA")}</Text>
+      {item.summary ? <Text numberOfLines={compact ? 2 : 4} style={styles.summary}>{item.summary}</Text> : null}
+      {showCategory && category ? <Text style={styles.newsCategory}>{category}{showRegion && regions.length ? ` · ${regions.join(" · ")}` : ""}</Text> : showRegion && regions.length ? <Text style={styles.newsCategory}>{regions.join(" · ")}</Text> : null}
+      <Text style={styles.meta}>{economic ? `${pick("Source officielle", "Official source")} · ${source}` : source || pick("Actualité", "News")} · {date}</Text>
+      {showTone && economic ? <View style={styles.tone}><Text style={styles.toneLabel}>{pick("Tonalité lexicale", "Lexical tone")} · {tone}</Text><Text style={styles.toneHelp}>{pick("Analyse automatique du vocabulaire du titre et du résumé; elle ne mesure pas l’impact de marché.", "Automated analysis of title and summary wording; it does not measure market impact.")}</Text></View> : null}
+      {onExplore && exploreLabel ? <Pressable accessibilityRole="button" onPress={(event) => { event.stopPropagation(); onExplore(); }} style={styles.explore}><Text style={styles.exploreText}>{exploreLabel}</Text></Pressable> : null}
     </Pressable>
   );
 }
@@ -45,7 +75,14 @@ const styles = StyleSheet.create({
   price: { alignItems: "flex-end", gap: 2 },
   priceText: { ...typography.body, color: colors.text, fontWeight: "700" },
   news: { gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  newsCompact: { paddingVertical: spacing.sm },
   newsTitle: { ...typography.body, color: colors.text, fontWeight: "700" },
   summary: { ...typography.body, color: colors.textMuted },
+  newsCategory: { ...typography.caption, color: colors.primary, fontWeight: "800" },
+  tone: { gap: 3, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
+  toneLabel: { ...typography.caption, color: colors.text, fontWeight: "800" },
+  toneHelp: { ...typography.caption, color: colors.textMuted },
+  explore: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.borderStrong },
+  exploreText: { ...typography.caption, color: colors.primary, fontWeight: "800" },
   pressed: { opacity: 0.7 },
 });

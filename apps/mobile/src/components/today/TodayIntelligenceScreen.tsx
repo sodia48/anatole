@@ -8,7 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { NewsCard } from "@/src/components/market";
 import { Card, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
-import type { NewsItem } from "@/src/lib/api/types";
+import type { StockNewsItem } from "@/src/lib/api/types";
 import { workspaceApi } from "@/src/lib/api/workspace";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
@@ -91,7 +91,7 @@ export function TodayIntelligenceScreen() {
   }, [phase.phase]);
   const attention = useMemo(() => buildTodayAttention({ alerts: alerts.data, terminal: terminalV2, calendar: calendar.data, earnings: earnings.data, screener: screener.data, insiders: insiders.data, news: news.data, watchlistSymbols: workspace.data.watchlist, portfolioSymbols: workspace.data.portfolio.map((item) => item.symbol), universe, language, now }), [alerts.data, calendar.data, earnings.data, insiders.data, language, news.data, now, screener.data, terminalV2, universe, workspace.data.portfolio, workspace.data.watchlist]);
   const timeline = useMemo(() => buildTodayTimeline(calendar.data, earnings.data, now, language), [calendar.data, earnings.data, language, now]);
-  const personalNews = [personalNewsOne.data?.items[0], personalNewsTwo.data?.items[0]].filter((item): item is NewsItem => Boolean(item));
+  const personalNews = [personalNewsOne.data?.items[0], personalNewsTwo.data?.items[0]].filter((item): item is StockNewsItem => Boolean(item));
   const hasWorkspace = Boolean(workspace.data.watchlist.length || workspace.data.portfolio.length || workspace.data.alerts.length);
 
   const openTarget = useCallback((target: TodayTarget) => {
@@ -123,7 +123,7 @@ export function TodayIntelligenceScreen() {
     if (item === "heatmap") return <TodayHeatmap cockpit={cockpit.data} onOpen={openTarget} terminal={terminalV2} universe={universe} />;
     if (item === "personal") return <TodayPersonalBrief alerts={alerts.data} hasWorkspace={hasWorkspace} onOpen={openTarget} onPersonalize={() => router.push("/watchlist" as Href)} personalNews={personalNews} portfolio={portfolio.data} stale={Boolean((watchlist.data && watchlist.isError) || (portfolio.data && portfolio.isError) || (alerts.data && alerts.isError))} terminal={terminalV2} watchlist={watchlist.data} />;
     if (item === "timeline") return <TodayTimeline items={timeline} onCalendar={() => openTarget({ kind: "calendar" })} onOpen={openTarget} stale={Boolean((calendar.data && calendar.isError) || (earnings.data && earnings.isError))} />;
-    if (item === "news") return <Card action={<Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/(tabs)/markets", params: { hub: "news" } } as Href)} style={styles.link}><Text style={styles.linkText}>{pick("Voir toutes", "View all")} →</Text></Pressable>} title={pick("NEWS ESSENTIELLES", "ESSENTIAL NEWS")} testID="today-news">{news.data ? news.data.items.slice(0, 3).map((entry) => <NewsCard item={entry} key={entry.id} />) : <Text style={styles.muted}>N/D</Text>}{news.data && news.isError ? <Text style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}</Card>;
+    if (item === "news") return <Card action={<Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/(tabs)/markets", params: { hub: "news" } } as Href)} style={styles.link}><Text style={styles.linkText}>{pick("Voir toutes", "View all")} →</Text></Pressable>} title={pick("NEWS ESSENTIELLES", "ESSENTIAL NEWS")} testID="today-news">{news.data ? news.data.items.slice(0, 3).map((entry) => <NewsCard compact item={entry} key={entry.id} />) : <Text style={styles.muted}>N/D</Text>}{news.data && news.isError ? <Text style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}</Card>;
     return <Card title={pick("EXPLORER ANATOLE", "EXPLORE ANATOLE")}><View style={styles.links}>{[["Terminal Pro", "/terminal"], [pick("Psychologie", "Psychology"), "/psychology"], ["Screener", "/screener"], [pick("Calendrier", "Calendar"), "/(tabs)/markets?hub=calendar"]].map(([label, route]) => <Pressable accessibilityRole="button" key={route} onPress={() => router.push(route as Href)} style={styles.nav}><Text style={styles.navText}>{label} →</Text></Pressable>)}</View></Card>;
   };
 
