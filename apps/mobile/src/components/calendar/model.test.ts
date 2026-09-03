@@ -1,5 +1,5 @@
 import type { CalendarSnapshot, EarningsItem, EarningsSnapshot, EconomicEvent } from "@/src/lib/api/types";
-import { filterCalendarItems, formatEstimate, groupCalendarByTorontoDate, mergeCalendarEvents, nextMajorEvent, type CalendarFiltersState } from "./model";
+import { calendarRangeLabel, filterCalendarItems, formatEstimate, groupCalendarByTorontoDate, mergeCalendarEvents, nextMajorEvent, type CalendarFiltersState } from "./model";
 
 function economic(overrides: Partial<EconomicEvent> = {}): EconomicEvent {
   return { id: "jobs", title: "Enquête sur la population active", country: "Canada", currency: "CAD", category: "Travail", importance: "high", starts_at: "2026-09-03T12:30:00Z", source: "Statistique Canada", url: "https://statcan.gc.ca/jobs", description: "Données officielles.", regions: ["CA"], ...overrides };
@@ -35,6 +35,13 @@ describe("calendar intelligence model", () => {
     expect(filterCalendarItems(items, { ...base, range: "today" }, now, [])).toHaveLength(1);
     expect(filterCalendarItems(items, { ...base, range: "7d" }, now, [])).toHaveLength(2);
     expect(filterCalendarItems(items, { ...base, range: "30d" }, now, [])).toHaveLength(3);
+  });
+
+  it("labels the rolling 7-day and 30-day windows exactly", () => {
+    expect(calendarRangeLabel("7d", "fr")).toBe("7 prochains jours");
+    expect(calendarRangeLabel("7d", "en")).toBe("Next 7 days");
+    expect(calendarRangeLabel("30d", "fr")).toBe("30 prochains jours");
+    expect(calendarRangeLabel("30d", "en")).toBe("Next 30 days");
   });
 
   it("groups by Toronto date and selects only the next high-importance event", () => {

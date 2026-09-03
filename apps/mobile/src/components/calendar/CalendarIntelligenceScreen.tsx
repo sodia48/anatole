@@ -55,19 +55,26 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const [filters, setFilters] = useState<CalendarFiltersState>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<EconomicCalendarItem | null>(null);
-  const [now] = useState(() => referenceNow ?? new Date());
+  const [now, setNow] = useState(() => referenceNow ?? new Date());
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       const active = state === "active";
       setAppActive(active);
+      if (active && !referenceNow) setNow(new Date());
       if (!active) {
         void queryClient.cancelQueries({ queryKey: ["calendar"] });
         void queryClient.cancelQueries({ queryKey: ["earnings"] });
       }
     });
     return () => subscription.remove();
-  }, [queryClient]);
+  }, [queryClient, referenceNow]);
+
+  useEffect(() => {
+    if (referenceNow || !appActive) return;
+    const interval = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(interval);
+  }, [appActive, referenceNow]);
 
   useEffect(() => {
     const requestedRegion = initialRegion?.toLowerCase() === "prairies" || initialRegion?.toLowerCase() === "atlantic" ? initialRegion.toLowerCase() : initialRegion?.toUpperCase();

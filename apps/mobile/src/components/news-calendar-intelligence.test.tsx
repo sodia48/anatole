@@ -1,4 +1,4 @@
-import { act, render, userEvent } from "@testing-library/react-native";
+import { act, cleanup, render, userEvent, waitFor } from "@testing-library/react-native";
 import { AppState, Linking } from "react-native";
 
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
@@ -48,6 +48,7 @@ describe("mobile news and calendar intelligence", () => {
   beforeEach(() => {
     errorRoots.clear();
     mockPush.mockClear();
+    mockCancelQueries.mockClear();
     mockUseQueries.mockClear();
     mockLanguage = "fr";
     mockAppStateHandler = undefined;
@@ -56,12 +57,18 @@ describe("mobile news and calendar intelligence", () => {
       return { remove: jest.fn() };
     }) as typeof AppState.addEventListener);
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    cleanup();
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
 
   it("renders ranked news, preserves provincial regions and handles local filters and empty results", async () => {
     const view = await render(<NewsIntelligenceScreen />);
     const user = userEvent.setup();
     expect(view.getByTestId("news-hero")).toBeTruthy();
+    expect(view.getByText("Toutes régions")).toBeTruthy();
+    expect(view.getByTestId("news-region-CA")).toBeTruthy();
     expect(view.getAllByText(/QC/).length).toBeGreaterThan(0);
     await user.press(view.getByTestId("news-region-QC"));
     expect(view.getAllByText("Emploi au Québec").length).toBeGreaterThan(0);
@@ -69,6 +76,24 @@ describe("mobile news and calendar intelligence", () => {
     expect(view.getByText("Aucune actualité ne correspond à ces filtres.")).toBeTruthy();
     await user.press(view.getByText("Réinitialiser les filtres"));
     expect(view.getAllByText("Décision de la Banque du Canada").length).toBeGreaterThan(0);
+    await view.unmount();
+  });
+
+  it("hides My regions without preferences and treats a deep link only as a regional filter", async () => {
+    const view = await render(<NewsIntelligenceScreen initialRegion="QC" />);
+    expect(view.queryByTestId("news-primary-my-regions")).toBeNull();
+    await waitFor(() => expect(view.getByTestId("news-region-QC").props.accessibilityState.selected).toBe(true));
+    expect(view.getAllByText("Emploi au Québec")).toHaveLength(2);
+    expect(view.getAllByText("Décision de la Banque du Canada")).toHaveLength(1);
+    await view.unmount();
+  });
+
+  it("shows My regions only with explicit preferences and filters to them", async () => {
+    const view = await render(<NewsIntelligenceScreen preferredRegions={["QC"]} />);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("news-primary-my-regions"));
+    expect(view.getAllByText("Emploi au Québec")).toHaveLength(2);
+    expect(view.getAllByText("Décision de la Banque du Canada")).toHaveLength(1);
     await view.unmount();
   });
 
@@ -128,6 +153,48 @@ describe("mobile news and calendar intelligence", () => {
     await view.unmount();
   });
 
+  it("does not start a real clock when a deterministic reference time is supplied", async () => {
+    const setIntervalSpy = jest.spyOn(globalThis, "setInterval");
+    const view = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    expect(setIntervalSpy).not.toHaveBeenCalled();
+    await view.unmount();
+  });
+
+  it("advances the countdown every minute while the app is active", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-09-03T13:30:00Z"));
+    const setIntervalSpy = jest.spyOn(globalThis, "setInterval");
+    const view = await render(<CalendarIntelligenceScreen />);
+    expect(view.getByText(/dans 1 h 0 min/)).toBeTruthy();
+    const tick = setIntervalSpy.mock.calls.find((call) => call[1] === 60_000)?.[0] as (() => void) | undefined;
+    expect(tick).toBeDefined();
+    jest.setSystemTime(new Date("2026-09-03T13:31:00Z"));
+    await act(async () => tick?.());
+    expect(view.getByText(/dans 0 h 59 min/)).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("stops the clock in background and refreshes it immediately on foreground", async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date("2026-09-03T13:30:00Z"));
+    const setIntervalSpy = jest.spyOn(globalThis, "setInterval");
+    const clearIntervalSpy = jest.spyOn(globalThis, "clearInterval");
+    const view = await render(<CalendarIntelligenceScreen />);
+    expect(view.getByText(/dans 1 h 0 min/)).toBeTruthy();
+    await act(async () => mockAppStateHandler?.("background"));
+    expect(clearIntervalSpy).toHaveBeenCalled();
+    jest.setSystemTime(new Date("2026-09-03T13:32:00Z"));
+    expect(view.getByText(/dans 1 h 0 min/)).toBeTruthy();
+    await act(async () => mockAppStateHandler?.("active"));
+    expect(view.getByText(/dans 0 h 58 min/)).toBeTruthy();
+    const ticks = setIntervalSpy.mock.calls.filter((call) => call[1] === 60_000);
+    expect(ticks).toHaveLength(2);
+    jest.setSystemTime(new Date("2026-09-03T13:33:00Z"));
+    await act(async () => (ticks[1]?.[0] as (() => void) | undefined)?.());
+    expect(view.getByText(/dans 0 h 57 min/)).toBeTruthy();
+    await view.unmount();
+  });
+
   it("opens an accessible event modal and only opens the official source on button press", async () => {
     const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     const view = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
@@ -157,7 +224,7 @@ describe("mobile news and calendar intelligence", () => {
   it("renders English labels without leaking French data labels", async () => {
     mockLanguage = "en";
     const view = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
-    expect(view.getByText("This week")).toBeTruthy();
+    expect(view.getByText("Next 7 days")).toBeTruthy();
     expect(view.getByText("Estimated time")).toBeTruthy();
     expect(view.queryByText("Heure indicative")).toBeNull();
     await view.unmount();

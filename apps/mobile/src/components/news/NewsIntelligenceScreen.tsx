@@ -26,6 +26,7 @@ import {
 } from "./model";
 
 const DEFAULT_FILTERS: NewsFiltersState = { primary: "all", region: "all", category: "all", search: "" };
+const EMPTY_PREFERRED_REGIONS: string[] = [];
 const REGIONS = new Set<NewsRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "prairies", "atlantic"]);
 const CATEGORIES = new Set<NewsCategoryFilter>(["all", "monetary", "inflation", "labour", "growth", "trade", "energy", "public-finance", "investment", "housing", "other"]);
 
@@ -43,7 +44,7 @@ function updatedLabel(value: string, language: "fr" | "en") {
   return `${language === "fr" ? "Mis à jour" : "Updated"} ${date.toLocaleTimeString(language === "fr" ? "fr-CA" : "en-CA", { hour: "2-digit", minute: "2-digit" })}`;
 }
 
-export function NewsIntelligenceScreen({ header, initialRegion, initialCategory }: { header?: ReactNode; initialRegion?: string; initialCategory?: string }) {
+export function NewsIntelligenceScreen({ header, initialRegion, initialCategory, preferredRegions = EMPTY_PREFERRED_REGIONS }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; preferredRegions?: string[] }) {
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
   const queryClient = useQueryClient();
@@ -80,7 +81,7 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory 
   })) });
 
   const ranked = useMemo(() => rankNewsItems(dedupeNewsItems(news.data?.items ?? [])).slice(0, 3), [news.data?.items]);
-  const filtered = useMemo(() => filterNewsItems(dedupeNewsItems(news.data?.items ?? []), filters, initialRegion ? [initialRegion] : []), [filters, initialRegion, news.data?.items]);
+  const filtered = useMemo(() => filterNewsItems(dedupeNewsItems(news.data?.items ?? []), filters, preferredRegions), [filters, news.data?.items, preferredRegions]);
   const personal = useMemo(() => dedupePersonalNews(personalQueries.flatMap((query, index) => (query.data?.items ?? []).map((item) => ({ ...item, personal_ticker: personalSymbols[index]! })))), [personalQueries, personalSymbols]);
   const entries = useMemo<NewsFeedEntry[]>(() => filters.primary === "personal"
     ? personal.filter((item) => !filters.search.trim() || `${item.title} ${item.summary} ${item.publisher}`.toLowerCase().includes(filters.search.trim().toLowerCase())).map((item) => ({ id: `personal:${item.personal_ticker}:${item.id}`, item, ticker: item.personal_ticker }))
@@ -101,7 +102,7 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory 
     {stale ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
     <QueryState error={!news.data ? news.error : null} loading={news.isLoading || personalLoading} onRetry={refresh} />
     <NewsHero items={ranked} />
-    <NewsFilters filters={filters} hasPersonal={personalSymbols.length > 0} onChange={setFilters} />
+    <NewsFilters filters={filters} hasPersonal={personalSymbols.length > 0} onChange={setFilters} preferredRegions={preferredRegions} />
     {filters.primary === "personal" && personalSymbols.length > 0 ? <Text style={styles.scope}>{pick("Chargement limité à 5 titres, portefeuille en priorité.", "Loading is limited to 5 securities, portfolio first.")}</Text> : null}
   </>;
   return <SafeAreaView edges={["top"]} style={styles.safe} testID="news-intelligence-screen"><NewsFeed entries={entries} footer={<NewsSourceHealth statuses={news.data?.source_statuses ?? []} />} header={contentHeader} onRefresh={refresh} onReset={reset} onTicker={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })} refreshing={refreshing} /></SafeAreaView>;

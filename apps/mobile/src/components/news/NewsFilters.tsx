@@ -10,12 +10,13 @@ const primaryOptions: { id: NewsPrimaryFilter; fr: string; en: string }[] = [
   { id: "provinces", fr: "Provinces", en: "Provinces" },
   { id: "boc", fr: "Banque du Canada", en: "Bank of Canada" },
   { id: "statcan", fr: "Statistique Canada", en: "Statistics Canada" },
-  { id: "my-regions", fr: "Mes régions", en: "My regions" },
 ];
 
-const regionOptions: { id: NewsRegionFilter; label: string }[] = [
-  { id: "all", label: "Canada" }, { id: "QC", label: "QC" }, { id: "ON", label: "ON" },
-  { id: "BC", label: "BC" }, { id: "AB", label: "AB" }, { id: "prairies", label: "Prairies" }, { id: "atlantic", label: "Atlantique" },
+const regionOptions: { id: NewsRegionFilter; fr: string; en: string }[] = [
+  { id: "all", fr: "Toutes régions", en: "All regions" }, { id: "CA", fr: "Canada", en: "Canada" },
+  { id: "QC", fr: "QC", en: "QC" }, { id: "ON", fr: "ON", en: "ON" },
+  { id: "BC", fr: "BC", en: "BC" }, { id: "AB", fr: "AB", en: "AB" },
+  { id: "prairies", fr: "Prairies", en: "Prairies" }, { id: "atlantic", fr: "Atlantique", en: "Atlantic" },
 ];
 
 const categoryOptions: { id: NewsCategoryFilter; fr: string; en: string }[] = [
@@ -36,15 +37,19 @@ function Chip({ label, selected, onPress, testID }: { label: string; selected: b
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, selected && styles.selected]} testID={testID}><Text style={[styles.chipText, selected && styles.selectedText]}>{label}</Text></Pressable>;
 }
 
-export function NewsFilters({ filters, hasPersonal, onChange }: { filters: NewsFiltersState; hasPersonal: boolean; onChange: (next: NewsFiltersState) => void }) {
+export function NewsFilters({ filters, hasPersonal, onChange, preferredRegions = [] }: { filters: NewsFiltersState; hasPersonal: boolean; onChange: (next: NewsFiltersState) => void; preferredRegions?: string[] }) {
   const { language, pick } = useLocale();
-  const primary = hasPersonal ? [...primaryOptions, { id: "personal" as const, fr: "Mes titres", en: "My securities" }] : primaryOptions;
+  const primary = [
+    ...primaryOptions,
+    ...(preferredRegions.length > 0 ? [{ id: "my-regions" as const, fr: "Mes régions", en: "My regions" }] : []),
+    ...(hasPersonal ? [{ id: "personal" as const, fr: "Mes titres", en: "My securities" }] : []),
+  ];
   return <View style={styles.container} testID="news-filters">
     <ScrollView contentContainerStyle={styles.row} horizontal showsHorizontalScrollIndicator={false}>
       {primary.map((item) => <Chip key={item.id} label={language === "fr" ? item.fr : item.en} onPress={() => onChange({ ...filters, primary: item.id })} selected={filters.primary === item.id} testID={`news-primary-${item.id}`} />)}
     </ScrollView>
     <ScrollView contentContainerStyle={styles.row} horizontal showsHorizontalScrollIndicator={false}>
-      {regionOptions.map((item) => <Chip key={item.id} label={item.id === "atlantic" ? pick("Atlantique", "Atlantic") : item.label} onPress={() => onChange({ ...filters, region: item.id })} selected={filters.region === item.id} testID={`news-region-${item.id}`} />)}
+      {regionOptions.map((item) => <Chip key={item.id} label={language === "fr" ? item.fr : item.en} onPress={() => onChange({ ...filters, region: item.id })} selected={filters.region === item.id} testID={`news-region-${item.id}`} />)}
     </ScrollView>
     <ScrollView contentContainerStyle={styles.row} horizontal showsHorizontalScrollIndicator={false}>
       {categoryOptions.map((item) => <Chip key={item.id} label={language === "fr" ? item.fr : item.en} onPress={() => onChange({ ...filters, category: item.id })} selected={filters.category === item.id} testID={`news-category-${item.id}`} />)}

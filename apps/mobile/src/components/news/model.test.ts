@@ -26,6 +26,23 @@ describe("news intelligence model", () => {
     expect(classifyNewsCategory(items[2]!)).toBe("housing");
   });
 
+  it("distinguishes all regions, Canada and Quebec exactly", () => {
+    const items = [
+      news({ id: "ca", regions: ["CA"] }),
+      news({ id: "qc", regions: ["QC"] }),
+      news({ id: "both", regions: ["CA", "QC"] }),
+    ];
+    expect(filterNewsItems(items, { ...filters, region: "all" }).map((item) => item.id)).toEqual(["ca", "qc", "both"]);
+    expect(filterNewsItems(items, { ...filters, region: "CA" }).map((item) => item.id)).toEqual(["ca", "both"]);
+    expect(filterNewsItems(items, { ...filters, region: "QC" }).map((item) => item.id)).toEqual(["qc", "both"]);
+  });
+
+  it("uses only explicit preferred regions for My regions", () => {
+    const items = [news({ id: "ca", regions: ["CA"] }), news({ id: "qc", regions: ["QC"] })];
+    expect(filterNewsItems(items, { ...filters, primary: "my-regions" }, [])).toEqual([]);
+    expect(filterNewsItems(items, { ...filters, primary: "my-regions" }, ["QC"]).map((item) => item.id)).toEqual(["qc"]);
+  });
+
   it("keeps FR and EN lexical tone explicitly separate from market impact", () => {
     expect(lexicalToneLabel("Négative", "fr")).toBe("Tonalité lexicale · Négative");
     expect(lexicalToneLabel("Negative", "en")).toBe("Lexical tone · Negative");

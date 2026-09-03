@@ -121,8 +121,8 @@ export function nextMajorEvent(items: readonly CalendarIntelligenceItem[], now: 
 
 export function calendarRangeLabel(range: CalendarRange, language: CalendarLanguage): string {
   if (range === "today") return language === "fr" ? "Aujourd’hui" : "Today";
-  if (range === "7d") return language === "fr" ? "Cette semaine" : "This week";
-  return language === "fr" ? "Ce mois-ci" : "This month";
+  if (range === "7d") return language === "fr" ? "7 prochains jours" : "Next 7 days";
+  return language === "fr" ? "30 prochains jours" : "Next 30 days";
 }
 
 export function formatEstimate(value: number | null, currency: string | null, language: CalendarLanguage): string {
