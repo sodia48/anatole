@@ -9,7 +9,7 @@ const mockUseQuery = jest.fn();
 const mockScreener = jest.fn();
 let appStateHandler: ((state: string) => void) | undefined;
 let forceRefreshError = false;
-let mockRouteParams: { universe?: string; sector?: string } = {};
+let mockRouteParams: { universe?: string; sector?: string; signal?: string } = {};
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useLocalSearchParams: () => mockRouteParams }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr, t: (key: string) => key }) }));
@@ -122,11 +122,12 @@ describe("mobile TSX screener", () => {
     await view.unmount();
   });
 
-  it("restores a TSX60 sector filter from a reloadable deep link", async () => {
-    mockRouteParams = { universe: "tsx60", sector: "Financials" };
+  it("restores TSX60 sector and signal filters from a reloadable deep link", async () => {
+    mockRouteParams = { universe: "tsx60", sector: "Financials", signal: "Constructif" };
     const view = await render(<ScreenerScreen />);
     await waitFor(() => expect(view.getByTestId("screener-universe-tsx60").props.accessibilityState.selected).toBe(true));
     expect(view.getByTestId("screener-active-sector")).toBeTruthy();
+    expect(view.getByTestId("screener-active-signal")).toBeTruthy();
     expect(view.getByTestId("screener-row-RY")).toBeTruthy();
     expect(view.queryByTestId("screener-row-SHOP")).toBeNull();
     await view.unmount();

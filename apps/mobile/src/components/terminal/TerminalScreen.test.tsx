@@ -14,8 +14,9 @@ const mockUseLocale = jest.fn();
 let appStateHandler: ((state: string) => void) | undefined;
 let refreshError = false;
 let mockTerminalPresets: TerminalRadarPreset[] = [];
+let mockRouteParams: { symbol?: string; anomaly?: string } = {};
 
-jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+jest.mock("expo-router", () => ({ router: { push: jest.fn() }, useLocalSearchParams: () => mockRouteParams }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => mockUseLocale() }));
 jest.mock("@/src/lib/api/market", () => ({ marketApi: { terminal: (...args: unknown[]) => mockTerminal(...args) } }));
 jest.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => mockUseQuery(options), useQueryClient: () => ({ cancelQueries: mockCancelQueries }) }));
@@ -92,6 +93,7 @@ function queryResult() {
 
 describe("mobile Pro Terminal", () => {
   beforeEach(() => {
+    mockRouteParams = {};
     refreshError = false;
     mockUseQuery.mockReset();
     mockUseQuery.mockImplementation(queryResult);
@@ -165,6 +167,18 @@ describe("mobile Pro Terminal", () => {
     await user.press(view.getByTestId("terminal-details-toggle"));
     expect(view.getByTestId("terminal-component-breadth")).toBeTruthy();
     expect(view.getByText("Méthodologie complète du Terminal.")).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("honors a one-time symbol and anomaly deep link and lets the user restore the full radar", async () => {
+    mockRouteParams = { symbol: "RY", anomaly: "volume_spike" };
+    const view = await render(<TerminalScreen />);
+    const user = userEvent.setup();
+    expect(view.getByTestId("terminal-deep-link")).toHaveTextContent(/RY.*volume_spike/);
+    expect(view.getAllByTestId("terminal-radar-RY")).toHaveLength(1);
+    expect(view.queryByTestId("terminal-radar-SHOP")).toBeNull();
+    await user.press(view.getByText("Voir tout"));
+    expect(view.getByText("Radar · 3/3")).toBeTruthy();
     await view.unmount();
   });
 

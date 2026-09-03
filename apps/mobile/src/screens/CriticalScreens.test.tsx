@@ -35,30 +35,30 @@ const mockQueryData: Record<string, unknown> = {
   notifications: { unread_count: 1, generated_at: "2026-08-30T00:00:00Z", items: [{ id: "n1", kind: "alert", title: "RY", message: "Seuil atteint", severity: "important", symbol: "RY", route: null, created_at: "2026-08-30T00:00:00Z", read_at: null }] },
   watchlist: { tickers: ["RY"], items: [{ ...tile, currency: "CAD", previous_close: 198, day_high: 202, day_low: 197 }], summary: { advancers: 1, decliners: 0, unchanged: 0, average_change_percent: 1 }, generated_at: "2026-08-30T00:00:00Z", refresh_after_seconds: 45 },
 };
-const mockObservedQueryKeys: string[] = [];
+const mockObservedQueries: { queryKey: unknown[]; enabled?: boolean }[] = [];
 
 jest.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) => {
-    mockObservedQueryKeys.push(String(queryKey[0]));
+  useQuery: ({ queryKey, enabled }: { queryKey: unknown[]; enabled?: boolean }) => {
+    mockObservedQueries.push({ queryKey, enabled });
     return { data: mockQueryData[String(queryKey[0])], isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn() };
   },
   useQueryClient: () => ({ cancelQueries: jest.fn() }),
 }));
 
 describe("critical native screens", () => {
-  beforeEach(() => mockObservedQueryKeys.splice(0));
+  beforeEach(() => mockObservedQueries.splice(0));
 
-  it("does not register a Terminal fetch on Today, Markets, or Psychology", async () => {
+  it("keeps the staged Terminal query disabled on initial Today render and absent elsewhere", async () => {
     const today = await render(<TodayScreen />);
-    expect(mockObservedQueryKeys).not.toContain("terminal");
+    expect(mockObservedQueries.find(({ queryKey }) => queryKey[0] === "terminal")?.enabled).toBe(false);
     await today.unmount();
-    mockObservedQueryKeys.splice(0);
+    mockObservedQueries.splice(0);
     const markets = await render(<MarketsScreen />);
-    expect(mockObservedQueryKeys).not.toContain("terminal");
+    expect(mockObservedQueries.some(({ queryKey }) => queryKey[0] === "terminal")).toBe(false);
     await markets.unmount();
-    mockObservedQueryKeys.splice(0);
+    mockObservedQueries.splice(0);
     const psychology = await render(<PsychologyScreen />);
-    expect(mockObservedQueryKeys).toEqual(["psychology"]);
+    expect(mockObservedQueries.map(({ queryKey }) => queryKey[0])).toEqual(["psychology"]);
     await psychology.unmount();
   });
 
