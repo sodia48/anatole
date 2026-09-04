@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class PortfolioPositionInput(BaseModel):
@@ -192,6 +192,14 @@ AlertMetric = Literal[
     "score",
 ]
 AlertOperator = Literal["above", "below"]
+AlertKind = Literal["threshold", "event"]
+AlertEventType = Literal[
+    "terminal_anomaly",
+    "terminal_regime",
+    "earnings_upcoming",
+    "insider_unusual",
+    "company_news",
+]
 AlertType = Literal[
     "price_level",
     "indicator_threshold",
@@ -209,10 +217,13 @@ class DrawingAlertPoint(BaseModel):
 class AlertRule(BaseModel):
     id: str
     symbol: str
-    metric: AlertMetric
-    operator: AlertOperator
-    threshold: float
+    metric: AlertMetric | None = None
+    operator: AlertOperator | None = None
+    threshold: float | None = None
     enabled: bool = True
+    kind: AlertKind = "threshold"
+    event_type: AlertEventType | None = None
+    cooldown_minutes: int = Field(default=1_440, ge=5, le=43_200)
     label: str | None = None
     alert_type: AlertType = "price_level"
     indicator_id: str | None = Field(default=None, max_length=40)
@@ -257,6 +268,16 @@ class AlertRule(BaseModel):
             raise ValueError("Paramètres d’alerte invalides.")
         return values
 
+    @model_validator(mode="after")
+    def validate_rule_contract(self) -> "AlertRule":
+        if self.kind == "event":
+            if self.event_type is None:
+                raise ValueError("Une alerte événementielle exige event_type.")
+            return self
+        if self.metric is None or self.operator is None or self.threshold is None:
+            raise ValueError("Une alerte de seuil exige metric, operator et threshold.")
+        return self
+
 
 class AlertEvaluateRequest(BaseModel):
     rules: list[AlertRule] = Field(min_length=1, max_length=50)
@@ -266,11 +287,12 @@ class AlertEvaluation(BaseModel):
     id: str
     symbol: str
     name: str
-    metric: AlertMetric
+    metric: AlertMetric | None = None
+    event_type: AlertEventType | None = None
     alert_type: AlertType = "price_level"
     metric_label: str
-    operator: AlertOperator
-    threshold: float
+    operator: AlertOperator | None = None
+    threshold: float | None = None
     current_value: float | None = None
     unit: str
     triggered: bool

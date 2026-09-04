@@ -9,6 +9,12 @@ import { notificationApi } from "./api/notifications";
 const PUSH_TOKEN_KEY = "anatole.mobile.push-token";
 const PUSH_DEVICE_ID_KEY = "anatole.mobile.push-device-id";
 
+export function pushCapability(): { push_supported: boolean; reason: "expo-go" | "unsupported-platform" | "development-build" } {
+  if (Constants.appOwnership === "expo") return { push_supported: false, reason: "expo-go" };
+  if (!Device.isDevice || (Platform.OS !== "ios" && Platform.OS !== "android")) return { push_supported: false, reason: "unsupported-platform" };
+  return { push_supported: true, reason: "development-build" };
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -19,9 +25,12 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerPushDevice(): Promise<string> {
-  if (!Device.isDevice || (Platform.OS !== "ios" && Platform.OS !== "android")) {
+  const capability = pushCapability();
+  if (!capability.push_supported) {
+    if (capability.reason === "expo-go") throw new Error("Expo Go prend uniquement en charge les notifications Anatole dans l’application.");
     throw new Error("Les notifications distantes exigent un appareil iOS ou Android réel.");
   }
+  const nativePlatform = Platform.OS as "ios" | "android";
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("anatole-alerts", {
@@ -43,7 +52,7 @@ export async function registerPushDevice(): Promise<string> {
   const token = (await Notifications.getExpoPushTokenAsync({ projectId: String(projectId) })).data;
   const device = await notificationApi.registerDevice({
     token,
-    platform: Platform.OS,
+    platform: nativePlatform,
     device_name: Device.deviceName ?? Device.modelName ?? undefined,
     app_version: Constants.expoConfig?.version,
   });

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from app.schemas.workspace import (
     AlertEvaluateRequest,
@@ -18,6 +18,10 @@ from app.services.technical_analysis import (
     crossed_below,
     latest_value,
 )
+from app.services.analysis import analysis_service
+from app.services.earnings_calendar import earnings_calendar_service
+from app.services.insiders import insider_service
+from app.services.stock_news import stock_news_service
 
 
 _METRIC_LABELS = {
@@ -84,12 +88,53 @@ def drawing_level(points: list[DrawingAlertPoint], time: int) -> float | None:
 
 
 class AlertService:
+    async def _evaluate_event(self, rule, evaluated_at: datetime) -> AlertEvaluation:
+        symbol = rule.symbol.strip().upper().removesuffix(".TO")
+        triggered = False
+        source: str | None = None
+        message = "Événement non observé lors de cette évaluation."
+        try:
+            if rule.event_type == "terminal_anomaly":
+                snapshot = await analysis_service.terminal()
+                matches = [item for item in snapshot.anomalies if item.symbol == symbol]
+                triggered = bool(matches)
+                source = matches[0].source if matches else "Terminal Pro · données de marché"
+                message = matches[0].detail if matches else "Aucune anomalie Terminal active pour ce titre."
+            elif rule.event_type == "terminal_regime":
+                snapshot = await analysis_service.terminal()
+                source = "Terminal Pro · TSX 60"
+                message = f"Régime Terminal actuel : {snapshot.regime or 'N/D'}. Un changement nécessite une observation précédente."
+            elif rule.event_type == "earnings_upcoming":
+                snapshot = await earnings_calendar_service.get_snapshot("composite")
+                horizon = evaluated_at + timedelta(days=7)
+                matches = [item for item in snapshot.events if item.ticker == symbol and evaluated_at <= item.starts_at <= horizon]
+                triggered = bool(matches)
+                source = matches[0].source if matches else "Calendrier public des résultats"
+                message = f"Résultats attendus le {matches[0].starts_at.isoformat()}." if matches else "Aucun résultat sourcé dans les sept prochains jours."
+            elif rule.event_type == "insider_unusual":
+                snapshot = await insider_service.snapshot(market="canada", ticker=symbol, days=180, scan_limit=1, result_limit=40)
+                matches = [trade for trade in snapshot.trades if trade.unusual]
+                triggered = bool(matches)
+                source = matches[0].source_name if matches else next((item.source for item in snapshot.sources if item.status != "unavailable"), None)
+                message = f"{len(matches)} transaction(s) inhabituelle(s) sourcée(s)." if matches else "Aucune transaction inhabituelle sourcée dans le snapshot disponible."
+            elif rule.event_type == "company_news":
+                snapshot = await stock_news_service.get_snapshot(symbol, language="fr")
+                recent = [item for item in snapshot.items if item.published_at >= evaluated_at - timedelta(hours=24)]
+                triggered = bool(recent)
+                source = recent[0].publisher if recent else None
+                message = recent[0].title if recent else "Aucune nouvelle récente sourcée concernant ce titre."
+            else:
+                raise ValueError("Type d'événement inconnu")
+        except Exception:  # noqa: BLE001
+            return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=False, status="unavailable", message="Source événementielle temporairement indisponible.", evaluated_at=evaluated_at)
+        return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=triggered, status="triggered" if triggered else "monitoring", message=message, source=source, evaluated_at=evaluated_at)
+
     async def evaluate(self, request: AlertEvaluateRequest) -> AlertSnapshot:
         enabled_symbols = list(
             dict.fromkeys(
                 rule.symbol.strip().upper().removesuffix(".TO")
                 for rule in request.rules
-                if rule.enabled
+                if rule.enabled and rule.kind == "threshold"
             )
         )
         quotes, histories = await asyncio.gather(
@@ -108,6 +153,13 @@ class AlertService:
 
         for rule in request.rules:
             symbol = rule.symbol.strip().upper().removesuffix(".TO")
+            if rule.kind == "event":
+                if not rule.enabled:
+                    items.append(AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=False, status="disabled", message="Alerte désactivée.", evaluated_at=evaluated_at))
+                else:
+                    items.append(await self._evaluate_event(rule, evaluated_at))
+                continue
+            assert rule.metric is not None and rule.operator is not None and rule.threshold is not None
             label, unit = _METRIC_LABELS[rule.metric]
             if not rule.enabled:
                 items.append(

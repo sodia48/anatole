@@ -75,11 +75,14 @@ export type PortfolioPositionInput = { symbol: string; quantity: number; average
 export type AlertRule = {
   id: string;
   symbol: string;
-  metric: "price" | "change_percent" | "rsi_14" | "momentum_20d" | "relative_volume" | "score";
-  operator: "above" | "below";
-  threshold: number;
+  metric?: "price" | "change_percent" | "rsi_14" | "momentum_20d" | "relative_volume" | "score" | null;
+  operator?: "above" | "below" | null;
+  threshold?: number | null;
   enabled: boolean;
   label?: string | null;
+  kind?: "threshold" | "event";
+  event_type?: "terminal_anomaly" | "terminal_regime" | "earnings_upcoming" | "insider_unusual" | "company_news" | null;
+  cooldown_minutes?: number;
 };
 
 export type SyncedWorkspaceData = {
@@ -196,7 +199,7 @@ export type PortfolioCorrelation = { symbols: string[]; values: (number | null)[
 export type PortfolioStressTest = { key: "tsx" | "wti" | "cad_usd" | "canada_10y"; label: string; shock: number; shock_unit: "percent" | "basis_points"; estimated_portfolio_change_percent: number | null; coverage: PortfolioCoverage; methodology: string };
 export type PortfolioPositionSnapshot = PortfolioPositionInput & { symbol: string; ticker: string; name: string; sector: string; currency?: string; price: number; market_value: number; unrealized_pnl: number; unrealized_pnl_percent: number; day_pnl?: number; day_change_percent: number; weight_percent: number; momentum_20d?: number | null; rsi_14?: number | null; relative_volume?: number | null; score?: number | null; source?: string; delayed?: boolean };
 export type PortfolioSnapshot = { base_currency?: string; total_market_value: number; total_day_pnl: number; total_day_change_percent: number; total_unrealized_pnl: number; total_unrealized_pnl_percent?: number; portfolio_score?: number | null; sector_allocation: PortfolioAllocation[]; currency_allocation?: PortfolioAllocation[]; positions: PortfolioPositionSnapshot[]; risk?: PortfolioRisk | null; contributors?: PortfolioContributor[]; detractors?: PortfolioContributor[]; performance_horizons?: PortfolioHorizon[]; contribution_horizons?: PortfolioContributionResult[]; correlation?: PortfolioCorrelation | null; stress_tests?: PortfolioStressTest[]; risk_reading?: string[]; methodology?: string; notes?: string[]; generated_at?: string; refresh_after_seconds?: number };
-export type AlertSnapshot = { items: { id: string; symbol: string; status: string; message: string; current_value: number | null; triggered: boolean; name?: string; metric_label?: string; unit?: string; source?: string | null; evaluated_at?: string }[]; triggered_count: number; monitored_count: number; unavailable_count: number; generated_at?: string; refresh_after_seconds?: number };
+export type AlertSnapshot = { items: { id: string; symbol: string; status: string; message: string; current_value?: number | null; triggered: boolean; name?: string; metric_label?: string; unit?: string; source?: string | null; event_type?: AlertRule["event_type"]; evaluated_at?: string }[]; triggered_count: number; monitored_count: number; unavailable_count: number; generated_at?: string; refresh_after_seconds?: number };
 export type NotificationItem = { id: string; kind: string; title: string; message: string; severity: "info" | "attention" | "important"; symbol: string | null; route: string | null; created_at: string; read_at: string | null };
 export type NotificationFeed = { items: NotificationItem[]; unread_count: number; generated_at: string };
 export type MobileDevice = { id: string; platform: "ios" | "android"; device_name: string | null; app_version: string | null; push_enabled: boolean; created_at: string; updated_at: string; last_seen_at: string };
