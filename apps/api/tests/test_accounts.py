@@ -55,6 +55,9 @@ def test_register_login_me_and_logout(account_client: TestClient):
     created = register(account_client)
     assert created["user"]["email"] == "beta@example.com"
     assert created["workspace"]["revision"] == 0
+    assert created["workspace"]["data"]["preferences"]["preferred_regions"] == []
+    assert created["workspace"]["data"]["preferences"]["preferred_sectors"] == []
+    assert created["workspace"]["data"]["preferences"]["onboarding_version"] == 0
 
     me = account_client.get(
         "/api/v1/account/me",
@@ -158,6 +161,9 @@ def test_workspace_sync_revision_conflict_and_isolation(account_client: TestClie
                 "decimals": 2,
                 "default_range": "1y",
                 "default_universe": "composite",
+                "preferred_regions": ["QC", "QC", "CA"],
+                "preferred_sectors": ["Financials", "Energy", "Financials"],
+                "onboarding_version": 2,
             },
             "advisor_profile": None,
             "cockpit_universe": "composite",
@@ -173,6 +179,9 @@ def test_workspace_sync_revision_conflict_and_isolation(account_client: TestClie
     assert saved.status_code == 200, saved.text
     assert saved.json()["revision"] == 1
     assert saved.json()["data"]["watchlist"] == ["RY", "TD"]
+    assert saved.json()["data"]["preferences"]["preferred_regions"] == ["QC", "CA"]
+    assert saved.json()["data"]["preferences"]["preferred_sectors"] == ["Financials", "Energy"]
+    assert saved.json()["data"]["preferences"]["onboarding_version"] == 2
 
     conflict = account_client.put(
         "/api/v1/account/workspace",

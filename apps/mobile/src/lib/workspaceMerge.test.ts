@@ -24,3 +24,11 @@ it("merges local discovery symbols with the remote account workspace", () => {
   const merged = mergeWorkspaceData(workspace(["RY", "TD"]), workspace(["ry.to", "CNR"]));
   expect(merged.watchlist).toEqual(["RY", "TD", "CNR"]);
 });
+
+it("carries a completed anonymous onboarding into a new account workspace", () => {
+  const remote = workspace([]);
+  const local = workspace(["RY", "TD", "BMO"]);
+  local.preferences = { ...local.preferences, language: "en", preferred_regions: ["QC"], preferred_sectors: ["Financials"], onboarding_version: 2 };
+  const merged = mergeWorkspaceData(remote, local);
+  expect(merged.preferences).toEqual(expect.objectContaining({ language: "en", preferred_regions: ["QC"], preferred_sectors: ["Financials"], onboarding_version: 2 }));
+});
