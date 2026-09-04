@@ -80,15 +80,36 @@ export function MobileAccountProvider({ children }: PropsWithChildren) {
     becomeAnonymous(true);
   }, [becomeAnonymous, queryClient]);
 
-  const flushQueuedWorkspace = useCallback(async () => {
+  const flushQueuedWorkspace = useCallback(async (remote?: WorkspaceSnapshot) => {
     try {
-      const saved = await replayWorkspaceQueue(accountApi.workspace, accountApi.updateWorkspace);
+      const saved = await replayWorkspaceQueue(
+        remote ? async () => remote : accountApi.workspace,
+        accountApi.updateWorkspace,
+      );
       if (saved) setAndPersistWorkspace(saved);
+      else if (remote) setAndPersistWorkspace(remote);
       setWorkspaceError(null);
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : "Synchronisation indisponible.");
     }
   }, [setAndPersistWorkspace]);
+
+  const revalidateSession = useCallback(async () => {
+    try {
+      const status = await accountApi.me();
+      setUser(status.user);
+      setState("authenticated");
+      const remoteWorkspace = await accountApi.workspace();
+      await flushQueuedWorkspace(remoteWorkspace);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        clearPrivateState();
+        return;
+      }
+      setState("authenticated");
+      setWorkspaceError(error instanceof Error ? error.message : "Connexion indisponible.");
+    }
+  }, [clearPrivateState, flushQueuedWorkspace]);
 
   useEffect(() => onUnauthorized(() => {
     clearPrivateState();
@@ -108,36 +129,15 @@ export function MobileAccountProvider({ children }: PropsWithChildren) {
         if (active) becomeAnonymous();
         return;
       }
-      try {
-        const status = await accountApi.me();
-        if (!active) return;
-        setUser(status.user);
-        setState("authenticated");
-        try {
-          const remoteWorkspace = await accountApi.workspace();
-          if (active) {
-            setAndPersistWorkspace(remoteWorkspace);
-            setWorkspaceError(null);
-            void flushQueuedWorkspace();
-          }
-        } catch (error) {
-          if (active) setWorkspaceError(error instanceof Error ? error.message : "Synchronisation indisponible.");
-        }
-      } catch (error) {
-        if (!active) return;
-        if (error instanceof ApiError && error.status === 401) clearPrivateState();
-        else {
-          setWorkspaceError(error instanceof Error ? error.message : "Connexion indisponible.");
-          becomeAnonymous();
-        }
-      }
+      if (active) setState("authenticated");
+      await revalidateSession();
     })();
     return () => { active = false; };
-  }, [becomeAnonymous, clearPrivateState, flushQueuedWorkspace, setAndPersistWorkspace]);
+  }, [becomeAnonymous, revalidateSession]);
 
   useEffect(() => onlineManager.subscribe((online) => {
-    if (online && state === "authenticated") void flushQueuedWorkspace();
-  }), [flushQueuedWorkspace, state]);
+    if (online && state === "authenticated") void revalidateSession();
+  }), [revalidateSession, state]);
 
   const applySession = useCallback(async (session: Awaited<ReturnType<typeof accountApi.login>>) => {
     await sessionStore.set(session.token, session.expires_at);

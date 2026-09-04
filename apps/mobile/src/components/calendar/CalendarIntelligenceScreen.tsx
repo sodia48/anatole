@@ -29,7 +29,7 @@ import {
   type EconomicCalendarItem,
 } from "./model";
 
-const DEFAULT_FILTERS: CalendarFiltersState = { range: "7d", kind: "all", importance: "all", region: "all", category: "all", sector: "all", scope: "all", ticker: "" };
+const DEFAULT_FILTERS: CalendarFiltersState = { range: "7d", kind: "all", importance: "all", region: "all", category: "all", sector: "all", scope: "all", ticker: "", dayOffset: null };
 const REGIONS = new Set<CalendarRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "prairies", "atlantic"]);
 
 function rangeFromParam(value?: string): CalendarRange {
@@ -48,7 +48,7 @@ function uniqueStatuses(statuses: readonly FeedStatus[]): FeedStatus[] {
   });
 }
 
-export function CalendarIntelligenceScreen({ header, initialRegion, initialCategory, initialDateRange, initialTicker, referenceNow }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; initialDateRange?: string; initialTicker?: string; referenceNow?: Date }) {
+export function CalendarIntelligenceScreen({ header, initialRegion, initialCategory, initialDateRange, initialKind, initialDayOffset, initialTicker, referenceNow }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; initialDateRange?: string; initialKind?: string; initialDayOffset?: string | number; initialTicker?: string; referenceNow?: Date }) {
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
   const queryClient = useQueryClient();
@@ -80,11 +80,14 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
     const requestedRegion = initialRegion?.toLowerCase() === "prairies" || initialRegion?.toLowerCase() === "atlantic" ? initialRegion.toLowerCase() : initialRegion?.toUpperCase();
     const region = requestedRegion && REGIONS.has(requestedRegion as CalendarRegionFilter) ? requestedRegion as CalendarRegionFilter : "all";
     const range = rangeFromParam(initialDateRange);
+    const kind = initialKind === "earnings" || initialKind === "economic" ? initialKind : "all";
+    const parsedDayOffset = Number(initialDayOffset);
+    const dayOffset = Number.isInteger(parsedDayOffset) && parsedDayOffset >= 0 && parsedDayOffset <= 30 ? parsedDayOffset : null;
     const category = initialCategory?.trim() || "all";
     const ticker = initialTicker?.trim().toUpperCase() || "";
-    const timer = setTimeout(() => setFilters((current) => current.region === region && current.range === range && current.category === category && current.ticker === ticker ? current : { ...current, region, range, category, ticker }), 0);
+    const timer = setTimeout(() => setFilters((current) => current.region === region && current.range === range && current.kind === kind && current.category === category && current.ticker === ticker && current.dayOffset === dayOffset ? current : { ...current, region, range, kind, category, ticker, dayOffset }), 0);
     return () => clearTimeout(timer);
-  }, [initialCategory, initialDateRange, initialRegion, initialTicker]);
+  }, [initialCategory, initialDateRange, initialDayOffset, initialKind, initialRegion, initialTicker]);
 
   const calendar = useQuery({ queryKey: ["calendar", language], queryFn: ({ signal }) => marketApi.calendar(language, signal), enabled: appActive, staleTime: 600_000 });
   const earnings = useQuery({ queryKey: ["earnings", "composite"], queryFn: ({ signal }) => marketApi.earnings(signal), enabled: appActive, staleTime: 600_000 });
@@ -93,7 +96,7 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   const personalSymbols = useMemo(() => [...new Set([...workspace.data.portfolio.map((item) => item.symbol), ...workspace.data.watchlist].map((symbol) => symbol.replace(/\.TO$/i, "").toUpperCase()))], [workspace.data.portfolio, workspace.data.watchlist]);
   const filtered = useMemo(() => filterCalendarItems(merged, filters, now, personalSymbols, preferredRegions), [filters, merged, now, personalSymbols, preferredRegions]);
   const sections = useMemo(() => groupCalendarByTorontoDate(filtered, now, language), [filtered, language, now]);
-  const major = useMemo(() => nextMajorEvent(merged, now), [merged, now]);
+  const major = useMemo(() => nextMajorEvent(filtered, now), [filtered, now]);
   const categories = useMemo(() => [...new Set(merged.filter((item) => item.kind === "economic").map((item) => item.category))].sort(), [merged]);
   const sectors = useMemo(() => [...new Set(merged.filter((item) => item.kind === "earnings").map((item) => item.sector).filter((value): value is string => Boolean(value)))].sort(), [merged]);
   const statuses = useMemo(() => uniqueStatuses([...(calendar.data?.source_statuses ?? []), ...(earnings.data?.source_statuses ?? [])]), [calendar.data?.source_statuses, earnings.data?.source_statuses]);
@@ -105,7 +108,7 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
 
   const contentHeader = <>
     {header}
-    <ScreenHeader eyebrow={pick("CALENDRIER ÉCONOMIQUE", "ECONOMIC CALENDAR")} title={calendarRangeLabel(filters.range, language)} subtitle={pick("Économie canadienne, provinces et résultats TSX.", "Canadian economy, provinces and TSX earnings.")} />
+    <ScreenHeader eyebrow={pick("CALENDRIER ÉCONOMIQUE", "ECONOMIC CALENDAR")} title={calendarRangeLabel(filters.range, language, filters.dayOffset)} subtitle={pick("Économie canadienne, provinces et résultats TSX.", "Canadian economy, provinces and TSX earnings.")} />
     {stale ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
     <QueryState error={!anyData ? (calendar.error instanceof Error ? calendar.error : earnings.error instanceof Error ? earnings.error : null) : null} loading={!anyData && (calendar.isLoading || earnings.isLoading)} onRetry={refresh} />
     {calendar.isError && !calendar.data && earnings.data ? <Text style={styles.partial}>{pick("Le calendrier économique est indisponible; les résultats demeurent accessibles.", "The economic calendar is unavailable; earnings remain available.")}</Text> : null}

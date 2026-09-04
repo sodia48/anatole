@@ -19,7 +19,7 @@ export function alertLabel(rule: AlertRule, language: "fr" | "en"): string {
 export function appendAlertHistory(history: AlertSnapshot["items"], incoming: AlertSnapshot["items"]): AlertSnapshot["items"] {
   const seen = new Set<string>();
   return [...incoming, ...history].filter((item) => {
-    const key = `${item.id}|${item.status}|${item.message}|${item.evaluated_at ?? ""}`;
+    const key = `${item.id}|${item.event_fingerprint ?? item.last_triggered_at ?? "transition"}`;
     if (seen.has(key)) return false;
     seen.add(key); return true;
   }).slice(0, 100);

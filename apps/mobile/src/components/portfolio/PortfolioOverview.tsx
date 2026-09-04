@@ -15,7 +15,7 @@ export function PortfolioOverview({ snapshot }: { snapshot: PortfolioSnapshot })
       <View><Text style={uiStyles.label}>{pick("Valeur totale", "Total value")}</Text><Text style={uiStyles.value}>{formatPortfolioMoney(snapshot.total_market_value, language, snapshot.base_currency)}</Text></View>
       <View><Text style={uiStyles.label}>{pick("Variation du jour", "Day change")}</Text><Change value={snapshot.total_day_change_percent} /></View>
       <View><Text style={uiStyles.label}>{pick("P/L du jour", "Day P/L")}</Text><Text style={styles.value}>{formatPortfolioMoney(snapshot.total_day_pnl, language, snapshot.base_currency)}</Text></View>
-      <View><Text style={uiStyles.label}>{pick("P/L latent", "Unrealized P/L")}</Text><Text style={styles.value}>{formatPortfolioMoney(snapshot.total_unrealized_pnl, language, snapshot.base_currency)}</Text></View>
+      <View><Text style={uiStyles.label}>{pick("P/L latent", "Unrealized P/L")}</Text><Text style={styles.value}>{formatPortfolioMoney(snapshot.total_unrealized_pnl, language, snapshot.base_currency)} · {formatPortfolioNumber(snapshot.total_unrealized_pnl_percent, language, " %")}</Text></View>
     </View>
     <Text style={styles.copy}>{pick("Top contributeur", "Top contributor")} · {top ? `${top.symbol} ${formatPortfolioNumber(top.day_change_percent, language, " %")}` : "N/D"}</Text>
     <Text style={styles.copy}>{pick("Top détracteur", "Top detractor")} · {bottom ? `${bottom.symbol} ${formatPortfolioNumber(bottom.day_change_percent, language, " %")}` : "N/D"}</Text>

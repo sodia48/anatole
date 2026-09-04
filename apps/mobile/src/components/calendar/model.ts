@@ -16,6 +16,7 @@ export type CalendarFiltersState = {
   sector: string;
   scope: CalendarScopeFilter;
   ticker: string;
+  dayOffset?: number | null;
 };
 
 type SharedCalendarItem = { id: string; startsAt: string; title: string; source: string; url: string | null; category: string; regions: string[] };
@@ -90,7 +91,8 @@ export function filterCalendarItems(items: readonly CalendarIntelligenceItem[], 
   const preferred = new Set(preferredRegions.map((region) => region.toUpperCase()));
   return items.filter((item) => {
     const day = dateOrdinal(item.startsAt);
-    if (day == null || start == null || day < start || day > start + lastDay) return false;
+    if (day == null || start == null) return false;
+    if (filters.dayOffset != null ? day !== start + filters.dayOffset : day < start || day > start + lastDay) return false;
     if (filters.kind !== "all" && item.kind !== filters.kind) return false;
     if (filters.importance !== "all" && item.importance !== filters.importance) return false;
     if (!matchesRegion(item.regions, filters.region)) return false;
@@ -121,7 +123,8 @@ export function nextMajorEvent(items: readonly CalendarIntelligenceItem[], now: 
   return items.find((item): item is EconomicCalendarItem => item.kind === "economic" && item.importance === "high" && new Date(item.startsAt).getTime() >= now.getTime()) ?? null;
 }
 
-export function calendarRangeLabel(range: CalendarRange, language: CalendarLanguage): string {
+export function calendarRangeLabel(range: CalendarRange, language: CalendarLanguage, dayOffset: number | null | undefined = null): string {
+  if (dayOffset === 1) return language === "fr" ? "Demain" : "Tomorrow";
   if (range === "today") return language === "fr" ? "Aujourd’hui" : "Today";
   if (range === "7d") return language === "fr" ? "7 prochains jours" : "Next 7 days";
   return language === "fr" ? "30 prochains jours" : "Next 30 days";

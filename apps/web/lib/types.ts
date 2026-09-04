@@ -641,7 +641,7 @@ export type PortfolioPositionSnapshot = {
   cost_basis: number;
   market_value: number;
   unrealized_pnl: number;
-  unrealized_pnl_percent: number;
+  unrealized_pnl_percent: number | null;
   day_pnl: number;
   day_change_percent: number;
   weight_percent: number;
@@ -681,7 +681,7 @@ export type PortfolioSnapshot = {
   total_market_value: number;
   total_cost_basis: number;
   total_unrealized_pnl: number;
-  total_unrealized_pnl_percent: number;
+  total_unrealized_pnl_percent: number | null;
   total_day_pnl: number;
   total_day_change_percent: number;
   portfolio_score: number;
@@ -699,6 +699,8 @@ export type PortfolioSnapshot = {
     top_three_percent: number;
     diversification_score: number;
     risk_level: "Faible" | "Modéré" | "Élevé" | "Très élevé";
+    history_coverage_percent: number;
+    history_observations: number;
   };
   contributors: PortfolioContributor[];
   detractors: PortfolioContributor[];
@@ -758,6 +760,8 @@ export type AlertEvaluation = {
   status: "triggered" | "monitoring" | "unavailable" | "disabled";
   message: string;
   source: string | null;
+  event_fingerprint: string | null;
+  event_value: string | null;
   evaluated_at: string;
 };
 

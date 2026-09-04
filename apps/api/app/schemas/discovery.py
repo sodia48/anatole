@@ -22,6 +22,9 @@ class ScreenerRow(BaseModel):
     source: str
     delayed: bool
     quote_as_of: datetime | None = None
+    prior_high_20d: float | None = None
+    breakout_20d: bool | None = None
+    breakout_percent: float | None = None
 
 
 class ScreenerSnapshot(BaseModel):

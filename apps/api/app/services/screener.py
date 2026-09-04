@@ -61,6 +61,20 @@ def _trend(price: float, sma_20: float | None, sma_50: float | None) -> str:
     return "Mixte"
 
 
+def _breakout_metrics(candles: list[Candle], current_price: float) -> tuple[float | None, bool | None, float | None]:
+    """Compare the current quote with the 20 completed sessions before it."""
+    if len(candles) < 21:
+        return None, None, None
+    previous = candles[-21:-1]
+    if len(previous) != 20:
+        return None, None, None
+    prior_high = max(item.high for item in previous)
+    if prior_high <= 0:
+        return None, None, None
+    breakout = current_price > prior_high
+    return round(prior_high, 4), breakout, round((current_price / prior_high - 1) * 100, 4)
+
+
 def tsx60_constituents() -> list[CompositeConstituent]:
     return [
         CompositeConstituent(ticker=item.symbol, name=item.name, sector=item.sector)
@@ -97,6 +111,7 @@ def build_rows_from_quotes_and_histories(
             technicals.rsi_14,
             trend,
         )
+        prior_high_20d, breakout_20d, breakout_percent = _breakout_metrics(candles, quote.price)
         rows.append(ScreenerRow(
             ticker=quote.ticker,
             symbol=symbol,
@@ -117,6 +132,9 @@ def build_rows_from_quotes_and_histories(
             source=quote.source,
             delayed=quote.delayed,
             quote_as_of=quote.timestamp,
+            prior_high_20d=prior_high_20d,
+            breakout_20d=breakout_20d,
+            breakout_percent=breakout_percent,
         ))
     return rows
 

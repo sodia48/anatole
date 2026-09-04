@@ -166,6 +166,44 @@ def _risk_level(
     return "Très élevé"
 
 
+def _pnl_percent(pnl: float, cost_basis: float) -> float | None:
+    return pnl / cost_basis * 100 if cost_basis else None
+
+
+def _covered_performance(
+    return_maps: dict[str, dict[int, float]],
+    weights: dict[str, float],
+    benchmark_map: dict[int, float],
+) -> tuple[list[float], list[float], list[PortfolioPerformancePoint], float]:
+    all_days = sorted(set().union(*(values.keys() for values in return_maps.values())) if return_maps else set())
+    portfolio_returns: list[float] = []
+    benchmark_returns: list[float] = []
+    performance: list[PortfolioPerformancePoint] = []
+    portfolio_level = 100.0
+    benchmark_level = 100.0
+    daily_coverages: list[float] = []
+    for day in all_days:
+        available = [symbol for symbol, values in return_maps.items() if day in values]
+        available_weight = sum(weights[symbol] for symbol in available)
+        daily_coverages.append(available_weight)
+        if not available or available_weight < 0.70:
+            continue
+        daily_return = sum(weights[symbol] * return_maps[symbol][day] for symbol in available)
+        portfolio_level *= 1 + daily_return
+        portfolio_returns.append(daily_return)
+        benchmark_value = benchmark_map.get(day)
+        if benchmark_value is not None:
+            benchmark_level *= 1 + benchmark_value
+            benchmark_returns.append(benchmark_value)
+        performance.append(PortfolioPerformancePoint(
+            time=day * 86_400,
+            portfolio=round(portfolio_level, 4),
+            benchmark=round(benchmark_level, 4) if benchmark_value is not None else None,
+        ))
+    coverage = sum(daily_coverages) / len(daily_coverages) * 100 if daily_coverages else 0.0
+    return portfolio_returns, benchmark_returns, performance, coverage
+
+
 def _allocation(
     positions: list[PortfolioPositionSnapshot],
     attribute: str,
@@ -330,10 +368,7 @@ class PortfolioService:
                     cost_basis=round(cost_basis, 2),
                     market_value=round(market_value, 2),
                     unrealized_pnl=round(pnl, 2),
-                    unrealized_pnl_percent=round(
-                        pnl / cost_basis * 100 if cost_basis else 0.0,
-                        2,
-                    ),
+                    unrealized_pnl_percent=(round(value, 2) if (value := _pnl_percent(pnl, cost_basis)) is not None else None),
                     day_pnl=round(
                         item.quantity * quote.change * float(raw["fx_rate"]),
                         2,
@@ -363,54 +398,20 @@ class PortfolioService:
             for symbol in weights
         }
         benchmark_map = _returns(histories.get(request.benchmark, []))
-        all_days = sorted(
-            set().union(*(values.keys() for values in return_maps.values()))
-            if return_maps
-            else set()
-        )
-        portfolio_returns: list[float] = []
-        benchmark_returns: list[float] = []
-        performance: list[PortfolioPerformancePoint] = []
-        portfolio_level = 100.0
-        benchmark_level = 100.0
-
-        for day in all_days:
-            available = [
-                symbol
-                for symbol, values in return_maps.items()
-                if day in values
-            ]
-            available_weight = sum(weights[symbol] for symbol in available)
-            if not available or available_weight <= 0:
-                continue
-            daily_return = sum(
-                weights[symbol] / available_weight * return_maps[symbol][day]
-                for symbol in available
+        portfolio_returns, benchmark_returns, performance, history_coverage = _covered_performance(return_maps, weights, benchmark_map)
+        portfolio_level = performance[-1].portfolio if performance else 100.0
+        history_observations = len(portfolio_returns)
+        if history_coverage >= 70:
+            volatility, beta, max_drawdown, sharpe = _risk_statistics(
+                portfolio_returns,
+                benchmark_returns,
             )
-            portfolio_level *= 1 + daily_return
-            portfolio_returns.append(daily_return)
-
-            benchmark_value = benchmark_map.get(day)
-            if benchmark_value is not None:
-                benchmark_level *= 1 + benchmark_value
-                benchmark_returns.append(benchmark_value)
-
-            performance.append(
-                PortfolioPerformancePoint(
-                    time=day * 86_400,
-                    portfolio=round(portfolio_level, 4),
-                    benchmark=(
-                        round(benchmark_level, 4)
-                        if benchmark_value is not None
-                        else None
-                    ),
-                )
+        else:
+            volatility, beta, max_drawdown, sharpe = None, None, None, None
+            notes.append(
+                "Couverture historique inférieure à 70 %; les statistiques "
+                "de risque restent indisponibles."
             )
-
-        volatility, beta, max_drawdown, sharpe = _risk_statistics(
-            portfolio_returns,
-            benchmark_returns,
-        )
         top_position = positions[0].weight_percent if positions else 0.0
         top_three = sum(item.weight_percent for item in positions[:3])
         hhi = sum((item.weight_percent / 100) ** 2 for item in positions) * 10_000
@@ -493,10 +494,7 @@ class PortfolioService:
             total_market_value=round(total_market_value, 2),
             total_cost_basis=round(total_cost_basis, 2),
             total_unrealized_pnl=round(total_pnl, 2),
-            total_unrealized_pnl_percent=round(
-                total_pnl / total_cost_basis * 100 if total_cost_basis else 0.0,
-                2,
-            ),
+            total_unrealized_pnl_percent=(round(value, 2) if (value := _pnl_percent(total_pnl, total_cost_basis)) is not None else None),
             total_day_pnl=round(total_day_pnl, 2),
             total_day_change_percent=round(
                 total_day_pnl / max(total_market_value - total_day_pnl, 1) * 100,
@@ -517,6 +515,8 @@ class PortfolioService:
                 top_three_percent=round(top_three, 2),
                 diversification_score=round(diversification, 1),
                 risk_level=risk_level,
+                history_coverage_percent=round(history_coverage, 2),
+                history_observations=history_observations,
             ) if positions else None,
             contributors=contributors,
             detractors=detractors,

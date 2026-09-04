@@ -96,6 +96,8 @@ class AlertService:
         symbol = rule.symbol.strip().upper().removesuffix(".TO")
         triggered = False
         source: str | None = None
+        event_fingerprint: str | None = None
+        event_value: str | None = None
         message = "Événement non observé lors de cette évaluation."
         try:
             if rule.event_type == "terminal_anomaly":
@@ -104,9 +106,14 @@ class AlertService:
                 triggered = bool(matches)
                 source = matches[0].source if matches else "Terminal Pro · données de marché"
                 message = matches[0].detail if matches else "Aucune anomalie Terminal active pour ce titre."
+                if matches:
+                    event_fingerprint = f"{symbol}:{matches[0].type}:{matches[0].id}"
+                    event_value = matches[0].id
             elif rule.event_type == "terminal_regime":
                 snapshot = await analysis_service.terminal()
                 source = "Terminal Pro · TSX 60"
+                event_value = snapshot.regime
+                event_fingerprint = f"terminal-regime:{snapshot.regime}" if snapshot.regime else None
                 message = f"Régime Terminal actuel : {snapshot.regime or 'N/D'}. Un changement nécessite une observation précédente."
             elif rule.event_type == "earnings_upcoming":
                 snapshot = await earnings_calendar_service.get_snapshot("composite")
@@ -115,23 +122,32 @@ class AlertService:
                 triggered = bool(matches)
                 source = matches[0].source if matches else "Calendrier public des résultats"
                 message = f"Résultats attendus le {matches[0].starts_at.isoformat()}." if matches else "Aucun résultat sourcé dans les sept prochains jours."
+                if matches:
+                    event_value = matches[0].starts_at.isoformat()
+                    event_fingerprint = f"{symbol}:earnings:{event_value}"
             elif rule.event_type == "insider_unusual":
                 snapshot = await insider_service.snapshot(market="canada", ticker=symbol, days=180, scan_limit=1, result_limit=40)
                 matches = [trade for trade in snapshot.trades if trade.unusual]
                 triggered = bool(matches)
                 source = matches[0].source_name if matches else next((item.source for item in snapshot.sources if item.status != "unavailable"), None)
                 message = f"{len(matches)} transaction(s) inhabituelle(s) sourcée(s)." if matches else "Aucune transaction inhabituelle sourcée dans le snapshot disponible."
+                if matches:
+                    event_value = matches[0].id
+                    event_fingerprint = f"{symbol}:insider:{matches[0].id}"
             elif rule.event_type == "company_news":
                 snapshot = await stock_news_service.get_snapshot(symbol, language="fr")
                 recent = [item for item in snapshot.items if item.published_at >= evaluated_at - timedelta(hours=24)]
                 triggered = bool(recent)
                 source = recent[0].publisher if recent else None
                 message = recent[0].title if recent else "Aucune nouvelle récente sourcée concernant ce titre."
+                if recent:
+                    event_value = recent[0].id or recent[0].url
+                    event_fingerprint = f"{symbol}:news:{event_value}"
             else:
                 raise ValueError("Type d'événement inconnu")
         except Exception:  # noqa: BLE001
             return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=False, status="unavailable", message="Source événementielle temporairement indisponible.", evaluated_at=evaluated_at)
-        return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=triggered, status="triggered" if triggered else "monitoring", message=message, source=source, evaluated_at=evaluated_at)
+        return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=triggered, status="triggered" if triggered else "monitoring", message=message, source=source, event_fingerprint=event_fingerprint, event_value=event_value, evaluated_at=evaluated_at)
 
     async def evaluate(self, request: AlertEvaluateRequest) -> AlertSnapshot:
         enabled_symbols = list(

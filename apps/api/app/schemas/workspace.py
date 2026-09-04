@@ -61,7 +61,7 @@ class PortfolioPositionSnapshot(BaseModel):
     cost_basis: float
     market_value: float
     unrealized_pnl: float
-    unrealized_pnl_percent: float
+    unrealized_pnl_percent: float | None = None
     day_pnl: float
     day_change_percent: float
     weight_percent: float
@@ -105,6 +105,8 @@ class PortfolioRisk(BaseModel):
     top_three_percent: float | None = None
     diversification_score: float | None = Field(default=None, ge=0, le=100)
     risk_level: Literal["Faible", "Modéré", "Élevé", "Très élevé"] | None = None
+    history_coverage_percent: float = Field(default=0, ge=0, le=100)
+    history_observations: int = Field(default=0, ge=0)
 
 
 class PortfolioCoverage(BaseModel):
@@ -161,7 +163,7 @@ class PortfolioSnapshot(BaseModel):
     total_market_value: float
     total_cost_basis: float
     total_unrealized_pnl: float
-    total_unrealized_pnl_percent: float
+    total_unrealized_pnl_percent: float | None = None
     total_day_pnl: float
     total_day_change_percent: float
     portfolio_score: float | None = Field(default=None, ge=0, le=100)
@@ -299,6 +301,8 @@ class AlertEvaluation(BaseModel):
     status: Literal["triggered", "monitoring", "unavailable", "disabled"]
     message: str
     source: str | None = None
+    event_fingerprint: str | None = None
+    event_value: str | None = None
     evaluated_at: datetime
 
 

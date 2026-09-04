@@ -17,6 +17,7 @@ export type ScreenerRow = {
   volume: number; average_volume_20d: number; relative_volume: number; momentum_20d: number;
   rsi_14: number | null; sma_20: number | null; sma_50: number | null; trend: string;
   score: number; signal: string; source: string; delayed: boolean; quote_as_of: string | null;
+  prior_high_20d?: number | null; breakout_20d?: boolean | null; breakout_percent?: number | null;
 };
 export type ScreenerSnapshot = {
   universe: string; items: ScreenerRow[]; sectors: string[]; generated_at: string;

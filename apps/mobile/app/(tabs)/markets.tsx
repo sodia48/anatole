@@ -63,7 +63,7 @@ function MarketsNavigation({ hub, onHub }: { hub: Hub; onHub: (hub: Hub) => void
 }
 
 export default function MarketsScreen() {
-  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[]; hub?: string | string[]; region?: string | string[]; category?: string | string[]; dateRange?: string | string[]; ticker?: string | string[] }>();
+  const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[]; hub?: string | string[]; region?: string | string[]; category?: string | string[]; dateRange?: string | string[]; kind?: string | string[]; dayOffset?: string | string[]; ticker?: string | string[] }>();
   const { pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const requestedHub = first(params.hub);
@@ -72,6 +72,8 @@ export default function MarketsScreen() {
   const requestedRegion = first(params.region);
   const requestedCategory = first(params.category);
   const requestedDateRange = first(params.dateRange);
+  const requestedKind = first(params.kind);
+  const requestedDayOffset = first(params.dayOffset);
   const requestedTicker = first(params.ticker);
   const [hub, setHub] = useState<Hub>(isHub(requestedHub) ? requestedHub : "cockpit");
   const [universe, setUniverse] = useState<"tsx60" | "composite">(requestedUniverse === "composite" ? "composite" : "tsx60");
@@ -88,7 +90,7 @@ export default function MarketsScreen() {
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: ({ signal }) => marketApi.cockpit(universe, signal), enabled: hub === "cockpit", staleTime: 60_000 });
   const navigation = <MarketsNavigation hub={hub} onHub={setHub} />;
   if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} preferredRegions={workspace.data.preferences?.preferred_regions ?? []} />;
-  if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
+  if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialDayOffset={requestedDayOffset} initialKind={requestedKind} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
 
   async function addWatchlist(ticker: string) {
     if (workspace.data.watchlist.includes(ticker)) return;

@@ -159,7 +159,7 @@ class AssistantService:
             ],
             sources=[
                 AssistantSource(label="Comparateur Anatole", detail=snapshot.methodology, status="internal"),
-                AssistantSource(label="Données de marché", detail="Historiques publics avec données de secours en cas de panne.", status="delayed"),
+                AssistantSource(label="Données de marché", detail="Historiques publics stricts réellement disponibles.", status="delayed"),
             ],
             suggestions=[
                 f"Quel est le principal risque de {winner.symbol} ?",
@@ -174,6 +174,8 @@ class AssistantService:
     async def _ticker(self, symbol: str) -> AssistantResponse:
         snapshot = await market_data_service.get_focus_snapshot(symbol, range_="1y", interval="1d")
         quote = snapshot.quote
+        if quote.source == "demo-fallback" and not market_data_service.demo_mode:
+            return self._insufficient("ticker", f"Analyse de {symbol}")
         tech = snapshot.technicals
         momentum: float | None = None
         if len(snapshot.history) > 21 and snapshot.history[-21].close:
@@ -241,7 +243,12 @@ class AssistantService:
         snapshot = await portfolio_service.analyze(
             PortfolioAnalyzeRequest(positions=request.portfolio_positions)
         )
-        if snapshot.portfolio_score is None or snapshot.risk is None or snapshot.risk.risk_level is None:
+        if (
+            snapshot.portfolio_score is None
+            or snapshot.risk is None
+            or snapshot.risk.risk_level is None
+            or snapshot.total_unrealized_pnl_percent is None
+        ):
             return self._insufficient("portfolio", "Diagnostic du portefeuille")
         top = snapshot.positions[0] if snapshot.positions else None
         answer = (
