@@ -3,20 +3,21 @@ import NetInfo from "@react-native-community/netinfo";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { focusManager, onlineManager, QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { type PropsWithChildren, useEffect } from "react";
+import { type PropsWithChildren, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { LocaleProvider } from "@/src/lib/i18n";
+import { MOBILE_CACHE_BUSTER, MOBILE_CACHE_KEY, MOBILE_CACHE_MAX_AGE, PERSISTED_QUERY_SCOPES, scheduleReconnectRefresh } from "@/src/lib/offlineCache";
 import { MobileAccountProvider } from "./MobileAccountProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,
-      gcTime: 1000 * 60 * 60 * 24,
+      gcTime: MOBILE_CACHE_MAX_AGE,
       retry: 1,
       networkMode: "offlineFirst",
-      refetchOnReconnect: true,
+      refetchOnReconnect: false,
     },
     mutations: { networkMode: "online", retry: 0 },
   },
@@ -24,13 +25,22 @@ const queryClient = new QueryClient({
 
 const persister = createAsyncStoragePersister({
   storage: AsyncStorage,
-  key: "anatole.mobile.query-cache.v1",
+  key: MOBILE_CACHE_KEY,
   throttleTime: 1_000,
 });
 
 export function AppProviders({ children }: PropsWithChildren) {
+  const previousOnline = useRef<boolean | null>(null);
+  const cancelReconnect = useRef<(() => void) | null>(null);
+
   useEffect(() => NetInfo.addEventListener((state) => {
-    onlineManager.setOnline(Boolean(state.isConnected));
+    const online = Boolean(state.isConnected);
+    onlineManager.setOnline(online);
+    if (previousOnline.current === false && online) {
+      cancelReconnect.current?.();
+      cancelReconnect.current = scheduleReconnectRefresh(queryClient);
+    }
+    previousOnline.current = online;
   }), []);
 
   useEffect(() => {
@@ -43,9 +53,10 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={{
       persister,
-      maxAge: 1000 * 60 * 60 * 24,
+      maxAge: MOBILE_CACHE_MAX_AGE,
+      buster: MOBILE_CACHE_BUSTER,
       dehydrateOptions: {
-        shouldDehydrateQuery: (query) => ["cockpit", "screener", "terminal", "psychology", "focus", "news", "earnings", "calendar", "stock-news", "etf-directory", "etf-holdings", "etf-history", "ipo", "insiders"].includes(String(query.queryKey[0])),
+        shouldDehydrateQuery: (query) => PERSISTED_QUERY_SCOPES.has(String(query.queryKey[0])),
       },
     }}>
       <LocaleProvider>

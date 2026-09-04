@@ -1,15 +1,13 @@
 import type { PropsWithChildren, ReactNode } from "react";
 import * as Haptics from "expo-haptics";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, type TextInputProps, View } from "react-native";
-import { useNetInfo } from "@react-native-community/netinfo";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { OfflineBadge } from "@/src/components/dataQuality";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 
 export function Screen({ children, refreshing = false, onRefresh, testID }: PropsWithChildren<{ refreshing?: boolean; onRefresh?: () => void; testID?: string }>) {
-  const network = useNetInfo();
-  const { pick } = useLocale();
   return (
     <SafeAreaView edges={["top"]} style={styles.safe} testID={testID}>
       <KeyboardAvoidingView style={styles.safe} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -18,7 +16,7 @@ export function Screen({ children, refreshing = false, onRefresh, testID }: Prop
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined}
         >
-          {network.isConnected === false ? <Text accessibilityRole="alert" style={styles.offline}>{pick("Hors ligne · dernières données disponibles", "Offline · latest available data")}</Text> : null}
+          <OfflineBadge />
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -90,7 +88,6 @@ export const uiStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  offline: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: "rgba(246,185,74,0.1)", textAlign: "center" },
   screen: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md, backgroundColor: colors.background },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, marginBottom: spacing.sm },
   headerCopy: { flex: 1, gap: spacing.xs },

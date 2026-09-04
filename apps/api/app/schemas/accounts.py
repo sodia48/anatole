@@ -92,6 +92,19 @@ class SyncedPreferences(BaseModel):
     default_range: Literal["1m", "3m", "6m", "1y", "5y"] = "1y"
     default_universe: Literal["tsx60", "composite"] = "tsx60"
     language: Literal["fr", "en"] = "fr"
+    preferred_regions: list[str] = Field(default_factory=list, max_length=10)
+    preferred_sectors: list[str] = Field(default_factory=list, max_length=20)
+    onboarding_version: int = Field(default=0, ge=0, le=100)
+
+    @field_validator("preferred_regions", "preferred_sectors")
+    @classmethod
+    def unique_preferences(cls, values: list[str]) -> list[str]:
+        output: list[str] = []
+        for value in values:
+            clean = value.strip()
+            if clean and clean not in output:
+                output.append(clean)
+        return output
 
 
 class FocusDrawingAnchor(BaseModel):

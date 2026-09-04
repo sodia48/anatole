@@ -96,6 +96,9 @@ export type SyncedWorkspaceData = {
     default_range: "1m" | "3m" | "6m" | "1y" | "5y";
     default_universe: "tsx60" | "composite";
     language: "fr" | "en";
+    preferred_regions?: string[];
+    preferred_sectors?: string[];
+    onboarding_version?: number;
   };
   advisor_profile?: unknown;
   cockpit_universe: "tsx60" | "composite";
