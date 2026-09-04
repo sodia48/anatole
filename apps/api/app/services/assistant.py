@@ -77,6 +77,8 @@ def _tone(value: float) -> str:
 class AssistantService:
     async def _market(self) -> AssistantResponse:
         snapshot = await analysis_service.terminal()
+        if snapshot.regime is None or snapshot.regime_score is None or snapshot.risk_level is None or snapshot.advance_ratio is None or snapshot.above_sma50_percent is None:
+            return self._insufficient("market", "Lecture du marché canadien")
         leading = snapshot.sectors[:3]
         signals = snapshot.opportunities[:3]
         sectors_text = ", ".join(
@@ -126,12 +128,15 @@ class AssistantService:
         snapshot = await analysis_service.compare(
             CompareRequest(symbols=symbols, range="1y")
         )
-        winner = snapshot.instruments[0]
+        ranked = [item for item in snapshot.instruments if item.score is not None]
+        if not ranked:
+            return self._insufficient("compare", f"Comparaison {' · '.join(symbols)}")
+        winner = ranked[0]
         rows = "; ".join(
             f"{item.symbol}: score {item.score:.0f}/100, rendement {item.total_return_percent:+.1f} %, volatilité "
             f"{item.volatility_percent:.1f} %" if item.volatility_percent is not None else
             f"{item.symbol}: score {item.score:.0f}/100, rendement {item.total_return_percent:+.1f} %"
-            for item in snapshot.instruments
+            for item in ranked
         )
         answer = (
             f"Sur un an, **{winner.symbol}** obtient le score quantitatif le plus élevé dans cette comparaison. "
@@ -170,14 +175,15 @@ class AssistantService:
         snapshot = await market_data_service.get_focus_snapshot(symbol, range_="1y", interval="1d")
         quote = snapshot.quote
         tech = snapshot.technicals
-        momentum = 0.0
+        momentum: float | None = None
         if len(snapshot.history) > 21 and snapshot.history[-21].close:
             momentum = (snapshot.history[-1].close / snapshot.history[-21].close - 1) * 100
         rsi_text = f"{tech.rsi_14:.1f}" if tech.rsi_14 is not None else "N/D"
+        momentum_text = f"{momentum:+.1f} %" if momentum is not None else "N/D"
         answer = (
             f"**{quote.symbol} — {quote.name}** cote {quote.price:,.2f} {quote.currency}, "
             f"en variation de {quote.change_percent:+.2f} % sur la séance. La tendance technique "
-            f"est {tech.trend.lower()}, le momentum sur environ 20 séances est de {momentum:+.1f} % "
+            f"est {tech.trend.lower()}, le momentum sur environ 20 séances est de {momentum_text} "
             f"et le RSI 14 se situe à {rsi_text}.\n\n"
             f"Le support calculé est {tech.support:,.2f} et la résistance {tech.resistance:,.2f}. "
             "Ces niveaux sont des repères statistiques, pas des garanties d’exécution."
@@ -185,7 +191,7 @@ class AssistantService:
             else (
                 f"**{quote.symbol} — {quote.name}** cote {quote.price:,.2f} {quote.currency}, "
                 f"en variation de {quote.change_percent:+.2f} %. La tendance technique est "
-                f"{tech.trend.lower()}, le momentum 20 séances est {momentum:+.1f} % et le RSI 14 {rsi_text}."
+                f"{tech.trend.lower()}, le momentum 20 séances est {momentum_text} et le RSI 14 {rsi_text}."
             )
         )
         source_status = "fallback" if quote.source.startswith("demo") else "delayed" if quote.delayed else "live"
@@ -196,7 +202,7 @@ class AssistantService:
             facts=[
                 AssistantFact(label="Prix", value=f"{quote.price:,.2f} {quote.currency}", tone="neutral"),
                 AssistantFact(label="Séance", value=f"{quote.change_percent:+.2f} %", tone=_tone(quote.change_percent)),
-                AssistantFact(label="Momentum 20j", value=f"{momentum:+.1f} %", tone=_tone(momentum)),
+                AssistantFact(label="Momentum 20j", value=momentum_text, tone=_tone(momentum) if momentum is not None else "neutral"),
                 AssistantFact(label="RSI 14", value=rsi_text, tone="neutral"),
             ],
             links=[
@@ -235,6 +241,8 @@ class AssistantService:
         snapshot = await portfolio_service.analyze(
             PortfolioAnalyzeRequest(positions=request.portfolio_positions)
         )
+        if snapshot.portfolio_score is None or snapshot.risk is None or snapshot.risk.risk_level is None:
+            return self._insufficient("portfolio", "Diagnostic du portefeuille")
         top = snapshot.positions[0] if snapshot.positions else None
         answer = (
             f"Le portefeuille vaut environ {snapshot.total_market_value:,.2f} {snapshot.base_currency}. "
@@ -266,6 +274,10 @@ class AssistantService:
             disclaimer=DISCLAIMER,
             generated_at=datetime.now(UTC),
         )
+
+    @staticmethod
+    def _insufficient(intent: str, title: str) -> AssistantResponse:
+        return AssistantResponse(intent=intent, title=title, answer="Je n’ai pas suffisamment de données sourcées pour répondre.", sources=[], suggestions=[], confidence="limitée", disclaimer=DISCLAIMER, generated_at=datetime.now(UTC))
 
     async def _quality(self) -> AssistantResponse:
         snapshot = data_quality_service.snapshot()

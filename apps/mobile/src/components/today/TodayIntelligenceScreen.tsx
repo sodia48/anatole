@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { NewsCard } from "@/src/components/market";
 import { Card, ScreenHeader } from "@/src/components/ui";
-import { GlobalSearchButton } from "@/src/components/search/GlobalSearchButton";
+import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
 import { marketApi } from "@/src/lib/api/market";
 import type { StockNewsItem } from "@/src/lib/api/types";
 import { workspaceApi } from "@/src/lib/api/workspace";
@@ -117,7 +117,7 @@ export function TodayIntelligenceScreen() {
   const refreshing = [cockpit, psychology, news, calendar, earnings, watchlist, alerts, portfolio].some((query) => query.isRefetching);
 
   const renderSection = ({ item }: { item: Section }) => {
-    if (item === "header") return <View style={styles.header}><ScreenHeader action={<GlobalSearchButton />} eyebrow={pick("AUJOURD’HUI 2.0 · DAILY INTELLIGENCE", "TODAY 2.0 · DAILY INTELLIGENCE")} title={`${phase.greeting}${firstName(user?.display_name) ? ` ${firstName(user?.display_name)}` : ""}`} subtitle={phase.title} /><Text style={[styles.marketStatus, phase.quoteIsCurrent && styles.current]}>{phase.marketStatus}</Text></View>;
+    if (item === "header") return <View style={styles.header}><ScreenHeader action={<IntelligenceActions />} eyebrow={pick("AUJOURD’HUI 2.0 · DAILY INTELLIGENCE", "TODAY 2.0 · DAILY INTELLIGENCE")} title={`${phase.greeting}${firstName(user?.display_name) ? ` ${firstName(user?.display_name)}` : ""}`} subtitle={phase.title} /><Text style={[styles.marketStatus, phase.quoteIsCurrent && styles.current]}>{phase.marketStatus}</Text></View>;
     if (item === "market") return <TodayMarketBrief cockpit={cockpit.data} error={!cockpit.data && cockpit.error instanceof Error ? cockpit.error : null} loading={cockpit.isLoading} onPsychology={() => router.push("/psychology" as Href)} onRetry={() => void cockpit.refetch()} onTerminal={() => router.push("/terminal" as Href)} onUniverse={setUniverse} psychology={psychology.data} terminal={terminalV2} universe={universe} />;
     if (item === "drivers") return <TodayDrivers drivers={terminalV2?.market_drivers ?? []} onOpenTerminal={() => router.push("/terminal" as Href)} stale={Boolean(terminal.data && terminal.isError)} />;
     if (item === "attention") return <TodayAttention items={attention} onOpen={openTarget} stale={Boolean((terminal.data && terminal.isError) || (news.data && news.isError) || (calendar.data && calendar.isError))} />;

@@ -13,6 +13,7 @@ import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights"
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
 import { focusPeriods, MobileFocusOverview, type FocusPeriod } from "@/src/components/focus/MobileFocusOverview";
 import { MobileFocusPro } from "@/src/components/focus/MobileFocusPro";
+import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
 import { QueryState, Screen } from "@/src/components/ui";
 import { useLiveQuote } from "@/src/hooks/useLiveQuote";
 import { marketApi } from "@/src/lib/api/market";
@@ -54,6 +55,7 @@ export default function StockDetailScreen() {
     {focus.data && live.quote ? <>
       <MobileFocusHeader company={company} followed={followed} liveState={live.state} onFollow={() => void toggleWatchlist()} quote={live.quote} />
       <MobileFocusNavigation onChange={changeSection} section={section} />
+      <View style={{ alignItems: "flex-end" }}><IntelligenceActions symbol={ticker} /></View>
       <Pressable accessibilityRole="link" onPress={() => router.push("/terminal")} style={styles.terminalLink} testID="focus-open-terminal"><Text style={styles.terminalLinkText}>← Terminal Pro</Text></Pressable>
       {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview liveState={live.state} news={news.data} newsError={!news.data ? news.error : null} newsLoading={news.isLoading} period={period} snapshot={{ ...focus.data, quote: live.quote }} ticker={ticker} /></> : null}
       {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
