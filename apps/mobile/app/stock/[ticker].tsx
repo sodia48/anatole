@@ -9,6 +9,7 @@ import { MobileFocusEcosystem } from "@/src/components/focus/MobileFocusEcosyste
 import { MobileFocusFinancials } from "@/src/components/focus/MobileFocusFinancials";
 import { MobileFocusFundamentals } from "@/src/components/focus/MobileFocusFundamentals";
 import { MobileFocusHeader } from "@/src/components/focus/MobileFocusHeader";
+import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights";
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
 import { focusPeriods, MobileFocusOverview, type FocusPeriod } from "@/src/components/focus/MobileFocusOverview";
 import { MobileFocusPro } from "@/src/components/focus/MobileFocusPro";
@@ -60,6 +61,7 @@ export default function StockDetailScreen() {
       {section === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "ecosystem" ? <MobileFocusEcosystem ticker={ticker} /> : null}
+      {section === "insights" ? <MobileFocusInsights snapshot={focus.data} ticker={ticker} /> : null}
       <MobileFocusActions />
     </> : null}
     <Text style={styles.disclaimer}>{pick("Les données peuvent être différées. Information générale seulement; aucune recommandation de placement.", "Data may be delayed. General information only; not investment advice.")}</Text>

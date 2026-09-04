@@ -46,7 +46,7 @@ describe("mobile Focus parity", () => {
   });
   it("keeps every functional Focus section in the native navigation", async () => {
     const onChange = jest.fn(); const view = await render(<MobileFocusNavigation onChange={onChange} section="overview" />);
-    expect(view.getByText("Fondamentaux")).toBeTruthy(); expect(view.getByText("Résultats")).toBeTruthy(); expect(view.getByText("Analystes")).toBeTruthy(); expect(view.getByText("Écosystème")).toBeTruthy();
+    expect(view.getByText("Fondamentaux")).toBeTruthy(); expect(view.getByText("Résultats")).toBeTruthy(); expect(view.getByText("Analystes")).toBeTruthy(); expect(view.getByText("Écosystème")).toBeTruthy(); expect(view.getByText("Intelligence")).toBeTruthy();
     fireEvent.press(view.getByText("Pro")); expect(onChange).toHaveBeenCalledWith("pro");
   });
   it("renders null backend values as N/D in fundamentals", async () => {

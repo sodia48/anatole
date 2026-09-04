@@ -3,11 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 
-export type MobileFocusSection = "overview" | "pro" | "fundamentals" | "financials" | "analysts" | "ecosystem";
+export type MobileFocusSection = "overview" | "pro" | "fundamentals" | "financials" | "analysts" | "ecosystem" | "insights";
 const sections: { id: MobileFocusSection; fr: string; en: string }[] = [
   { id: "overview", fr: "Cours", en: "Price" }, { id: "pro", fr: "Pro", en: "Pro" },
   { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" }, { id: "financials", fr: "Résultats", en: "Financials" },
   { id: "analysts", fr: "Analystes", en: "Analysts" }, { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
+  { id: "insights", fr: "Intelligence", en: "Insights" },
 ];
 
 export function MobileFocusNavigation({ section, onChange }: { section: MobileFocusSection; onChange: (section: MobileFocusSection) => void }) {
