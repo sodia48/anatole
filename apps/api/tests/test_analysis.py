@@ -37,6 +37,7 @@ def test_compare_route_with_demo_provider() -> None:
         assert payload["range"] == "1y"
         assert len(payload["instruments"]) == 3
         assert len(payload["series"]) == 3
+        assert len({tuple(point["time"] for point in series["points"]) for series in payload["series"]}) == 1
         assert payload["correlation"]["symbols"]
         assert all(
             0 <= item["score"] <= 100

@@ -5,6 +5,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
+import { GlobalSearchButton } from "@/src/components/search/GlobalSearchButton";
 import { MarketHeatmap } from "@/src/components/cockpit/MarketHeatmap";
 import { StockRow } from "@/src/components/market";
 import { NewsIntelligenceScreen } from "@/src/components/news/NewsIntelligenceScreen";
@@ -58,7 +59,7 @@ function MarketsNavigation({ hub, onHub }: { hub: Hub; onHub: (hub: Hub) => void
     else if (value === "ipo") router.push("/ipo-insiders" as Href);
     else onHub(value);
   };
-  return <><ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("Marchés canadiens", "Canadian markets")} subtitle={pick("Données économiques, provinciales et de marché vérifiables.", "Verifiable economic, provincial and market data.")} /><View accessibilityRole="tablist" style={styles.hubs}>{hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => open(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}</View></>;
+  return <><ScreenHeader action={<GlobalSearchButton />} eyebrow={pick("Marchés", "Markets")} title={pick("Marchés canadiens", "Canadian markets")} subtitle={pick("Données économiques, provinciales et de marché vérifiables.", "Verifiable economic, provincial and market data.")} /><View accessibilityRole="tablist" style={styles.hubs}>{hubs.map((item) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: hub === item.id }} key={item.id} onPress={() => open(item.id)} style={[styles.hub, hub === item.id && styles.hubActive]}><Text style={[styles.hubText, hub === item.id && styles.hubTextActive]}>{pick(item.fr, item.en)}</Text></Pressable>)}</View></>;
 }
 
 export default function MarketsScreen() {

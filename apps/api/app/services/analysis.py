@@ -220,7 +220,7 @@ def _correlation(left: list[Candle], right: list[Candle]) -> float | None:
     left_returns = _return_by_day(left)
     right_returns = _return_by_day(right)
     shared = sorted(set(left_returns) & set(right_returns))
-    if len(shared) < 5:
+    if len(shared) < 40:
         return None
     x = [left_returns[day] for day in shared]
     y = [right_returns[day] for day in shared]
@@ -239,15 +239,17 @@ def _correlation(left: list[Candle], right: list[Candle]) -> float | None:
     return max(-1.0, min(1.0, numerator / denominator))
 
 
-def _momentum(candles: list[Candle], sessions: int = 20) -> float:
+def _momentum(candles: list[Candle], sessions: int = 20) -> float | None:
     if len(candles) <= sessions or candles[-sessions - 1].close == 0:
-        return 0.0
+        return None
     return (candles[-1].close / candles[-sessions - 1].close - 1) * 100
 
 
-def _average_volume(candles: list[Candle], sessions: int = 20) -> float:
+def _average_volume(candles: list[Candle], sessions: int = 20) -> float | None:
+    if not candles:
+        return None
     sample = candles[-sessions:] if len(candles) >= sessions else candles
-    return sum(item.volume for item in sample) / max(len(sample), 1)
+    return sum(item.volume for item in sample) / len(sample)
 
 
 def _normalized_series(candles: list[Candle]) -> list[ComparisonPoint]:
@@ -282,30 +284,29 @@ def _score(
     total_return: float,
     sharpe: float | None,
     volatility: float | None,
-    momentum: float,
+    momentum: float | None,
     rsi: float | None,
     trend: str,
     forward_pe: float | None,
-) -> float:
-    performance = max(0.0, min(100.0, 50 + total_return * 2.2))
-    risk_adjusted = 50.0 if sharpe is None else max(0.0, min(100.0, 50 + sharpe * 18))
-    risk = 50.0 if volatility is None else max(0.0, min(100.0, 100 - volatility * 1.7))
-    momentum_score = max(0.0, min(100.0, 50 + momentum * 3.0))
-    rsi_score = 50.0 if rsi is None else max(0.0, min(100.0, 100 - abs(rsi - 58) * 2.1))
-    trend_score = {"Haussière": 90.0, "Mixte": 55.0, "Baissière": 20.0}.get(trend, 45.0)
-    valuation = 50.0
+) -> float | None:
+    parts: list[tuple[float, float]] = [(max(0.0, min(100.0, 50 + total_return * 2.2)), 0.27)]
+    if sharpe is not None:
+        parts.append((max(0.0, min(100.0, 50 + sharpe * 18)), 0.20))
+    if volatility is not None:
+        parts.append((max(0.0, min(100.0, 100 - volatility * 1.7)), 0.12))
+    if momentum is not None:
+        parts.append((max(0.0, min(100.0, 50 + momentum * 3.0)), 0.17))
+    if rsi is not None:
+        parts.append((max(0.0, min(100.0, 100 - abs(rsi - 58) * 2.1)), 0.08))
+    trend_score = {"Haussière": 90.0, "Mixte": 55.0, "Baissière": 20.0}.get(trend)
+    if trend_score is not None:
+        parts.append((trend_score, 0.11))
     if forward_pe is not None and forward_pe > 0:
-        valuation = max(10.0, min(90.0, 82 - forward_pe * 1.8))
-    value = (
-        performance * 0.27
-        + risk_adjusted * 0.20
-        + risk * 0.12
-        + momentum_score * 0.17
-        + rsi_score * 0.08
-        + trend_score * 0.11
-        + valuation * 0.05
-    )
-    return round(max(0.0, min(100.0, value)), 1)
+        parts.append((max(10.0, min(90.0, 82 - forward_pe * 1.8)), 0.05))
+    coverage = sum(weight for _, weight in parts)
+    if coverage < 0.70:
+        return None
+    return round(sum(value * weight for value, weight in parts) / coverage, 1)
 
 
 def _strengths_weaknesses(
@@ -313,7 +314,7 @@ def _strengths_weaknesses(
     total_return: float,
     sharpe: float | None,
     volatility: float | None,
-    momentum: float,
+    momentum: float | None,
     rsi: float | None,
     trend: str,
     forward_pe: float | None,
@@ -335,9 +336,9 @@ def _strengths_weaknesses(
             strengths.append("Volatilité contenue")
         elif volatility >= 35:
             weaknesses.append("Volatilité élevée")
-    if momentum >= 5:
+    if momentum is not None and momentum >= 5:
         strengths.append("Momentum 20 jours positif")
-    elif momentum <= -5:
+    elif momentum is not None and momentum <= -5:
         weaknesses.append("Momentum 20 jours sous pression")
     if trend == "Haussière":
         strengths.append("Tendance technique haussière")
@@ -354,10 +355,6 @@ def _strengths_weaknesses(
             weaknesses.append("Valorisation prospective exigeante")
     if dividend_yield is not None and dividend_yield >= 3:
         strengths.append("Rendement du dividende notable")
-    if not strengths:
-        strengths.append("Profil équilibré sans avantage dominant")
-    if not weaknesses:
-        weaknesses.append("Aucune faiblesse majeure détectée dans les données disponibles")
     return strengths[:4], weaknesses[:4]
 
 
@@ -418,7 +415,7 @@ class AnalysisService:
             source_range = SOURCE_RANGES[request.range]
             history_symbols = list(dict.fromkeys([*request.symbols, request.benchmark]))
             quotes_task = market_data_service.get_quotes(request.symbols)
-            histories_task = market_data_service.get_history_many(
+            histories_task = market_data_service.get_history_many_strict(
                 history_symbols,
                 range_=source_range,
                 interval="1d",
@@ -440,19 +437,18 @@ class AnalysisService:
                 request.range,
             )
             raw_rows: list[dict[str, object]] = []
-            series: list[ComparisonSeries] = []
 
             for symbol in request.symbols:
                 quote = quote_by_symbol.get(symbol.replace("-", "."))
                 candles = _trim_range(histories.get(symbol, []), request.range)
-                if quote is None or len(candles) < 2:
+                if quote is None or len(candles) < 2 or (quote.source == "demo-fallback" and not market_data_service.demo_mode):
                     continue
                 technicals = market_data_service.calculate_technicals(candles)
                 fundamental = fundamentals.get(symbol)
                 metrics = fundamental.metrics if fundamental is not None else None
                 name, sector, instrument_type = _metadata(symbol, quote)
                 avg_volume = _average_volume(candles)
-                relative_volume = quote.volume / avg_volume if avg_volume else 0.0
+                relative_volume = quote.volume / avg_volume if avg_volume else None
                 total_return = _total_return(candles)
                 annualized = _annualized_return(candles)
                 volatility = _volatility(candles)
@@ -517,18 +513,22 @@ class AnalysisService:
                         "delayed": quote.delayed,
                     }
                 )
-                series.append(
-                    ComparisonSeries(
-                        symbol=symbol,
-                        name=name,
-                        points=_normalized_series(candles),
-                    )
-                )
-
-            ranked = sorted(raw_rows, key=lambda row: float(row["score"]), reverse=True)
+            ranked = sorted(raw_rows, key=lambda row: float(row["score"]) if row["score"] is not None else -1, reverse=True)
             instruments = [
                 ComparisonInstrument(**row, rank=index + 1)
                 for index, row in enumerate(ranked)
+            ]
+            common_days: set[int] | None = None
+            for item in instruments:
+                days = {candle.time // 86_400 for candle in _trim_range(histories.get(item.symbol, []), request.range)}
+                common_days = days if common_days is None else common_days & days
+            aligned_days = common_days or set()
+            series = [
+                ComparisonSeries(symbol=item.symbol, name=item.name, points=_normalized_series([
+                    candle for candle in _trim_range(histories.get(item.symbol, []), request.range)
+                    if candle.time // 86_400 in aligned_days
+                ]))
+                for item in instruments
             ]
 
             correlation_symbols = [item.symbol for item in instruments]

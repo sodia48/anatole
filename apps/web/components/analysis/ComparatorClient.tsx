@@ -408,7 +408,7 @@ function InstrumentProfile({
           <h3>{instrument.symbol}</h3>
           <p>{instrument.name}</p>
         </div>
-        <span className={styles.profileScore}>{instrument.score}</span>
+        <span className={styles.profileScore}>{instrument.score ?? "—"}</span>
       </div>
       <div className={styles.prosCons}>
         <div className={styles.pros}>
@@ -839,7 +839,7 @@ export function ComparatorClient() {
                       <td data-label="RSI">{formatNumber(instrument.rsi_14, 1, language)}</td>
                       <td data-label={pick(language, "P/E prévu", "Forward P/E")}>{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1, language)}×`}</td>
                       <td data-label={pick(language, "Dividende", "Dividend")}>{formatPercent(instrument.dividend_yield_percent, 2, language)}</td>
-                      <td data-label="Score"><span className={styles.scorePill}>{instrument.score}</span></td>
+                      <td data-label="Score"><span className={styles.scorePill}>{instrument.score ?? "—"}</span></td>
                     </tr>
                   ))}
                 </tbody>

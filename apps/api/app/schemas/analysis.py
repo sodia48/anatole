@@ -72,16 +72,16 @@ class ComparisonInstrument(BaseModel):
     beta: float | None = None
     max_drawdown_percent: float | None = None
     sharpe_ratio: float | None = None
-    momentum_20d: float
+    momentum_20d: float | None = None
     rsi_14: float | None = None
-    relative_volume: float
+    relative_volume: float | None = None
     trend: str
     market_cap: float | None = None
     trailing_pe: float | None = None
     forward_pe: float | None = None
     price_to_book: float | None = None
     dividend_yield_percent: float | None = None
-    score: float = Field(ge=0, le=100)
+    score: float | None = Field(default=None, ge=0, le=100)
     rank: int = Field(ge=1)
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)
