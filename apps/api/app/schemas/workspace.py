@@ -65,10 +65,11 @@ class PortfolioPositionSnapshot(BaseModel):
     day_pnl: float
     day_change_percent: float
     weight_percent: float
-    momentum_20d: float
+    momentum_20d: float | None = None
     rsi_14: float | None = None
-    trend: str
-    score: float = Field(ge=0, le=100)
+    relative_volume: float | None = None
+    trend: str | None = None
+    score: float | None = Field(default=None, ge=0, le=100)
     source: str
     delayed: bool
 
@@ -99,11 +100,58 @@ class PortfolioRisk(BaseModel):
     beta: float | None = None
     max_drawdown_percent: float | None = None
     sharpe_ratio: float | None = None
-    concentration_hhi: float
-    top_position_percent: float
-    top_three_percent: float
-    diversification_score: float = Field(ge=0, le=100)
-    risk_level: Literal["Faible", "Modéré", "Élevé", "Très élevé"]
+    concentration_hhi: float | None = None
+    top_position_percent: float | None = None
+    top_three_percent: float | None = None
+    diversification_score: float | None = Field(default=None, ge=0, le=100)
+    risk_level: Literal["Faible", "Modéré", "Élevé", "Très élevé"] | None = None
+
+
+class PortfolioCoverage(BaseModel):
+    symbols_expected: int = Field(ge=0)
+    symbols_available: int = Field(ge=0)
+    coverage_percent: float = Field(ge=0, le=100)
+
+
+class PortfolioHorizonResult(BaseModel):
+    horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
+    return_percent: float | None = None
+    coverage: PortfolioCoverage
+    methodology: Literal["observed_day", "current_positions_reconstructed"]
+
+
+class PortfolioHorizonContribution(BaseModel):
+    symbol: str
+    contribution_percent: float
+    security_return_percent: float
+    current_weight_percent: float
+
+
+class PortfolioContributionResult(BaseModel):
+    horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
+    items: list[PortfolioHorizonContribution] = Field(default_factory=list)
+    coverage: PortfolioCoverage
+    methodology: Literal["observed_day", "current_positions_reconstructed"]
+
+
+class PortfolioCorrelationMatrix(BaseModel):
+    symbols: list[str]
+    values: list[list[float | None]]
+    observations: list[list[int]]
+    average_correlation: float | None = None
+    highest_pair: tuple[str, str, float] | None = None
+    lowest_pair: tuple[str, str, float] | None = None
+    minimum_observations: int = 40
+
+
+class PortfolioStressTest(BaseModel):
+    key: Literal["tsx", "wti", "cad_usd", "canada_10y"]
+    label: str
+    shock: float
+    shock_unit: Literal["percent", "basis_points"]
+    estimated_portfolio_change_percent: float | None = None
+    coverage: PortfolioCoverage
+    methodology: str
 
 
 class PortfolioSnapshot(BaseModel):
@@ -116,14 +164,20 @@ class PortfolioSnapshot(BaseModel):
     total_unrealized_pnl_percent: float
     total_day_pnl: float
     total_day_change_percent: float
-    portfolio_score: float = Field(ge=0, le=100)
+    portfolio_score: float | None = Field(default=None, ge=0, le=100)
     positions: list[PortfolioPositionSnapshot]
     sector_allocation: list[PortfolioAllocation]
     currency_allocation: list[PortfolioAllocation]
     performance: list[PortfolioPerformancePoint]
-    risk: PortfolioRisk
+    risk: PortfolioRisk | None = None
     contributors: list[PortfolioContributor]
     detractors: list[PortfolioContributor]
+    performance_horizons: list[PortfolioHorizonResult] = Field(default_factory=list)
+    contribution_horizons: list[PortfolioContributionResult] = Field(default_factory=list)
+    correlation: PortfolioCorrelationMatrix | None = None
+    stress_tests: list[PortfolioStressTest] = Field(default_factory=list)
+    risk_reading: list[str] = Field(default_factory=list)
+    methodology: str = ""
     notes: list[str]
     generated_at: datetime
     refresh_after_seconds: int = 30
