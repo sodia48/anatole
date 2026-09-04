@@ -48,18 +48,18 @@ async def test_event_alerts_use_sourced_engines(
     async def terminal():
         return SimpleNamespace(
             regime="Constructif",
-            anomalies=[SimpleNamespace(symbol="RY", source="Terminal Pro", detail="Volume observé.")],
+            anomalies=[SimpleNamespace(id="volume_spike:RY", type="volume_spike", symbol="RY", source="Terminal Pro", detail="Volume observé.")],
         )
 
     async def earnings(_universe):
         return SimpleNamespace(events=[SimpleNamespace(ticker="RY", starts_at=now + timedelta(days=1), source="Calendrier public")])
 
     async def insiders(**_kwargs):
-        return SimpleNamespace(trades=[SimpleNamespace(unusual=True, source_name="SEDI")], sources=[])
+        return SimpleNamespace(trades=[SimpleNamespace(id="trade-1", unusual=True, source_name="SEDI")], sources=[])
 
     async def news(_symbol, *, language):
         assert language == "fr"
-        return SimpleNamespace(items=[SimpleNamespace(published_at=now - timedelta(hours=1), publisher="Issuer IR", title="Publication officielle")])
+        return SimpleNamespace(items=[SimpleNamespace(id="news-1", url="https://example.com/news-1", published_at=now - timedelta(hours=1), publisher="Issuer IR", title="Publication officielle")])
 
     monkeypatch.setattr(analysis_service, "terminal", terminal)
     monkeypatch.setattr(earnings_calendar_service, "get_snapshot", earnings)
@@ -72,3 +72,22 @@ async def test_event_alerts_use_sourced_engines(
     assert result.triggered is expected_triggered
     assert result.status == ("triggered" if expected_triggered else "monitoring")
     assert result.source
+    if event_type == "terminal_regime":
+        assert result.event_value == "Constructif"
+        assert result.event_fingerprint == "terminal-regime:Constructif"
+    else:
+        assert result.event_fingerprint
+
+
+@pytest.mark.asyncio
+async def test_event_fingerprints_are_stable_for_the_same_real_event(monkeypatch: pytest.MonkeyPatch) -> None:
+    now = datetime(2026, 9, 3, 14, tzinfo=UTC)
+
+    async def earnings(_universe):
+        return SimpleNamespace(events=[SimpleNamespace(ticker="RY", starts_at=now + timedelta(days=1), source="Calendrier public")])
+
+    monkeypatch.setattr(earnings_calendar_service, "get_snapshot", earnings)
+    rule = AlertRule(id="earnings", symbol="RY", kind="event", event_type="earnings_upcoming")
+    first = await AlertService()._evaluate_event(rule, now)
+    second = await AlertService()._evaluate_event(rule, now + timedelta(minutes=1))
+    assert first.event_fingerprint == second.event_fingerprint == "RY:earnings:2026-09-04T14:00:00+00:00"

@@ -155,6 +155,16 @@ describe("mobile news and calendar intelligence", () => {
     await view.unmount();
   });
 
+  it("filters a calendar deep link to earnings on the exact next Toronto day", async () => {
+    const view = await render(<CalendarIntelligenceScreen initialDayOffset={1} initialKind="earnings" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    await waitFor(() => expect(view.getByText("Demain")).toBeTruthy());
+    expect(view.getByText("RY · Royal Bank")).toBeTruthy();
+    expect(view.getByText("BCE · BCE")).toBeTruthy();
+    expect(view.queryByText("Enquête sur la population active")).toBeNull();
+    expect(view.getByTestId("calendar-kind-earnings").props.accessibilityState.selected).toBe(true);
+    await view.unmount();
+  });
+
   it("does not start a real clock when a deterministic reference time is supplied", async () => {
     const setIntervalSpy = jest.spyOn(globalThis, "setInterval");
     const view = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
