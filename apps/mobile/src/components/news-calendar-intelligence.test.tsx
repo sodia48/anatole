@@ -10,11 +10,12 @@ const mockCancelQueries = jest.fn();
 const mockQueryClient = { cancelQueries: mockCancelQueries };
 const errorRoots = new Set<string>();
 let mockLanguage: "fr" | "en" = "fr";
+let mockPreferredRegions: string[] = [];
 let mockAppStateHandler: ((state: "active" | "background") => void) | undefined;
 
 jest.mock("expo-router", () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: mockLanguage, pick: (fr: string, en: string) => mockLanguage === "fr" ? fr : en, t: (key: string) => key }) }));
-jest.mock("@/src/providers/MobileAccountProvider", () => ({ useMobileAccount: () => ({ workspace: { data: { portfolio: [{ symbol: "RY", quantity: 1, average_cost: 100 }], watchlist: ["TD", "CNQ", "SHOP", "BMO", "AEM", "BNS"] } } }) }));
+jest.mock("@/src/providers/MobileAccountProvider", () => ({ useMobileAccount: () => ({ workspace: { data: { portfolio: [{ symbol: "RY", quantity: 1, average_cost: 100 }], watchlist: ["TD", "CNQ", "SHOP", "BMO", "AEM", "BNS"], preferences: { preferred_regions: mockPreferredRegions } } } }) }));
 jest.mock("@/src/lib/api/market", () => ({ marketApi: { news: jest.fn(), stockNews: jest.fn(), calendar: jest.fn(), earnings: jest.fn() } }));
 
 const newsItems = [
@@ -51,6 +52,7 @@ describe("mobile news and calendar intelligence", () => {
     mockCancelQueries.mockClear();
     mockUseQueries.mockClear();
     mockLanguage = "fr";
+    mockPreferredRegions = [];
     mockAppStateHandler = undefined;
     jest.spyOn(AppState, "addEventListener").mockImplementation(((_event: string, callback: (state: "active" | "background") => void) => {
       mockAppStateHandler = callback;
@@ -218,6 +220,19 @@ describe("mobile news and calendar intelligence", () => {
     await user.press(view.getByTestId("calendar-personal"));
     expect(view.getByText("RY · Royal Bank")).toBeTruthy();
     expect(view.queryByText("BCE · BCE")).toBeNull();
+    await view.unmount();
+  });
+
+  it("offers My regions in Calendar only for explicit workspace preferences", async () => {
+    const without = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    expect(without.queryByTestId("calendar-preferred-regions")).toBeNull();
+    await without.unmount();
+    mockPreferredRegions = ["QC"];
+    const view = await render(<CalendarIntelligenceScreen referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("calendar-preferred-regions"));
+    expect(view.getAllByText("Enquête sur la population active").length).toBeGreaterThan(0);
+    expect(view.queryByText("RY · Royal Bank")).toBeNull();
     await view.unmount();
   });
 

@@ -89,8 +89,9 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   const calendar = useQuery({ queryKey: ["calendar", language], queryFn: ({ signal }) => marketApi.calendar(language, signal), enabled: appActive, staleTime: 600_000 });
   const earnings = useQuery({ queryKey: ["earnings", "composite"], queryFn: ({ signal }) => marketApi.earnings(signal), enabled: appActive, staleTime: 600_000 });
   const merged = useMemo(() => mergeCalendarEvents(calendar.data, earnings.data), [calendar.data, earnings.data]);
+  const preferredRegions = useMemo(() => workspace.data.preferences?.preferred_regions ?? [], [workspace.data.preferences?.preferred_regions]);
   const personalSymbols = useMemo(() => [...new Set([...workspace.data.portfolio.map((item) => item.symbol), ...workspace.data.watchlist].map((symbol) => symbol.replace(/\.TO$/i, "").toUpperCase()))], [workspace.data.portfolio, workspace.data.watchlist]);
-  const filtered = useMemo(() => filterCalendarItems(merged, filters, now, personalSymbols), [filters, merged, now, personalSymbols]);
+  const filtered = useMemo(() => filterCalendarItems(merged, filters, now, personalSymbols, preferredRegions), [filters, merged, now, personalSymbols, preferredRegions]);
   const sections = useMemo(() => groupCalendarByTorontoDate(filtered, now, language), [filtered, language, now]);
   const major = useMemo(() => nextMajorEvent(merged, now), [merged, now]);
   const categories = useMemo(() => [...new Set(merged.filter((item) => item.kind === "economic").map((item) => item.category))].sort(), [merged]);
@@ -110,7 +111,7 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
     {calendar.isError && !calendar.data && earnings.data ? <Text style={styles.partial}>{pick("Le calendrier économique est indisponible; les résultats demeurent accessibles.", "The economic calendar is unavailable; earnings remain available.")}</Text> : null}
     {earnings.isError && !earnings.data && calendar.data ? <Text style={styles.partial}>{pick("Les résultats sont indisponibles; le calendrier économique demeure accessible.", "Earnings are unavailable; the economic calendar remains available.")}</Text> : null}
     {major ? <View style={styles.major} testID="calendar-next-major"><Text style={styles.eyebrow}>{pick("PROCHAIN ÉVÉNEMENT MAJEUR", "NEXT MAJOR EVENT")}</Text><Text style={styles.majorTitle}>{major.title}</Text><Text style={styles.majorMeta}>{new Date(major.startsAt).toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", timeZoneName: "short" })} · {countdownLabel(major.startsAt, now, language)}</Text></View> : null}
-    <CalendarFilters categories={categories} filters={filters} hasPersonal={personalSymbols.length > 0} onChange={setFilters} sectors={sectors} />
+    <CalendarFilters categories={categories} filters={filters} hasPersonal={personalSymbols.length > 0} onChange={setFilters} preferredRegions={preferredRegions} sectors={sectors} />
   </>;
   return <SafeAreaView edges={["top"]} style={styles.safe} testID="calendar-intelligence-screen"><CalendarTimeline footer={<CalendarSourceHealth statuses={statuses} />} header={contentHeader} onOpen={open} onRefresh={refresh} onReset={reset} refreshing={calendar.isRefetching || earnings.isRefetching} sections={sections} /><CalendarEventModal item={selected} onClose={() => setSelected(null)} /></SafeAreaView>;
 }

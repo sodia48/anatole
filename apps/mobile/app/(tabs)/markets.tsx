@@ -87,7 +87,7 @@ export default function MarketsScreen() {
 
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: ({ signal }) => marketApi.cockpit(universe, signal), enabled: hub === "cockpit", staleTime: 60_000 });
   const navigation = <MarketsNavigation hub={hub} onHub={setHub} />;
-  if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} />;
+  if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} preferredRegions={workspace.data.preferences?.preferred_regions ?? []} />;
   if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
 
   async function addWatchlist(ticker: string) {

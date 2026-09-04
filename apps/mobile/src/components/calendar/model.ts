@@ -5,7 +5,7 @@ export type CalendarRange = "today" | "7d" | "30d";
 export type CalendarKindFilter = "all" | "economic" | "earnings";
 export type CalendarImportanceFilter = "all" | "high" | "medium" | "low";
 export type CalendarRegionFilter = "all" | "CA" | "QC" | "ON" | "BC" | "AB" | "prairies" | "atlantic";
-export type CalendarScopeFilter = "all" | "personal";
+export type CalendarScopeFilter = "all" | "personal" | "preferred";
 
 export type CalendarFiltersState = {
   range: CalendarRange;
@@ -83,10 +83,11 @@ function matchesRegion(regions: readonly string[], filter: CalendarRegionFilter)
   return values.has(filter);
 }
 
-export function filterCalendarItems(items: readonly CalendarIntelligenceItem[], filters: CalendarFiltersState, now: Date, personalSymbols: readonly string[]): CalendarIntelligenceItem[] {
+export function filterCalendarItems(items: readonly CalendarIntelligenceItem[], filters: CalendarFiltersState, now: Date, personalSymbols: readonly string[], preferredRegions: readonly string[] = []): CalendarIntelligenceItem[] {
   const start = dateOrdinal(now);
   const lastDay = filters.range === "today" ? 0 : filters.range === "7d" ? 6 : 29;
   const personal = new Set(personalSymbols.map((symbol) => symbol.replace(/\.TO$/i, "").toUpperCase()));
+  const preferred = new Set(preferredRegions.map((region) => region.toUpperCase()));
   return items.filter((item) => {
     const day = dateOrdinal(item.startsAt);
     if (day == null || start == null || day < start || day > start + lastDay) return false;
@@ -96,6 +97,7 @@ export function filterCalendarItems(items: readonly CalendarIntelligenceItem[], 
     if (filters.category !== "all" && normalized(item.category) !== normalized(filters.category)) return false;
     if (filters.sector !== "all" && (item.kind !== "earnings" || normalized(item.sector ?? "") !== normalized(filters.sector))) return false;
     if (filters.scope === "personal" && (item.kind !== "earnings" || !personal.has(item.ticker.replace(/\.TO$/i, "").toUpperCase()))) return false;
+    if (filters.scope === "preferred" && !item.regions.some((region) => preferred.has(region.toUpperCase()))) return false;
     if (filters.ticker && (item.kind !== "earnings" || item.ticker.replace(/\.TO$/i, "").toUpperCase() !== filters.ticker.replace(/\.TO$/i, "").toUpperCase())) return false;
     return true;
   });
