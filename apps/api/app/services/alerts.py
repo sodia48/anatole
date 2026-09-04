@@ -43,10 +43,14 @@ def _average_volume(candles, sessions: int = 20) -> float:
     return sum(item.volume for item in sample) / max(len(sample), 1)
 
 
-def _momentum(candles, sessions: int = 20) -> float:
+def _momentum(candles, sessions: int = 20) -> float | None:
     if len(candles) <= sessions or candles[-sessions - 1].close == 0:
-        return 0.0
+        return None
     return (candles[-1].close / candles[-sessions - 1].close - 1) * 100
+
+
+def _relative_volume(volume: float, average_volume: float) -> float | None:
+    return volume / average_volume if average_volume > 0 else None
 
 
 def _score(change: float, momentum: float, relative_volume: float, rsi, trend: str) -> float:
@@ -126,8 +130,8 @@ class AlertService:
             else:
                 raise ValueError("Type d'événement inconnu")
         except Exception:  # noqa: BLE001
-            return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=False, status="unavailable", message="Source événementielle temporairement indisponible.", evaluated_at=evaluated_at)
-        return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=triggered, status="triggered" if triggered else "monitoring", message=message, source=source, evaluated_at=evaluated_at)
+            return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=False, status="unavailable", message="Source événementielle temporairement indisponible.", evaluated_at=evaluated_at)
+        return AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=triggered, status="triggered" if triggered else "monitoring", message=message, source=source, evaluated_at=evaluated_at)
 
     async def evaluate(self, request: AlertEvaluateRequest) -> AlertSnapshot:
         enabled_symbols = list(
@@ -155,7 +159,7 @@ class AlertService:
             symbol = rule.symbol.strip().upper().removesuffix(".TO")
             if rule.kind == "event":
                 if not rule.enabled:
-                    items.append(AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", triggered=False, status="disabled", message="Alerte désactivée.", evaluated_at=evaluated_at))
+                    items.append(AlertEvaluation(id=rule.id, symbol=symbol, name=symbol, event_type=rule.event_type, metric_label="Événement", unit="", triggered=False, status="disabled", message="Alerte désactivée.", evaluated_at=evaluated_at))
                 else:
                     items.append(await self._evaluate_event(rule, evaluated_at))
                 continue
@@ -210,9 +214,7 @@ class AlertService:
                 if rule.alert_type == "price_level":
                     technicals = market_data_service.calculate_technicals(candles)
                     average_volume = _average_volume(candles)
-                    relative_volume = (
-                        quote.volume / average_volume if average_volume else 0.0
-                    )
+                    relative_volume = _relative_volume(quote.volume, average_volume)
                     momentum = _momentum(candles)
                     values = {
                         "price": quote.price,
@@ -226,7 +228,7 @@ class AlertService:
                             relative_volume,
                             technicals.rsi_14,
                             technicals.trend,
-                        ),
+                        ) if momentum is not None and relative_volume is not None else None,
                     }
                     current = values[rule.metric]
                     threshold = rule.threshold
@@ -355,6 +357,27 @@ class AlertService:
                         triggered=False,
                         status="unavailable",
                         message=f"Règle invalide ou indisponible : {error}",
+                        source=quote.source,
+                        evaluated_at=evaluated_at,
+                    )
+                )
+                continue
+            if current is None or threshold is None:
+                items.append(
+                    AlertEvaluation(
+                        id=rule.id,
+                        symbol=symbol,
+                        name=quote.name or symbol,
+                        metric=rule.metric,
+                        alert_type=rule.alert_type,
+                        metric_label=label,
+                        operator=rule.operator,
+                        threshold=rule.threshold,
+                        current_value=None,
+                        unit=unit,
+                        triggered=False,
+                        status="unavailable",
+                        message="Métrique indisponible avec les observations actuelles.",
                         source=quote.source,
                         evaluated_at=evaluated_at,
                     )

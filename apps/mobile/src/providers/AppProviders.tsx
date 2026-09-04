@@ -33,15 +33,18 @@ export function AppProviders({ children }: PropsWithChildren) {
   const previousOnline = useRef<boolean | null>(null);
   const cancelReconnect = useRef<(() => void) | null>(null);
 
-  useEffect(() => NetInfo.addEventListener((state) => {
-    const online = Boolean(state.isConnected);
-    onlineManager.setOnline(online);
-    if (previousOnline.current === false && online) {
-      cancelReconnect.current?.();
-      cancelReconnect.current = scheduleReconnectRefresh(queryClient);
-    }
-    previousOnline.current = online;
-  }), []);
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const online = Boolean(state.isConnected);
+      onlineManager.setOnline(online);
+      if (previousOnline.current === false && online) {
+        cancelReconnect.current?.();
+        cancelReconnect.current = scheduleReconnectRefresh(queryClient);
+      }
+      previousOnline.current = online;
+    });
+    return () => { unsubscribe(); cancelReconnect.current?.(); };
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {

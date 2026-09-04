@@ -17,7 +17,11 @@ import { appendAlertHistory, migrateAlertRule } from "./model";
 export function AlertCenterScreen() {
   const { state, workspace, saveWorkspace } = useMobileAccount(); const { pick } = useLocale(); const rules = workspace.data.alerts.map(migrateAlertRule); const [templateSymbol, setTemplateSymbol] = useState(workspace.data.watchlist[0] ?? ""); const [history, setHistory] = useState<AlertSnapshot["items"]>([]);
   const query = useQuery({ queryKey: ["alerts", rules], queryFn: ({ signal }) => workspaceApi.alerts(rules, signal), enabled: rules.length > 0, refetchInterval: 60_000, refetchIntervalInBackground: false });
-  useEffect(() => { if (query.data) setHistory((current) => appendAlertHistory(current, query.data.items.filter((item) => item.triggered))); }, [query.data]);
+  useEffect(() => {
+    if (!query.data) return;
+    const timer = setTimeout(() => setHistory((current) => appendAlertHistory(current, query.data!.items.filter((item) => item.triggered))), 0);
+    return () => clearTimeout(timer);
+  }, [query.data]);
   const saveRules = (next: AlertRule[]) => saveWorkspace({ ...workspace.data, alerts: next });
   const add = async (rule: AlertRule) => { await saveRules([...rules, rule]); setTemplateSymbol(rule.symbol); };
   const capability = pushCapability();

@@ -41,7 +41,6 @@ export function OfflineBadge({ forceOffline, asOf }: { forceOffline?: boolean; a
   useEffect(() => {
     if (!offline) {
       const value = new Date().toISOString();
-      setLastOnlineAt(value);
       void AsyncStorage.setItem(LAST_ONLINE_KEY, value);
       return;
     }

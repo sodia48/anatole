@@ -7,6 +7,10 @@ import { alertLabel, eventTypes } from "./model";
 
 export function AlertTemplates({ symbol, onAdd }: { symbol: string; onAdd: (rule: AlertRule) => Promise<void> }) {
   const { language, pick } = useLocale();
-  return <Card title={pick("Alertes événementielles", "Event alerts")}><Text style={styles.note}>{pick("Ajout explicite seulement. Les événements proviennent des moteurs Anatole sourcés.", "Explicit opt-in only. Events come from sourced Anatole engines.")}</Text><View style={styles.wrap}>{eventTypes.map((eventType) => { const rule: AlertRule = { id: `${symbol}-${eventType}-${Date.now()}`, symbol, enabled: true, kind: "event", event_type: eventType, cooldown_minutes: 1_440 }; return <Pressable disabled={!symbol} key={eventType} onPress={() => void onAdd(rule)} style={styles.chip}><Text style={styles.text}>+ {alertLabel(rule, language)}</Text></Pressable>; })}</View></Card>;
+  const add = (eventType: AlertRule["event_type"]) => {
+    const rule: AlertRule = { id: `${symbol}-${eventType}`, symbol, enabled: true, kind: "event", event_type: eventType, cooldown_minutes: 1_440 };
+    void onAdd(rule);
+  };
+  return <Card title={pick("Alertes événementielles", "Event alerts")}><Text style={styles.note}>{pick("Ajout explicite seulement. Les événements proviennent des moteurs Anatole sourcés.", "Explicit opt-in only. Events come from sourced Anatole engines.")}</Text><View style={styles.wrap}>{eventTypes.map((eventType) => { const preview: AlertRule = { id: eventType, symbol, enabled: true, kind: "event", event_type: eventType }; return <Pressable disabled={!symbol} key={eventType} onPress={() => add(eventType)} style={styles.chip}><Text style={styles.text}>+ {alertLabel(preview, language)}</Text></Pressable>; })}</View></Card>;
 }
 const styles = StyleSheet.create({ note: { ...typography.caption, color: colors.textMuted }, wrap: { gap: spacing.xs }, chip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, text: { ...typography.label, color: colors.primary } });
