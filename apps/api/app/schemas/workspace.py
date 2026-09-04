@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class PortfolioPositionInput(BaseModel):
@@ -61,14 +61,15 @@ class PortfolioPositionSnapshot(BaseModel):
     cost_basis: float
     market_value: float
     unrealized_pnl: float
-    unrealized_pnl_percent: float
+    unrealized_pnl_percent: float | None = None
     day_pnl: float
     day_change_percent: float
     weight_percent: float
-    momentum_20d: float
+    momentum_20d: float | None = None
     rsi_14: float | None = None
-    trend: str
-    score: float = Field(ge=0, le=100)
+    relative_volume: float | None = None
+    trend: str | None = None
+    score: float | None = Field(default=None, ge=0, le=100)
     source: str
     delayed: bool
 
@@ -99,11 +100,60 @@ class PortfolioRisk(BaseModel):
     beta: float | None = None
     max_drawdown_percent: float | None = None
     sharpe_ratio: float | None = None
-    concentration_hhi: float
-    top_position_percent: float
-    top_three_percent: float
-    diversification_score: float = Field(ge=0, le=100)
-    risk_level: Literal["Faible", "Modéré", "Élevé", "Très élevé"]
+    concentration_hhi: float | None = None
+    top_position_percent: float | None = None
+    top_three_percent: float | None = None
+    diversification_score: float | None = Field(default=None, ge=0, le=100)
+    risk_level: Literal["Faible", "Modéré", "Élevé", "Très élevé"] | None = None
+    history_coverage_percent: float = Field(default=0, ge=0, le=100)
+    history_observations: int = Field(default=0, ge=0)
+
+
+class PortfolioCoverage(BaseModel):
+    symbols_expected: int = Field(ge=0)
+    symbols_available: int = Field(ge=0)
+    coverage_percent: float = Field(ge=0, le=100)
+
+
+class PortfolioHorizonResult(BaseModel):
+    horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
+    return_percent: float | None = None
+    coverage: PortfolioCoverage
+    methodology: Literal["observed_day", "current_positions_reconstructed"]
+
+
+class PortfolioHorizonContribution(BaseModel):
+    symbol: str
+    contribution_percent: float
+    security_return_percent: float
+    current_weight_percent: float
+
+
+class PortfolioContributionResult(BaseModel):
+    horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
+    items: list[PortfolioHorizonContribution] = Field(default_factory=list)
+    coverage: PortfolioCoverage
+    methodology: Literal["observed_day", "current_positions_reconstructed"]
+
+
+class PortfolioCorrelationMatrix(BaseModel):
+    symbols: list[str]
+    values: list[list[float | None]]
+    observations: list[list[int]]
+    average_correlation: float | None = None
+    highest_pair: tuple[str, str, float] | None = None
+    lowest_pair: tuple[str, str, float] | None = None
+    minimum_observations: int = 40
+
+
+class PortfolioStressTest(BaseModel):
+    key: Literal["tsx", "wti", "cad_usd", "canada_10y"]
+    label: str
+    shock: float
+    shock_unit: Literal["percent", "basis_points"]
+    estimated_portfolio_change_percent: float | None = None
+    coverage: PortfolioCoverage
+    methodology: str
 
 
 class PortfolioSnapshot(BaseModel):
@@ -113,17 +163,23 @@ class PortfolioSnapshot(BaseModel):
     total_market_value: float
     total_cost_basis: float
     total_unrealized_pnl: float
-    total_unrealized_pnl_percent: float
+    total_unrealized_pnl_percent: float | None = None
     total_day_pnl: float
     total_day_change_percent: float
-    portfolio_score: float = Field(ge=0, le=100)
+    portfolio_score: float | None = Field(default=None, ge=0, le=100)
     positions: list[PortfolioPositionSnapshot]
     sector_allocation: list[PortfolioAllocation]
     currency_allocation: list[PortfolioAllocation]
     performance: list[PortfolioPerformancePoint]
-    risk: PortfolioRisk
+    risk: PortfolioRisk | None = None
     contributors: list[PortfolioContributor]
     detractors: list[PortfolioContributor]
+    performance_horizons: list[PortfolioHorizonResult] = Field(default_factory=list)
+    contribution_horizons: list[PortfolioContributionResult] = Field(default_factory=list)
+    correlation: PortfolioCorrelationMatrix | None = None
+    stress_tests: list[PortfolioStressTest] = Field(default_factory=list)
+    risk_reading: list[str] = Field(default_factory=list)
+    methodology: str = ""
     notes: list[str]
     generated_at: datetime
     refresh_after_seconds: int = 30
@@ -138,6 +194,14 @@ AlertMetric = Literal[
     "score",
 ]
 AlertOperator = Literal["above", "below"]
+AlertKind = Literal["threshold", "event"]
+AlertEventType = Literal[
+    "terminal_anomaly",
+    "terminal_regime",
+    "earnings_upcoming",
+    "insider_unusual",
+    "company_news",
+]
 AlertType = Literal[
     "price_level",
     "indicator_threshold",
@@ -155,10 +219,13 @@ class DrawingAlertPoint(BaseModel):
 class AlertRule(BaseModel):
     id: str
     symbol: str
-    metric: AlertMetric
-    operator: AlertOperator
-    threshold: float
+    metric: AlertMetric | None = None
+    operator: AlertOperator | None = None
+    threshold: float | None = None
     enabled: bool = True
+    kind: AlertKind = "threshold"
+    event_type: AlertEventType | None = None
+    cooldown_minutes: int = Field(default=1_440, ge=5, le=43_200)
     label: str | None = None
     alert_type: AlertType = "price_level"
     indicator_id: str | None = Field(default=None, max_length=40)
@@ -203,6 +270,16 @@ class AlertRule(BaseModel):
             raise ValueError("Paramètres d’alerte invalides.")
         return values
 
+    @model_validator(mode="after")
+    def validate_rule_contract(self) -> "AlertRule":
+        if self.kind == "event":
+            if self.event_type is None:
+                raise ValueError("Une alerte événementielle exige event_type.")
+            return self
+        if self.metric is None or self.operator is None or self.threshold is None:
+            raise ValueError("Une alerte de seuil exige metric, operator et threshold.")
+        return self
+
 
 class AlertEvaluateRequest(BaseModel):
     rules: list[AlertRule] = Field(min_length=1, max_length=50)
@@ -212,17 +289,20 @@ class AlertEvaluation(BaseModel):
     id: str
     symbol: str
     name: str
-    metric: AlertMetric
+    metric: AlertMetric | None = None
+    event_type: AlertEventType | None = None
     alert_type: AlertType = "price_level"
     metric_label: str
-    operator: AlertOperator
-    threshold: float
+    operator: AlertOperator | None = None
+    threshold: float | None = None
     current_value: float | None = None
     unit: str
     triggered: bool
     status: Literal["triggered", "monitoring", "unavailable", "disabled"]
     message: str
     source: str | None = None
+    event_fingerprint: str | None = None
+    event_value: str | None = None
     evaluated_at: datetime
 
 

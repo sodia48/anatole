@@ -1,3 +1,5 @@
+import type { PsychologyComponent as SharedPsychologyComponent, PsychologySnapshot as SharedPsychologySnapshot, ScreenerRow as SharedScreenerRow, ScreenerSnapshot as SharedScreenerSnapshot, TerminalAlert as SharedTerminalAlert, TerminalComponent as SharedTerminalComponent, TerminalOpportunity as SharedTerminalOpportunity, TerminalSector as SharedTerminalSector, TerminalSnapshot as SharedTerminalSnapshot } from "@anatole/shared";
+
 export type Quote = {
   ticker: string;
   symbol: string;
@@ -327,36 +329,8 @@ export type SymbolSearchResponse = {
   count: number;
 };
 
-export type ScreenerRow = {
-  ticker: string;
-  symbol: string;
-  name: string;
-  sector: string;
-  price: number;
-  change_percent: number;
-  volume: number;
-  average_volume_20d: number;
-  relative_volume: number;
-  momentum_20d: number;
-  rsi_14: number | null;
-  sma_20: number | null;
-  sma_50: number | null;
-  trend: string;
-  score: number;
-  signal: string;
-  source: string;
-  delayed: boolean;
-};
-
-export type ScreenerSnapshot = {
-  universe: string;
-  items: ScreenerRow[];
-  sectors: string[];
-  generated_at: string;
-  refresh_after_seconds: number;
-  live_items: number;
-  fallback_items: number;
-};
+export type ScreenerRow = SharedScreenerRow;
+export type ScreenerSnapshot = SharedScreenerSnapshot;
 
 export type FeedStatus = {
   source: string;
@@ -550,25 +524,8 @@ export type InstitutionsSnapshot = {
   message: string | null;
 };
 
-export type PsychologyComponent = {
-  key: string;
-  label: string;
-  score: number;
-  description: string;
-};
-
-export type PsychologySnapshot = {
-  score: number;
-  label: string;
-  change_20d: number;
-  change_50d: number;
-  volatility_20d: number;
-  advance_ratio: number;
-  components: PsychologyComponent[];
-  generated_at: string;
-  refresh_after_seconds: number;
-  source: string;
-};
+export type PsychologyComponent = SharedPsychologyComponent;
+export type PsychologySnapshot = SharedPsychologySnapshot;
 
 export type ComparisonRange =
   | "1mo"
@@ -605,16 +562,16 @@ export type ComparisonInstrument = {
   beta: number | null;
   max_drawdown_percent: number | null;
   sharpe_ratio: number | null;
-  momentum_20d: number;
+  momentum_20d: number | null;
   rsi_14: number | null;
-  relative_volume: number;
+  relative_volume: number | null;
   trend: string;
   market_cap: number | null;
   trailing_pe: number | null;
   forward_pe: number | null;
   price_to_book: number | null;
   dividend_yield_percent: number | null;
-  score: number;
+  score: number | null;
   rank: number;
   strengths: string[];
   weaknesses: string[];
@@ -639,82 +596,31 @@ export type ComparisonSnapshot = {
   refresh_after_seconds: number;
 };
 
-export type TerminalComponent = {
-  key: string;
-  label: string;
-  score: number;
-  value: string;
-  description: string;
-};
-
-export type TerminalSector = {
-  sector: string;
-  change_percent: number;
-  momentum_20d: number;
-  average_score: number;
-  relative_volume: number;
-  advancers: number;
-  decliners: number;
-  leadership_score: number;
-  state:
-    | "Leadership"
-    | "Accumulation"
-    | "Neutre"
-    | "Distribution"
-    | "Faiblesse";
-};
-
-export type TerminalOpportunity = {
-  symbol: string;
-  name: string;
-  sector: string;
-  price: number;
-  change_percent: number;
-  momentum_20d: number;
-  rsi_14: number | null;
-  relative_volume: number;
-  score: number;
-  signal: string;
-  opportunity_type: string;
-  reasons: string[];
-};
-
-export type TerminalAlert = {
-  id: string;
-  severity: "info" | "watch" | "high";
-  category: string;
-  symbol: string | null;
-  title: string;
-  detail: string;
-};
-
-export type TerminalSnapshot = {
-  universe: string;
-  regime:
-    | "Haussier"
-    | "Constructif"
-    | "Neutre"
-    | "Fragile"
-    | "Baissier";
-  regime_score: number;
-  risk_level: "Faible" | "Modéré" | "Élevé" | "Critique";
-  weighted_change_percent: number;
-  advance_ratio: number;
-  average_anatole_score: number;
-  average_momentum_20d: number;
-  above_sma20_percent: number;
-  above_sma50_percent: number;
-  high_relative_volume_count: number;
-  components: TerminalComponent[];
-  sectors: TerminalSector[];
-  opportunities: TerminalOpportunity[];
-  alerts: TerminalAlert[];
-  leaders: TerminalOpportunity[];
-  laggards: TerminalOpportunity[];
-  methodology: string;
-  generated_at: string;
-  refresh_after_seconds: number;
-};
+export type TerminalComponent = SharedTerminalComponent;
+export type TerminalSector = SharedTerminalSector;
+export type TerminalOpportunity = SharedTerminalOpportunity;
+export type TerminalAlert = SharedTerminalAlert;
+export type TerminalSnapshot = SharedTerminalSnapshot;
+export type {
+  TerminalAnomaly,
+  TerminalAnomalyType,
+  TerminalBreadthDivergence,
+  TerminalBreadthPoint,
+  TerminalBreadthPro,
+  TerminalDataQuality,
+  TerminalMarketDriver,
+  TerminalMethodologySection,
+  TerminalRadarFilters,
+  TerminalRadarItem,
+  TerminalRadarPreset,
+  TerminalRadarSort,
+  TerminalRegime,
+  TerminalRegimeHistoryPoint,
+  TerminalRegimeHorizon,
+  TerminalRisk,
+  TerminalSectorQuadrant,
+  TerminalSectorRotation,
+} from "@anatole/shared";
 
 export type PortfolioPositionInput = {
   symbol: string;
@@ -735,7 +641,7 @@ export type PortfolioPositionSnapshot = {
   cost_basis: number;
   market_value: number;
   unrealized_pnl: number;
-  unrealized_pnl_percent: number;
+  unrealized_pnl_percent: number | null;
   day_pnl: number;
   day_change_percent: number;
   weight_percent: number;
@@ -775,7 +681,7 @@ export type PortfolioSnapshot = {
   total_market_value: number;
   total_cost_basis: number;
   total_unrealized_pnl: number;
-  total_unrealized_pnl_percent: number;
+  total_unrealized_pnl_percent: number | null;
   total_day_pnl: number;
   total_day_change_percent: number;
   portfolio_score: number;
@@ -793,6 +699,8 @@ export type PortfolioSnapshot = {
     top_three_percent: number;
     diversification_score: number;
     risk_level: "Faible" | "Modéré" | "Élevé" | "Très élevé";
+    history_coverage_percent: number;
+    history_observations: number;
   };
   contributors: PortfolioContributor[];
   detractors: PortfolioContributor[];
@@ -852,6 +760,8 @@ export type AlertEvaluation = {
   status: "triggered" | "monitoring" | "unavailable" | "disabled";
   message: string;
   source: string | null;
+  event_fingerprint: string | null;
+  event_value: string | null;
   evaluated_at: string;
 };
 

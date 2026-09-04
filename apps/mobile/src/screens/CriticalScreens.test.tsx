@@ -1,8 +1,11 @@
-import { render } from "@testing-library/react-native";
+import { render, userEvent, waitFor } from "@testing-library/react-native";
+import { router } from "expo-router";
 
 import MarketsScreen from "@/app/(tabs)/markets";
 import PortfolioScreen from "@/app/(tabs)/portfolio";
+import TodayScreen from "@/app/(tabs)/today";
 import NotificationsScreen from "@/app/notifications";
+import { PsychologyScreen } from "@/src/components/psychology/PsychologyScreen";
 import StockDetailScreen from "@/app/stock/[ticker]";
 import WatchlistScreen from "@/app/watchlist";
 
@@ -12,10 +15,11 @@ jest.mock("@/src/components/ChartWebView", () => {
   const { View } = jest.requireActual("react-native");
   return { ChartWebView: () => <View testID="focus-chart-webview" /> };
 });
+jest.mock("@/src/hooks/useLiveQuote", () => ({ useLiveQuote: (_ticker: string, quote: unknown) => ({ quote, state: "live" }) }));
 jest.mock("@/src/providers/MobileAccountProvider", () => ({
   useMobileAccount: () => ({
     state: "authenticated", user: { email: "mobile@example.com" }, saveWorkspace: jest.fn(),
-    workspace: { revision: 1, data: { watchlist: ["RY"], portfolio: [{ symbol: "RY", quantity: 2, average_cost: 100 }], alerts: [], preferences: {}, comparator_symbols: [], focus_layouts: [], focus_scripts: [] } },
+    workspace: { revision: 1, data: { watchlist: ["RY"], portfolio: [{ symbol: "RY", quantity: 2, average_cost: 100 }], alerts: [], preferences: {}, comparator_symbols: [], focus_layouts: [], focus_scripts: [], terminal_presets: [] } },
   }),
 }));
 jest.mock("@/src/lib/api/market", () => ({ marketApi: { cockpit: jest.fn(), focus: jest.fn(), stockNews: jest.fn(), watchlist: jest.fn() } }));
@@ -31,22 +35,72 @@ const mockQueryData: Record<string, unknown> = {
   notifications: { unread_count: 1, generated_at: "2026-08-30T00:00:00Z", items: [{ id: "n1", kind: "alert", title: "RY", message: "Seuil atteint", severity: "important", symbol: "RY", route: null, created_at: "2026-08-30T00:00:00Z", read_at: null }] },
   watchlist: { tickers: ["RY"], items: [{ ...tile, currency: "CAD", previous_close: 198, day_high: 202, day_low: 197 }], summary: { advancers: 1, decliners: 0, unchanged: 0, average_change_percent: 1 }, generated_at: "2026-08-30T00:00:00Z", refresh_after_seconds: 45 },
 };
+const mockObservedQueries: { queryKey: unknown[]; enabled?: boolean }[] = [];
 
 jest.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey }: { queryKey: unknown[] }) => ({ data: mockQueryData[String(queryKey[0])], isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn() }),
+  useQuery: ({ queryKey, enabled }: { queryKey: unknown[]; enabled?: boolean }) => {
+    mockObservedQueries.push({ queryKey, enabled });
+    return { data: mockQueryData[String(queryKey[0])], isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn() };
+  },
+  useQueryClient: () => ({ cancelQueries: jest.fn() }),
 }));
 
 describe("critical native screens", () => {
-  it("renders the Cockpit mobile sector map", async () => {
+  beforeEach(() => mockObservedQueries.splice(0));
+
+  it("keeps the staged Terminal query disabled on initial Today render and absent elsewhere", async () => {
+    const today = await render(<TodayScreen />);
+    expect(mockObservedQueries.find(({ queryKey }) => queryKey[0] === "terminal")?.enabled).toBe(false);
+    await today.unmount();
+    mockObservedQueries.splice(0);
+    const markets = await render(<MarketsScreen />);
+    expect(mockObservedQueries.some(({ queryKey }) => queryKey[0] === "terminal")).toBe(false);
+    await markets.unmount();
+    mockObservedQueries.splice(0);
+    const psychology = await render(<PsychologyScreen />);
+    expect(mockObservedQueries.map(({ queryKey }) => queryKey[0])).toEqual(["psychology"]);
+    await psychology.unmount();
+  });
+
+  it("renders the Cockpit mobile heatmap", async () => {
     const view = await render(<MarketsScreen />);
-    expect(view.getByTestId("cockpit-sector-map")).toBeTruthy();
+    expect(view.getByTestId("cockpit-heatmap")).toBeTruthy();
+    expect(view.getByTestId("market-heatmap-svg")).toBeTruthy();
+    await view.unmount();
+  }, 30_000);
+
+  it("opens the active Screener, Terminal and Psychology routes from Markets", async () => {
+    jest.mocked(router.push).mockClear();
+    const view = await render(<MarketsScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByText("Screener"));
+    expect(router.push).toHaveBeenCalledWith("/screener");
+    await user.press(view.getByText("Terminal Pro"));
+    expect(router.push).toHaveBeenCalledWith("/terminal");
+    await user.press(view.getByText("Psychologie"));
+    expect(router.push).toHaveBeenCalledWith("/psychology");
+    expect(view.queryByText("Bientôt sur mobile. La migration utilisera le même backend que le web.")).toBeNull();
     await view.unmount();
   }, 30_000);
 
   it("renders the native Focus shell with its specialized chart", async () => {
     const view = await render(<StockDetailScreen />);
-    expect(view.getByTestId("focus-chart-section")).toBeTruthy();
+    expect(view.getByTestId("focus-overview-section")).toBeTruthy();
     expect(view.getByTestId("focus-chart-webview")).toBeTruthy();
+    expect(view.getByText("RY · LIVE")).toBeTruthy();
+    await view.unmount();
+  }, 30_000);
+
+  it("preloads Focus Pro once and keeps its bridge state across section switches", async () => {
+    const view = await render(<StockDetailScreen />);
+    await waitFor(() => expect(view.getAllByTestId("focus-pro-webview")).toHaveLength(1));
+    const webview = view.getByTestId("focus-pro-webview");
+    const user = userEvent.setup();
+    await user.press(view.getByText("Pro"));
+    await user.press(view.getByText("Fondamentaux"));
+    await user.press(view.getByText("Pro"));
+    expect(view.getAllByTestId("focus-pro-webview")).toHaveLength(1);
+    expect(view.getByTestId("focus-pro-webview")).toBe(webview);
     await view.unmount();
   }, 30_000);
 

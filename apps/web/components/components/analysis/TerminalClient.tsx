@@ -455,7 +455,7 @@ export function TerminalClient() {
           <section className={`panel ${styles.terminalFeedPanel}`}>
             <div className={styles.terminalFeedHeading}>
               <div>
-                <span className="eyebrow">RADAR INSTITUTIONNEL</span>
+                <span className="eyebrow">RADAR PRO</span>
                 <h2>Signaux à surveiller</h2>
                 <p>
                   Les cartes classent les configurations selon le score, le volume,

@@ -8,6 +8,9 @@ class SymbolSearchItem(BaseModel):
     sector: str
     exchange: str = "TSX"
     universe: str = "tsx60"
+    instrument_type: str = "stock"
+    provider: str | None = None
+    exposure: str | None = None
 
 
 class SymbolSearchResponse(BaseModel):

@@ -763,7 +763,8 @@ class CompanyNetworkStore:
                 frontier = next_frontier if depth > 1 else set()
             # Return one sentinel node beyond the public limit so the service
             # can report truncation truthfully before enforcing 40 visible nodes.
-            node_rows = connection.execute(select(self.entities.c.payload).where(self.entities.c.id.in_(list(all_ids)[: MAX_NODES + 1])))
+            selected_ids = [center.id] + sorted(all_ids - {center.id})[:MAX_NODES]
+            node_rows = connection.execute(select(self.entities.c.payload).where(self.entities.c.id.in_(selected_ids)))
             nodes = [CompanyNetworkNode.model_validate_json(row.payload) for row in node_rows]
         node_ids = {item.id for item in nodes}
         filtered = [item for item in relationships.values() if item.source_node_id in node_ids and item.target_node_id in node_ids]

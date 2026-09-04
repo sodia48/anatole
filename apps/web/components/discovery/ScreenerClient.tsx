@@ -47,6 +47,17 @@ export function ScreenerClient() {
   const [sort, setSort] = useState<"score" | "change" | "momentum" | "volume">("score");
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedUniverse = params.get("universe");
+    const requestedSector = params.get("sector");
+    const timer = window.setTimeout(() => {
+      if (requestedUniverse === "tsx60") setUniverse("tsx60");
+      if (requestedSector) setSector(requestedSector);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     let controller =
       new AbortController();

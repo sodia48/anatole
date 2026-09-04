@@ -22,6 +22,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { buildCandleSessionFlow } from "@anatole/shared";
 
 import { pick } from "@/lib/i18n";
 import { FocusStockNews } from "@/components/stock/FocusStockNews";
@@ -255,49 +256,18 @@ function periodPerformance(candles: Candle[]): number | null {
   return ((last - first) / first) * 100;
 }
 
-type VolumeBreakdown = {
-  buyer: number;
-  seller: number;
-  neutral: number;
-  total: number;
-};
-
-function periodVolume(candles: Candle[]): VolumeBreakdown {
-  let buyer = 0;
-  let seller = 0;
-  let neutral = 0;
-
-  for (const candle of candles) {
-    const volume = Number.isFinite(candle.volume)
-      ? Math.max(candle.volume, 0)
-      : 0;
-
-    if (candle.close > candle.open) {
-      buyer += volume;
-    } else if (candle.close < candle.open) {
-      seller += volume;
-    } else {
-      neutral += volume;
-    }
+function formatVolume(value: number | null): string {
+  if (value === null) {
+    return "N/D";
   }
-
-  return {
-    buyer,
-    seller,
-    neutral,
-    total: buyer + seller + neutral,
-  };
-}
-
-function formatVolume(value: number): string {
   return new Intl.NumberFormat("fr-CA", {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
 }
 
-function volumeShare(value: number, total: number): number {
-  return total > 0 ? (value / total) * 100 : 0;
+function volumeShare(value: number | null, total: number | null): number {
+  return value !== null && total !== null && total > 0 ? (value / total) * 100 : 0;
 }
 
 function formatPercent(value: number | null): string {
@@ -487,7 +457,15 @@ export function FocusRangeChart({
     () => periodPerformance(candles),
     [candles],
   );
-  const volume = useMemo(() => periodVolume(candles), [candles]);
+  const volume = useMemo(() => buildCandleSessionFlow({
+    ticker,
+    range: period.range,
+    interval: period.interval,
+    candles: snapshot?.history ?? [],
+    source: snapshot?.quote?.source ?? "unavailable",
+    delayed: Boolean(snapshot?.quote?.delayed),
+    generatedAt: snapshot?.generated_at,
+  }), [period.interval, period.range, snapshot, ticker]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -820,41 +798,41 @@ export function FocusRangeChart({
         >
           <div className={styles.volumeHeading}>
             <span>Volume · {period.label}</span>
-            <strong>{formatVolume(volume.total)}</strong>
+            <strong>{formatVolume(volume.total_volume)}</strong>
           </div>
 
           <div className={styles.volumeBar} aria-hidden="true">
             <span
               className={styles.buyerBar}
-              style={{ width: `${volumeShare(volume.buyer, volume.total)}%` }}
+              style={{ width: `${volumeShare(volume.buy_volume, volume.total_volume)}%` }}
             />
             <span
               className={styles.sellerBar}
-              style={{ width: `${volumeShare(volume.seller, volume.total)}%` }}
+              style={{ width: `${volumeShare(volume.sell_volume, volume.total_volume)}%` }}
             />
             <span
               className={styles.neutralBar}
-              style={{ width: `${volumeShare(volume.neutral, volume.total)}%` }}
+              style={{ width: `${volumeShare(volume.neutral_volume, volume.total_volume)}%` }}
             />
           </div>
 
           <div className={styles.volumeMetric}>
             <span><i className={styles.buyerDot} />Acheteur estimé</span>
-            <strong>{formatVolume(volume.buyer)}</strong>
-            <small>{volumeShare(volume.buyer, volume.total).toFixed(1)} %</small>
+            <strong>{formatVolume(volume.buy_volume)}</strong>
+            <small>{volume.buy_ratio === null ? "N/D" : `${(volume.buy_ratio * 100).toFixed(1)} %`}</small>
           </div>
 
           <div className={styles.volumeMetric}>
             <span><i className={styles.sellerDot} />Vendeur estimé</span>
-            <strong>{formatVolume(volume.seller)}</strong>
-            <small>{volumeShare(volume.seller, volume.total).toFixed(1)} %</small>
+            <strong>{formatVolume(volume.sell_volume)}</strong>
+            <small>{volume.sell_ratio === null ? "N/D" : `${(volume.sell_ratio * 100).toFixed(1)} %`}</small>
           </div>
 
-          {volume.neutral > 0 ? (
+          {volume.neutral_volume !== null && volume.neutral_volume > 0 ? (
             <div className={`${styles.volumeMetric} ${styles.neutralMetric}`}>
               <span><i className={styles.neutralDot} />Indéterminé</span>
-              <strong>{formatVolume(volume.neutral)}</strong>
-              <small>{volumeShare(volume.neutral, volume.total).toFixed(1)} %</small>
+              <strong>{formatVolume(volume.neutral_volume)}</strong>
+              <small>{volumeShare(volume.neutral_volume, volume.total_volume).toFixed(1)} %</small>
             </div>
           ) : null}
 

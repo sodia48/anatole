@@ -522,6 +522,7 @@ def deduplicate_trades(
 ) -> list[InsiderTrade]:
     output: list[InsiderTrade] = []
     seen: set[tuple[str, str, str, str, str, int]] = set()
+    seen_ids: set[str] = set()
     for trade in sorted(
         trades,
         key=lambda item: (
@@ -538,8 +539,9 @@ def deduplicate_trades(
             trade.transaction_type,
             round(trade.shares or 0),
         )
-        if key in seen:
+        if trade.id in seen_ids or key in seen:
             continue
+        seen_ids.add(trade.id)
         seen.add(key)
         output.append(trade)
     return output

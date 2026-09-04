@@ -18,6 +18,13 @@ from app.schemas.workspace import (
     PortfolioSnapshot,
 )
 from app.services.market_data import market_data_service
+from app.services.bank_of_canada import bank_of_canada_valet_service
+from app.services.portfolio_intelligence import (
+    build_correlation_matrix,
+    build_horizon_results,
+    build_portfolio_risk_reading,
+    build_stress_tests,
+)
 from app.services.tsx60 import TSX60
 
 
@@ -53,25 +60,29 @@ def _returns(candles: list[Candle]) -> dict[int, float]:
     return output
 
 
-def _momentum(candles: list[Candle], sessions: int = 20) -> float:
+def _momentum(candles: list[Candle], sessions: int = 20) -> float | None:
     if len(candles) <= sessions or candles[-sessions - 1].close == 0:
-        return 0.0
+        return None
     return (candles[-1].close / candles[-sessions - 1].close - 1) * 100
 
 
-def _average_volume(candles: list[Candle], sessions: int = 20) -> float:
+def _average_volume(candles: list[Candle], sessions: int = 20) -> float | None:
+    if not candles:
+        return None
     sample = candles[-sessions:] if len(candles) >= sessions else candles
-    return sum(item.volume for item in sample) / max(len(sample), 1)
+    return sum(item.volume for item in sample) / len(sample)
 
 
 def _position_score(
     *,
     change_percent: float,
-    momentum: float,
-    relative_volume: float,
+    momentum: float | None,
+    relative_volume: float | None,
     rsi: float | None,
     trend: str,
-) -> float:
+) -> float | None:
+    if momentum is None or relative_volume is None:
+        return None
     score = 50.0
     score += max(-18.0, min(18.0, momentum * 1.8))
     score += max(-8.0, min(8.0, change_percent * 2.0))
@@ -137,7 +148,9 @@ def _risk_level(
     volatility: float | None,
     top_position: float,
     drawdown: float | None,
-) -> str:
+) -> str | None:
+    if volatility is None or drawdown is None:
+        return None
     risk_points = 0
     if volatility is not None:
         risk_points += 0 if volatility < 18 else 1 if volatility < 28 else 2
@@ -151,6 +164,44 @@ def _risk_level(
     if risk_points <= 4:
         return "Élevé"
     return "Très élevé"
+
+
+def _pnl_percent(pnl: float, cost_basis: float) -> float | None:
+    return pnl / cost_basis * 100 if cost_basis else None
+
+
+def _covered_performance(
+    return_maps: dict[str, dict[int, float]],
+    weights: dict[str, float],
+    benchmark_map: dict[int, float],
+) -> tuple[list[float], list[float], list[PortfolioPerformancePoint], float]:
+    all_days = sorted(set().union(*(values.keys() for values in return_maps.values())) if return_maps else set())
+    portfolio_returns: list[float] = []
+    benchmark_returns: list[float] = []
+    performance: list[PortfolioPerformancePoint] = []
+    portfolio_level = 100.0
+    benchmark_level = 100.0
+    daily_coverages: list[float] = []
+    for day in all_days:
+        available = [symbol for symbol, values in return_maps.items() if day in values]
+        available_weight = sum(weights[symbol] for symbol in available)
+        daily_coverages.append(available_weight)
+        if not available or available_weight < 0.70:
+            continue
+        daily_return = sum(weights[symbol] * return_maps[symbol][day] for symbol in available)
+        portfolio_level *= 1 + daily_return
+        portfolio_returns.append(daily_return)
+        benchmark_value = benchmark_map.get(day)
+        if benchmark_value is not None:
+            benchmark_level *= 1 + benchmark_value
+            benchmark_returns.append(benchmark_value)
+        performance.append(PortfolioPerformancePoint(
+            time=day * 86_400,
+            portfolio=round(portfolio_level, 4),
+            benchmark=round(benchmark_level, 4) if benchmark_value is not None else None,
+        ))
+    coverage = sum(daily_coverages) / len(daily_coverages) * 100 if daily_coverages else 0.0
+    return portfolio_returns, benchmark_returns, performance, coverage
 
 
 def _allocation(
@@ -181,8 +232,8 @@ class PortfolioService:
         self,
         currencies: set[str],
         base_currency: str,
-    ) -> tuple[dict[str, float], list[str]]:
-        rates = {base_currency: 1.0}
+    ) -> tuple[dict[str, float | None], list[str]]:
+        rates: dict[str, float | None] = {base_currency: 1.0}
         notes: list[str] = []
         for currency in sorted(currencies):
             if currency == base_currency:
@@ -195,13 +246,13 @@ class PortfolioService:
                     rates["USD"] = fx.price if base_currency == "CAD" else 1.0
                     rates["CAD"] = 1.0 if base_currency == "CAD" else 1 / fx.price
                 except Exception:  # noqa: BLE001
-                    rates[currency] = 1.0
+                    rates[currency] = None
                     notes.append(
                         f"Conversion {currency}/{base_currency} indisponible; "
-                        "la valeur est présentée sans conversion."
+                        "la position est exclue des agrégats."
                     )
             else:
-                rates[currency] = 1.0
+                rates[currency] = None
                 notes.append(
                     f"La devise {currency} n'est pas convertie automatiquement."
                 )
@@ -212,10 +263,10 @@ class PortfolioService:
         request: PortfolioAnalyzeRequest,
     ) -> PortfolioSnapshot:
         symbols = [item.symbol for item in request.positions]
-        history_symbols = list(dict.fromkeys(symbols + [request.benchmark]))
+        history_symbols = list(dict.fromkeys(symbols + [request.benchmark, "CL=F", "CAD=X"]))
         quotes, histories = await asyncio.gather(
             market_data_service.get_quotes(symbols),
-            market_data_service.get_history_many(
+            market_data_service.get_history_many_strict(
                 history_symbols,
                 range_="1y",
                 interval="1d",
@@ -242,12 +293,17 @@ class PortfolioService:
             if quote is None:
                 notes.append(f"Aucune cotation n'a été récupérée pour {item.symbol}.")
                 continue
+            if quote.source.startswith("demo-fallback") and not market_data_service.demo_mode:
+                notes.append(f"La cotation réelle de {item.symbol} est indisponible; la position est exclue.")
+                continue
             technicals = market_data_service.calculate_technicals(candles)
             average_volume = _average_volume(candles)
-            relative_volume = quote.volume / average_volume if average_volume else 0.0
+            relative_volume = quote.volume / average_volume if average_volume else None
             momentum = _momentum(candles)
             name, sector = _metadata(item.symbol, quote)
-            fx_rate = fx_rates.get(quote.currency, 1.0)
+            fx_rate = fx_rates.get(quote.currency)
+            if fx_rate is None:
+                continue
             cost_basis = item.quantity * item.average_cost * fx_rate
             market_value = item.quantity * quote.price * fx_rate
             pnl = market_value - cost_basis
@@ -293,8 +349,8 @@ class PortfolioService:
             )
             score = _position_score(
                 change_percent=quote.change_percent,
-                momentum=float(raw["momentum"]),
-                relative_volume=float(raw["relative_volume"]),
+                momentum=raw["momentum"] if isinstance(raw["momentum"], float) else None,
+                relative_volume=raw["relative_volume"] if isinstance(raw["relative_volume"], float) else None,
                 rsi=technicals.rsi_14,
                 trend=technicals.trend,
             )
@@ -312,18 +368,16 @@ class PortfolioService:
                     cost_basis=round(cost_basis, 2),
                     market_value=round(market_value, 2),
                     unrealized_pnl=round(pnl, 2),
-                    unrealized_pnl_percent=round(
-                        pnl / cost_basis * 100 if cost_basis else 0.0,
-                        2,
-                    ),
+                    unrealized_pnl_percent=(round(value, 2) if (value := _pnl_percent(pnl, cost_basis)) is not None else None),
                     day_pnl=round(
                         item.quantity * quote.change * float(raw["fx_rate"]),
                         2,
                     ),
                     day_change_percent=round(quote.change_percent, 2),
                     weight_percent=round(weight, 2),
-                    momentum_20d=round(float(raw["momentum"]), 2),
+                    momentum_20d=(round(float(raw["momentum"]), 2) if raw["momentum"] is not None else None),
                     rsi_14=technicals.rsi_14,
+                    relative_volume=(round(float(raw["relative_volume"]), 3) if raw["relative_volume"] is not None else None),
                     trend=technicals.trend,
                     score=score,
                     source=quote.source,
@@ -344,97 +398,64 @@ class PortfolioService:
             for symbol in weights
         }
         benchmark_map = _returns(histories.get(request.benchmark, []))
-        all_days = sorted(
-            set().union(*(values.keys() for values in return_maps.values()))
-            if return_maps
-            else set()
-        )
-        portfolio_returns: list[float] = []
-        benchmark_returns: list[float] = []
-        performance: list[PortfolioPerformancePoint] = []
-        portfolio_level = 100.0
-        benchmark_level = 100.0
-
-        for day in all_days:
-            available = [
-                symbol
-                for symbol, values in return_maps.items()
-                if day in values
-            ]
-            available_weight = sum(weights[symbol] for symbol in available)
-            if not available or available_weight <= 0:
-                continue
-            daily_return = sum(
-                weights[symbol] / available_weight * return_maps[symbol][day]
-                for symbol in available
+        portfolio_returns, benchmark_returns, performance, history_coverage = _covered_performance(return_maps, weights, benchmark_map)
+        portfolio_level = performance[-1].portfolio if performance else 100.0
+        history_observations = len(portfolio_returns)
+        if history_coverage >= 70:
+            volatility, beta, max_drawdown, sharpe = _risk_statistics(
+                portfolio_returns,
+                benchmark_returns,
             )
-            portfolio_level *= 1 + daily_return
-            portfolio_returns.append(daily_return)
-
-            benchmark_value = benchmark_map.get(day)
-            if benchmark_value is not None:
-                benchmark_level *= 1 + benchmark_value
-                benchmark_returns.append(benchmark_value)
-            else:
-                benchmark_returns.append(0.0)
-
-            performance.append(
-                PortfolioPerformancePoint(
-                    time=day * 86_400,
-                    portfolio=round(portfolio_level, 4),
-                    benchmark=(
-                        round(benchmark_level, 4)
-                        if benchmark_value is not None
-                        else None
-                    ),
-                )
+        else:
+            volatility, beta, max_drawdown, sharpe = None, None, None, None
+            notes.append(
+                "Couverture historique inférieure à 70 %; les statistiques "
+                "de risque restent indisponibles."
             )
-
-        volatility, beta, max_drawdown, sharpe = _risk_statistics(
-            portfolio_returns,
-            benchmark_returns,
-        )
         top_position = positions[0].weight_percent if positions else 0.0
         top_three = sum(item.weight_percent for item in positions[:3])
         hhi = sum((item.weight_percent / 100) ** 2 for item in positions) * 10_000
         diversification = max(0.0, min(100.0, 110 - hhi / 55))
         risk_level = _risk_level(volatility, top_position, max_drawdown)
 
-        period_return = portfolio_level - 100 if performance else 0.0
-        return_score = max(0.0, min(100.0, 50 + period_return * 2.0))
-        risk_score = 50.0 if volatility is None else max(0.0, min(100.0, 100 - volatility * 1.8))
-        drawdown_score = 50.0 if max_drawdown is None else max(0.0, min(100.0, 100 + max_drawdown * 2.5))
-        holdings_score = (
-            sum(item.score * item.weight_percent for item in positions) / 100
-            if positions
-            else 0.0
-        )
-        portfolio_score = round(
-            max(
-                0.0,
-                min(
-                    100.0,
-                    holdings_score * 0.38
-                    + diversification * 0.22
-                    + return_score * 0.18
-                    + risk_score * 0.12
-                    + drawdown_score * 0.10,
-                ),
-            ),
-            1,
-        )
+        score_parts: list[tuple[float, float]] = [(diversification, 0.25)] if positions else []
+        scored_weight = sum(item.weight_percent for item in positions if item.score is not None)
+        if scored_weight >= 70:
+            holdings_score = sum(item.score * item.weight_percent for item in positions if item.score is not None) / scored_weight
+            score_parts.append((holdings_score, 0.45))
+        if performance:
+            score_parts.append((max(0.0, min(100.0, 50 + (portfolio_level - 100) * 2.0)), 0.15))
+        if volatility is not None:
+            score_parts.append((max(0.0, min(100.0, 100 - volatility * 1.8)), 0.10))
+        if max_drawdown is not None:
+            score_parts.append((max(0.0, min(100.0, 100 + max_drawdown * 2.5)), 0.05))
+        score_weight = sum(weight for _, weight in score_parts)
+        portfolio_score = round(sum(value * weight for value, weight in score_parts) / score_weight, 1) if score_weight >= 0.7 else None
 
         if top_position >= 40:
             notes.append(
                 f"Concentration élevée : {positions[0].symbol} représente "
                 f"{top_position:.1f} % du portefeuille."
             )
-        if any(item.source.startswith("demo") for item in positions):
-            notes.append(
-                "Au moins une position utilise une donnée de secours; vérifie la source avant décision."
-            )
         if not positions:
             notes.append("Aucune position exploitable n'a été calculée.")
+
+        observed_at = datetime.now(UTC)
+        performance_horizons, contribution_horizons = build_horizon_results(positions, histories, observed_at)
+        correlation = build_correlation_matrix(positions, histories)
+        canada_10y: list[tuple[int, float]] = []
+        if not market_data_service.demo_mode:
+            try:
+                canada_10y = (await bank_of_canada_valet_service.yields()).get("V39055", [])
+            except Exception:  # noqa: BLE001
+                notes.append("La série officielle Canada 10 ans est temporairement indisponible.")
+        stress_tests = build_stress_tests(positions, histories, canada_10y)
+        sector_allocation = _allocation(positions, "sector")
+        risk_reading = build_portfolio_risk_reading(
+            positions,
+            [(item.label, item.weight_percent) for item in sector_allocation],
+            correlation,
+        )
 
         contributors = [
             PortfolioContributor(
@@ -473,10 +494,7 @@ class PortfolioService:
             total_market_value=round(total_market_value, 2),
             total_cost_basis=round(total_cost_basis, 2),
             total_unrealized_pnl=round(total_pnl, 2),
-            total_unrealized_pnl_percent=round(
-                total_pnl / total_cost_basis * 100 if total_cost_basis else 0.0,
-                2,
-            ),
+            total_unrealized_pnl_percent=(round(value, 2) if (value := _pnl_percent(total_pnl, total_cost_basis)) is not None else None),
             total_day_pnl=round(total_day_pnl, 2),
             total_day_change_percent=round(
                 total_day_pnl / max(total_market_value - total_day_pnl, 1) * 100,
@@ -484,7 +502,7 @@ class PortfolioService:
             ),
             portfolio_score=portfolio_score,
             positions=positions,
-            sector_allocation=_allocation(positions, "sector"),
+            sector_allocation=sector_allocation,
             currency_allocation=_allocation(positions, "currency"),
             performance=performance,
             risk=PortfolioRisk(
@@ -497,11 +515,19 @@ class PortfolioService:
                 top_three_percent=round(top_three, 2),
                 diversification_score=round(diversification, 1),
                 risk_level=risk_level,
-            ),
+                history_coverage_percent=round(history_coverage, 2),
+                history_observations=history_observations,
+            ) if positions else None,
             contributors=contributors,
             detractors=detractors,
+            performance_horizons=performance_horizons,
+            contribution_horizons=contribution_horizons,
+            correlation=correlation,
+            stress_tests=stress_tests,
+            risk_reading=risk_reading,
+            methodology="Les horizons supérieurs à un jour reconstituent la performance des positions actuelles en supposant les quantités constantes. Les corrélations et sensibilités utilisent uniquement des historiques stricts réellement disponibles.",
             notes=notes,
-            generated_at=datetime.now(UTC),
+            generated_at=observed_at,
             refresh_after_seconds=30,
         )
 

@@ -272,6 +272,8 @@ class YahooProvider:
 
 
 class MarketDataService:
+    strict_history_timeout_seconds = 10.0
+
     def __init__(self) -> None:
         self.demo = DemoProvider()
         self.yahoo = YahooProvider()
@@ -411,6 +413,50 @@ class MarketDataService:
 
         pairs = await asyncio.gather(*(load(ticker) for ticker in tickers))
         return dict(pairs)
+
+    async def get_history_many_strict(
+        self,
+        tickers: list[str],
+        *,
+        range_: str = "1y",
+        interval: str = "1d",
+        concurrency: int = 6,
+    ) -> dict[str, list[Candle]]:
+        """Load real Yahoo histories without silently substituting demo data.
+
+        Explicit demo mode remains deterministic for development and tests. In
+        every other environment a failed symbol is omitted, so callers can
+        expose real coverage and return N/D when it is insufficient.
+        """
+        unique = list(dict.fromkeys(ticker.strip().upper() for ticker in tickers if ticker.strip()))
+        semaphore = asyncio.Semaphore(max(1, min(concurrency, 8)))
+
+        async def load(ticker: str) -> tuple[str, list[Candle] | None]:
+            async with semaphore:
+                try:
+                    history_call = (
+                        self.demo.history(ticker, range_, interval)
+                        if self.demo_mode
+                        else self.yahoo.history(ticker, range_, interval)
+                    )
+                    candles = await asyncio.wait_for(
+                        history_call,
+                        timeout=self.strict_history_timeout_seconds,
+                    )
+                    return ticker, candles if len(candles) >= 2 else None
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:  # noqa: BLE001
+                    logger.warning(
+                        "market_data_strict_history_unavailable ticker=%s error=%s detail=%s",
+                        ticker,
+                        type(error).__name__,
+                        error,
+                    )
+                    return ticker, None
+
+        pairs = await asyncio.gather(*(load(ticker) for ticker in unique))
+        return {ticker: candles for ticker, candles in pairs if candles is not None}
 
     async def get_profile(self, ticker: str) -> StockProfile:
         if self.demo_mode:

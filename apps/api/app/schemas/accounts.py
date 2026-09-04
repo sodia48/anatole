@@ -92,6 +92,19 @@ class SyncedPreferences(BaseModel):
     default_range: Literal["1m", "3m", "6m", "1y", "5y"] = "1y"
     default_universe: Literal["tsx60", "composite"] = "tsx60"
     language: Literal["fr", "en"] = "fr"
+    preferred_regions: list[str] = Field(default_factory=list, max_length=10)
+    preferred_sectors: list[str] = Field(default_factory=list, max_length=20)
+    onboarding_version: int = Field(default=0, ge=0, le=100)
+
+    @field_validator("preferred_regions", "preferred_sectors")
+    @classmethod
+    def unique_preferences(cls, values: list[str]) -> list[str]:
+        output: list[str] = []
+        for value in values:
+            clean = value.strip()
+            if clean and clean not in output:
+                output.append(clean)
+        return output
 
 
 class FocusDrawingAnchor(BaseModel):
@@ -240,6 +253,46 @@ class FocusScript(BaseModel):
     updated_at: datetime | None = None
 
 
+class TerminalRadarFilters(BaseModel):
+    score_min: float | None = Field(default=None, ge=0, le=100)
+    score_max: float | None = Field(default=None, ge=0, le=100)
+    momentum_20d_min: float | None = Field(default=None, ge=-1000, le=1000)
+    momentum_20d_max: float | None = Field(default=None, ge=-1000, le=1000)
+    relative_volume_min: float | None = Field(default=None, ge=0, le=100)
+    rsi_min: float | None = Field(default=None, ge=0, le=100)
+    rsi_max: float | None = Field(default=None, ge=0, le=100)
+    change_percent_min: float | None = Field(default=None, ge=-100, le=1000)
+    change_percent_max: float | None = Field(default=None, ge=-100, le=1000)
+    sector: str | None = Field(default=None, max_length=80)
+    trend: str | None = Field(default=None, max_length=40)
+    signal: str | None = Field(default=None, max_length=60)
+    anomaly_types: list[Literal[
+        "volume_spike", "gap", "momentum_acceleration", "rsi_extreme",
+        "sma_cross", "price_volume_divergence", "sector_dislocation", "score_shift",
+    ]] = Field(default_factory=list, max_length=8)
+
+    @model_validator(mode="after")
+    def valid_ranges(self) -> "TerminalRadarFilters":
+        for minimum, maximum, label in (
+            (self.score_min, self.score_max, "score"),
+            (self.momentum_20d_min, self.momentum_20d_max, "momentum"),
+            (self.rsi_min, self.rsi_max, "RSI"),
+            (self.change_percent_min, self.change_percent_max, "variation"),
+        ):
+            if minimum is not None and maximum is not None and minimum > maximum:
+                raise ValueError(f"La borne minimale {label} dépasse la borne maximale.")
+        return self
+
+
+class TerminalRadarPreset(BaseModel):
+    id: str = Field(min_length=1, max_length=80)
+    name: str = Field(min_length=1, max_length=80)
+    filters: TerminalRadarFilters = Field(default_factory=TerminalRadarFilters)
+    sort: Literal["score_desc", "score_asc", "volume_desc", "momentum_desc", "change_desc", "change_asc"] = "score_desc"
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
 class SyncedWorkspaceData(BaseModel):
     watchlist: list[str] = Field(default_factory=list, max_length=30)
     portfolio: list[PortfolioPositionInput] = Field(default_factory=list, max_length=30)
@@ -250,6 +303,7 @@ class SyncedWorkspaceData(BaseModel):
     comparator_symbols: list[str] = Field(default_factory=list, max_length=5)
     focus_layouts: list[FocusLayout] = Field(default_factory=list, max_length=10)
     focus_scripts: list[FocusScript] = Field(default_factory=list, max_length=10)
+    terminal_presets: list[TerminalRadarPreset] = Field(default_factory=list, max_length=10)
 
     @field_validator("watchlist", "comparator_symbols")
     @classmethod
@@ -281,6 +335,18 @@ class SyncedWorkspaceData(BaseModel):
     def unique_scripts(cls, values: list[FocusScript]) -> list[FocusScript]:
         seen: set[str] = set()
         output: list[FocusScript] = []
+        for item in values:
+            if item.id in seen:
+                continue
+            seen.add(item.id)
+            output.append(item)
+        return output
+
+    @field_validator("terminal_presets")
+    @classmethod
+    def unique_terminal_presets(cls, values: list[TerminalRadarPreset]) -> list[TerminalRadarPreset]:
+        seen: set[str] = set()
+        output: list[TerminalRadarPreset] = []
         for item in values:
             if item.id in seen:
                 continue

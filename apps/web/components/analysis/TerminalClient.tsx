@@ -1,5 +1,6 @@
 "use client";
 
+import { isTerminalV2Snapshot } from "@anatole/shared";
 import Link from "next/link";
 import {
   Activity,
@@ -28,6 +29,7 @@ import type {
 } from "@/lib/types";
 
 import styles from "./Analysis.module.css";
+import { TerminalV2Sections } from "./TerminalV2Sections";
 
 type FeedMode = "all" | "volume" | "momentum" | "pressure";
 
@@ -55,8 +57,8 @@ function formatPrice(value: number, language: AnatoleLanguage): string {
   }).format(value);
 }
 
-function valueClass(value: number): string {
-  if (value === 0) {
+function valueClass(value: number | null): string {
+  if (value == null || value === 0) {
     return "";
   }
   return value > 0 ? "positive" : "negative";
@@ -96,6 +98,15 @@ function alertIcon(alert: TerminalAlert) {
     return <AlertTriangle size={16} />;
   }
   return <Activity size={16} />;
+}
+
+function formatAsOf(value: string | null, language: AnatoleLanguage, dateOnly = false): string {
+  if (!value) return "N/D";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "N/D";
+  return new Intl.DateTimeFormat(localeFor(language), dateOnly
+    ? { year: "numeric", month: "2-digit", day: "2-digit" }
+    : { hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function regimeLabel(value: string, language: AnatoleLanguage): string {
@@ -315,6 +326,9 @@ export function TerminalClient() {
 
       try {
         const response = await getTerminalSnapshot(signal);
+        if (!isTerminalV2Snapshot(response)) {
+          throw new Error(pick(language, "Le backend connecté ne fournit pas le contrat Terminal V2.", "The connected backend does not provide the Terminal V2 contract."));
+        }
         setSnapshot(response);
       } catch (reason) {
         if ((reason as Error).name !== "AbortError") {
@@ -392,8 +406,9 @@ export function TerminalClient() {
     return items.sort((left, right) => right.score - left.score);
   }, [feedMode, radarItems, sectorFilter]);
 
-  const strongestSector = snapshot?.sectors[0];
-  const weakestSector = snapshot?.sectors.at(-1);
+  const scoredSectors = snapshot?.sectors.filter((sector) => sector.leadership_score != null) ?? [];
+  const strongestSector = scoredSectors[0];
+  const weakestSector = scoredSectors.at(-1);
   const generatedAt = useMemo(() => {
     if (!snapshot) {
       return "";
@@ -436,18 +451,18 @@ export function TerminalClient() {
             <div
               className={styles.scoreRing}
               style={{
-                background: `conic-gradient(#20caa3 0 ${snapshot.regime_score}%, rgba(52,83,102,.32) ${snapshot.regime_score}% 100%)`,
+                background: snapshot.regime_score == null ? "rgba(52,83,102,.32)" : `conic-gradient(#20caa3 0 ${snapshot.regime_score}%, rgba(52,83,102,.32) ${snapshot.regime_score}% 100%)`,
               }}
             >
               <span>
-                <strong>{snapshot.regime_score.toFixed(0)}</strong>
+                <strong>{snapshot.regime_score?.toFixed(0) ?? "N/D"}</strong>
                 <small>/100</small>
               </span>
             </div>
             <div className={styles.regimeCopy}>
               <span>{pick(language, "Régime", "Regime")}</span>
-              <strong>{regimeLabel(snapshot.regime, language)}</strong>
-              <small>{pick(language, "Risque", "Risk")} {riskLabel(snapshot.risk_level, language).toLowerCase()}</small>
+              <strong>{snapshot.regime ? regimeLabel(snapshot.regime, language) : "N/D"}</strong>
+              <small>{pick(language, "Risque", "Risk")} {snapshot.risk_level ? riskLabel(snapshot.risk_level, language).toLowerCase() : "N/D"}</small>
             </div>
           </div>
         ) : null}
@@ -461,6 +476,13 @@ export function TerminalClient() {
 
       {snapshot ? (
         <>
+          <section className={styles.marketEventStrip} data-testid="terminal-freshness">
+            <div className={styles.marketEventCopy}>
+              <span>{pick(language, "Données marché", "Market data")} · {formatAsOf(snapshot.data_quality.quotes_as_of, language)}</span>
+              <strong>{pick(language, "Historique quotidien", "Daily history")} · {formatAsOf(snapshot.data_quality.history_as_of, language, true)}</strong>
+            </div>
+            {snapshot.radar_items.some((item) => item.delayed) ? <strong>{pick(language, "Différé", "Delayed")}</strong> : null}
+          </section>
           <section className={styles.marketEventStrip}>
             <div className={styles.marketEventIcon}>
               <Bell size={18} />
@@ -468,7 +490,7 @@ export function TerminalClient() {
             <div className={styles.marketEventCopy}>
               <span>{pick(language, "Événements de marché", "Market events")}</span>
               <strong>
-                {snapshot.alerts.length} {pick(language, "alertes", "alerts")} · {snapshot.high_relative_volume_count} {pick(language, "volumes inhabituels", "unusual volumes")}
+                {snapshot.alerts.length} {pick(language, "alertes", "alerts")} · {snapshot.high_relative_volume_count ?? "N/D"} {pick(language, "volumes inhabituels", "unusual volumes")}
               </strong>
             </div>
             <a href="#terminal-alerts">
@@ -480,27 +502,29 @@ export function TerminalClient() {
             <article>
               <span>TSX 60</span>
               <strong className={valueClass(snapshot.weighted_change_percent)}>
-                {formatPercent(snapshot.weighted_change_percent, 2, language)}
+                {snapshot.weighted_change_percent == null ? "N/D" : formatPercent(snapshot.weighted_change_percent, 2, language)}
               </strong>
             </article>
             <article>
               <span>{pick(language, "Largeur", "Breadth")}</span>
-              <strong>{snapshot.advance_ratio.toFixed(0)} %</strong>
+              <strong>{snapshot.advance_ratio == null ? "N/D" : `${snapshot.advance_ratio.toFixed(0)} %`}</strong>
             </article>
             <article>
               <span>{pick(language, "Au-dessus MM50", "Above 50-session average")}</span>
-              <strong>{snapshot.above_sma50_percent.toFixed(0)} %</strong>
+              <strong>{snapshot.above_sma50_percent == null ? "N/D" : `${snapshot.above_sma50_percent.toFixed(0)} %`}</strong>
             </article>
             <article>
               <span>{pick(language, "Score moyen", "Average score")}</span>
-              <strong>{snapshot.average_anatole_score.toFixed(0)}</strong>
+              <strong>{snapshot.average_anatole_score?.toFixed(0) ?? "N/D"}</strong>
             </article>
           </section>
+
+          <TerminalV2Sections language={language} snapshot={snapshot} />
 
           <section className={`panel ${styles.terminalFeedPanel}`}>
             <div className={styles.terminalFeedHeading}>
               <div>
-                <span className="eyebrow">{pick(language, "RADAR INSTITUTIONNEL", "INSTITUTIONAL RADAR")}</span>
+                <span className="eyebrow">{pick(language, "RADAR PRO", "PRO RADAR")}</span>
                 <h2>{pick(language, "Signaux à surveiller", "Signals to monitor")}</h2>
                 <p>
                   {pick(language, "Les cartes classent les configurations selon le score, le volume, le momentum et la pression observée.", "Cards rank configurations by score, volume, momentum, and observed pressure.")}
@@ -568,10 +592,10 @@ export function TerminalClient() {
                       {stateLabel(sector.state, language)}
                     </span>
                   </div>
-                  <div className={styles.terminalSectorScore}>
+                  {sector.leadership_score != null ? <div className={styles.terminalSectorScore} data-testid={`terminal-sector-score-${sector.sector}`}>
                     <span style={{ width: `${sector.leadership_score}%` }} />
                     <i style={{ left: `calc(${sector.leadership_score}% - 4px)` }} />
-                  </div>
+                  </div> : null}
                   <div className={styles.terminalSectorMetrics}>
                     <div>
                       <span>{pick(language, "Séance", "Session")}</span>
@@ -582,7 +606,7 @@ export function TerminalClient() {
                     <div>
                       <span>Momentum</span>
                       <strong className={valueClass(sector.momentum_20d)}>
-                        {formatPercent(sector.momentum_20d, 1, language)}
+                        {sector.momentum_20d == null ? "N/D" : formatPercent(sector.momentum_20d, 1, language)}
                       </strong>
                     </div>
                     <div>
@@ -655,11 +679,11 @@ export function TerminalClient() {
                   <article className={styles.componentCard} key={component.key}>
                     <div className={styles.componentTop}>
                       <span>{component.label}</span>
-                      <strong>{component.score.toFixed(0)}</strong>
+                      <strong>{component.score?.toFixed(0) ?? "N/D"}</strong>
                     </div>
-                    <div className={styles.componentTrack}>
+                    {component.score != null ? <div className={styles.componentTrack} data-testid={`terminal-component-score-${component.key}`}>
                       <span style={{ width: `${component.score}%` }} />
-                    </div>
+                    </div> : null}
                     <b>{component.value}</b>
                     <p>{component.description}</p>
                   </article>
@@ -685,15 +709,15 @@ export function TerminalClient() {
               <section className={styles.kpiGrid}>
                 <article className={styles.notice}>
                   <strong>Leadership</strong><br />
-                  {pick(language, `${strongestSector?.sector ?? "—"} domine avec un score de ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${strongestSector?.sector ?? "—"} leads with a score of ${strongestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
+                  {pick(language, `${strongestSector?.sector ?? "N/D"} domine avec un score de ${strongestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`, `${strongestSector?.sector ?? "N/D"} leads with a score of ${strongestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`)}
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Faiblesse", "Weakness")}</strong><br />
-                  {pick(language, `${weakestSector?.sector ?? "—"} ferme la marche à ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`, `${weakestSector?.sector ?? "—"} trails at ${weakestSector?.leadership_score.toFixed(0) ?? "—"}/100.`)}
+                  {pick(language, `${weakestSector?.sector ?? "N/D"} ferme la marche à ${weakestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`, `${weakestSector?.sector ?? "N/D"} trails at ${weakestSector?.leadership_score?.toFixed(0) ?? "N/D"}/100.`)}
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Impulsion moyenne", "Average momentum")}</strong><br />
-                  {pick(language, "Le momentum 20 jours transversal est de", "Cross-sectional 20-day momentum is")} {formatPercent(snapshot.average_momentum_20d, 2, language)}.
+                  {pick(language, "Le momentum 20 jours transversal est de", "Cross-sectional 20-day momentum is")} {snapshot.average_momentum_20d == null ? "N/D" : formatPercent(snapshot.average_momentum_20d, 2, language)}.
                 </article>
                 <article className={styles.notice}>
                   <strong>{pick(language, "Actualisation", "Refresh")}</strong><br />

@@ -4,6 +4,7 @@ import pandas as pd
 from app.schemas.ipo_insiders import InsiderTrade
 from app.services.insiders import (
     InsiderService,
+    deduplicate_trades,
     infer_transaction_type,
     parse_sec_ownership_xml,
     parse_yahoo_insider_frame,
@@ -86,6 +87,33 @@ def test_sec_form_4_and_summary() -> None:
 def test_inference() -> None:
     assert infer_transaction_type(code="S")[0] == "sell"
     assert infer_transaction_type("Option Exercise")[0] == "exercise"
+
+
+def insider_trade(*, trade_id: str, shares: float) -> InsiderTrade:
+    return InsiderTrade(
+        id=trade_id,
+        ticker="RY",
+        company="Royal Bank of Canada",
+        market="Canada",
+        insider_name="Jane Doe",
+        transaction_type="buy",
+        transaction_label="Achat",
+        shares=shares,
+        source_name="Test",
+        source_url="https://example.com",
+        official_verification_url="https://example.com/official",
+    )
+
+
+def test_deduplicate_trades_guarantees_unique_ids_without_dropping_distinct_trades() -> None:
+    duplicate_id = insider_trade(trade_id="same-id", shares=100)
+    collision = insider_trade(trade_id="same-id", shares=250)
+    distinct = insider_trade(trade_id="different-id", shares=500)
+
+    result = deduplicate_trades([duplicate_id, collision, distinct])
+
+    assert [trade.id for trade in result].count("same-id") == 1
+    assert {trade.id for trade in result} == {"same-id", "different-id"}
 
 
 

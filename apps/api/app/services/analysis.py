@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import statistics
 from collections import defaultdict
 from datetime import UTC, datetime
 from time import monotonic
-from typing import Iterable
+from typing import Awaitable, Iterable, TypeVar
 
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.analysis import (
@@ -18,17 +19,46 @@ from app.schemas.analysis import (
     CorrelationMatrix,
     TerminalAlert,
     TerminalComponent,
-    TerminalOpportunity,
-    TerminalSector,
+    TerminalRadarItem,
     TerminalSnapshot,
 )
 from app.schemas.fundamentals import FundamentalSnapshot
 from app.schemas.stocks import Candle, Quote
-from app.services.cockpit import cockpit_service
+from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
-from app.services.screener import screener_service
+from app.services.screener import build_rows_from_quotes_and_histories, tsx60_constituents
 from app.services.tsx60 import TSX60
+from app.services.terminal_drivers import YAHOO_DRIVERS, rate_market_drivers, yahoo_market_drivers
+from app.services.terminal_engine import (
+    COVERAGE_THRESHOLD_PERCENT,
+    build_anomalies,
+    build_breadth,
+    build_regime_history,
+    build_regime_horizons,
+    build_sector_rotation,
+    data_quality,
+    legacy_sectors,
+    methodology_sections,
+    opportunity,
+    rebuild_real_rows,
+)
+
+
+logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+
+async def _measure_terminal_stage(
+    key: str,
+    operation: Awaitable[T],
+    timings: dict[str, float],
+) -> T:
+    started = monotonic()
+    try:
+        return await operation
+    finally:
+        timings[key] = (monotonic() - started) * 1_000
 
 
 RANGE_LABELS = {
@@ -88,6 +118,10 @@ class _TimedCache:
 
     def set(self, key: object, value: object) -> None:
         self._values[key] = (monotonic(), value)
+
+    def peek(self, key: object) -> object | None:
+        cached = self._values.get(key)
+        return None if cached is None else cached[1]
 
     def lock(self, key: object) -> asyncio.Lock:
         lock = self._locks.get(key)
@@ -186,7 +220,7 @@ def _correlation(left: list[Candle], right: list[Candle]) -> float | None:
     left_returns = _return_by_day(left)
     right_returns = _return_by_day(right)
     shared = sorted(set(left_returns) & set(right_returns))
-    if len(shared) < 5:
+    if len(shared) < 40:
         return None
     x = [left_returns[day] for day in shared]
     y = [right_returns[day] for day in shared]
@@ -205,15 +239,17 @@ def _correlation(left: list[Candle], right: list[Candle]) -> float | None:
     return max(-1.0, min(1.0, numerator / denominator))
 
 
-def _momentum(candles: list[Candle], sessions: int = 20) -> float:
+def _momentum(candles: list[Candle], sessions: int = 20) -> float | None:
     if len(candles) <= sessions or candles[-sessions - 1].close == 0:
-        return 0.0
+        return None
     return (candles[-1].close / candles[-sessions - 1].close - 1) * 100
 
 
-def _average_volume(candles: list[Candle], sessions: int = 20) -> float:
+def _average_volume(candles: list[Candle], sessions: int = 20) -> float | None:
+    if not candles:
+        return None
     sample = candles[-sessions:] if len(candles) >= sessions else candles
-    return sum(item.volume for item in sample) / max(len(sample), 1)
+    return sum(item.volume for item in sample) / len(sample)
 
 
 def _normalized_series(candles: list[Candle]) -> list[ComparisonPoint]:
@@ -248,30 +284,29 @@ def _score(
     total_return: float,
     sharpe: float | None,
     volatility: float | None,
-    momentum: float,
+    momentum: float | None,
     rsi: float | None,
     trend: str,
     forward_pe: float | None,
-) -> float:
-    performance = max(0.0, min(100.0, 50 + total_return * 2.2))
-    risk_adjusted = 50.0 if sharpe is None else max(0.0, min(100.0, 50 + sharpe * 18))
-    risk = 50.0 if volatility is None else max(0.0, min(100.0, 100 - volatility * 1.7))
-    momentum_score = max(0.0, min(100.0, 50 + momentum * 3.0))
-    rsi_score = 50.0 if rsi is None else max(0.0, min(100.0, 100 - abs(rsi - 58) * 2.1))
-    trend_score = {"Haussière": 90.0, "Mixte": 55.0, "Baissière": 20.0}.get(trend, 45.0)
-    valuation = 50.0
+) -> float | None:
+    parts: list[tuple[float, float]] = [(max(0.0, min(100.0, 50 + total_return * 2.2)), 0.27)]
+    if sharpe is not None:
+        parts.append((max(0.0, min(100.0, 50 + sharpe * 18)), 0.20))
+    if volatility is not None:
+        parts.append((max(0.0, min(100.0, 100 - volatility * 1.7)), 0.12))
+    if momentum is not None:
+        parts.append((max(0.0, min(100.0, 50 + momentum * 3.0)), 0.17))
+    if rsi is not None:
+        parts.append((max(0.0, min(100.0, 100 - abs(rsi - 58) * 2.1)), 0.08))
+    trend_score = {"Haussière": 90.0, "Mixte": 55.0, "Baissière": 20.0}.get(trend)
+    if trend_score is not None:
+        parts.append((trend_score, 0.11))
     if forward_pe is not None and forward_pe > 0:
-        valuation = max(10.0, min(90.0, 82 - forward_pe * 1.8))
-    value = (
-        performance * 0.27
-        + risk_adjusted * 0.20
-        + risk * 0.12
-        + momentum_score * 0.17
-        + rsi_score * 0.08
-        + trend_score * 0.11
-        + valuation * 0.05
-    )
-    return round(max(0.0, min(100.0, value)), 1)
+        parts.append((max(10.0, min(90.0, 82 - forward_pe * 1.8)), 0.05))
+    coverage = sum(weight for _, weight in parts)
+    if coverage < 0.70:
+        return None
+    return round(sum(value * weight for value, weight in parts) / coverage, 1)
 
 
 def _strengths_weaknesses(
@@ -279,7 +314,7 @@ def _strengths_weaknesses(
     total_return: float,
     sharpe: float | None,
     volatility: float | None,
-    momentum: float,
+    momentum: float | None,
     rsi: float | None,
     trend: str,
     forward_pe: float | None,
@@ -301,9 +336,9 @@ def _strengths_weaknesses(
             strengths.append("Volatilité contenue")
         elif volatility >= 35:
             weaknesses.append("Volatilité élevée")
-    if momentum >= 5:
+    if momentum is not None and momentum >= 5:
         strengths.append("Momentum 20 jours positif")
-    elif momentum <= -5:
+    elif momentum is not None and momentum <= -5:
         weaknesses.append("Momentum 20 jours sous pression")
     if trend == "Haussière":
         strengths.append("Tendance technique haussière")
@@ -320,39 +355,7 @@ def _strengths_weaknesses(
             weaknesses.append("Valorisation prospective exigeante")
     if dividend_yield is not None and dividend_yield >= 3:
         strengths.append("Rendement du dividende notable")
-    if not strengths:
-        strengths.append("Profil équilibré sans avantage dominant")
-    if not weaknesses:
-        weaknesses.append("Aucune faiblesse majeure détectée dans les données disponibles")
     return strengths[:4], weaknesses[:4]
-
-
-def _opportunity_from_row(row, opportunity_type: str) -> TerminalOpportunity:
-    reasons: list[str] = []
-    if row.score >= 72:
-        reasons.append(f"Score Anatole élevé ({row.score:.0f}/100)")
-    if row.momentum_20d >= 5:
-        reasons.append(f"Momentum 20 j de {row.momentum_20d:+.1f} %")
-    if row.relative_volume >= 1.4:
-        reasons.append(f"Volume relatif {row.relative_volume:.1f}×")
-    if row.trend == "Haussière":
-        reasons.append("Cours au-dessus de ses moyennes clés")
-    if row.rsi_14 is not None and row.rsi_14 < 70:
-        reasons.append("RSI encore sous la zone de surachat")
-    return TerminalOpportunity(
-        symbol=row.symbol,
-        name=row.name,
-        sector=row.sector,
-        price=row.price,
-        change_percent=row.change_percent,
-        momentum_20d=row.momentum_20d,
-        rsi_14=row.rsi_14,
-        relative_volume=row.relative_volume,
-        score=row.score,
-        signal=row.signal,
-        opportunity_type=opportunity_type,
-        reasons=reasons[:4] or ["Profil à surveiller dans Focus"],
-    )
 
 
 class AnalysisService:
@@ -412,7 +415,7 @@ class AnalysisService:
             source_range = SOURCE_RANGES[request.range]
             history_symbols = list(dict.fromkeys([*request.symbols, request.benchmark]))
             quotes_task = market_data_service.get_quotes(request.symbols)
-            histories_task = market_data_service.get_history_many(
+            histories_task = market_data_service.get_history_many_strict(
                 history_symbols,
                 range_=source_range,
                 interval="1d",
@@ -434,19 +437,18 @@ class AnalysisService:
                 request.range,
             )
             raw_rows: list[dict[str, object]] = []
-            series: list[ComparisonSeries] = []
 
             for symbol in request.symbols:
                 quote = quote_by_symbol.get(symbol.replace("-", "."))
                 candles = _trim_range(histories.get(symbol, []), request.range)
-                if quote is None or len(candles) < 2:
+                if quote is None or len(candles) < 2 or (quote.source == "demo-fallback" and not market_data_service.demo_mode):
                     continue
                 technicals = market_data_service.calculate_technicals(candles)
                 fundamental = fundamentals.get(symbol)
                 metrics = fundamental.metrics if fundamental is not None else None
                 name, sector, instrument_type = _metadata(symbol, quote)
                 avg_volume = _average_volume(candles)
-                relative_volume = quote.volume / avg_volume if avg_volume else 0.0
+                relative_volume = quote.volume / avg_volume if avg_volume else None
                 total_return = _total_return(candles)
                 annualized = _annualized_return(candles)
                 volatility = _volatility(candles)
@@ -511,18 +513,22 @@ class AnalysisService:
                         "delayed": quote.delayed,
                     }
                 )
-                series.append(
-                    ComparisonSeries(
-                        symbol=symbol,
-                        name=name,
-                        points=_normalized_series(candles),
-                    )
-                )
-
-            ranked = sorted(raw_rows, key=lambda row: float(row["score"]), reverse=True)
+            ranked = sorted(raw_rows, key=lambda row: float(row["score"]) if row["score"] is not None else -1, reverse=True)
             instruments = [
                 ComparisonInstrument(**row, rank=index + 1)
                 for index, row in enumerate(ranked)
+            ]
+            common_days: set[int] | None = None
+            for item in instruments:
+                days = {candle.time // 86_400 for candle in _trim_range(histories.get(item.symbol, []), request.range)}
+                common_days = days if common_days is None else common_days & days
+            aligned_days = common_days or set()
+            series = [
+                ComparisonSeries(symbol=item.symbol, name=item.name, points=_normalized_series([
+                    candle for candle in _trim_range(histories.get(item.symbol, []), request.range)
+                    if candle.time // 86_400 in aligned_days
+                ]))
+                for item in instruments
             ]
 
             correlation_symbols = [item.symbol for item in instruments]
@@ -565,7 +571,7 @@ class AnalysisService:
             return snapshot
 
     async def terminal(self) -> TerminalSnapshot:
-        cache_key = "terminal:tsx60"
+        cache_key = "terminal:v2:tsx60"
         cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
         if isinstance(cached, TerminalSnapshot):
             return cached
@@ -574,239 +580,217 @@ class AnalysisService:
             cached = self._cache.get(cache_key, self.terminal_ttl_seconds)
             if isinstance(cached, TerminalSnapshot):
                 return cached
-
-            screener, cockpit = await asyncio.gather(
-                screener_service.get_tsx60(),
-                cockpit_service.get_tsx60(),
+            previous = self._cache.peek(cache_key)
+            symbols = [item.symbol for item in TSX60]
+            driver_symbols = [definition[3] for definition in YAHOO_DRIVERS]
+            history_symbols = list(dict.fromkeys([*symbols, "^GSPTSE", *driver_symbols]))
+            timings: dict[str, float] = {}
+            build_started = monotonic()
+            logger.info(
+                "terminal_build_start history_symbols_requested=%d",
+                len(history_symbols),
             )
-            rows = screener.items
-            count = max(len(rows), 1)
-            average_score = sum(row.score for row in rows) / count
-            average_momentum = sum(row.momentum_20d for row in rows) / count
-            above_sma20 = sum(
-                row.sma_20 is not None and row.price > row.sma_20
-                for row in rows
-            ) / count * 100
-            above_sma50 = sum(
-                row.sma_50 is not None and row.price > row.sma_50
-                for row in rows
-            ) / count * 100
-            high_relative_volume_count = sum(row.relative_volume >= 1.5 for row in rows)
-            breadth_score = cockpit.breadth.advance_ratio
-            trend_score = (above_sma20 * 0.45 + above_sma50 * 0.55)
-            momentum_score = max(0.0, min(100.0, 50 + average_momentum * 4))
-            tape_score = max(0.0, min(100.0, 50 + cockpit.weighted_change_percent * 16))
-            regime_score = round(
-                breadth_score * 0.30
-                + trend_score * 0.30
-                + average_score * 0.22
-                + momentum_score * 0.12
-                + tape_score * 0.06,
-                1,
+            quotes_result, histories_result, rates_result = await asyncio.gather(
+                _measure_terminal_stage(
+                    "quotes",
+                    market_data_service.get_quotes(symbols),
+                    timings,
+                ),
+                _measure_terminal_stage(
+                    "histories",
+                    market_data_service.get_history_many_strict(
+                        history_symbols,
+                        range_="1y",
+                        interval="1d",
+                        concurrency=8,
+                    ),
+                    timings,
+                ),
+                _measure_terminal_stage(
+                    "rates",
+                    bank_of_canada_valet_service.yields(),
+                    timings,
+                ),
+                return_exceptions=True,
             )
-            if regime_score >= 72:
-                regime = "Haussier"
-            elif regime_score >= 60:
-                regime = "Constructif"
-            elif regime_score >= 45:
-                regime = "Neutre"
-            elif regime_score >= 32:
-                regime = "Fragile"
-            else:
-                regime = "Baissier"
+            if isinstance(quotes_result, Exception):
+                if isinstance(previous, TerminalSnapshot):
+                    return previous
+                raise quotes_result
+            histories = histories_result if isinstance(histories_result, dict) else {}
+            rates = rates_result if isinstance(rates_result, dict) else None
+            quotes = quotes_result
+            raw_rows = build_rows_from_quotes_and_histories(
+                tsx60_constituents(),
+                quotes,
+                histories,
+            )
+            real_quote_count = sum(
+                quote.source != "demo-fallback"
+                and (market_data_service.demo_mode or quote.source != "demo-explicit")
+                for quote in quotes
+            )
+            logger.info(
+                "terminal_data_loaded terminal_quotes_ms=%.1f terminal_histories_ms=%.1f "
+                "terminal_rates_ms=%.1f history_symbols_requested=%d "
+                "history_symbols_received=%d real_quote_count=%d",
+                timings.get("quotes", 0.0),
+                timings.get("histories", 0.0),
+                timings.get("rates", 0.0),
+                len(history_symbols),
+                len(histories),
+                real_quote_count,
+            )
+            compute_started = monotonic()
+            quality = data_quality(raw_rows, histories, symbols, explicit_demo=market_data_service.demo_mode)
+            rows = rebuild_real_rows(raw_rows, histories, explicit_demo=market_data_service.demo_mode)
+            equity_histories = {row.symbol: histories[row.symbol] for row in rows if row.symbol in histories}
+            weights = {item.symbol: item.weight for item in TSX60}
+            benchmark = histories.get("^GSPTSE", [])
+            sufficient = quality.history_coverage_percent >= COVERAGE_THRESHOLD_PERCENT
 
-            if regime_score >= 68 and cockpit.breadth.advance_ratio >= 55:
-                risk_level = "Faible"
-            elif regime_score >= 48:
-                risk_level = "Modéré"
-            elif regime_score >= 30:
-                risk_level = "Élevé"
-            else:
-                risk_level = "Critique"
+            if (
+                not sufficient
+                and isinstance(previous, TerminalSnapshot)
+                and previous.data_quality.history_coverage_percent >= COVERAGE_THRESHOLD_PERCENT
+            ):
+                stale_quality = previous.data_quality.model_copy(
+                    update={
+                        "warnings": [
+                            *previous.data_quality.warnings,
+                            "Dernier snapshot réel conservé: la couverture fournisseur actuelle est insuffisante.",
+                        ],
+                        "source_statuses": {**previous.data_quality.source_statuses, "terminal_cache": "stale-real"},
+                    }
+                )
+                logger.info(
+                    "terminal_build_complete terminal_compute_ms=%.1f terminal_total_ms=%.1f stale_snapshot=true",
+                    (monotonic() - compute_started) * 1_000,
+                    (monotonic() - build_started) * 1_000,
+                )
+                return previous.model_copy(update={"data_quality": stale_quality})
 
+            horizons = build_regime_horizons(rows, equity_histories, weights, len(symbols))
+            session = next((item for item in horizons if item.key == "session"), None)
+            breadth = build_breadth(rows, equity_histories, weights, len(symbols))
+            rotation = build_sector_rotation(rows, equity_histories, benchmark, len(symbols)) if sufficient else []
+            anomalies = build_anomalies(rows, equity_histories) if sufficient else []
+            sectors = legacy_sectors(rotation, rows)
+            ranked = sorted(rows, key=lambda row: row.score, reverse=True)
+            anomaly_types_by_symbol: dict[str, list[str]] = defaultdict(list)
+            for anomaly in anomalies:
+                if anomaly.symbol and anomaly.type not in anomaly_types_by_symbol[anomaly.symbol]:
+                    anomaly_types_by_symbol[anomaly.symbol].append(anomaly.type)
+            radar_items = [
+                TerminalRadarItem(
+                    **opportunity(row, "Radar").model_dump(),
+                    volume=row.volume,
+                    average_volume_20d=row.average_volume_20d,
+                    sma_20=row.sma_20,
+                    sma_50=row.sma_50,
+                    trend=row.trend,
+                    source=row.source,
+                    delayed=row.delayed,
+                    anomaly_types=anomaly_types_by_symbol.get(row.symbol, []),
+                )
+                for row in ranked
+            ]
+            leaders = [opportunity(row, "Leadership") for row in ranked[:8]]
+            laggards = [opportunity(row, "Sous pression") for row in sorted(rows, key=lambda row: row.score)[:8]]
+            opportunities = [
+                opportunity(row, "Accélération" if row.relative_volume >= 1.4 else "Tendance")
+                for row in ranked
+                if row.score >= 62 and row.momentum_20d > 0 and (row.rsi_14 is None or row.rsi_14 < 75)
+            ][:12]
+            alerts = [
+                TerminalAlert(
+                    id=item.id,
+                    severity=item.severity,
+                    category="Anomalie statistique",
+                    symbol=item.symbol,
+                    title=item.title,
+                    detail=item.detail,
+                )
+                for item in anomalies[:16]
+            ]
+            if breadth.divergence.active:
+                alerts.insert(0, TerminalAlert(
+                    id="breadth-divergence",
+                    severity=breadth.divergence.severity,
+                    category="Marché",
+                    title=breadth.divergence.title,
+                    detail=breadth.divergence.explanation,
+                ))
             components = [
                 TerminalComponent(
-                    key="breadth",
-                    label="Largeur du marché",
-                    score=round(breadth_score, 1),
-                    value=f"{cockpit.breadth.advancers} hausses / {cockpit.breadth.decliners} baisses",
-                    description="Part des titres en hausse parmi les mouvements directionnels du TSX 60.",
+                    key="breadth", label="Largeur du marché", score=breadth.advance_ratio,
+                    value=(f"{breadth.advancers} hausses / {breadth.decliners} baisses" if breadth.advancers is not None else "N/D"),
+                    description="Part des titres en hausse parmi les mouvements directionnels sur données réelles éligibles.",
                 ),
                 TerminalComponent(
-                    key="trend",
-                    label="Structure de tendance",
-                    score=round(trend_score, 1),
-                    value=f"{above_sma50:.0f} % au-dessus de la MM50",
-                    description="Proportion des titres soutenus par leurs moyennes mobiles à 20 et 50 séances.",
+                    key="trend", label="Structure de tendance",
+                    score=(None if breadth.above_sma20_percent is None or breadth.above_sma50_percent is None else round(breadth.above_sma20_percent * 0.45 + breadth.above_sma50_percent * 0.55, 1)),
+                    value=(f"{breadth.above_sma50_percent:.0f} % au-dessus de la MM50" if breadth.above_sma50_percent is not None else "N/D"),
+                    description="Proportion des titres au-dessus des MM20 et MM50, sans historique de démonstration implicite.",
                 ),
                 TerminalComponent(
-                    key="momentum",
-                    label="Impulsion 20 jours",
-                    score=round(momentum_score, 1),
-                    value=f"{average_momentum:+.2f} % en moyenne",
-                    description="Momentum transversal moyen des composantes du TSX 60.",
+                    key="momentum", label="Impulsion 20 jours",
+                    score=(None if session is None or session.average_momentum_percent is None else max(0, min(100, 50 + session.average_momentum_percent * 4))),
+                    value=(f"{session.average_momentum_percent:+.2f} % en moyenne" if session and session.average_momentum_percent is not None else "N/D"),
+                    description="Momentum transversal moyen des composantes disposant d'un historique réel suffisant.",
                 ),
                 TerminalComponent(
-                    key="quality",
-                    label="Qualité des signaux",
-                    score=round(average_score, 1),
-                    value=f"{average_score:.1f}/100",
-                    description="Moyenne du score Anatole combinant prix, volume, momentum, RSI et tendance.",
+                    key="quality", label="Qualité des signaux",
+                    score=(round(statistics.fmean(row.score for row in rows), 1) if sufficient and rows else None),
+                    value=(f"{statistics.fmean(row.score for row in rows):.1f}/100" if sufficient and rows else "N/D"),
+                    description="Moyenne du score Anatole reconstruit à partir du jeu historique strict.",
                 ),
             ]
-
-            sector_rows: dict[str, list] = defaultdict(list)
-            for row in rows:
-                sector_rows[row.sector].append(row)
-            cockpit_sector = {item.sector: item for item in cockpit.sectors}
-            sectors: list[TerminalSector] = []
-            for sector, members in sector_rows.items():
-                member_count = max(len(members), 1)
-                change = cockpit_sector.get(sector).change_percent if sector in cockpit_sector else sum(item.change_percent for item in members) / member_count
-                momentum = sum(item.momentum_20d for item in members) / member_count
-                score = sum(item.score for item in members) / member_count
-                relative_volume = sum(item.relative_volume for item in members) / member_count
-                advancers = sum(item.change_percent > 0 for item in members)
-                decliners = sum(item.change_percent < 0 for item in members)
-                leadership = max(
-                    0.0,
-                    min(
-                        100.0,
-                        score * 0.45
-                        + max(0, min(100, 50 + momentum * 4)) * 0.35
-                        + max(0, min(100, 50 + change * 12)) * 0.20,
-                    ),
-                )
-                if leadership >= 72:
-                    state = "Leadership"
-                elif leadership >= 60:
-                    state = "Accumulation"
-                elif leadership >= 44:
-                    state = "Neutre"
-                elif leadership >= 30:
-                    state = "Distribution"
-                else:
-                    state = "Faiblesse"
-                sectors.append(
-                    TerminalSector(
-                        sector=sector,
-                        change_percent=round(change, 3),
-                        momentum_20d=round(momentum, 2),
-                        average_score=round(score, 1),
-                        relative_volume=round(relative_volume, 2),
-                        advancers=advancers,
-                        decliners=decliners,
-                        leadership_score=round(leadership, 1),
-                        state=state,
-                    )
-                )
-            sectors.sort(key=lambda item: item.leadership_score, reverse=True)
-
-            ranked = sorted(rows, key=lambda row: row.score, reverse=True)
-            leaders = [_opportunity_from_row(row, "Leadership") for row in ranked[:8]]
-            laggards = [
-                _opportunity_from_row(row, "Sous pression")
-                for row in sorted(rows, key=lambda row: row.score)[:8]
-            ]
-            opportunity_rows = [
-                row
-                for row in ranked
-                if row.score >= 62
-                and row.momentum_20d > 0
-                and (row.rsi_14 is None or row.rsi_14 < 75)
-            ][:12]
-            opportunities = [
-                _opportunity_from_row(
-                    row,
-                    "Accélération" if row.relative_volume >= 1.4 else "Tendance",
-                )
-                for row in opportunity_rows
-            ]
-
-            alerts: list[TerminalAlert] = []
-            for row in rows:
-                if row.relative_volume >= 1.8 and abs(row.change_percent) >= 1.0:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"volume:{row.symbol}",
-                            severity="high" if abs(row.change_percent) >= 2.5 else "watch",
-                            category="Prix-volume",
-                            symbol=row.symbol,
-                            title=f"Activité inhabituelle sur {row.symbol}",
-                            detail=(
-                                f"Volume relatif {row.relative_volume:.1f}× avec une variation "
-                                f"de {row.change_percent:+.2f} %."
-                            ),
-                        )
-                    )
-                if row.rsi_14 is not None and row.rsi_14 >= 75:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"rsi:{row.symbol}",
-                            severity="watch",
-                            category="Extension",
-                            symbol=row.symbol,
-                            title=f"{row.symbol} techniquement étendu",
-                            detail=f"RSI 14 à {row.rsi_14:.1f}; le titre peut rester fort, mais le risque de consolidation augmente.",
-                        )
-                    )
-                if row.momentum_20d >= 5 and row.change_percent <= -1.5:
-                    alerts.append(
-                        TerminalAlert(
-                            id=f"pullback:{row.symbol}",
-                            severity="info",
-                            category="Dislocation",
-                            symbol=row.symbol,
-                            title=f"Repli dans une tendance positive — {row.symbol}",
-                            detail=f"Momentum 20 j de {row.momentum_20d:+.1f} % malgré une séance à {row.change_percent:+.2f} %.",
-                        )
-                    )
-            if cockpit.breadth.advance_ratio < 35:
-                alerts.insert(
-                    0,
-                    TerminalAlert(
-                        id="market-breadth",
-                        severity="high",
-                        category="Marché",
-                        title="Largeur de marché faible",
-                        detail=(
-                            f"Seulement {cockpit.breadth.advance_ratio:.0f} % des mouvements directionnels "
-                            "sont positifs; la hausse de l'indice peut être concentrée."
-                        ),
-                    ),
-                )
-            alerts = sorted(
-                alerts,
-                key=lambda item: {"high": 0, "watch": 1, "info": 2}[item.severity],
-            )[:16]
-
+            drivers = yahoo_market_drivers(histories, benchmark) + rate_market_drivers(rates, benchmark)
+            source_statuses = dict(quality.source_statuses)
+            source_statuses["bank_of_canada"] = "available" if rates else "unavailable"
+            source_statuses["benchmark"] = "available" if benchmark else "unavailable"
+            quality = quality.model_copy(update={"source_statuses": source_statuses})
             snapshot = TerminalSnapshot(
-                universe=screener.universe,
-                regime=regime,
-                regime_score=regime_score,
-                risk_level=risk_level,
-                weighted_change_percent=cockpit.weighted_change_percent,
-                advance_ratio=cockpit.breadth.advance_ratio,
-                average_anatole_score=round(average_score, 1),
-                average_momentum_20d=round(average_momentum, 2),
-                above_sma20_percent=round(above_sma20, 1),
-                above_sma50_percent=round(above_sma50, 1),
-                high_relative_volume_count=high_relative_volume_count,
+                universe="S&P/TSX 60",
+                regime=session.regime if session else None,
+                regime_score=session.score if session else None,
+                risk_level=session.risk_level if session else None,
+                weighted_change_percent=session.change_percent if session else None,
+                advance_ratio=breadth.advance_ratio,
+                average_anatole_score=(round(statistics.fmean(row.score for row in rows), 1) if sufficient and rows else None),
+                average_momentum_20d=(round(statistics.fmean(row.momentum_20d for row in rows), 2) if sufficient and rows else None),
+                above_sma20_percent=breadth.above_sma20_percent,
+                above_sma50_percent=breadth.above_sma50_percent,
+                high_relative_volume_count=(sum(row.relative_volume >= 1.5 for row in rows) if sufficient else None),
                 components=components,
                 sectors=sectors,
                 opportunities=opportunities,
-                alerts=alerts,
+                alerts=alerts[:16],
                 leaders=leaders,
                 laggards=laggards,
+                data_quality=quality,
+                regime_horizons=horizons,
+                regime_history=build_regime_history(equity_histories, benchmark, len(symbols)) if sufficient else [],
+                breadth_pro=breadth,
+                sector_rotation=rotation,
+                anomalies=anomalies,
+                market_drivers=drivers,
+                radar_items=radar_items,
+                methodology_sections=methodology_sections(),
                 methodology=(
-                    "Le régime combine largeur de marché, position par rapport aux moyennes mobiles, "
-                    "score Anatole moyen, momentum transversal et variation pondérée. Les radars sont "
-                    "des signaux de recherche, pas des recommandations d'achat ou de vente."
+                    "Régime: largeur 30 %, tendance 30 %, score Anatole moyen 22 %, momentum 12 % et tape/performance 6 %. "
+                    "Les calculs utilisent uniquement les données réelles disponibles, ou demo-explicit lorsque ce mode est demandé."
                 ),
                 generated_at=datetime.now(UTC),
                 refresh_after_seconds=60,
             )
             self._cache.set(cache_key, snapshot)
+            logger.info(
+                "terminal_build_complete terminal_compute_ms=%.1f terminal_total_ms=%.1f stale_snapshot=false",
+                (monotonic() - compute_started) * 1_000,
+                (monotonic() - build_started) * 1_000,
+            )
             return snapshot
 
 

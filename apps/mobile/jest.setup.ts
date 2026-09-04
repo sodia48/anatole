@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+jest.mock("@react-native-async-storage/async-storage", () => require("@react-native-async-storage/async-storage/jest/async-storage-mock"));
+
 jest.mock("expo-secure-store", () => ({
-  getItemAsync: jest.fn(),
-  setItemAsync: jest.fn(),
-  deleteItemAsync: jest.fn(),
+  getItemAsync: jest.fn(async () => null),
+  setItemAsync: jest.fn(async () => undefined),
+  deleteItemAsync: jest.fn(async () => undefined),
 }));
 
 jest.mock("expo-localization", () => ({
@@ -11,6 +14,17 @@ jest.mock("expo-localization", () => ({
 }));
 
 jest.mock("expo-haptics", () => ({ selectionAsync: jest.fn() }));
+
+jest.mock("react-native-webview", () => {
+  const React = jest.requireActual("react");
+  const { View } = jest.requireActual("react-native");
+  const WebView = React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
+    React.useImperativeHandle(ref, () => ({ injectJavaScript: jest.fn(), postMessage: jest.fn(), reload: jest.fn() }), []);
+    return React.createElement(View, props);
+  });
+  WebView.displayName = "MockWebView";
+  return { WebView };
+});
 
 jest.mock("@react-native-community/netinfo", () => ({
   __esModule: true,

@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from time import monotonic
 
 from app.schemas.discovery import ScreenerRow, ScreenerSnapshot
-from app.schemas.stocks import Candle
+from app.schemas.stocks import Candle, Quote
 from app.services.market_data import market_data_service
 from app.services.tsx60 import TSX60
 from app.services.tsx_composite_universe import (
@@ -19,10 +19,10 @@ def _clamp(value: float, minimum: float = 0.0, maximum: float = 100.0) -> float:
     return max(minimum, min(maximum, value))
 
 
-def _momentum(candles: list[Candle], sessions: int = 20) -> float:
+def _momentum(candles: list[Candle], current_price: float, sessions: int = 20) -> float:
     if len(candles) <= sessions or candles[-sessions - 1].close == 0:
         return 0.0
-    return (candles[-1].close / candles[-sessions - 1].close - 1) * 100
+    return (current_price / candles[-sessions - 1].close - 1) * 100
 
 
 def _average_volume(candles: list[Candle], sessions: int = 20) -> int:
@@ -49,6 +49,94 @@ def _signal(score: float) -> str:
     if score <= 44:
         return "Fragile"
     return "Neutre"
+
+
+def _trend(price: float, sma_20: float | None, sma_50: float | None) -> str:
+    if sma_20 is None or sma_50 is None:
+        return "Indéterminée"
+    if price > sma_20 > sma_50:
+        return "Haussière"
+    if price < sma_20 < sma_50:
+        return "Baissière"
+    return "Mixte"
+
+
+def _breakout_metrics(candles: list[Candle], current_price: float) -> tuple[float | None, bool | None, float | None]:
+    """Compare the current quote with the 20 completed sessions before it."""
+    if len(candles) < 21:
+        return None, None, None
+    previous = candles[-21:-1]
+    if len(previous) != 20:
+        return None, None, None
+    prior_high = max(item.high for item in previous)
+    if prior_high <= 0:
+        return None, None, None
+    breakout = current_price > prior_high
+    return round(prior_high, 4), breakout, round((current_price / prior_high - 1) * 100, 4)
+
+
+def tsx60_constituents() -> list[CompositeConstituent]:
+    return [
+        CompositeConstituent(ticker=item.symbol, name=item.name, sector=item.sector)
+        for item in TSX60
+    ]
+
+
+def build_rows_from_quotes_and_histories(
+    constituents: list[CompositeConstituent],
+    quotes: list[Quote],
+    histories: dict[str, list[Candle]],
+) -> list[ScreenerRow]:
+    quote_by_symbol = {
+        quote.symbol.replace("-", ".").upper(): quote
+        for quote in quotes
+    }
+    rows: list[ScreenerRow] = []
+    for constituent in constituents:
+        symbol = constituent.ticker
+        quote = quote_by_symbol.get(symbol.upper())
+        candles = histories.get(symbol, [])
+        if quote is None or not candles:
+            continue
+
+        technicals = market_data_service.calculate_technicals(candles)
+        average_volume = _average_volume(candles)
+        relative_volume = quote.volume / average_volume if average_volume else 0.0
+        momentum_20d = _momentum(candles, quote.price)
+        trend = _trend(quote.price, technicals.sma_20, technicals.sma_50)
+        score = _score(
+            quote.change_percent,
+            momentum_20d,
+            relative_volume,
+            technicals.rsi_14,
+            trend,
+        )
+        prior_high_20d, breakout_20d, breakout_percent = _breakout_metrics(candles, quote.price)
+        rows.append(ScreenerRow(
+            ticker=quote.ticker,
+            symbol=symbol,
+            name=constituent.name,
+            sector=constituent.sector or "Non classé",
+            price=round(quote.price, 4),
+            change_percent=round(quote.change_percent, 4),
+            volume=quote.volume,
+            average_volume_20d=average_volume,
+            relative_volume=round(relative_volume, 2),
+            momentum_20d=round(momentum_20d, 2),
+            rsi_14=technicals.rsi_14,
+            sma_20=technicals.sma_20,
+            sma_50=technicals.sma_50,
+            trend=trend,
+            score=score,
+            signal=_signal(score),
+            source=quote.source,
+            delayed=quote.delayed,
+            quote_as_of=quote.timestamp,
+            prior_high_20d=prior_high_20d,
+            breakout_20d=breakout_20d,
+            breakout_percent=breakout_percent,
+        ))
+    return rows
 
 
 class ScreenerService:
@@ -111,14 +199,7 @@ class ScreenerService:
         if universe == "tsx60":
             return (
                 "S&P/TSX 60",
-                [
-                    CompositeConstituent(
-                        ticker=item.symbol,
-                        name=item.name,
-                        sector=item.sector,
-                    )
-                    for item in TSX60
-                ],
+                tsx60_constituents(),
             )
 
         try:
@@ -208,97 +289,11 @@ class ScreenerService:
                 )
             )
 
-            quote_by_symbol = {
-                quote.symbol.replace(
-                    "-", "."
-                ): quote
-                for quote in quotes
-            }
-            rows: list[ScreenerRow] = []
-
-            for constituent in constituents:
-                symbol = constituent.ticker
-                quote = quote_by_symbol.get(
-                    symbol
-                )
-                candles = histories.get(
-                    symbol,
-                    [],
-                )
-
-                if quote is None or not candles:
-                    continue
-
-                technicals = (
-                    market_data_service
-                    .calculate_technicals(
-                        candles
-                    )
-                )
-                avg_volume = _average_volume(
-                    candles
-                )
-                relative_volume = (
-                    quote.volume / avg_volume
-                    if avg_volume
-                    else 0.0
-                )
-                momentum_20d = _momentum(
-                    candles
-                )
-                score = _score(
-                    quote.change_percent,
-                    momentum_20d,
-                    relative_volume,
-                    technicals.rsi_14,
-                    technicals.trend,
-                )
-
-                rows.append(
-                    ScreenerRow(
-                        ticker=quote.ticker,
-                        symbol=symbol,
-                        name=constituent.name,
-                        sector=(
-                            constituent.sector
-                            or "Non classé"
-                        ),
-                        price=round(
-                            quote.price,
-                            4,
-                        ),
-                        change_percent=round(
-                            quote.change_percent,
-                            4,
-                        ),
-                        volume=quote.volume,
-                        average_volume_20d=(
-                            avg_volume
-                        ),
-                        relative_volume=round(
-                            relative_volume,
-                            2,
-                        ),
-                        momentum_20d=round(
-                            momentum_20d,
-                            2,
-                        ),
-                        rsi_14=(
-                            technicals.rsi_14
-                        ),
-                        sma_20=(
-                            technicals.sma_20
-                        ),
-                        sma_50=(
-                            technicals.sma_50
-                        ),
-                        trend=technicals.trend,
-                        score=score,
-                        signal=_signal(score),
-                        source=quote.source,
-                        delayed=quote.delayed,
-                    )
-                )
+            rows = build_rows_from_quotes_and_histories(
+                constituents,
+                quotes,
+                histories,
+            )
 
             snapshot = ScreenerSnapshot(
                 universe=universe_name,

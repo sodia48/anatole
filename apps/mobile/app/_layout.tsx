@@ -45,13 +45,25 @@ function AppStack() {
   const { pick } = useLocale();
   return <Stack screenOptions={{ headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.background }, headerBackButtonDisplayMode: "minimal" }}>
     <Stack.Screen name="index" options={{ headerShown: false }} />
+    <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: "modal" }} />
-    <Stack.Screen name="stock/[ticker]" options={{ title: "Focus" }} />
+    <Stack.Screen name="stock/[ticker]" options={{ title: "Focus", orientation: "all" }} />
     <Stack.Screen name="focus/[ticker]" options={{ title: "Focus" }} />
+    <Stack.Screen name="etf/index" options={{ title: pick("ETF canadiens", "Canadian ETFs") }} />
+    <Stack.Screen name="etf/[ticker]" options={{ title: "ETF" }} />
+    <Stack.Screen name="screener/index" options={{ title: "Screener" }} />
+    <Stack.Screen name="terminal/index" options={{ title: "Terminal Pro" }} />
+    <Stack.Screen name="psychology/index" options={{ title: pick("Psychologie", "Psychology") }} />
+    <Stack.Screen name="ipo-insiders/index" options={{ title: pick("IPO & initiés", "IPOs & insiders") }} />
     <Stack.Screen name="notifications" options={{ title: pick("Notifications", "Notifications") }} />
     <Stack.Screen name="alerts" options={{ title: pick("Alertes", "Alerts") }} />
     <Stack.Screen name="watchlist" options={{ title: "Watchlist" }} />
+    <Stack.Screen name="compare" options={{ title: pick("Comparateur", "Comparator") }} />
+    <Stack.Screen name="search" options={{ title: pick("Recherche", "Search") }} />
+    <Stack.Screen name="discover" options={{ title: pick("Découvrir", "Discover") }} />
+    <Stack.Screen name="assistant" options={{ title: "Assistant Anatole" }} />
+    <Stack.Screen name="network/[ticker]" options={{ title: pick("Réseau d’entreprise", "Company network") }} />
     <Stack.Screen name="settings" options={{ title: pick("Réglages", "Settings") }} />
   </Stack>;
 }

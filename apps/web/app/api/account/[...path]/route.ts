@@ -17,11 +17,12 @@ const API_URL = (
   "https://anatole-api.onrender.com"
 ).replace(/\/+$/, "");
 
-const PUBLIC_ROUTES = new Set(["registration", "register", "login"]);
+const PUBLIC_ROUTES = new Set(["registration", "register", "login", "mobile-session"]);
 const ROUTES = new Map<string, ReadonlySet<string>>([
   ["registration", new Set(["GET"])],
   ["register", new Set(["POST"])],
   ["login", new Set(["POST"])],
+  ["mobile-session", new Set(["POST"])],
   ["me", new Set(["GET"])],
   ["logout", new Set(["POST"])],
   ["logout-all", new Set(["POST"])],
@@ -99,6 +100,21 @@ async function proxy(
   }
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+  if (route === "mobile-session") {
+    const authorization = request.headers.get("authorization") ?? "";
+    const mobileToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    if (!mobileToken) return NextResponse.json({ detail: "Jeton mobile requis." }, { status: 401, headers: noStoreHeaders() });
+    try {
+      const upstream = await fetch(`${API_URL}/api/v1/account/me`, { headers: { Accept: "application/json", Authorization: `Bearer ${mobileToken}` }, cache: "no-store" });
+      if (!upstream.ok) return NextResponse.json({ detail: "Session mobile invalide." }, { status: 401, headers: noStoreHeaders() });
+      const response = NextResponse.json({ ok: true }, { headers: noStoreHeaders() });
+      response.cookies.set(sessionCookie(mobileToken, new Date(Date.now() + 12 * 60 * 60 * 1000)));
+      copyRequestId(upstream, response);
+      return response;
+    } catch {
+      return NextResponse.json({ detail: "Validation de session mobile indisponible." }, { status: 502, headers: noStoreHeaders() });
+    }
+  }
   if (!PUBLIC_ROUTES.has(route) && !token) {
     return NextResponse.json(
       { detail: "Connexion requise." },

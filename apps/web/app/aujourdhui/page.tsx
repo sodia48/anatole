@@ -635,7 +635,7 @@ export default function TodayPage() {
     const sectorSentence = topSector && weakSector
       ? pick(language, `${topSector.sector} mène (${formatPercent(topSector.change_percent)}), tandis que ${weakSector.sector} ferme la marche (${formatPercent(weakSector.change_percent)}).`, `${topSector.sector} leads (${formatPercent(topSector.change_percent)}), while ${weakSector.sector} trails (${formatPercent(weakSector.change_percent)}).`)
       : pick(language, "Les données sectorielles se mettent à jour.", "Sector data is updating.");
-    const regime = terminal ? pick(language, ` Le régime Terminal est ${terminal.regime.toLowerCase()} avec un risque ${terminal.risk_level.toLowerCase()}.`, ` The Terminal regime is ${terminalRegimeLabel(terminal.regime, language).toLowerCase()} with ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} risk.`) : "";
+    const regime = terminal?.regime && terminal.risk_level ? pick(language, ` Le régime Terminal est ${terminal.regime.toLowerCase()} avec un risque ${terminal.risk_level.toLowerCase()}.`, ` The Terminal regime is ${terminalRegimeLabel(terminal.regime, language).toLowerCase()} with ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} risk.`) : "";
     return pick(language, `Le ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} de ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation} % des titres avancent. ${sectorSentence}${regime}`, `The ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation}% of securities are advancing. ${sectorSentence}${regime}`);
   }, [cockpit, language, terminal, topSector, universe, weakSector]);
 
@@ -795,8 +795,8 @@ export default function TodayPage() {
           <article className={styles.metricCard}>
             <Gauge size={21} />
             <span>{pick(language, "Régime Terminal", "Terminal regime")}</span>
-            <strong>{terminal ? terminalRegimeLabel(terminal.regime, language) : pick(language, "En attente", "Pending")}</strong>
-            <small>{terminal ? `${pick(language, "Risque", "Risk")} ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} · score ${Math.round(terminal.regime_score)}` : pick(language, "Analyse en cours", "Analyzing")}</small>
+            <strong>{terminal?.regime ? terminalRegimeLabel(terminal.regime, language) : pick(language, "N/D", "N/A")}</strong>
+            <small>{terminal?.risk_level && terminal.regime_score != null ? `${pick(language, "Risque", "Risk")} ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} · score ${Math.round(terminal.regime_score)}` : pick(language, "Couverture insuffisante", "Insufficient coverage")}</small>
           </article>
 
           <article className={styles.metricCard}>

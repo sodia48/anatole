@@ -2,7 +2,25 @@ import asyncio
 
 import pytest
 
-from app.core.resilience import AsyncStaleCache
+from app.core.resilience import AsyncStaleCache, SharedHttpClient
+
+
+def test_shared_http_client_never_reuses_a_pool_across_event_loops():
+    client = SharedHttpClient()
+
+    async def first_loop():
+        await client.start()
+        assert client._client is not None
+        return client._client
+
+    async def second_loop():
+        await client.start()
+        assert client._client is not None
+        instance = client._client
+        await client.close()
+        return instance
+
+    assert asyncio.run(first_loop()) is not asyncio.run(second_loop())
 
 
 @pytest.mark.asyncio

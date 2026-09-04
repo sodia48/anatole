@@ -74,6 +74,7 @@ class SharedHttpClient:
         self._client: httpx.AsyncClient | None = None
         self._start_lock: asyncio.Lock | None = None
         self._semaphore: asyncio.Semaphore | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self.metrics = HttpMetrics()
 
     @property
@@ -81,14 +82,23 @@ class SharedHttpClient:
         return self._client is not None and not self._client.is_closed
 
     async def start(self) -> None:
-        if self.started:
+        current_loop = asyncio.get_running_loop()
+        if self.started and self._loop is current_loop:
             return
+
+        # Test clients and reloaders can replace their event loop while this
+        # process-level service remains alive. A pool must never cross loops.
+        if self._loop is not None and self._loop is not current_loop:
+            self._client = None
+            self._semaphore = None
+            self._start_lock = None
+            self._loop = None
 
         if self._start_lock is None:
             self._start_lock = asyncio.Lock()
 
         async with self._start_lock:
-            if self.started:
+            if self.started and self._loop is current_loop:
                 return
 
             max_concurrency = _env_int("UPSTREAM_MAX_CONCURRENCY", 6)
@@ -114,6 +124,7 @@ class SharedHttpClient:
             )
 
             self._semaphore = asyncio.Semaphore(max_concurrency)
+            self._loop = current_loop
             self._client = httpx.AsyncClient(
                 timeout=timeout,
                 limits=limits,
@@ -131,8 +142,12 @@ class SharedHttpClient:
 
     async def close(self) -> None:
         client = self._client
+        owner_loop = self._loop
         self._client = None
-        if client is not None and not client.is_closed:
+        self._semaphore = None
+        self._start_lock = None
+        self._loop = None
+        if client is not None and not client.is_closed and owner_loop is asyncio.get_running_loop():
             await client.aclose()
 
     @staticmethod
