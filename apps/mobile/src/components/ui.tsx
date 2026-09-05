@@ -4,6 +4,7 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, RefreshCo
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { OfflineBadge } from "@/src/components/dataQuality";
+import { shouldSuppressQueryError } from "@/src/lib/api/base";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 
@@ -72,6 +73,7 @@ export function Change({ value, suffix = "%" }: { value: number; suffix?: string
 export function QueryState({ loading, error, empty, onRetry }: { loading: boolean; error?: Error | null; empty?: boolean; onRetry?: () => void }) {
   const { t } = useLocale();
   if (loading) return <View accessibilityLabel={t("loading")} style={styles.skeletonState}><View style={styles.skeletonWide} /><View style={styles.skeletonShort} /><ActivityIndicator color={colors.primary} /></View>;
+  if (shouldSuppressQueryError(error)) return null;
   if (error) return <View style={styles.state}><Text style={styles.error}>{error.message}</Text>{onRetry ? <Button label={t("retry")} onPress={onRetry} variant="secondary" /> : null}</View>;
   if (empty) return <View style={styles.state}><Text style={styles.muted}>{t("noData")}</Text></View>;
   return null;

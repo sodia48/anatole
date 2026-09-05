@@ -46,7 +46,8 @@ def _canonical_symbol(value: str) -> str:
 class CockpitService:
     cache_ttl_seconds = 15.0
     composite_cache_ttl_seconds = 90.0
-    composite_quote_timeout_seconds = 70.0
+    tsx60_quote_deadline_seconds = 6.0
+    composite_quote_deadline_seconds = 10.0
 
     def __init__(self) -> None:
         # Ces deux attributs restent les caches TSX 60 historiques afin de
@@ -54,10 +55,14 @@ class CockpitService:
         self._cached: CockpitSnapshot | None = None
         self._cached_at = 0.0
         self._lock = asyncio.Lock()
+        self._tsx60_refresh_task: asyncio.Task[CockpitSnapshot] | None = None
 
         self._composite_cached: CockpitSnapshot | None = None
         self._composite_cached_at = 0.0
         self._composite_lock = asyncio.Lock()
+        self._composite_refresh_task: asyncio.Task[CockpitSnapshot] | None = (
+            None
+        )
 
     @staticmethod
     def _tsx60_constituents() -> list[CockpitConstituent]:
@@ -105,20 +110,15 @@ class CockpitService:
         universe_source: str,
         previous: CockpitSnapshot | None,
         refresh_after_seconds: int,
-        include_unavailable: bool,
-        quote_timeout_seconds: float | None = None,
+        quote_deadline_seconds: float,
     ) -> CockpitSnapshot:
         generated_at = datetime.now(UTC)
         symbols = [item.symbol for item in constituents]
 
-        quote_request = market_data_service.get_quotes(symbols)
-        if quote_timeout_seconds is not None:
-            quotes = await asyncio.wait_for(
-                quote_request,
-                timeout=quote_timeout_seconds,
-            )
-        else:
-            quotes = await quote_request
+        quotes = await market_data_service.get_quotes(
+            symbols,
+            deadline_seconds=quote_deadline_seconds,
+        )
 
         quote_by_symbol = {
             _canonical_symbol(quote.symbol): quote
@@ -163,39 +163,19 @@ class CockpitService:
                 )
                 continue
 
-            if include_unavailable:
-                tiles.append(
-                    MarketTile(
-                        ticker=market_data_service.normalize_ticker(
-                            item.symbol
-                        ),
-                        symbol=item.symbol,
-                        name=item.name,
-                        sector=item.sector,
-                        weight=item.weight,
-                        price=0.0,
-                        change=0.0,
-                        change_percent=0.0,
-                        volume=0,
-                        timestamp=generated_at,
-                        source="unavailable",
-                        delayed=True,
-                    )
-                )
-
         # Ne remplace jamais une bonne carte par une réponse vide.
         if not tiles and previous is not None:
             return previous
 
-        priced_tiles = [
-            tile for tile in tiles if tile.source != "unavailable"
-        ]
-        weighted_tiles = priced_tiles or tiles
-        total_weight = sum(tile.weight for tile in weighted_tiles) or 1.0
+        if not tiles:
+            raise RuntimeError("No market quotes completed before deadline")
+
+        priced_tiles = tiles
+        total_weight = sum(tile.weight for tile in priced_tiles) or 1.0
         weighted_change = (
             sum(
                 tile.weight * tile.change_percent
-                for tile in weighted_tiles
+                for tile in priced_tiles
             )
             / total_weight
         )
@@ -223,9 +203,7 @@ class CockpitService:
         sectors: list[SectorSnapshot] = []
         for sector in sorted({tile.sector for tile in tiles}):
             members = [tile for tile in tiles if tile.sector == sector]
-            priced_members = [
-                tile for tile in members if tile.source != "unavailable"
-            ]
+            priced_members = members
             sector_weight = sum(tile.weight for tile in members)
             priced_weight = (
                 sum(tile.weight for tile in priced_members) or 1.0
@@ -261,7 +239,7 @@ class CockpitService:
             )
 
         sectors.sort(key=lambda item: item.weight, reverse=True)
-        ranked_tiles = priced_tiles or tiles
+        ranked_tiles = priced_tiles
 
         return CockpitSnapshot(
             universe=universe,
@@ -288,14 +266,37 @@ class CockpitService:
             refresh_after_seconds=refresh_after_seconds,
         )
 
-    async def get_tsx60(self) -> CockpitSnapshot:
-        now = monotonic()
-        if (
-            self._cached is not None
-            and now - self._cached_at < self.cache_ttl_seconds
-        ):
-            return self._cached
+    @staticmethod
+    def _observe_background_refresh(
+        task: asyncio.Task[CockpitSnapshot],
+        universe: str,
+    ) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            return
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "cockpit_background_refresh_failed universe=%s error=%s "
+                "detail=%s",
+                universe,
+                type(error).__name__,
+                error,
+            )
 
+    def _schedule_tsx60_refresh(self) -> None:
+        if (
+            self._tsx60_refresh_task is None
+            or self._tsx60_refresh_task.done()
+        ):
+            self._tsx60_refresh_task = asyncio.create_task(
+                self._refresh_tsx60()
+            )
+            self._tsx60_refresh_task.add_done_callback(
+                lambda task: self._observe_background_refresh(task, "tsx60")
+            )
+
+    async def _refresh_tsx60(self) -> CockpitSnapshot:
         async with self._lock:
             now = monotonic()
             if (
@@ -311,21 +312,40 @@ class CockpitService:
                 universe_source=TSX60_SOURCE,
                 previous=self._cached,
                 refresh_after_seconds=15,
-                include_unavailable=False,
+                quote_deadline_seconds=self.tsx60_quote_deadline_seconds,
             )
             self._cached = snapshot
             self._cached_at = monotonic()
             return snapshot
 
-    async def get_composite(self) -> CockpitSnapshot:
+    async def get_tsx60(self) -> CockpitSnapshot:
         now = monotonic()
         if (
-            self._composite_cached is not None
-            and now - self._composite_cached_at
-            < self.composite_cache_ttl_seconds
+            self._cached is not None
+            and now - self._cached_at < self.cache_ttl_seconds
         ):
-            return self._composite_cached
+            return self._cached
+        if self._cached is not None:
+            self._schedule_tsx60_refresh()
+            return self._cached
+        return await self._refresh_tsx60()
 
+    def _schedule_composite_refresh(self) -> None:
+        if (
+            self._composite_refresh_task is None
+            or self._composite_refresh_task.done()
+        ):
+            self._composite_refresh_task = asyncio.create_task(
+                self._refresh_composite()
+            )
+            self._composite_refresh_task.add_done_callback(
+                lambda task: self._observe_background_refresh(
+                    task,
+                    "composite",
+                )
+            )
+
+    async def _refresh_composite(self) -> CockpitSnapshot:
         async with self._composite_lock:
             now = monotonic()
             if (
@@ -347,9 +367,8 @@ class CockpitService:
                     universe_source=XIC_UNIVERSE_SOURCE,
                     previous=self._composite_cached,
                     refresh_after_seconds=90,
-                    include_unavailable=True,
-                    quote_timeout_seconds=(
-                        self.composite_quote_timeout_seconds
+                    quote_deadline_seconds=(
+                        self.composite_quote_deadline_seconds
                     ),
                 )
             except Exception as error:  # noqa: BLE001
@@ -375,12 +394,27 @@ class CockpitService:
                     ),
                     previous=None,
                     refresh_after_seconds=90,
-                    include_unavailable=False,
+                    quote_deadline_seconds=(
+                        self.tsx60_quote_deadline_seconds
+                    ),
                 )
 
             self._composite_cached = snapshot
             self._composite_cached_at = monotonic()
             return snapshot
+
+    async def get_composite(self) -> CockpitSnapshot:
+        now = monotonic()
+        if (
+            self._composite_cached is not None
+            and now - self._composite_cached_at
+            < self.composite_cache_ttl_seconds
+        ):
+            return self._composite_cached
+        if self._composite_cached is not None:
+            self._schedule_composite_refresh()
+            return self._composite_cached
+        return await self._refresh_composite()
 
 
 cockpit_service = CockpitService()

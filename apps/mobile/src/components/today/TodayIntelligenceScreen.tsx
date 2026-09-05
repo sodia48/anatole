@@ -1,5 +1,5 @@
 import { isTerminalV2Snapshot } from "@anatole/shared";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from "react-native";
@@ -24,7 +24,6 @@ import { buildTodayAttention, buildTodayTimeline, latestCockpitQuoteTime, person
 
 type Section = "header" | "market" | "drivers" | "attention" | "heatmap" | "personal" | "timeline" | "news" | "links";
 const SECTIONS: Section[] = ["header", "market", "drivers", "attention", "heatmap", "personal", "timeline", "news", "links"];
-const QUERY_ROOTS = ["cockpit", "psychology", "news", "calendar", "earnings", "watchlist", "alerts", "portfolio", "terminal", "screener", "insiders", "stock-news"];
 const TODAY_VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 function firstName(value: string | null | undefined) {
@@ -34,7 +33,6 @@ function firstName(value: string | null | undefined) {
 export function TodayIntelligenceScreen() {
   const { language, pick } = useLocale();
   const { user, workspace } = useMobileAccount();
-  const queryClient = useQueryClient();
   const [universe, setUniverse] = useState<TodayUniverse>("composite");
   const [tier, setTier] = useState(1);
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
@@ -49,13 +47,9 @@ export function TodayIntelligenceScreen() {
       const active = state === "active";
       if (!active) setTier(1);
       setAppActive(active);
-      if (!active) for (const root of QUERY_ROOTS) void queryClient.cancelQueries({ queryKey: [root] });
     });
-    return () => {
-      subscription.remove();
-      for (const root of QUERY_ROOTS) void queryClient.cancelQueries({ queryKey: [root] });
-    };
-  }, [queryClient]);
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (!appActive) return;

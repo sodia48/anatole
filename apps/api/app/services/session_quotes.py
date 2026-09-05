@@ -256,7 +256,12 @@ class SessionQuoteService:
         )
         return quote
 
-    async def get_quotes(self, tickers: list[str]) -> list[Quote]:
+    async def get_quotes(
+        self,
+        tickers: list[str],
+        *,
+        deadline_seconds: float | None = None,
+    ) -> list[Quote]:
         # Déduplication avant gather : la même action n'est jamais demandée
         # plusieurs fois dans un même snapshot.
         unique: dict[str, str] = {}
@@ -265,16 +270,55 @@ class SessionQuoteService:
                 unique.setdefault(self.normalize_ticker(ticker), ticker)
             except ValueError:
                 continue
+        if not unique:
+            return []
 
-        results = await asyncio.gather(
-            *(self.get_quote(ticker) for ticker in unique.values()),
-            return_exceptions=True,
-        )
+        if deadline_seconds is None:
+            results = await asyncio.gather(
+                *(self.get_quote(ticker) for ticker in unique.values()),
+                return_exceptions=True,
+            )
+        else:
+            tasks = [
+                asyncio.create_task(self.get_quote(ticker))
+                for ticker in unique.values()
+            ]
+            try:
+                done, pending = await asyncio.wait(
+                    tasks,
+                    timeout=max(0.01, deadline_seconds),
+                )
+            except asyncio.CancelledError:
+                for task in tasks:
+                    task.add_done_callback(self._consume_background_quote)
+                raise
+
+            # Let incomplete loaders populate AsyncStaleCache. Cancelling them
+            # here would interrupt the single-flight shared by other requests.
+            for task in pending:
+                task.add_done_callback(self._consume_background_quote)
+            results = []
+            for task in tasks:
+                if task not in done or task.cancelled():
+                    results.append(None)
+                    continue
+                error = task.exception()
+                results.append(error if error is not None else task.result())
+            logger.info(
+                "session_quote_deadline_complete requested=%s completed=%s "
+                "timed_out=%s deadline_seconds=%s",
+                len(tasks),
+                len(done),
+                len(pending),
+                deadline_seconds,
+            )
 
         output: list[Quote] = []
         for normalized, result in zip(unique, results, strict=False):
             if isinstance(result, Quote):
                 output.append(result)
+                continue
+            if result is None:
                 continue
             logger.warning(
                 "session_quote_unavailable ticker=%s error=%s detail=%s",
@@ -283,6 +327,19 @@ class SessionQuoteService:
                 result,
             )
         return output
+
+    @staticmethod
+    def _consume_background_quote(task: asyncio.Task[Quote]) -> None:
+        try:
+            task.result()
+        except asyncio.CancelledError:
+            return
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "session_quote_background_unavailable error=%s detail=%s",
+                type(error).__name__,
+                error,
+            )
 
 
 session_quote_service = SessionQuoteService()

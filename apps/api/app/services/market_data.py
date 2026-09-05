@@ -297,7 +297,12 @@ class MarketDataService:
 
         return await self.yahoo.quote(ticker)
 
-    async def get_quotes(self, tickers: list[str]) -> list[Quote]:
+    async def get_quotes(
+        self,
+        tickers: list[str],
+        *,
+        deadline_seconds: float | None = None,
+    ) -> list[Quote]:
         unique: list[str] = []
         seen: set[str] = set()
         for ticker in tickers:
@@ -319,7 +324,10 @@ class MarketDataService:
                 )
             )
 
-        public_quotes = await session_quote_service.get_quotes(unique)
+        public_quotes = await session_quote_service.get_quotes(
+            unique,
+            deadline_seconds=deadline_seconds,
+        )
         public_by_symbol = {
             quote.symbol.replace("-", ".").upper(): quote
             for quote in public_quotes
