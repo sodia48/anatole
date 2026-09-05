@@ -96,22 +96,33 @@ def build_rows_from_quotes_and_histories(
         symbol = constituent.ticker
         quote = quote_by_symbol.get(symbol.upper())
         candles = histories.get(symbol, [])
-        if quote is None or not candles:
+        if quote is None:
             continue
-
-        technicals = market_data_service.calculate_technicals(candles)
-        average_volume = _average_volume(candles)
-        relative_volume = quote.volume / average_volume if average_volume else 0.0
-        momentum_20d = _momentum(candles, quote.price)
-        trend = _trend(quote.price, technicals.sma_20, technicals.sma_50)
-        score = _score(
-            quote.change_percent,
-            momentum_20d,
-            relative_volume,
-            technicals.rsi_14,
-            trend,
+        technicals = market_data_service.calculate_technicals(candles) if candles else None
+        average_volume = _average_volume(candles) if candles else None
+        relative_volume = quote.volume / average_volume if average_volume else None
+        momentum_20d = _momentum(candles, quote.price) if candles else None
+        trend = (
+            _trend(quote.price, technicals.sma_20, technicals.sma_50)
+            if technicals is not None
+            else None
         )
-        prior_high_20d, breakout_20d, breakout_percent = _breakout_metrics(candles, quote.price)
+        score = (
+            _score(
+                quote.change_percent,
+                momentum_20d,
+                relative_volume,
+                technicals.rsi_14,
+                trend,
+            )
+            if momentum_20d is not None and relative_volume is not None and trend is not None
+            else None
+        )
+        prior_high_20d, breakout_20d, breakout_percent = (
+            _breakout_metrics(candles, quote.price)
+            if candles
+            else (None, None, None)
+        )
         rows.append(ScreenerRow(
             ticker=quote.ticker,
             symbol=symbol,
@@ -121,14 +132,14 @@ def build_rows_from_quotes_and_histories(
             change_percent=round(quote.change_percent, 4),
             volume=quote.volume,
             average_volume_20d=average_volume,
-            relative_volume=round(relative_volume, 2),
-            momentum_20d=round(momentum_20d, 2),
-            rsi_14=technicals.rsi_14,
-            sma_20=technicals.sma_20,
-            sma_50=technicals.sma_50,
+            relative_volume=round(relative_volume, 2) if relative_volume is not None else None,
+            momentum_20d=round(momentum_20d, 2) if momentum_20d is not None else None,
+            rsi_14=technicals.rsi_14 if technicals is not None else None,
+            sma_20=technicals.sma_20 if technicals is not None else None,
+            sma_50=technicals.sma_50 if technicals is not None else None,
             trend=trend,
             score=score,
-            signal=_signal(score),
+            signal=_signal(score) if score is not None else None,
             source=quote.source,
             delayed=quote.delayed,
             quote_as_of=quote.timestamp,
@@ -142,8 +153,11 @@ def build_rows_from_quotes_and_histories(
 class ScreenerService:
     tsx60_cache_ttl_seconds = 45.0
     composite_cache_ttl_seconds = 180.0
+    tsx60_stale_seconds = 900.0
+    composite_stale_seconds = 21_600.0
     composite_history_concurrency = 16
     composite_max_constituents = 260
+    composite_history_deadline_seconds = 7.0
 
     def __init__(self) -> None:
         self._cache: dict[
@@ -154,6 +168,7 @@ class ScreenerService:
             "tsx60": asyncio.Lock(),
             "composite": asyncio.Lock(),
         }
+        self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
 
     @staticmethod
     def _normalize_universe(
@@ -187,6 +202,13 @@ class ScreenerService:
             self.composite_cache_ttl_seconds
             if universe == "composite"
             else self.tsx60_cache_ttl_seconds
+        )
+
+    def _stale_ttl(self, universe: str) -> float:
+        return (
+            self.composite_stale_seconds
+            if universe == "composite"
+            else self.tsx60_stale_seconds
         )
 
     async def _constituents(
@@ -231,110 +253,103 @@ class ScreenerService:
             ],
         )
 
+    async def _build_snapshot(self, normalized: str) -> ScreenerSnapshot:
+        started_at = monotonic()
+        universe_name, constituents = await self._constituents(normalized)
+        symbols = [item.ticker for item in constituents]
+        quotes, histories = await asyncio.gather(
+            market_data_service.get_quotes(symbols),
+            market_data_service.get_history_many(
+                symbols,
+                range_="3mo",
+                interval="1d",
+                concurrency=(
+                    self.composite_history_concurrency
+                    if normalized == "composite"
+                    else 12
+                ),
+                deadline_seconds=(
+                    self.composite_history_deadline_seconds
+                    if normalized == "composite"
+                    else 5.0
+                ),
+            ),
+        )
+        rows = build_rows_from_quotes_and_histories(
+            constituents,
+            quotes,
+            histories,
+        )
+        snapshot = ScreenerSnapshot(
+            universe=universe_name,
+            items=sorted(rows, key=lambda item: item.score if item.score is not None else -1, reverse=True),
+            sectors=sorted({item.sector for item in rows}),
+            generated_at=datetime.now(UTC),
+            refresh_after_seconds=180 if normalized == "composite" else 45,
+            live_items=sum(item.source != "demo-fallback" for item in rows),
+            fallback_items=sum(item.source == "demo-fallback" for item in rows),
+        )
+        logger.info(
+            "screener_snapshot_complete universe=%s constituents=%s rows=%s history_coverage=%s duration_ms=%s",
+            normalized,
+            len(constituents),
+            len(rows),
+            round(len(histories) / max(len(constituents), 1) * 100, 1),
+            round((monotonic() - started_at) * 1000),
+        )
+        return snapshot
+
+    async def _refresh(self, normalized: str) -> ScreenerSnapshot:
+        async with self._locks[normalized]:
+            cached = self._cache.get(normalized)
+            if cached is not None and monotonic() - cached[0] < self._ttl(normalized):
+                return cached[1]
+            snapshot = await self._build_snapshot(normalized)
+            self._cache[normalized] = (monotonic(), snapshot)
+            return snapshot
+
+    async def _refresh_in_background(self, normalized: str) -> None:
+        try:
+            await self._refresh(normalized)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            logger.warning(
+                "screener_background_refresh_failed universe=%s error=%s detail=%s",
+                normalized,
+                type(error).__name__,
+                error,
+            )
+        finally:
+            self._refresh_tasks.pop(normalized, None)
+
+    def _schedule_refresh(self, normalized: str) -> None:
+        task = self._refresh_tasks.get(normalized)
+        if task is None or task.done():
+            self._refresh_tasks[normalized] = asyncio.create_task(
+                self._refresh_in_background(normalized)
+            )
+
     async def get_snapshot(
         self,
         universe: str = "composite",
     ) -> ScreenerSnapshot:
-        normalized = self._normalize_universe(
-            universe
-        )
+        normalized = self._normalize_universe(universe)
         now = monotonic()
         cached = self._cache.get(normalized)
-
-        if (
-            cached is not None
-            and now - cached[0] <
-            self._ttl(normalized)
-        ):
-            return cached[1]
-
-        async with self._locks[normalized]:
-            now = monotonic()
-            cached = self._cache.get(
-                normalized
-            )
-            if (
-                cached is not None
-                and now - cached[0] <
-                self._ttl(normalized)
-            ):
+        if cached is not None:
+            age = now - cached[0]
+            if age < self._ttl(normalized):
                 return cached[1]
-
-            universe_name, constituents = (
-                await self._constituents(
-                    normalized
+            if age < self._stale_ttl(normalized):
+                self._schedule_refresh(normalized)
+                logger.info(
+                    "screener_stale_snapshot_served universe=%s age_seconds=%s",
+                    normalized,
+                    round(age, 1),
                 )
-            )
-            symbols = [
-                item.ticker
-                for item in constituents
-            ]
-
-            quotes, histories = (
-                await asyncio.gather(
-                    market_data_service
-                    .get_quotes(symbols),
-                    market_data_service
-                    .get_history_many(
-                        symbols,
-                        range_="3mo",
-                        interval="1d",
-                        concurrency=(
-                            self.composite_history_concurrency
-                            if normalized
-                            == "composite"
-                            else 12
-                        ),
-                    ),
-                )
-            )
-
-            rows = build_rows_from_quotes_and_histories(
-                constituents,
-                quotes,
-                histories,
-            )
-
-            snapshot = ScreenerSnapshot(
-                universe=universe_name,
-                items=sorted(
-                    rows,
-                    key=lambda item: (
-                        item.score
-                    ),
-                    reverse=True,
-                ),
-                sectors=sorted(
-                    {
-                        item.sector
-                        for item in rows
-                    }
-                ),
-                generated_at=datetime.now(
-                    UTC
-                ),
-                refresh_after_seconds=(
-                    180
-                    if normalized
-                    == "composite"
-                    else 45
-                ),
-                live_items=sum(
-                    item.source
-                    != "demo-fallback"
-                    for item in rows
-                ),
-                fallback_items=sum(
-                    item.source
-                    == "demo-fallback"
-                    for item in rows
-                ),
-            )
-            self._cache[normalized] = (
-                monotonic(),
-                snapshot,
-            )
-            return snapshot
+                return cached[1]
+        return await self._refresh(normalized)
 
     async def get_tsx60(
         self,

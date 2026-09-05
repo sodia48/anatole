@@ -25,6 +25,8 @@ export function TodayMarketBrief({
   cockpit,
   terminal,
   psychology,
+  psychologyLoading,
+  terminalLoading,
   loading,
   error,
   onRetry,
@@ -36,6 +38,8 @@ export function TodayMarketBrief({
   cockpit?: CockpitSnapshot;
   terminal: TerminalSnapshot | null;
   psychology?: PsychologySnapshot;
+  psychologyLoading: boolean;
+  terminalLoading: boolean;
   loading: boolean;
   error: Error | null;
   onRetry: () => void;
@@ -51,6 +55,7 @@ export function TodayMarketBrief({
   const trailingClassification = classifyTrailingSector(pressure, language);
   const delayed = cockpit?.constituents.some((item) => item.delayed) ?? false;
   const quoteTime = latestCockpitQuoteTime(cockpit);
+  const loadingLabel = pick("Chargement…", "Loading…");
   return <View style={styles.stack}>
     <Card title={pick("LE MARCHÉ EN 15 SECONDES", "THE MARKET IN 15 SECONDS")} testID="today-market-brief">
       <View style={styles.segment}>{(["composite", "tsx60"] as TodayUniverse[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: universe === value }} key={value} onPress={() => onUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]} testID={`today-universe-${value}`}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "composite" ? "Composite" : "TSX 60"}</Text></Pressable>)}</View>
@@ -60,8 +65,8 @@ export function TodayMarketBrief({
         <View style={styles.grid}>
           <Metric label={pick("Largeur", "Breadth")} value={`${cockpit.breadth.advancers}↑ · ${cockpit.breadth.decliners}↓`} />
           <Metric label={pick("Ratio de hausse", "Advance ratio")} value={valueOrNd(cockpit.breadth.advance_ratio, 1, language) === "N/D" ? "N/D" : `${valueOrNd(cockpit.breadth.advance_ratio, 1, language)} %`} />
-          <Metric label={pick("Régime Terminal · TSX 60", "Terminal regime · TSX 60")} onPress={onTerminal} testID="today-open-terminal" value={terminal?.regime && terminal.regime_score != null ? `${terminal.regime} · ${Math.round(terminal.regime_score)}/100` : "N/D"} />
-          <Metric label={pick("Psychologie", "Psychology")} onPress={onPsychology} testID="today-open-psychology" value={psychology ? `${psychology.label} · ${Math.round(psychology.score)}/100` : "N/D"} />
+          <Metric label={pick("Régime Terminal · TSX 60", "Terminal regime · TSX 60")} onPress={onTerminal} testID="today-open-terminal" value={terminal?.regime && terminal.regime_score != null ? `${terminal.regime} · ${Math.round(terminal.regime_score)}/100` : terminalLoading ? loadingLabel : "N/D"} />
+          <Metric label={pick("Psychologie", "Psychology")} onPress={onPsychology} testID="today-open-psychology" value={psychology ? `${psychology.label} · ${Math.round(psychology.score)}/100` : psychologyLoading ? loadingLabel : "N/D"} />
           <Metric label={pick("Secteur leader", "Leading sector")} value={leader ? `${leader.sector} · ${percentOrNd(leader.change_percent, language)}` : "N/D"} />
           <Metric label={trailingClassification?.label ?? pick("Secteur le moins fort", "Least strong sector")} value={pressure ? `${pressure.sector} · ${percentOrNd(pressure.change_percent, language)}` : "N/D"} />
           <Metric label="MM50 · TSX 60" value={percentOrNd(terminal?.above_sma50_percent, language)} />

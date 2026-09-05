@@ -35,18 +35,18 @@ export function ScreenerClient() {
     return () => { active = false; window.clearInterval(timer); };
   }, []);
 
-  const signals = useMemo(() => Array.from(new Set(data?.items.map((item) => item.signal) ?? [])).sort(), [data]);
+  const signals = useMemo(() => Array.from(new Set(data?.items.map((item) => item.signal).filter((item): item is string => item !== null) ?? [])).sort(), [data]);
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const rows = (data?.items ?? []).filter((item) => {
       const matchesQuery = !normalized || `${item.symbol} ${item.name}`.toLowerCase().includes(normalized);
-      return matchesQuery && (sector === "Tous" || item.sector === sector) && (signal === "Tous" || item.signal === signal) && item.score >= minimumScore;
+      return matchesQuery && (sector === "Tous" || item.sector === sector) && (signal === "Tous" || item.signal === signal) && (minimumScore <= 0 || (item.score !== null && item.score >= minimumScore));
     });
     return [...rows].sort((a, b) => {
       if (sort === "change") return b.change_percent - a.change_percent;
-      if (sort === "momentum") return b.momentum_20d - a.momentum_20d;
-      if (sort === "volume") return b.relative_volume - a.relative_volume;
-      return b.score - a.score;
+      if (sort === "momentum") return (b.momentum_20d ?? -Infinity) - (a.momentum_20d ?? -Infinity);
+      if (sort === "volume") return (b.relative_volume ?? -Infinity) - (a.relative_volume ?? -Infinity);
+      return (b.score ?? -Infinity) - (a.score ?? -Infinity);
     });
   }, [data, minimumScore, query, sector, signal, sort]);
 
@@ -77,11 +77,11 @@ export function ScreenerClient() {
               <div className="screener-name"><strong>{item.symbol}</strong><span>{item.name}</span><small>{item.sector}</small></div>
               <strong>{money.format(item.price)}</strong>
               <span className={item.change_percent >= 0 ? "positive" : "negative"}>{item.change_percent >= 0 ? <ArrowUp size={13} /> : <ArrowDown size={13} />}{item.change_percent.toFixed(2)} %</span>
-              <span className={item.momentum_20d >= 0 ? "positive" : "negative"}>{item.momentum_20d.toFixed(2)} %</span>
+              <span className={item.momentum_20d === null ? "" : item.momentum_20d >= 0 ? "positive" : "negative"}>{item.momentum_20d === null ? "N/D" : `${item.momentum_20d.toFixed(2)} %`}</span>
               <span>{item.rsi_14?.toFixed(1) ?? "—"}</span>
-              <span>{item.relative_volume.toFixed(2)}× <small>{compact.format(item.volume)}</small></span>
-              <span className="score-pill">{item.score.toFixed(0)}</span>
-              <span className={`signal-badge signal-${item.signal.toLowerCase().replaceAll(" ", "-")}`}>{item.signal}</span>
+              <span>{item.relative_volume === null ? "N/D" : `${item.relative_volume.toFixed(2)}×`} <small>{compact.format(item.volume)}</small></span>
+              <span className="score-pill">{item.score === null ? "N/D" : item.score.toFixed(0)}</span>
+              <span className={`signal-badge ${item.signal ? `signal-${item.signal.toLowerCase().replaceAll(" ", "-")}` : ""}`}>{item.signal ?? "N/D"}</span>
             </Link>
           ))}
           {!filtered.length ? <div className="empty-filter"><Filter size={24} /><strong>Aucun titre ne correspond aux filtres.</strong><span>Réduis le score minimum ou élargis les critères.</span></div> : null}

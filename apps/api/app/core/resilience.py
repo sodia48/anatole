@@ -101,7 +101,7 @@ class SharedHttpClient:
             if self.started and self._loop is current_loop:
                 return
 
-            max_concurrency = _env_int("UPSTREAM_MAX_CONCURRENCY", 6)
+            max_concurrency = _env_int("UPSTREAM_MAX_CONCURRENCY", 12)
             max_connections = _env_int("UPSTREAM_MAX_CONNECTIONS", 12)
             max_keepalive = min(
                 max_connections,
@@ -188,7 +188,7 @@ class SharedHttpClient:
         max_attempts = max(
             1,
             attempts
-            or _env_int("UPSTREAM_REQUEST_ATTEMPTS", 3),
+            or _env_int("UPSTREAM_REQUEST_ATTEMPTS", 2),
         )
         last_error: Exception | None = None
 

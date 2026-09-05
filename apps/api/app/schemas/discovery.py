@@ -10,15 +10,15 @@ class ScreenerRow(BaseModel):
     price: float
     change_percent: float
     volume: int
-    average_volume_20d: int
-    relative_volume: float
-    momentum_20d: float
+    average_volume_20d: int | None = None
+    relative_volume: float | None = None
+    momentum_20d: float | None = None
     rsi_14: float | None = None
     sma_20: float | None = None
     sma_50: float | None = None
-    trend: str
-    score: float = Field(ge=0, le=100)
-    signal: str
+    trend: str | None = None
+    score: float | None = Field(default=None, ge=0, le=100)
+    signal: str | None = None
     source: str
     delayed: bool
     quote_as_of: datetime | None = None

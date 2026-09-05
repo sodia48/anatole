@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.schemas.workspace import (
     AlertEvaluateRequest,
@@ -26,8 +26,11 @@ router = APIRouter()
     response_model=PortfolioSnapshot,
     summary="Analyse un portefeuille local sans exécution d’ordres",
 )
-async def portfolio(request: PortfolioAnalyzeRequest) -> PortfolioSnapshot:
-    return await portfolio_service.analyze(request)
+async def portfolio(
+    request: PortfolioAnalyzeRequest,
+    fast: bool = Query(default=False),
+) -> PortfolioSnapshot:
+    return await portfolio_service.analyze(request, fast=fast)
 
 
 @router.post(

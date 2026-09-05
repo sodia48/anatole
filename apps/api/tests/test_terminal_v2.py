@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.schemas.discovery import ScreenerRow
 from app.schemas.stocks import Candle, Quote
 from app.services.market_data import market_data_service
+from app.services.session_quotes import session_quote_service
 from app.services.analysis import AnalysisService
 from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.services.screener import screener_service
@@ -201,7 +202,7 @@ async def test_strict_history_never_calls_demo_fallback(monkeypatch: pytest.Monk
     monkeypatch.setattr(settings, "market_data_provider", "yahoo")
     demo_called = False
 
-    async def strict_yahoo(ticker: str, range_: str, interval: str) -> list[Candle]:
+    async def strict_yahoo(ticker: str, range_: str, interval: str, attempts: int | None = None) -> list[Candle]:
         if ticker == "TD":
             raise RuntimeError("unavailable")
         return candles(count=30)
@@ -219,11 +220,21 @@ async def test_strict_history_never_calls_demo_fallback(monkeypatch: pytest.Monk
 
 
 @pytest.mark.asyncio
+async def test_bulk_quotes_never_inject_demo_rows_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "market_data_provider", "yahoo")
+    monkeypatch.setattr(session_quote_service, "get_quotes", AsyncMock(return_value=[]))
+    demo_quote = AsyncMock()
+    monkeypatch.setattr(market_data_service.demo, "quote", demo_quote)
+    assert await market_data_service.get_quotes(["RY", "TD"]) == []
+    demo_quote.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_strict_history_times_out_one_symbol_without_blocking_coverage(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "market_data_provider", "yahoo")
     monkeypatch.setattr(market_data_service, "strict_history_timeout_seconds", 0.01)
 
-    async def history(ticker: str, range_: str, interval: str) -> list[Candle]:
+    async def history(ticker: str, range_: str, interval: str, attempts: int | None = None) -> list[Candle]:
         if ticker == "SLOW":
             await asyncio.sleep(0.05)
         return candles(count=30)
@@ -231,6 +242,27 @@ async def test_strict_history_times_out_one_symbol_without_blocking_coverage(mon
     monkeypatch.setattr(market_data_service.yahoo, "history", history)
     result = await market_data_service.get_history_many_strict(["RY", "SLOW"], concurrency=2)
     assert set(result) == {"RY"}
+
+
+@pytest.mark.asyncio
+async def test_bulk_history_global_deadline_returns_completed_tickers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "market_data_provider", "yahoo")
+
+    async def history(ticker: str, range_: str, interval: str, attempts: int | None = None) -> list[Candle]:
+        if ticker != "RY":
+            await asyncio.sleep(0.2)
+        return candles(count=30)
+
+    monkeypatch.setattr(market_data_service.yahoo, "history", history)
+    loop = asyncio.get_running_loop()
+    started = loop.time()
+    result = await market_data_service.get_history_many_strict(
+        ["RY", "SLOW-1", "SLOW-2"],
+        concurrency=3,
+        deadline_seconds=0.03,
+    )
+    assert set(result) == {"RY"}
+    assert loop.time() - started < 0.15
 
 
 @pytest.mark.asyncio

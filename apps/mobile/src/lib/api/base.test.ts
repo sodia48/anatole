@@ -34,17 +34,31 @@ describe("mobile API client", () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
   });
 
-  it("retries one safe GET after a network failure", async () => {
-    globalThis.fetch = jest.fn()
-      .mockRejectedValueOnce(new TypeError("network unavailable"))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    await expect(apiRequest<{ ok: boolean }>("/api/v1/market/cockpit")).resolves.toEqual({ ok: true });
-    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  it("fails fast without a second transport retry", async () => {
+    globalThis.fetch = jest.fn().mockRejectedValue(new TypeError("network unavailable"));
+    await expect(apiRequest<{ ok: boolean }>("/api/v1/market/cockpit")).rejects.toThrow("network unavailable");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("never retries an unsafe POST blindly", async () => {
     globalThis.fetch = jest.fn().mockRejectedValue(new TypeError("network unavailable"));
     await expect(apiRequest("/api/v1/account/login", { method: "POST", body: "{}" })).rejects.toThrow("network unavailable");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates navigation cancellation without retrying or converting it to a timeout", async () => {
+    const controller = new AbortController();
+    globalThis.fetch = jest.fn((...args: Parameters<typeof fetch>) => new Promise<Response>((_resolve, reject) => {
+      const init = args[1];
+      init?.signal?.addEventListener("abort", () => {
+        const error = new Error("navigation cancelled");
+        error.name = "AbortError";
+        reject(error);
+      }, { once: true });
+    })) as jest.MockedFunction<typeof fetch>;
+    const request = apiRequest("/api/v1/stocks/RY/news", { signal: controller.signal });
+    controller.abort();
+    await expect(request).rejects.toEqual(expect.objectContaining({ name: "AbortError" }));
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
   });
 });
