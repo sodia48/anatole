@@ -8,6 +8,7 @@ import NotificationsScreen from "@/app/notifications";
 import { PsychologyScreen } from "@/src/components/psychology/PsychologyScreen";
 import StockDetailScreen from "@/app/stock/[ticker]";
 import WatchlistScreen from "@/app/watchlist";
+import { marketApi } from "@/src/lib/api/market";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn(), replace: jest.fn() }, useLocalSearchParams: () => ({ ticker: "RY" }) }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr, t: (key: string) => key }) }));
@@ -35,11 +36,11 @@ const mockQueryData: Record<string, unknown> = {
   notifications: { unread_count: 1, generated_at: "2026-08-30T00:00:00Z", items: [{ id: "n1", kind: "alert", title: "RY", message: "Seuil atteint", severity: "important", symbol: "RY", route: null, created_at: "2026-08-30T00:00:00Z", read_at: null }] },
   watchlist: { tickers: ["RY"], items: [{ ...tile, currency: "CAD", previous_close: 198, day_high: 202, day_low: 197 }], summary: { advancers: 1, decliners: 0, unchanged: 0, average_change_percent: 1 }, generated_at: "2026-08-30T00:00:00Z", refresh_after_seconds: 45 },
 };
-const mockObservedQueries: { queryKey: unknown[]; enabled?: boolean }[] = [];
+const mockObservedQueries: { queryKey: unknown[]; enabled?: boolean; queryFn?: (context: { signal: AbortSignal }) => unknown }[] = [];
 
 jest.mock("@tanstack/react-query", () => ({
-  useQuery: ({ queryKey, enabled }: { queryKey: unknown[]; enabled?: boolean }) => {
-    mockObservedQueries.push({ queryKey, enabled });
+  useQuery: ({ queryKey, enabled, queryFn }: { queryKey: unknown[]; enabled?: boolean; queryFn?: (context: { signal: AbortSignal }) => unknown }) => {
+    mockObservedQueries.push({ queryKey, enabled, queryFn });
     return { data: mockQueryData[String(queryKey[0])], isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn() };
   },
   useQueryClient: () => ({ cancelQueries: jest.fn() }),
@@ -88,6 +89,19 @@ describe("critical native screens", () => {
     expect(view.getByTestId("focus-overview-section")).toBeTruthy();
     expect(view.getByTestId("focus-chart-webview")).toBeTruthy();
     expect(view.getByText("RY · LIVE")).toBeTruthy();
+    await view.unmount();
+  }, 30_000);
+
+  it("forwards React Query cancellation to stock news", async () => {
+    const view = await render(<StockDetailScreen />);
+    const stockNews = mockObservedQueries.find(({ queryKey }) => queryKey[0] === "stock-news");
+    const controller = new AbortController();
+
+    await stockNews?.queryFn?.({ signal: controller.signal });
+
+    expect(marketApi.stockNews).toHaveBeenCalledWith("RY", "Royal Bank", "fr", controller.signal);
+    controller.abort();
+    expect(controller.signal.aborted).toBe(true);
     await view.unmount();
   }, 30_000);
 

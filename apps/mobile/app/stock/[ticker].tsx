@@ -42,7 +42,7 @@ export default function StockDetailScreen() {
     const task = InteractionManager.runAfterInteractions(() => setPreloadedProTicker(ticker));
     return () => task.cancel();
   }, [focus.data, ticker]);
-  const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: () => marketApi.stockNews(ticker, company, language), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
+  const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: ({ signal }) => marketApi.stockNews(ticker, company, language, signal), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
   const needsFundamentals = ["fundamentals", "financials", "analysts"].includes(section);
   const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: needsFundamentals, staleTime: 10 * 60_000 });
   const live = useLiveQuote(ticker, focus.data?.quote);

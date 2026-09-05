@@ -7,7 +7,7 @@ import { type PropsWithChildren, useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { LocaleProvider } from "@/src/lib/i18n";
-import { MOBILE_CACHE_BUSTER, MOBILE_CACHE_KEY, MOBILE_CACHE_MAX_AGE, PERSISTED_QUERY_SCOPES, scheduleReconnectRefresh } from "@/src/lib/offlineCache";
+import { MOBILE_CACHE_BUSTER, MOBILE_CACHE_KEY, MOBILE_CACHE_MAX_AGE, scheduleReconnectRefresh, shouldDehydrateMobileQuery } from "@/src/lib/offlineCache";
 import { MobileAccountProvider } from "./MobileAccountProvider";
 
 const queryClient = new QueryClient({
@@ -59,7 +59,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       maxAge: MOBILE_CACHE_MAX_AGE,
       buster: MOBILE_CACHE_BUSTER,
       dehydrateOptions: {
-        shouldDehydrateQuery: (query) => PERSISTED_QUERY_SCOPES.has(String(query.queryKey[0])),
+        shouldDehydrateQuery: (query) => shouldDehydrateMobileQuery(query),
       },
     }}>
       <LocaleProvider>
