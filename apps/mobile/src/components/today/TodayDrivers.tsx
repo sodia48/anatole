@@ -1,26 +1,27 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { valueOrNd } from "@/src/components/focus/format";
-import { Card } from "@/src/components/ui";
+import { Card, QueryState } from "@/src/components/ui";
 import type { TerminalMarketDriver } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { driverMove, driverRelationship, selectTodayDrivers } from "./model";
 
-export function TodayDrivers({ drivers, stale, onOpenTerminal }: { drivers: readonly TerminalMarketDriver[]; stale: boolean; onOpenTerminal: () => void }) {
+export function TodayDrivers({ drivers, stale, loading, onOpenTerminal }: { drivers: readonly TerminalMarketDriver[]; stale: boolean; loading: boolean; onOpenTerminal: () => void }) {
   const { language, pick } = useLocale();
   const selected = selectTodayDrivers(drivers);
   const status = (value: TerminalMarketDriver["status"]) => value === "available" ? pick("À jour", "Up to date") : value === "stale" ? pick("Dernières données", "Latest available") : pick("Indisponible", "Unavailable");
   return <Card action={<Pressable accessibilityRole="button" onPress={onOpenTerminal} style={styles.link}><Text style={styles.linkText}>Terminal Pro →</Text></Pressable>} title={pick("DRIVERS DU JOUR", "TODAY’S DRIVERS")} testID="today-drivers">
     {stale ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
-    {selected.length ? selected.map((driver) => {
+    <QueryState loading={loading} />
+    {!loading && selected.length ? selected.map((driver) => {
       const relationship = driverRelationship(driver, language);
       return <View key={driver.key} style={styles.driver} testID={`today-driver-${driver.key}`}>
         <View style={styles.top}><View style={styles.identity}><Text style={styles.name}>{driver.label}</Text><Text style={styles.category}>{driver.category}</Text></View><Text style={[styles.status, driver.status === "stale" && styles.statusStale]}>{status(driver.status)}</Text></View>
         <View style={styles.values}><Text style={styles.value}>{driver.value == null ? "N/D" : `${valueOrNd(driver.value, 3, language)} ${driver.unit}`}</Text><Text style={[styles.move, { color: driver.change_1d == null ? colors.textMuted : driver.change_1d >= 0 ? colors.positive : colors.negative }]}>{driverMove(driver, language)}</Text></View>
         {relationship ? <Text style={styles.relationship}>{relationship}</Text> : null}
       </View>;
-    }) : <Pressable accessibilityRole="button" onPress={onOpenTerminal} style={styles.empty}><Text style={styles.emptyTitle}>N/D</Text><Text style={styles.emptyText}>{pick("Ouvrir Terminal Pro pour vérifier la disponibilité des drivers.", "Open Pro Terminal to check driver availability.")}</Text></Pressable>}
+    }) : !loading ? <Pressable accessibilityRole="button" onPress={onOpenTerminal} style={styles.empty}><Text style={styles.emptyTitle}>N/D</Text><Text style={styles.emptyText}>{pick("Ouvrir Terminal Pro pour vérifier la disponibilité des drivers.", "Open Pro Terminal to check driver availability.")}</Text></Pressable> : null}
   </Card>;
 }
 

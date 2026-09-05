@@ -14,9 +14,9 @@ export type CockpitSnapshot = {
 export type ScreenerUniverse = "composite" | "tsx60";
 export type ScreenerRow = {
   ticker: string; symbol: string; name: string; sector: string; price: number; change_percent: number;
-  volume: number; average_volume_20d: number; relative_volume: number; momentum_20d: number;
-  rsi_14: number | null; sma_20: number | null; sma_50: number | null; trend: string;
-  score: number; signal: string; source: string; delayed: boolean; quote_as_of: string | null;
+  volume: number; average_volume_20d: number | null; relative_volume: number | null; momentum_20d: number | null;
+  rsi_14: number | null; sma_20: number | null; sma_50: number | null; trend: string | null;
+  score: number | null; signal: string | null; source: string; delayed: boolean; quote_as_of: string | null;
   prior_high_20d?: number | null; breakout_20d?: boolean | null; breakout_percent?: number | null;
 };
 export type ScreenerSnapshot = {

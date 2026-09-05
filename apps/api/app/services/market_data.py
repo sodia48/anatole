@@ -6,7 +6,8 @@ import math
 import os
 import random
 from datetime import UTC, datetime, timedelta
-from typing import Any, Awaitable, Callable, TypeVar
+from time import monotonic
+from typing import Any
 
 from app.core.config import settings
 from app.core.resilience import AsyncStaleCache, shared_http_client
@@ -21,9 +22,6 @@ from app.services.indicators import calculate_technicals
 from app.services.session_quotes import session_quote_service
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
 
 class DemoProvider:
     def normalize_ticker(self, ticker: str) -> str:
@@ -179,9 +177,11 @@ class YahooProvider:
         symbol: str,
         range_: str,
         interval: str,
+        attempts: int | None = None,
     ) -> dict[str, Any]:
         payload = await shared_http_client.get_json(
             f"{self.base_url}/{symbol}",
+            attempts=attempts,
             params={
                 "range": range_,
                 "interval": interval,
@@ -199,13 +199,14 @@ class YahooProvider:
         ticker: str,
         range_: str,
         interval: str,
+        attempts: int | None = None,
     ) -> dict[str, Any]:
         symbol = self.normalize_ticker(ticker)
         key = (symbol, range_, interval)
         fresh, stale = self._cache_policy(range_, interval)
         return await self._chart_cache.get_or_load(
             key,
-            lambda: self._load_chart(symbol, range_, interval),
+            lambda: self._load_chart(symbol, range_, interval, attempts),
             fresh_seconds=fresh,
             stale_seconds=stale,
         )
@@ -220,8 +221,9 @@ class YahooProvider:
         ticker: str,
         range_: str,
         interval: str,
+        attempts: int | None = None,
     ) -> list[Candle]:
-        result = await self.chart(ticker, range_, interval)
+        result = await self.chart(ticker, range_, interval, attempts)
         timestamps = result.get("timestamp") or []
         raw_quote = (
             ((result.get("indicators") or {}).get("quote") or [{}])[0]
@@ -273,6 +275,7 @@ class YahooProvider:
 
 class MarketDataService:
     strict_history_timeout_seconds = 10.0
+    bulk_history_deadline_seconds = 8.0
 
     def __init__(self) -> None:
         self.demo = DemoProvider()
@@ -285,29 +288,6 @@ class MarketDataService:
     def normalize_ticker(self, ticker: str) -> str:
         return self.yahoo.normalize_ticker(ticker)
 
-    async def _with_fallback(
-        self,
-        primary: Callable[[], Awaitable[T]],
-        fallback: Callable[[], Awaitable[T]],
-        *,
-        label: str,
-    ) -> T:
-        if self.demo_mode:
-            return await fallback()
-
-        try:
-            return await primary()
-        except asyncio.CancelledError:
-            raise
-        except Exception as error:  # noqa: BLE001
-            logger.warning(
-                "market_data_fallback label=%s error=%s detail=%s",
-                label,
-                type(error).__name__,
-                error,
-            )
-            return await fallback()
-
     async def get_quote(self, ticker: str) -> Quote:
         if self.demo_mode:
             return await self.demo.quote(
@@ -315,14 +295,7 @@ class MarketDataService:
                 source="demo-explicit",
             )
 
-        return await self._with_fallback(
-            lambda: self.yahoo.quote(ticker),
-            lambda: self.demo.quote(
-                ticker,
-                source="demo-fallback",
-            ),
-            label=f"quote:{ticker}",
-        )
+        return await self.yahoo.quote(ticker)
 
     async def get_quotes(self, tickers: list[str]) -> list[Quote]:
         unique: list[str] = []
@@ -352,30 +325,10 @@ class MarketDataService:
             for quote in public_quotes
         }
 
-        missing = [
-            ticker
-            for ticker in unique
-            if ticker.strip().upper().replace("-", ".")
-            not in public_by_symbol
-        ]
-        fallback_quotes = await asyncio.gather(
-            *(
-                self.demo.quote(
-                    ticker,
-                    source="demo-fallback",
-                )
-                for ticker in missing
-            )
-        )
-        fallback_by_symbol = {
-            quote.symbol.replace("-", ".").upper(): quote
-            for quote in fallback_quotes
-        }
-
         output: list[Quote] = []
         for ticker in unique:
             key = ticker.strip().upper().replace("-", ".")
-            quote = public_by_symbol.get(key) or fallback_by_symbol.get(key)
+            quote = public_by_symbol.get(key)
             if quote is not None:
                 output.append(quote)
         return output
@@ -386,11 +339,9 @@ class MarketDataService:
         range_: str = "1y",
         interval: str = "1d",
     ) -> list[Candle]:
-        return await self._with_fallback(
-            lambda: self.yahoo.history(ticker, range_, interval),
-            lambda: self.demo.history(ticker, range_, interval),
-            label=f"history:{ticker}:{range_}:{interval}",
-        )
+        if self.demo_mode:
+            return await self.demo.history(ticker, range_, interval)
+        return await self.yahoo.history(ticker, range_, interval)
 
     async def get_history_many(
         self,
@@ -399,20 +350,58 @@ class MarketDataService:
         range_: str = "1y",
         interval: str = "1d",
         concurrency: int = 6,
+        deadline_seconds: float | None = None,
     ) -> dict[str, list[Candle]]:
-        semaphore = asyncio.Semaphore(max(1, min(concurrency, 8)))
+        unique = list(dict.fromkeys(ticker.strip().upper() for ticker in tickers if ticker.strip()))
+        if not unique:
+            return {}
+        semaphore = asyncio.Semaphore(max(1, min(concurrency, 16)))
+        deadline = self.bulk_history_deadline_seconds if deadline_seconds is None else max(0.01, deadline_seconds)
+        started_at = monotonic()
 
-        async def load(ticker: str) -> tuple[str, list[Candle]]:
+        async def load(ticker: str) -> tuple[str, list[Candle] | None]:
             async with semaphore:
-                candles = await self.get_history(
-                    ticker,
-                    range_=range_,
-                    interval=interval,
-                )
-                return ticker, candles
+                try:
+                    history_call = (
+                        self.demo.history(ticker, range_, interval)
+                        if self.demo_mode
+                        else self.yahoo.history(ticker, range_, interval, attempts=1)
+                    )
+                    candles = await asyncio.wait_for(history_call, timeout=deadline)
+                    return ticker, candles if len(candles) >= 2 else None
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:  # noqa: BLE001
+                    logger.warning(
+                        "market_data_bulk_history_unavailable ticker=%s error=%s detail=%s",
+                        ticker,
+                        type(error).__name__,
+                        error,
+                    )
+                    return ticker, None
 
-        pairs = await asyncio.gather(*(load(ticker) for ticker in tickers))
-        return dict(pairs)
+        tasks = [asyncio.create_task(load(ticker)) for ticker in unique]
+        try:
+            done, pending = await asyncio.wait(tasks, timeout=deadline)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        pairs = [task.result() for task in done if not task.cancelled() and task.exception() is None]
+        output = {ticker: candles for ticker, candles in pairs if candles is not None}
+        logger.info(
+            "market_data_bulk_history_complete requested=%s completed=%s timed_out=%s duration_ms=%s",
+            len(unique),
+            len(output),
+            len(pending),
+            round((monotonic() - started_at) * 1000),
+        )
+        return output
 
     async def get_history_many_strict(
         self,
@@ -421,6 +410,7 @@ class MarketDataService:
         range_: str = "1y",
         interval: str = "1d",
         concurrency: int = 6,
+        deadline_seconds: float | None = None,
     ) -> dict[str, list[Candle]]:
         """Load real Yahoo histories without silently substituting demo data.
 
@@ -429,7 +419,11 @@ class MarketDataService:
         expose real coverage and return N/D when it is insufficient.
         """
         unique = list(dict.fromkeys(ticker.strip().upper() for ticker in tickers if ticker.strip()))
-        semaphore = asyncio.Semaphore(max(1, min(concurrency, 8)))
+        if not unique:
+            return {}
+        semaphore = asyncio.Semaphore(max(1, min(concurrency, 16)))
+        deadline = self.bulk_history_deadline_seconds if deadline_seconds is None else max(0.01, deadline_seconds)
+        started_at = monotonic()
 
         async def load(ticker: str) -> tuple[str, list[Candle] | None]:
             async with semaphore:
@@ -437,11 +431,11 @@ class MarketDataService:
                     history_call = (
                         self.demo.history(ticker, range_, interval)
                         if self.demo_mode
-                        else self.yahoo.history(ticker, range_, interval)
+                        else self.yahoo.history(ticker, range_, interval, attempts=1)
                     )
                     candles = await asyncio.wait_for(
                         history_call,
-                        timeout=self.strict_history_timeout_seconds,
+                        timeout=min(self.strict_history_timeout_seconds, deadline),
                     )
                     return ticker, candles if len(candles) >= 2 else None
                 except asyncio.CancelledError:
@@ -455,8 +449,28 @@ class MarketDataService:
                     )
                     return ticker, None
 
-        pairs = await asyncio.gather(*(load(ticker) for ticker in unique))
-        return {ticker: candles for ticker, candles in pairs if candles is not None}
+        tasks = [asyncio.create_task(load(ticker)) for ticker in unique]
+        try:
+            done, pending = await asyncio.wait(tasks, timeout=deadline)
+        except asyncio.CancelledError:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        pairs = [task.result() for task in done if not task.cancelled() and task.exception() is None]
+        output = {ticker: candles for ticker, candles in pairs if candles is not None}
+        logger.info(
+            "market_data_strict_bulk_history_complete requested=%s completed=%s timed_out=%s duration_ms=%s",
+            len(unique),
+            len(output),
+            len(pending),
+            round((monotonic() - started_at) * 1000),
+        )
+        return output
 
     async def get_profile(self, ticker: str) -> StockProfile:
         if self.demo_mode:

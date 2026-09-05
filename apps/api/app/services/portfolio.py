@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 import statistics
 from collections import defaultdict
 from datetime import UTC, datetime
+from time import monotonic
 
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.stocks import Candle, Quote
@@ -26,6 +28,8 @@ from app.services.portfolio_intelligence import (
     build_stress_tests,
 )
 from app.services.tsx60 import TSX60
+
+logger = logging.getLogger(__name__)
 
 
 TRADING_DAYS = 252
@@ -228,6 +232,9 @@ def _allocation(
 
 
 class PortfolioService:
+    history_deadline_seconds = 4.0
+    driver_deadline_seconds = 1.5
+
     async def _fx_rates(
         self,
         currencies: set[str],
@@ -261,18 +268,26 @@ class PortfolioService:
     async def analyze(
         self,
         request: PortfolioAnalyzeRequest,
+        *,
+        fast: bool = False,
     ) -> PortfolioSnapshot:
+        started_at = monotonic()
         symbols = [item.symbol for item in request.positions]
         history_symbols = list(dict.fromkeys(symbols + [request.benchmark, "CL=F", "CAD=X"]))
-        quotes, histories = await asyncio.gather(
-            market_data_service.get_quotes(symbols),
-            market_data_service.get_history_many_strict(
-                history_symbols,
-                range_="1y",
-                interval="1d",
-                concurrency=6,
-            ),
-        )
+        if fast:
+            quotes = await market_data_service.get_quotes(symbols)
+            histories = {}
+        else:
+            quotes, histories = await asyncio.gather(
+                market_data_service.get_quotes(symbols),
+                market_data_service.get_history_many_strict(
+                    history_symbols,
+                    range_="1y",
+                    interval="1d",
+                    concurrency=6,
+                    deadline_seconds=self.history_deadline_seconds,
+                ),
+            )
         quote_by_symbol = {_key(item.symbol): item for item in quotes}
         quote_by_symbol.update({_key(item.ticker): item for item in quotes})
 
@@ -444,9 +459,14 @@ class PortfolioService:
         performance_horizons, contribution_horizons = build_horizon_results(positions, histories, observed_at)
         correlation = build_correlation_matrix(positions, histories)
         canada_10y: list[tuple[int, float]] = []
-        if not market_data_service.demo_mode:
+        if not fast and not market_data_service.demo_mode:
             try:
-                canada_10y = (await bank_of_canada_valet_service.yields()).get("V39055", [])
+                canada_10y = (
+                    await asyncio.wait_for(
+                        bank_of_canada_valet_service.yields(),
+                        timeout=self.driver_deadline_seconds,
+                    )
+                ).get("V39055", [])
             except Exception:  # noqa: BLE001
                 notes.append("La série officielle Canada 10 ans est temporairement indisponible.")
         stress_tests = build_stress_tests(positions, histories, canada_10y)
@@ -487,7 +507,7 @@ class PortfolioService:
             if item.day_pnl < 0
         ]
 
-        return PortfolioSnapshot(
+        snapshot = PortfolioSnapshot(
             base_currency=request.base_currency,
             benchmark=request.benchmark,
             benchmark_name="S&P/TSX Composite",
@@ -530,6 +550,15 @@ class PortfolioService:
             generated_at=observed_at,
             refresh_after_seconds=30,
         )
+        logger.info(
+            "portfolio_snapshot_complete fast=%s positions_requested=%s positions_priced=%s histories=%s duration_ms=%s",
+            fast,
+            len(request.positions),
+            len(positions),
+            len(histories),
+            round((monotonic() - started_at) * 1000),
+        )
+        return snapshot
 
 
 portfolio_service = PortfolioService()

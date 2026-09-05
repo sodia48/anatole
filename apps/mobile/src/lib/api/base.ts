@@ -34,7 +34,7 @@ async function errorFromResponse(response: Response): Promise<ApiError> {
 }
 
 export async function apiRequest<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { auth = false, timeoutMs = 25_000, ...init } = options;
+  const { auth = false, timeoutMs = 12_000, ...init } = options;
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body) headers.set("Content-Type", "application/json");
@@ -44,36 +44,29 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   }
 
   const { signal: externalSignal, ...fetchInit } = init;
-  const safeToRetry = !fetchInit.method || ["GET", "HEAD"].includes(fetchInit.method.toUpperCase());
-  const attempts = safeToRetry ? 2 : 1;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const controller = new AbortController();
-    const abort = () => controller.abort();
-    if (externalSignal?.aborted) controller.abort();
-    externalSignal?.addEventListener("abort", abort, { once: true });
-    const timeout = setTimeout(abort, timeoutMs);
-    try {
-      const response = await fetch(`${apiBaseUrl()}${path}`, { ...fetchInit, headers, signal: controller.signal });
-      if (!response.ok) {
-        const error = await errorFromResponse(response);
-        if (response.status === 401 && auth) await handleUnauthorized();
-        throw error;
-      }
-      if (response.status === 204) return undefined as T;
-      return await response.json() as T;
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      if (externalSignal?.aborted) throw error;
-      if (attempt + 1 < attempts) continue;
-      if (error instanceof Error && error.name === "AbortError") {
-        throw new ApiError("La requête a expiré.", 408, null);
-      }
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  externalSignal?.addEventListener("abort", abort, { once: true });
+  const timeout = setTimeout(abort, timeoutMs);
+  try {
+    const response = await fetch(`${apiBaseUrl()}${path}`, { ...fetchInit, headers, signal: controller.signal });
+    if (!response.ok) {
+      const error = await errorFromResponse(response);
+      if (response.status === 401 && auth) await handleUnauthorized();
       throw error;
-    } finally {
-      clearTimeout(timeout);
-      externalSignal?.removeEventListener("abort", abort);
     }
+    if (response.status === 204) return undefined as T;
+    return await response.json() as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (externalSignal?.aborted) throw error;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError("La requête a expiré.", 408, null);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    externalSignal?.removeEventListener("abort", abort);
   }
-  throw new ApiError("La requête a échoué.", 0, null);
 }

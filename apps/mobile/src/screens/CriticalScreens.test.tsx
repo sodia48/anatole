@@ -9,6 +9,7 @@ import { PsychologyScreen } from "@/src/components/psychology/PsychologyScreen";
 import StockDetailScreen from "@/app/stock/[ticker]";
 import WatchlistScreen from "@/app/watchlist";
 import { marketApi } from "@/src/lib/api/market";
+import { workspaceApi } from "@/src/lib/api/workspace";
 
 jest.mock("expo-router", () => ({ router: { push: jest.fn(), replace: jest.fn() }, useLocalSearchParams: () => ({ ticker: "RY" }) }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr, t: (key: string) => key }) }));
@@ -122,6 +123,15 @@ describe("critical native screens", () => {
     const view = await render(<PortfolioScreen />);
     expect(view.getByTestId("portfolio-value")).toBeTruthy();
     expect(view.getByTestId("portfolio-allocation")).toBeTruthy();
+    const portfolioQueries = mockObservedQueries.filter(({ queryKey }) => queryKey[0] === "portfolio");
+    expect(portfolioQueries.map(({ queryKey }) => queryKey[1])).toEqual(["fast", "full"]);
+    const controller = new AbortController();
+    await portfolioQueries[0]?.queryFn?.({ signal: controller.signal });
+    expect(workspaceApi.portfolio).toHaveBeenCalledWith(
+      [{ symbol: "RY", quantity: 2, average_cost: 100 }],
+      controller.signal,
+      true,
+    );
     await view.unmount();
   }, 30_000);
 

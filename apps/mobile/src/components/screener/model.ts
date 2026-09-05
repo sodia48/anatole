@@ -34,13 +34,13 @@ export function filterAndSortScreenerRows(rows: readonly ScreenerRow[], filters:
     return matchesQuery
       && (filters.sector === "all" || row.sector === filters.sector)
       && (filters.signal === "all" || row.signal === filters.signal)
-      && row.score >= filters.minimumScore;
+      && (filters.minimumScore <= 0 || (row.score !== null && row.score >= filters.minimumScore));
   });
   return filtered.sort((left, right) => {
-    let difference = right.score - left.score;
+    let difference = (right.score ?? Number.NEGATIVE_INFINITY) - (left.score ?? Number.NEGATIVE_INFINITY);
     if (filters.sort === "change") difference = right.change_percent - left.change_percent;
-    if (filters.sort === "momentum") difference = right.momentum_20d - left.momentum_20d;
-    if (filters.sort === "volume") difference = right.relative_volume - left.relative_volume;
+    if (filters.sort === "momentum") difference = (right.momentum_20d ?? Number.NEGATIVE_INFINITY) - (left.momentum_20d ?? Number.NEGATIVE_INFINITY);
+    if (filters.sort === "volume") difference = (right.relative_volume ?? Number.NEGATIVE_INFINITY) - (left.relative_volume ?? Number.NEGATIVE_INFINITY);
     return difference || left.ticker.localeCompare(right.ticker, "en", { sensitivity: "base" });
   });
 }

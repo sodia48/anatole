@@ -54,6 +54,12 @@ function latest(root: string) {
   return mockUseQuery.mock.calls.map(([options]) => options).filter((options) => options.queryKey[0] === root).at(-1);
 }
 
+async function showSections(view: Awaited<ReturnType<typeof render>>, ...sections: string[]) {
+  await act(async () => view.getByTestId("today-sections").props.onViewableItemsChanged({
+    viewableItems: sections.map((item) => ({ item, isViewable: true })),
+  }));
+}
+
 describe("Today 2.0 screen", () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -63,6 +69,8 @@ describe("Today 2.0 screen", () => {
     mockCancelQueries.mockClear();
     mockErrorRoots.clear();
     preserveCachedData = false;
+    dataByRoot.terminal = terminalWithDriver;
+    dataByRoot.psychology = { score: 61, label: "Optimiste", components: [], generated_at: "2026-09-02", refresh_after_seconds: 120 };
     mockWorkspace = { data: { watchlist: [], portfolio: [], alerts: [] } };
     jest.spyOn(AppState, "addEventListener").mockImplementation(((_type: string, handler: (state: string) => void) => {
       appStateHandler = handler;
@@ -100,8 +108,10 @@ describe("Today 2.0 screen", () => {
     expect(latest("terminal").enabled).toBe(false);
     await act(async () => jest.advanceTimersByTime(950));
     expect(latest("terminal").enabled).toBe(true);
-    expect(latest("screener").enabled).toBe(true);
+    expect(latest("screener").enabled).toBe(false);
     expect(latest("insiders").enabled).toBe(false);
+    await showSections(view, "attention");
+    expect(latest("screener").enabled).toBe(true);
     await act(async () => jest.advanceTimersByTime(600));
     expect(latest("insiders").enabled).toBe(true);
     expect(latest("insiders").queryKey).toEqual(["insiders", "preview", "canada", 30, ""]);
@@ -121,6 +131,7 @@ describe("Today 2.0 screen", () => {
   it("loads conditional personal data and caps stock-news requests at two symbols", async () => {
     mockWorkspace = { data: { watchlist: ["TD", "CNQ", "RY"], portfolio: [{ symbol: "RY", quantity: 1, average_cost: 90 }], alerts: [{ id: "a" }] } };
     const view = await render(<TodayScreen />);
+    await showSections(view, "personal", "attention");
     await act(async () => jest.advanceTimersByTime(900));
     expect(latest("watchlist").enabled).toBe(true);
     expect(latest("portfolio").enabled).toBe(true);
@@ -132,6 +143,7 @@ describe("Today 2.0 screen", () => {
 
   it("restarts tier scheduling after background while preserving cached content", async () => {
     const view = await render(<TodayScreen />);
+    await showSections(view, "market", "attention");
     await act(async () => jest.advanceTimersByTime(1_900));
     expect(latest("terminal").enabled).toBe(true);
     expect(latest("screener").enabled).toBe(true);
@@ -171,6 +183,21 @@ describe("Today 2.0 screen", () => {
     expect(view.getByTestId("today-drivers")).toHaveTextContent(/N\/D/);
     await view.unmount();
     dataByRoot.terminal = terminalWithDriver;
+  });
+
+  it("renders pending metrics as loading instead of unavailable N/D", async () => {
+    const savedTerminal = dataByRoot.terminal;
+    const savedPsychology = dataByRoot.psychology;
+    dataByRoot.terminal = undefined;
+    dataByRoot.psychology = undefined;
+    const view = await render(<TodayScreen />);
+    await act(async () => jest.advanceTimersByTime(1_300));
+    expect(view.getByTestId("today-open-terminal")).toHaveTextContent(/Chargement/);
+    expect(view.getByTestId("today-open-terminal")).not.toHaveTextContent("N/D");
+    expect(view.getByTestId("today-open-psychology")).toHaveTextContent(/Chargement/);
+    await view.unmount();
+    dataByRoot.terminal = savedTerminal;
+    dataByRoot.psychology = savedPsychology;
   });
 
   it("keeps Cockpit usable with cached Terminal, news and calendar data after refresh errors", async () => {

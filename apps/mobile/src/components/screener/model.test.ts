@@ -42,4 +42,19 @@ describe("mobile screener client-side model", () => {
     expect(unique.map((item) => item.ticker)).toEqual(["RY", "SHOP"]);
     expect(unique[0]?.score).toBe(74);
   });
+
+  it("keeps quote-only rows visible by default and sorts unavailable metrics last", () => {
+    const quoteOnly = row({
+      ticker: "BAM",
+      symbol: "BAM.TO",
+      average_volume_20d: null,
+      relative_volume: null,
+      momentum_20d: null,
+      trend: null,
+      score: null,
+      signal: null,
+    });
+    expect(filterAndSortScreenerRows([...rows, quoteOnly], DEFAULT_SCREENER_FILTERS).at(-1)?.ticker).toBe("BAM");
+    expect(filterAndSortScreenerRows([...rows, quoteOnly], { ...DEFAULT_SCREENER_FILTERS, minimumScore: 5 }).some((item) => item.ticker === "BAM")).toBe(false);
+  });
 });

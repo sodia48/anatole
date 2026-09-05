@@ -15,7 +15,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 60_000,
       gcTime: MOBILE_CACHE_MAX_AGE,
-      retry: 1,
+      retry: false,
       networkMode: "offlineFirst",
       refetchOnReconnect: false,
     },
