@@ -141,7 +141,7 @@ describe("Today 2.0 screen", () => {
     await view.unmount();
   });
 
-  it("restarts tier scheduling after background while preserving cached content", async () => {
+  it("restarts tier scheduling after inactive without cancelling shared queries", async () => {
     const view = await render(<TodayScreen />);
     await showSections(view, "market", "attention");
     await act(async () => jest.advanceTimersByTime(1_900));
@@ -149,11 +149,11 @@ describe("Today 2.0 screen", () => {
     expect(latest("screener").enabled).toBe(true);
     expect(latest("insiders").enabled).toBe(true);
     preserveCachedData = true;
-    await act(async () => appStateHandler?.("background"));
+    await act(async () => appStateHandler?.("inactive"));
     expect(latest("terminal").enabled).toBe(false);
     expect(latest("screener").enabled).toBe(false);
     expect(latest("insiders").enabled).toBe(false);
-    expect(mockCancelQueries).toHaveBeenCalledWith({ queryKey: ["terminal"] });
+    expect(mockCancelQueries).not.toHaveBeenCalled();
     expect(view.getByTestId("today-market-brief")).toHaveTextContent(/Constructif.*70\/100/);
     expect(view.getByTestId("today-drivers")).toHaveTextContent(/WTI/);
 
@@ -173,6 +173,7 @@ describe("Today 2.0 screen", () => {
     await act(async () => jest.advanceTimersByTime(600));
     expect(latest("insiders").enabled).toBe(true);
     await view.unmount();
+    expect(mockCancelQueries).not.toHaveBeenCalled();
   });
 
   it("rejects a Terminal V1 payload without breaking the rest of Today", async () => {

@@ -15,6 +15,27 @@ export class ApiError extends Error {
   }
 }
 
+export function isRequestCancellation(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { name?: unknown; message?: unknown };
+  const name = typeof candidate.name === "string" ? candidate.name.toLowerCase() : "";
+  const message = typeof candidate.message === "string" ? candidate.message.toLowerCase() : "";
+  return name === "aborterror"
+    || name === "fetchrequestcanceledexception"
+    || name === "cancellederror"
+    || name === "cancelederror"
+    || message.includes("request has been canceled")
+    || message.includes("request has been cancelled");
+}
+
+export function shouldSuppressQueryError(error: unknown): boolean {
+  if (isRequestCancellation(error)) return true;
+  if (!error || typeof error !== "object") return false;
+  const candidate = error as { name?: unknown; message?: unknown };
+  const technicalDetail = `${String(candidate.name ?? "")} ${String(candidate.message ?? "")}`;
+  return /FetchRequestCanceledException|NativeResponse\.swift|AbortError/i.test(technicalDetail);
+}
+
 export function apiBaseUrl(): string {
   const configured = Constants.expoConfig?.extra?.apiUrl;
   return (typeof configured === "string" ? configured : "https://anatole-api.onrender.com").replace(/\/+$/, "");
@@ -45,10 +66,19 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
 
   const { signal: externalSignal, ...fetchInit } = init;
   const controller = new AbortController();
-  const abort = () => controller.abort();
-  if (externalSignal?.aborted) controller.abort();
-  externalSignal?.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(abort, timeoutMs);
+  let externalCancellation = externalSignal?.aborted ?? false;
+  const abortFromExternal = () => {
+    externalCancellation = true;
+    controller.abort();
+  };
+  if (externalCancellation) controller.abort();
+  externalSignal?.addEventListener("abort", abortFromExternal, { once: true });
+  let timeoutTriggered = false;
+  const timeout = setTimeout(() => {
+    if (controller.signal.aborted) return;
+    timeoutTriggered = true;
+    controller.abort();
+  }, timeoutMs);
   try {
     const response = await fetch(`${apiBaseUrl()}${path}`, { ...fetchInit, headers, signal: controller.signal });
     if (!response.ok) {
@@ -60,13 +90,13 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     return await response.json() as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    if (externalSignal?.aborted) throw error;
-    if (error instanceof Error && error.name === "AbortError") {
+    if (timeoutTriggered) {
       throw new ApiError("La requête a expiré.", 408, null);
     }
+    if (externalCancellation) throw error;
     throw error;
   } finally {
     clearTimeout(timeout);
-    externalSignal?.removeEventListener("abort", abort);
+    externalSignal?.removeEventListener("abort", abortFromExternal);
   }
 }
