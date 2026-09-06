@@ -67,11 +67,13 @@ function eventTypeLabel(
 
 export default function ProvinceCalendarPriorityPanel({ region }: Props) {
   const [language, setLanguage] = useState<AnatoleLanguage>("fr");
-  const [snapshot, setSnapshot] = useState<ProvincialMacroSnapshot | null>(null);
+  const [snapshots, setSnapshots] = useState<Record<string, ProvincialMacroSnapshot>>({});
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const provinceMode = isProvinceRegion(region);
+  const snapshotKey = `${region}:${language}`;
+  const snapshot = provinceMode ? snapshots[snapshotKey] ?? null : null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setLanguage(detectLanguage()), 0);
@@ -81,7 +83,6 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
   useEffect(() => {
     if (!provinceMode) {
       const timer = window.setTimeout(() => {
-        setSnapshot(null);
         setError(null);
         setLoading(false);
       }, 0);
@@ -94,7 +95,7 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
       setError(null);
       void getProvincialCalendarSnapshot(region, language, controller.signal)
         .then((data) => {
-          setSnapshot(data);
+          setSnapshots((current) => ({ ...current, [snapshotKey]: data }));
           setLoading(false);
         })
         .catch((caught: unknown) => {
@@ -108,7 +109,7 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [region, language, provinceMode]);
+  }, [region, language, provinceMode, snapshotKey]);
 
   const events = useMemo(() => {
     if (!snapshot) return [];
@@ -159,13 +160,31 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
         </p>
       </header>
 
-      {loading ? (
+      {snapshot?.sources.length ? (
+        <div className={styles.sources} aria-label={language === "fr" ? "État des sources" : "Source status"}>
+          {snapshot.sources.map((source) => (
+            <article data-status={source.status} key={source.key}>
+              <strong>{source.label}</strong>
+              <span>
+                {source.status === "available"
+                  ? language === "fr" ? "Disponible" : "Available"
+                  : source.status === "partial"
+                    ? language === "fr" ? "Partielle" : "Partial"
+                    : language === "fr" ? "Indisponible" : "Unavailable"}
+              </span>
+              {source.detail ? <small>{source.detail}</small> : null}
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      {loading && !snapshot ? (
         <div className={styles.state}>
           {language === "fr"
             ? "Chargement des prochaines diffusions provinciales…"
             : "Loading upcoming provincial releases…"}
         </div>
-      ) : error ? (
+      ) : error && !snapshot ? (
         <div className={styles.warning}>
           <strong>
             {language === "fr"
@@ -181,7 +200,18 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
             : "No essential provincial release has been published yet for the current horizon."}
         </div>
       ) : (
-        <div className={styles.grid}>
+        <>
+          {error ? (
+            <div className={styles.warning}>
+              <strong>
+                {language === "fr"
+                  ? "Dernières données disponibles."
+                  : "Latest available data."}
+              </strong>
+              <span>{error}</span>
+            </div>
+          ) : null}
+          <div className={styles.grid}>
           {events.map((event) => (
             <article className={styles.card} key={event.id}>
               <div className={styles.topline}>
@@ -216,7 +246,8 @@ export default function ProvinceCalendarPriorityPanel({ region }: Props) {
               </footer>
             </article>
           ))}
-        </div>
+          </div>
+        </>
       )}
 
       {snapshot?.message ? <p className={styles.message}>{snapshot.message}</p> : null}

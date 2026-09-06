@@ -38,6 +38,42 @@
   line-height: 1.55;
 }
 
+.sources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sources article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(76, 165, 219, 0.22);
+  border-radius: 12px;
+  color: #cbe9f9;
+  font-size: 11px;
+}
+
+.sources article[data-status="partial"] span {
+  color: #ffbf62;
+}
+
+.sources article[data-status="unavailable"] span {
+  color: #ff8799;
+}
+
+.sources article[data-status="available"] span {
+  color: #51e1bd;
+}
+
+.sources small {
+  grid-column: 1 / -1;
+  color: #92b8cc;
+  line-height: 1.4;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -165,6 +201,10 @@
   }
 
   .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sources {
     grid-template-columns: minmax(0, 1fr);
   }
 }

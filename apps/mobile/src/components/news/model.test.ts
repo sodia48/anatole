@@ -37,6 +37,25 @@ describe("news intelligence model", () => {
     expect(filterNewsItems(items, { ...filters, region: "QC" }).map((item) => item.id)).toEqual(["qc", "both"]);
   });
 
+  it("supports all remaining provinces and keeps Prairie and Atlantic groups", () => {
+    const items = [
+      news({ id: "sk", regions: ["SK"] }),
+      news({ id: "mb", regions: ["MB"] }),
+      news({ id: "nb", regions: ["NB"] }),
+      news({ id: "ns", regions: ["NS"] }),
+      news({ id: "pe", regions: ["PE"] }),
+      news({ id: "nl", regions: ["NL"] }),
+    ];
+    expect(filterNewsItems(items, { ...filters, region: "SK" }).map((item) => item.id)).toEqual(["sk"]);
+    expect(filterNewsItems(items, { ...filters, region: "MB" }).map((item) => item.id)).toEqual(["mb"]);
+    expect(filterNewsItems(items, { ...filters, region: "NB" }).map((item) => item.id)).toEqual(["nb"]);
+    expect(filterNewsItems(items, { ...filters, region: "NS" }).map((item) => item.id)).toEqual(["ns"]);
+    expect(filterNewsItems(items, { ...filters, region: "PE" }).map((item) => item.id)).toEqual(["pe"]);
+    expect(filterNewsItems(items, { ...filters, region: "NL" }).map((item) => item.id)).toEqual(["nl"]);
+    expect(filterNewsItems(items, { ...filters, region: "prairies" }).map((item) => item.id)).toEqual(["sk", "mb"]);
+    expect(filterNewsItems(items, { ...filters, region: "atlantic" }).map((item) => item.id)).toEqual(["nb", "ns", "pe", "nl"]);
+  });
+
   it("uses only explicit preferred regions for My regions", () => {
     const items = [news({ id: "ca", regions: ["CA"] }), news({ id: "qc", regions: ["QC"] })];
     expect(filterNewsItems(items, { ...filters, primary: "my-regions" }, [])).toEqual([]);

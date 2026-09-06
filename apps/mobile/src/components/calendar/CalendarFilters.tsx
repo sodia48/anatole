@@ -13,7 +13,15 @@ export function CalendarFilters({ filters, categories, sectors, hasPersonal, pre
   const ranges: { id: CalendarRange; label: string }[] = [{ id: "today", label: pick("Aujourd’hui", "Today") }, { id: "7d", label: pick("7 jours", "7 days") }, { id: "30d", label: pick("30 jours", "30 days") }];
   const kinds: { id: CalendarKindFilter; label: string }[] = [{ id: "all", label: pick("Tous", "All") }, { id: "economic", label: pick("Économie", "Economy") }, { id: "earnings", label: pick("Résultats", "Earnings") }];
   const importance: { id: CalendarImportanceFilter; label: string }[] = [{ id: "all", label: pick("Toutes importances", "All importance") }, { id: "high", label: pick("Élevée", "High") }, { id: "medium", label: pick("Moyenne", "Medium") }, { id: "low", label: pick("Faible", "Low") }];
-  const regions: { id: CalendarRegionFilter; label: string }[] = [{ id: "all", label: pick("Toutes régions", "All regions") }, { id: "CA", label: "Canada" }, { id: "QC", label: "QC" }, { id: "ON", label: "ON" }, { id: "BC", label: "BC" }, { id: "AB", label: "AB" }, { id: "prairies", label: "Prairies" }, { id: "atlantic", label: pick("Atlantique", "Atlantic") }];
+  const regions: { id: CalendarRegionFilter; label: string }[] = [
+    { id: "all", label: pick("Toutes régions", "All regions") }, { id: "CA", label: "Canada" },
+    { id: "QC", label: pick("Québec", "Quebec") }, { id: "ON", label: "Ontario" },
+    { id: "BC", label: pick("C.-B.", "B.C.") }, { id: "AB", label: "Alberta" },
+    { id: "SK", label: pick("Sask.", "Sask.") }, { id: "MB", label: "Manitoba" },
+    { id: "NB", label: pick("N.-B.", "N.B.") }, { id: "NS", label: pick("N.-É.", "N.S.") },
+    { id: "PE", label: pick("Î.-P.-É.", "P.E.I.") }, { id: "NL", label: pick("T.-N.-L.", "N.L.") },
+    { id: "prairies", label: "Prairies" }, { id: "atlantic", label: pick("Atlantique", "Atlantic") },
+  ];
   return <View style={styles.container} testID="calendar-filters">
     <View style={styles.segment}>{ranges.map((item) => <Chip key={item.id} label={item.label} onPress={() => onChange({ ...filters, range: item.id, dayOffset: null })} selected={filters.dayOffset == null && filters.range === item.id} testID={`calendar-range-${item.id}`} />)}</View>
     <ScrollView contentContainerStyle={styles.row} horizontal showsHorizontalScrollIndicator={false}>{kinds.map((item) => <Chip key={item.id} label={item.label} onPress={() => onChange({ ...filters, kind: item.id })} selected={filters.kind === item.id} testID={`calendar-kind-${item.id}`} />)}{preferredRegions.length ? <Chip label={pick("Mes régions", "My regions")} onPress={() => onChange({ ...filters, scope: filters.scope === "preferred" ? "all" : "preferred" })} selected={filters.scope === "preferred"} testID="calendar-preferred-regions" /> : null}{hasPersonal ? <Chip label={pick("Mes événements", "My events")} onPress={() => onChange({ ...filters, scope: filters.scope === "personal" ? "all" : "personal" })} selected={filters.scope === "personal"} testID="calendar-personal" /> : null}</ScrollView>

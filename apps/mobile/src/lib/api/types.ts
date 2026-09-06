@@ -192,6 +192,46 @@ export type EconomicEvent = {
 };
 export type CalendarEvent = EconomicEvent;
 export type CalendarSnapshot = { events: EconomicEvent[]; source_statuses: FeedStatus[]; generated_at: string; refresh_after_seconds: number };
+export type ProvinceCode = "QC" | "ON" | "BC" | "AB" | "SK" | "MB" | "NB" | "NS" | "PE" | "NL";
+export type ProvincialMacroSource = {
+  key: string;
+  label: string;
+  region: ProvinceCode;
+  kind: "statistics" | "economic_accounts" | "dashboard" | "finance" | "statcan";
+  url: string;
+  status: "available" | "partial" | "unavailable";
+  count: number;
+  detail: string | null;
+};
+export type ProvincialMacroEvent = {
+  id: string;
+  region: ProvinceCode;
+  province: string;
+  title: string;
+  description: string;
+  category: string;
+  importance: "Élevée" | "Moyenne" | "Faible";
+  importance_score: number;
+  starts_at: string;
+  time_is_estimated: boolean;
+  source: string;
+  source_kind: ProvincialMacroSource["kind"];
+  source_url: string;
+  official: boolean;
+  specificity: "province-direct" | "province-normalized" | "fiscal-direct";
+};
+export type ProvincialMacroSnapshot = {
+  region: ProvinceCode;
+  province: string;
+  language: "fr" | "en";
+  mode: "province-first";
+  latest_releases: unknown[];
+  upcoming_events: ProvincialMacroEvent[];
+  sources: ProvincialMacroSource[];
+  generated_at: string;
+  refresh_after_seconds: number;
+  message: string | null;
+};
 export type PortfolioAllocation = { key: string; label: string; value: number; weight_percent: number };
 export type PortfolioContributor = { symbol: string; name: string; value: number; value_percent: number; kind: "day" | "unrealized" };
 export type PortfolioRisk = { volatility_percent: number | null; beta: number | null; max_drawdown_percent: number | null; sharpe_ratio: number | null; concentration_hhi: number | null; top_position_percent: number | null; top_three_percent: number | null; diversification_score: number | null; risk_level: string | null; history_coverage_percent?: number; history_observations?: number };

@@ -99,10 +99,8 @@ export function CalendarClient() {
     useState<CalendarSnapshot | null>(
       null,
     );
-  const [provincialData, setProvincialData] =
-    useState<ProvincialMacroSnapshot | null>(
-      null,
-    );
+  const [provincialSnapshots, setProvincialSnapshots] =
+    useState<Record<string, ProvincialMacroSnapshot>>({});
   const [error, setError] =
     useState<string | null>(null);
   const [query, setQuery] =
@@ -117,17 +115,31 @@ export function CalendarClient() {
     useState<"economic" | "earnings">("economic");
   const provinceMode =
     isProvinceRegion(region);
+  const provincialKey = `${region}:${language}`;
+  const provincialData = provinceMode
+    ? provincialSnapshots[provincialKey] ?? null
+    : null;
 
   useEffect(() => {
     if (calendarSection !== "economic") return;
     let active = true;
     let controller =
       new AbortController();
+    let timer: number | undefined;
+
+    const schedule = (seconds: number) => {
+      if (!active) return;
+      timer = window.setTimeout(() => {
+        if (document.hidden) {
+          schedule(90);
+          return;
+        }
+        void load();
+      }, Math.max(30, seconds) * 1_000);
+    };
 
     queueMicrotask(() => {
       if (!active) return;
-      setData(null);
-      setProvincialData(null);
       setError(null);
     });
 
@@ -135,6 +147,7 @@ export function CalendarClient() {
       controller.abort();
       controller =
         new AbortController();
+      let refreshAfter = 90;
 
       try {
         const snapshot = provinceMode
@@ -152,10 +165,12 @@ export function CalendarClient() {
           active &&
           !controller.signal.aborted
         ) {
+          refreshAfter = snapshot.refresh_after_seconds;
           if (provinceMode) {
-            setProvincialData(
-              snapshot as ProvincialMacroSnapshot,
-            );
+            setProvincialSnapshots((current) => ({
+              ...current,
+              [provincialKey]: snapshot as ProvincialMacroSnapshot,
+            }));
           } else {
             setData(
               snapshot as CalendarSnapshot,
@@ -180,25 +195,19 @@ export function CalendarClient() {
             ),
           );
         }
+      } finally {
+        schedule(refreshAfter);
       }
     };
 
     void load();
 
-    const timer =
-      window.setInterval(
-        () => {
-          if (!document.hidden) void load();
-        },
-        30 * 60_000,
-      );
-
     return () => {
       active = false;
       controller.abort();
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [calendarSection, language, provinceMode, region]);
+  }, [calendarSection, language, provinceMode, provincialKey, region]);
 
   const events = useMemo<CalendarDisplayEvent[]>(() => {
     if (provinceMode) {
