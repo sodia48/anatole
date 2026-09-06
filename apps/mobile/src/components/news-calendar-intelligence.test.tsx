@@ -11,6 +11,7 @@ const mockCancelQueries = jest.fn();
 const mockQueryClient = { cancelQueries: mockCancelQueries };
 const mockUseQueryClient = jest.fn(() => mockQueryClient);
 const errorRoots = new Set<string>();
+const provincialErrorRegions = new Set<string>();
 let mockLanguage: "fr" | "en" = "fr";
 let mockPreferredRegions: string[] = [];
 let mockAppStateHandler: ((state: "active" | "background" | "inactive") => void) | undefined;
@@ -18,7 +19,7 @@ let mockAppStateHandler: ((state: "active" | "background" | "inactive") => void)
 jest.mock("expo-router", () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: mockLanguage, pick: (fr: string, en: string) => mockLanguage === "fr" ? fr : en, t: (key: string) => key }) }));
 jest.mock("@/src/providers/MobileAccountProvider", () => ({ useMobileAccount: () => ({ workspace: { data: { portfolio: [{ symbol: "RY", quantity: 1, average_cost: 100 }], watchlist: ["TD", "CNQ", "SHOP", "BMO", "AEM", "BNS"], preferences: { preferred_regions: mockPreferredRegions } } } }) }));
-jest.mock("@/src/lib/api/market", () => ({ marketApi: { news: jest.fn(), stockNews: jest.fn(), calendar: jest.fn(), earnings: jest.fn() } }));
+jest.mock("@/src/lib/api/market", () => ({ marketApi: { news: jest.fn(), stockNews: jest.fn(), calendar: jest.fn(), provincialCalendar: jest.fn(), earnings: jest.fn() } }));
 
 const newsItems = [
   { id: "ca", title: "Décision de la Banque du Canada", summary: "La banque publie sa décision.", url: "https://example.com/ca", source: "Banque du Canada", category: "Politique monétaire", published_at: "2026-09-03T13:00:00Z", sentiment: "Neutre", sentiment_score: 0, regions: ["CA"] },
@@ -30,6 +31,37 @@ const earnings = [
   { ticker: "BCE", symbol: "BCE", company: "BCE", sector: "Communication", weight: 1, starts_at: "2026-09-04T13:00:00Z", window_start: "2026-09-04T13:00:00Z", window_end: "2026-09-04T14:00:00Z", time_is_estimated: false, eps_estimate: 0.8, revenue_estimate: 6200, estimate_currency: "CAD", eps_analyst_count: 5, revenue_analyst_count: 4, source: "Public", url: "https://example.com/bce" },
 ];
 
+function provincialSnapshot(region: string) {
+  return {
+    region,
+    province: region,
+    language: mockLanguage,
+    mode: "province-first",
+    latest_releases: [],
+    upcoming_events: [{
+      id: `provincial-${region}`,
+      region,
+      province: region,
+      title: `Emploi ${region}`,
+      description: "Date provinciale officielle.",
+      category: "Emploi",
+      importance: "Élevée",
+      importance_score: 100,
+      starts_at: "2026-09-04T13:00:00Z",
+      time_is_estimated: true,
+      source: `Source ${region}`,
+      source_kind: "statcan",
+      source_url: `https://example.com/${region}/calendar`,
+      official: true,
+      specificity: "province-normalized",
+    }],
+    sources: [{ key: `statcan-${region}`, label: `StatCan ${region}`, region, kind: "statcan", url: "https://statcan.gc.ca", status: "available", count: 1, detail: null }],
+    generated_at: "2026-09-03T13:05:00Z",
+    refresh_after_seconds: 900,
+    message: null,
+  };
+}
+
 const dataByRoot: Record<string, unknown> = {
   news: { items: newsItems, source_statuses: [{ source: "Banque du Canada", status: "ok", detail: null }, { source: "BC Finance", status: "error", detail: "ConnectTimeout" }], generated_at: "2026-09-03T13:05:00Z", refresh_after_seconds: 900 },
   calendar: { events: [economic], source_statuses: [{ source: "Statistique Canada", status: "ok", detail: null }], generated_at: "2026-09-03T13:05:00Z", refresh_after_seconds: 1800 },
@@ -40,20 +72,29 @@ const mockUseQuery = jest.fn(({ queryKey }: { queryKey: unknown[] }) => {
   const root = String(queryKey[0]);
   return { data: dataByRoot[root], isLoading: false, isError: errorRoots.has(root), isRefetching: false, error: errorRoots.has(root) ? new Error("network") : null, refetch: jest.fn() };
 });
-const mockUseQueries = jest.fn(({ queries }: { queries: { queryKey: unknown[]; enabled: boolean }[] }) => queries.map((query) => ({
-  data: query.enabled ? { ticker: query.queryKey[1], symbol: query.queryKey[1], company: query.queryKey[1], status: "ok", detail: null, generated_at: "2026-09-03T13:00:00Z", refresh_after_seconds: 900, items: [{ id: `story-${query.queryKey[1]}`, title: `News ${query.queryKey[1]}`, summary: "Summary", url: `https://example.com/${query.queryKey[1]}`, publisher: "Publisher", published_at: "2026-09-03T13:00:00Z", related_tickers: [query.queryKey[1]] }] } : undefined,
-  isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn(),
-})));
+const mockUseQueries = jest.fn(({ queries }: { queries: { queryKey: unknown[]; enabled: boolean }[] }) => queries.map((query) => {
+  const root = String(query.queryKey[0]);
+  const provincialError = root === "provincial-calendar" && provincialErrorRegions.has(String(query.queryKey[1]));
+  const data = !query.enabled
+    ? undefined
+    : root === "provincial-calendar"
+      ? provincialSnapshot(String(query.queryKey[1]))
+      : { ticker: query.queryKey[1], symbol: query.queryKey[1], company: query.queryKey[1], status: "ok", detail: null, generated_at: "2026-09-03T13:00:00Z", refresh_after_seconds: 900, items: [{ id: `story-${query.queryKey[1]}`, title: `News ${query.queryKey[1]}`, summary: "Summary", url: `https://example.com/${query.queryKey[1]}`, publisher: "Publisher", published_at: "2026-09-03T13:00:00Z", related_tickers: [query.queryKey[1]] }] };
+  return { data, isLoading: false, isError: provincialError, isRefetching: false, error: provincialError ? new Error("network") : null, refetch: jest.fn() };
+}));
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => mockUseQuery(options as { queryKey: unknown[] }), useQueries: (options: unknown) => mockUseQueries(options as { queries: { queryKey: unknown[]; enabled: boolean }[] }), useQueryClient: () => mockUseQueryClient() }));
 
 describe("mobile news and calendar intelligence", () => {
   beforeEach(() => {
     errorRoots.clear();
+    provincialErrorRegions.clear();
     mockPush.mockClear();
     mockCancelQueries.mockClear();
     mockUseQueryClient.mockClear();
+    mockUseQuery.mockClear();
     jest.mocked(marketApi.stockNews).mockClear();
+    jest.mocked(marketApi.provincialCalendar).mockClear();
     mockUseQueries.mockClear();
     mockLanguage = "fr";
     mockPreferredRegions = [];
@@ -247,6 +288,67 @@ describe("mobile news and calendar intelligence", () => {
     await user.press(view.getByText("Source officielle"));
     expect(open).toHaveBeenCalledWith("https://example.com/jobs");
     open.mockRestore();
+    await view.unmount();
+  });
+
+  it("loads an exact province from the province-first endpoint with AbortSignal", async () => {
+    const view = await render(<CalendarIntelligenceScreen initialRegion="QC" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    expect(view.getByTestId("calendar-region-QC").props.accessibilityState.selected).toBe(true);
+    expect(view.getAllByText("Emploi QC").length).toBeGreaterThan(0);
+    expect(view.getAllByText(/heure non publiée/i).length).toBeGreaterThanOrEqual(2);
+    expect(view.getByText("Date confirmée")).toBeTruthy();
+    expect(view.queryByText(/dans \d+ h/)).toBeNull();
+    const call = mockUseQueries.mock.calls.at(-1)?.[0] as { queries: { queryKey: unknown[]; enabled: boolean; queryFn: (context: { signal: AbortSignal }) => unknown }[] };
+    expect(call.queries.map((query) => query.queryKey)).toEqual([["provincial-calendar", "QC", "fr"]]);
+    const calendarCall = mockUseQuery.mock.calls.find(([options]) => String((options as { queryKey: unknown[] }).queryKey[0]) === "calendar")?.[0] as unknown as { enabled: boolean };
+    expect(calendarCall.enabled).toBe(false);
+    const controller = new AbortController();
+    await call.queries[0]!.queryFn({ signal: controller.signal });
+    expect(marketApi.provincialCalendar).toHaveBeenCalledWith("QC", "fr", controller.signal);
+    await view.unmount();
+  });
+
+  it("loads and aggregates the three Prairie province calendars", async () => {
+    const view = await render(<CalendarIntelligenceScreen initialRegion="prairies" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    const call = mockUseQueries.mock.calls.at(-1)?.[0] as { queries: { queryKey: unknown[] }[] };
+    expect(call.queries.map((query) => query.queryKey[1])).toEqual(["AB", "SK", "MB"]);
+    expect(view.getAllByText("Emploi AB").length).toBeGreaterThan(0);
+    expect(view.getAllByText("Emploi SK").length).toBeGreaterThan(0);
+    expect(view.getAllByText("Emploi MB").length).toBeGreaterThan(0);
+    await view.unmount();
+  });
+
+  it("accepts every province in calendar and news filters", async () => {
+    const calendarView = await render(<CalendarIntelligenceScreen initialRegion="NL" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    for (const region of ["QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL"]) {
+      expect(calendarView.getByTestId(`calendar-region-${region}`)).toBeTruthy();
+    }
+    expect(calendarView.getByTestId("calendar-region-NL").props.accessibilityState.selected).toBe(true);
+    expect(calendarView.getAllByText("Emploi NL").length).toBeGreaterThan(0);
+    await calendarView.unmount();
+
+    const newsView = await render(<NewsIntelligenceScreen initialRegion="NS" />);
+    for (const region of ["QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL"]) {
+      expect(newsView.getByTestId(`news-region-${region}`)).toBeTruthy();
+    }
+    await waitFor(() => expect(newsView.getByTestId("news-region-NS").props.accessibilityState.selected).toBe(true));
+    await newsView.unmount();
+  });
+
+  it("never globally cancels shared calendar queries across AppState changes or unmount", async () => {
+    const view = await render(<CalendarIntelligenceScreen initialRegion="AB" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    await act(async () => mockAppStateHandler?.("inactive"));
+    await act(async () => mockAppStateHandler?.("active"));
+    await view.unmount();
+    expect(mockUseQueryClient).not.toHaveBeenCalled();
+    expect(mockCancelQueries).not.toHaveBeenCalled();
+  });
+
+  it("keeps a valid provincial snapshot visible when its refetch fails", async () => {
+    provincialErrorRegions.add("QC");
+    const view = await render(<CalendarIntelligenceScreen initialRegion="QC" referenceNow={new Date("2026-09-03T13:30:00Z")} />);
+    expect(view.getByText("Dernières données disponibles")).toBeTruthy();
+    expect(view.getAllByText("Emploi QC").length).toBeGreaterThan(0);
     await view.unmount();
   });
 

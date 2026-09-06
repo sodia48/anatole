@@ -27,7 +27,7 @@ import {
 
 const DEFAULT_FILTERS: NewsFiltersState = { primary: "all", region: "all", category: "all", search: "" };
 const EMPTY_PREFERRED_REGIONS: string[] = [];
-const REGIONS = new Set<NewsRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "prairies", "atlantic"]);
+const REGIONS = new Set<NewsRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "prairies", "atlantic"]);
 const CATEGORIES = new Set<NewsCategoryFilter>(["all", "monetary", "inflation", "labour", "growth", "trade", "energy", "public-finance", "investment", "housing", "other"]);
 
 function categoryFromParam(value?: string): NewsCategoryFilter {
@@ -36,6 +36,11 @@ function categoryFromParam(value?: string): NewsCategoryFilter {
   const aliases: Record<string, NewsCategoryFilter> = { "politique-monetaire": "monetary", "monetary-policy": "monetary", travail: "labour", emploi: "labour", croissance: "growth", commerce: "trade", energie: "energy", "finances-publiques": "public-finance", investissement: "investment", logement: "housing" };
   const category = aliases[normalized] ?? normalized;
   return CATEGORIES.has(category as NewsCategoryFilter) ? category as NewsCategoryFilter : "all";
+}
+
+function regionFromParam(value?: string): NewsRegionFilter {
+  const requested = value?.toLowerCase() === "prairies" || value?.toLowerCase() === "atlantic" ? value.toLowerCase() : value?.toUpperCase();
+  return requested && REGIONS.has(requested as NewsRegionFilter) ? requested as NewsRegionFilter : "all";
 }
 
 function updatedLabel(value: string, language: "fr" | "en") {
@@ -48,7 +53,11 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory,
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
-  const [filters, setFilters] = useState<NewsFiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<NewsFiltersState>(() => ({
+    ...DEFAULT_FILTERS,
+    region: regionFromParam(initialRegion),
+    category: categoryFromParam(initialCategory),
+  }));
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -59,8 +68,7 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory,
   }, []);
 
   useEffect(() => {
-    const requestedRegion = initialRegion?.toLowerCase() === "prairies" || initialRegion?.toLowerCase() === "atlantic" ? initialRegion.toLowerCase() : initialRegion?.toUpperCase();
-    const region = requestedRegion && REGIONS.has(requestedRegion as NewsRegionFilter) ? requestedRegion as NewsRegionFilter : "all";
+    const region = regionFromParam(initialRegion);
     const category = categoryFromParam(initialCategory);
     const timer = setTimeout(() => setFilters((current) => current.region === region && current.category === category ? current : { ...current, region, category }), 0);
     return () => clearTimeout(timer);

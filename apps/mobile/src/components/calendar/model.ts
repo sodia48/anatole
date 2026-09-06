@@ -1,10 +1,10 @@
-import type { CalendarSnapshot, EarningsItem, EarningsSnapshot, EconomicEvent } from "@/src/lib/api/types";
+import type { CalendarSnapshot, EarningsItem, EarningsSnapshot, EconomicEvent, ProvinceCode, ProvincialMacroEvent, ProvincialMacroSnapshot } from "@/src/lib/api/types";
 
 export type CalendarLanguage = "fr" | "en";
 export type CalendarRange = "today" | "7d" | "30d";
 export type CalendarKindFilter = "all" | "economic" | "earnings";
 export type CalendarImportanceFilter = "all" | "high" | "medium" | "low";
-export type CalendarRegionFilter = "all" | "CA" | "QC" | "ON" | "BC" | "AB" | "prairies" | "atlantic";
+export type CalendarRegionFilter = "all" | "CA" | ProvinceCode | "prairies" | "atlantic";
 export type CalendarScopeFilter = "all" | "personal" | "preferred";
 
 export type CalendarFiltersState = {
@@ -20,7 +20,7 @@ export type CalendarFiltersState = {
 };
 
 type SharedCalendarItem = { id: string; startsAt: string; title: string; source: string; url: string | null; category: string; regions: string[] };
-export type EconomicCalendarItem = SharedCalendarItem & { kind: "economic"; event: EconomicEvent; importance: "high" | "medium" | "low" | "unknown"; timeIsEstimated: false; ticker: null; sector: null };
+export type EconomicCalendarItem = SharedCalendarItem & { kind: "economic"; event: EconomicEvent | ProvincialMacroEvent; importance: "high" | "medium" | "low" | "unknown"; timeIsEstimated: boolean; ticker: null; sector: null };
 export type EarningsCalendarItem = SharedCalendarItem & { kind: "earnings"; event: EarningsItem; importance: "unknown"; timeIsEstimated: boolean; ticker: string; sector: string | null };
 export type CalendarIntelligenceItem = EconomicCalendarItem | EarningsCalendarItem;
 export type CalendarSection = { key: string; title: string; data: CalendarIntelligenceItem[] };
@@ -64,16 +64,27 @@ function regionsForEconomic(event: EconomicEvent): string[] {
   return event.country.toLowerCase().includes("canada") ? ["CA"] : [event.country.toUpperCase()];
 }
 
-export function mergeCalendarEvents(calendar?: CalendarSnapshot | null, earnings?: EarningsSnapshot | null): CalendarIntelligenceItem[] {
+export function calendarProvinceCodes(region: CalendarRegionFilter): ProvinceCode[] {
+  if (region === "prairies") return ["AB", "SK", "MB"];
+  if (region === "atlantic") return ["NB", "NS", "PE", "NL"];
+  if (["QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL"].includes(region)) return [region as ProvinceCode];
+  return [];
+}
+
+export function mergeCalendarEvents(calendar?: CalendarSnapshot | null, earnings?: EarningsSnapshot | null, provincial: readonly ProvincialMacroSnapshot[] = []): CalendarIntelligenceItem[] {
   const economic: EconomicCalendarItem[] = (calendar?.events ?? []).map((event) => ({
     id: `economic:${event.id}`, kind: "economic", startsAt: event.starts_at, title: event.title, source: event.source, url: event.url,
     category: event.category, regions: regionsForEconomic(event), event, importance: normalizeImportance(event.importance), timeIsEstimated: false, ticker: null, sector: null,
   }));
+  const provincialEconomic: EconomicCalendarItem[] = provincial.flatMap((snapshot) => snapshot.upcoming_events.map((event) => ({
+    id: `provincial:${event.region}:${event.id}`, kind: "economic" as const, startsAt: event.starts_at, title: event.title, source: event.source, url: event.source_url,
+    category: event.category, regions: [event.region], event, importance: normalizeImportance(event.importance), timeIsEstimated: event.time_is_estimated, ticker: null, sector: null,
+  })));
   const results: EarningsCalendarItem[] = (earnings?.events ?? []).map((event) => ({
     id: `earnings:${event.ticker}:${event.starts_at}`, kind: "earnings", startsAt: event.starts_at, title: `${event.ticker} · ${event.company}`,
     source: event.source, url: event.url, category: "Earnings", regions: ["CA"], event, importance: "unknown", timeIsEstimated: event.time_is_estimated, ticker: event.ticker, sector: event.sector,
   }));
-  return [...economic, ...results].filter((item) => Number.isFinite(new Date(item.startsAt).getTime())).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime() || left.id.localeCompare(right.id));
+  return [...economic, ...provincialEconomic, ...results].filter((item) => Number.isFinite(new Date(item.startsAt).getTime())).sort((left, right) => new Date(left.startsAt).getTime() - new Date(right.startsAt).getTime() || left.id.localeCompare(right.id));
 }
 
 function matchesRegion(regions: readonly string[], filter: CalendarRegionFilter): boolean {

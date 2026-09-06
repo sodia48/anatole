@@ -4,17 +4,19 @@ import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { formatEstimate, type CalendarIntelligenceItem } from "./model";
 
-function eventTime(value: string, language: "fr" | "en") {
+function eventTime(value: string, language: "fr" | "en", estimated: boolean) {
+  if (estimated) return language === "fr" ? "Heure non publiée" : "Time not published";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "N/D" : date.toLocaleTimeString(language === "fr" ? "fr-CA" : "en-CA", { hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", timeZoneName: "short" });
 }
 
 export function CalendarEventCard({ item, onPress }: { item: CalendarIntelligenceItem; onPress: () => void }) {
   const { language, pick } = useLocale();
-  const time = eventTime(item.startsAt, language);
+  const dateOnly = item.kind === "economic" && item.timeIsEstimated;
+  const time = eventTime(item.startsAt, language, dateOnly);
   const meta = item.kind === "economic" ? `${item.category} · ${item.regions.join(" · ")}` : `${item.event.sector ?? pick("Secteur N/D", "Sector N/A")} · ${item.ticker}`;
   return <Pressable accessibilityLabel={`${item.title}, ${time}, ${meta}`} accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]} testID={`calendar-event-${item.kind}`}>
-    <View style={styles.time}><Text style={styles.timeText}>{time}</Text>{item.kind === "earnings" ? <Text style={item.timeIsEstimated ? styles.estimated : styles.confirmed}>{item.timeIsEstimated ? pick("Heure indicative", "Estimated time") : pick("Heure confirmée", "Confirmed time")}</Text> : null}</View>
+    <View style={styles.time}><Text style={styles.timeText}>{time}</Text>{dateOnly ? <Text style={styles.estimated}>{pick("Date confirmée", "Confirmed date")}</Text> : item.kind === "earnings" ? <Text style={item.timeIsEstimated ? styles.estimated : styles.confirmed}>{item.timeIsEstimated ? pick("Heure indicative", "Estimated time") : pick("Heure confirmée", "Confirmed time")}</Text> : null}</View>
     <View style={styles.copy}><Text style={styles.title}>{item.title}</Text><Text style={styles.meta}>{meta}</Text>{item.kind === "earnings" ? <Text style={styles.estimates}>EPS {formatEstimate(item.event.eps_estimate, item.event.estimate_currency, language)} · {pick("Revenu", "Revenue")} {formatEstimate(item.event.revenue_estimate, item.event.estimate_currency, language)}</Text> : <Text style={styles.importance}>{pick("Importance", "Importance")} · {item.event.importance}</Text>}</View>
     <Text style={styles.arrow}>›</Text>
   </Pressable>;

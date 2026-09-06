@@ -612,6 +612,19 @@ def _statcan_official_schedule_fallback(
     return events
 
 
+def statcan_official_schedule_events(
+    *,
+    now: datetime,
+    language: str,
+) -> list[EconomicEvent]:
+    """Expose the dated official schedule for bounded downstream fallbacks."""
+    normalized_language = "en" if language.lower().startswith("en") else "fr"
+    return _statcan_official_schedule_fallback(
+        now=now,
+        language=normalized_language,
+    )
+
+
 def _is_boc_holiday(title: str) -> bool:
     lowered = title.casefold()
     return any(

@@ -178,27 +178,16 @@ export async function getProvincialCalendarSnapshot(
     lang: language,
   });
 
-  const paths = [
+  const response = await provincialRequest(
     `/api/v1/discovery/provincial-calendar?${query.toString()}`,
-    `/api/v1/discovery/provincial-macro?${query.toString()}`,
-  ];
+    signal,
+  );
 
-  let lastResponse: Response | null = null;
-  for (const path of paths) {
-    const response = await provincialRequest(path, signal);
-    if (response.ok) {
-      return response.json() as Promise<ProvincialMacroSnapshot>;
-    }
-    lastResponse = response;
-    if (response.status !== 404 && response.status !== 405) {
-      throw new ProvincialApiError("Provincial calendar", response.status);
-    }
+  if (!response.ok) {
+    throw new ProvincialApiError("Provincial calendar", response.status);
   }
 
-  if (lastResponse) {
-    throw new ProvincialApiError("Provincial calendar", lastResponse.status);
-  }
-  throw new Error("Provincial calendar unavailable");
+  return response.json() as Promise<ProvincialMacroSnapshot>;
 }
 
 

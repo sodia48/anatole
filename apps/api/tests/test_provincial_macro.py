@@ -1,10 +1,14 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.schemas.provincial_macro import ProvincialMacroSnapshot
+from app.schemas.provincial_macro import (
+    ProvincialMacroEvent,
+    ProvincialMacroSnapshot,
+    ProvincialMacroSource,
+)
 from app.services.provincial_macro import (
     PROVINCES,
     ProvincialMacroService,
@@ -13,6 +17,7 @@ from app.services.provincial_macro import (
     _dedupe_events,
     _ontario_calendar_events,
     _quebec_calendar_events,
+    _quebec_general_calendar_events,
     _saskatchewan_calendar_events,
     classify_macro,
     normalize_region,
@@ -111,36 +116,40 @@ def test_essential_macro_is_kept() -> None:
     assert score >= 88
 
 
-def test_quebec_calendar_parser_extracts_only_quebec_future_rows() -> None:
+def test_quebec_calendar_parser_uses_explicit_next_release_column() -> None:
     html = """
     <table>
-      <tr>
-        <th>Indicateur</th><th>Territoire</th><th>Période</th>
-        <th>Dernière diffusion</th><th>Prochaine diffusion</th>
-      </tr>
-      <tr>
-        <td>Comptes économiques trimestriels</td>
-        <td>Québec</td><td>2026-I</td><td>2026-06-26</td><td>2026-09-23</td>
-      </tr>
-      <tr>
-        <td>Comptes économiques trimestriels</td>
-        <td>Canada</td><td>2026-I</td><td>2026-05-29</td><td>2026-08-28</td>
-      </tr>
-      <tr>
-        <td>Exportations et importations internationales réelles de marchandises</td>
-        <td>Québec</td><td>mai 2026</td><td>2026-07-21</td><td>2026-08-18</td>
-      </tr>
+      <tr><th>Indicateurs économiques conjoncturels</th><th>Dernières</th><th>Dernière</th><th>Prochaine</th></tr>
+      <tr><th></th><th>données</th><th>diffusion</th><th>diffusion</th></tr>
+      <tr><td>Comptes économiques trimestriels</td></tr>
+      <tr><td>– Québec</td><td>2026-I</td><td>2026-06-26</td><td>2026-09-23</td></tr>
+      <tr><td>– Canada</td><td>2026-II</td><td>2026-08-28</td><td>2026-11-30</td></tr>
+      <tr><td>PIB réel aux prix de base ($ de 2017)</td></tr>
+      <tr><td>– Québec</td><td>mai 2026</td><td>2026-08-25</td><td>2026-09-23</td></tr>
+      <tr><td>Exportations et importations internationales réelles de marchandises ($ de 2017)</td></tr>
+      <tr><td>– Québec</td><td>juin 2026</td><td>2026-08-18</td><td>2026-09-18</td></tr>
+      <tr><td>Mises en chantier (Québec, Canada)</td><td>juillet 2026</td><td>2026-08-18</td><td>2026-09-16</td></tr>
+      <tr><td>Permis de bâtir (Québec, Canada)</td><td>juin 2026</td><td>2026-07-10</td><td>2026-09-16</td></tr>
+      <tr><td>Ventes de biens fabriqués (Québec, Canada)</td><td>juin 2026</td><td>2026-08-14</td><td>2026-09-14</td></tr>
+      <tr><td>Ventes en gros (Québec, Canada)</td><td>juin 2026</td><td>2026-08-14</td><td>2026-09-15</td></tr>
+      <tr><td>Ventes au détail (Québec, Canada)</td><td>juin 2026</td><td>2026-08-21</td><td>2026-09-24</td></tr>
+      <tr><td>Rémunération hebdomadaire moyenne,</td></tr>
+      <tr><td>incluant le temps supplémentaire (Québec, Canada)</td><td>juin 2026</td><td>2026-08-27</td><td>2026-09-24</td></tr>
+      <tr><td>Enquête sur la population active (EPA) (Québec, Canada)</td><td>août 2026</td><td>2026-09-04</td><td>2026-09-09</td></tr>
+      <tr><td>Indice des prix à la consommation (Québec, Canada)</td><td>juillet 2026</td><td>2026-08-17</td><td>2026-09-14</td></tr>
     </table>
     """
     events = _quebec_calendar_events(
         html,
-        now=datetime(2026, 8, 16, 20, tzinfo=UTC),
+        now=datetime(2026, 9, 5, 20, tzinfo=UTC),
         lang="fr",
         source_url="https://example.test/qc",
     )
     assert {event.starts_at.date().isoformat() for event in events} == {
-        "2026-08-18", "2026-09-23"
+        "2026-09-09", "2026-09-14", "2026-09-15", "2026-09-16",
+        "2026-09-18", "2026-09-23", "2026-09-24",
     }
+    assert len(events) == 11
     assert all(event.region == "QC" for event in events)
     assert all(event.specificity == "province-direct" for event in events)
 
@@ -279,20 +288,35 @@ def test_statcan_provincialization_removes_generic_noise() -> None:
     assert output[0].specificity == "province-normalized"
 
 
-def test_quebec_official_snapshot_fallback_has_immediate_releases() -> None:
-    from app.services.provincial_macro import _quebec_calendar_snapshot_fallback
-
-    events = _quebec_calendar_snapshot_fallback(
-        now=datetime(2026, 8, 16, 20, tzinfo=UTC),
+def test_quebec_general_calendar_fallback_keeps_only_dated_economic_items() -> None:
+    html = """
+    <div class="calendrier-diffusion_ResultItem__x">
+      <div class="calendrier-diffusion_date__x">18 septembre 2026</div>
+      <span class="calendrier-diffusion_title__x">Commerce international de marchandises, juillet 2026</span>
+    </div>
+    <div class="calendrier-diffusion_ResultItem__x">
+      <div class="calendrier-diffusion_date__x">23 septembre 2026</div>
+      <a class="calendrier-diffusion_title__x" href="/fr/document/pib">Produit intérieur brut par industrie au Québec, juin 2026</a>
+    </div>
+    <div class="calendrier-diffusion_ResultItem__x">
+      <div class="calendrier-diffusion_date__x">18 septembre 2026</div>
+      <span class="calendrier-diffusion_title__x">Classement des films, 2024</span>
+    </div>
+    <div class="calendrier-diffusion_ResultItem__x">
+      <div class="calendrier-diffusion_date__x">Septembre 2026</div>
+      <span class="calendrier-diffusion_title__x">Statistiques principales du secteur de la fabrication</span>
+    </div>
+    """
+    events = _quebec_general_calendar_events(
+        html,
+        now=datetime(2026, 9, 5, 20, tzinfo=UTC),
         lang="fr",
-        source_url="https://statistique.quebec.ca/calendar",
+        source_url="https://statistique.quebec.ca/fr/statistiques/calendrier-diffusion",
     )
-    dates = {event.starts_at.date().isoformat() for event in events}
-    assert "2026-08-17" in dates
-    assert "2026-08-18" in dates
-    assert "2026-08-21" in dates
-    assert "2026-09-04" in dates
-    assert "2026-09-23" in dates
+    assert [event.starts_at.date().isoformat() for event in events] == [
+        "2026-09-18", "2026-09-23"
+    ]
+    assert events[1].source_url == "https://statistique.quebec.ca/fr/document/pib"
     assert all(event.source == "Statistique Québec" for event in events)
 
 
@@ -363,8 +387,6 @@ def test_french_statcan_schedule_covers_requested_provincial_categories() -> Non
 
 
 def test_province_direct_event_suppresses_same_day_statcan_duplicate() -> None:
-    from app.schemas.provincial_macro import ProvincialMacroEvent
-
     shared = dict(
         region="AB",
         province="Alberta",
@@ -397,6 +419,58 @@ def test_province_direct_event_suppresses_same_day_statcan_duplicate() -> None:
     assert _dedupe_events([direct, normalized]) == [direct]
 
 
+def test_dedupe_keeps_distinct_employment_releases_on_same_day() -> None:
+    shared = dict(
+        region="QC",
+        province="Québec",
+        category="Emploi",
+        importance="Élevée",
+        importance_score=100,
+        starts_at=datetime(2026, 9, 24, 13, tzinfo=UTC),
+        source="Statistique Québec",
+        source_kind="statistics",
+        source_url="https://example.test/qc",
+        specificity="province-direct",
+        time_is_estimated=True,
+        description="Date officielle.",
+    )
+    labour = ProvincialMacroEvent(
+        id="labour",
+        title="Québec — Enquête sur la population active",
+        **shared,
+    )
+    payrolls = ProvincialMacroEvent(
+        id="payrolls",
+        title="Québec — Rémunération hebdomadaire moyenne",
+        **shared,
+    )
+
+    assert {event.id for event in _dedupe_events([labour, payrolls])} == {
+        "labour", "payrolls"
+    }
+
+
+def test_dedupe_collapses_same_event_from_two_urls() -> None:
+    shared = dict(
+        region="ON",
+        province="Ontario",
+        title="Ontario — Consumer Price Index",
+        description="Date officielle.",
+        category="Inflation",
+        importance="Élevée",
+        importance_score=100,
+        starts_at=datetime(2026, 9, 14, 12, tzinfo=UTC),
+        time_is_estimated=True,
+        source="Statistics Canada — Ontario",
+        source_kind="statcan",
+        specificity="province-normalized",
+    )
+    first = ProvincialMacroEvent(id="first", source_url="https://example.test/a", **shared)
+    second = ProvincialMacroEvent(id="second", source_url="https://example.test/b", **shared)
+
+    assert len(_dedupe_events([first, second])) == 1
+
+
 def test_statcan_relay_uses_language_specific_feed_and_reports_fallback(monkeypatch) -> None:
     import asyncio
 
@@ -416,7 +490,7 @@ def test_statcan_relay_uses_language_specific_feed_and_reports_fallback(monkeypa
         return [event], FeedStatus(
             source="Statistique Canada — Indicateurs clés",
             status="unavailable",
-            detail="Secours officiel daté.",
+            detail="ConnectTimeout after 3 attempts",
         )
 
     monkeypatch.setattr(calendar_service, "get_statcan_events", fake_feed)
@@ -431,7 +505,8 @@ def test_statcan_relay_uses_language_specific_feed_and_reports_fallback(monkeypa
     assert calls == ["en"]
     assert len(events) == 1
     assert source.status == "partial"
-    assert "Secours officiel daté" in (source.detail or "")
+    assert "live feed is degraded" in (source.detail or "")
+    assert "ConnectTimeout" not in (source.detail or "")
 
 
 def test_calendar_snapshot_fast_path_combines_direct_and_statcan(monkeypatch) -> None:
@@ -502,3 +577,356 @@ def test_calendar_snapshot_fast_path_combines_direct_and_statcan(monkeypatch) ->
     assert snapshot.latest_releases == []
     assert [item.id for item in snapshot.upcoming_events] == ["qc-direct", "qc-statcan"]
     assert len(snapshot.sources) == 2
+
+
+def _test_source(region: str, status: str = "available", count: int = 0) -> ProvincialMacroSource:
+    return ProvincialMacroSource(
+        key=f"calendar-{region.lower()}",
+        label=f"{region} calendar",
+        region=region,
+        kind="statistics",
+        url="https://example.test/calendar",
+        status=status,
+        count=count,
+        detail=None,
+    )
+
+
+def _test_event(region: str = "QC", event_id: str = "future") -> ProvincialMacroEvent:
+    return ProvincialMacroEvent(
+        id=event_id,
+        region=region,
+        province=PROVINCES[region].fr,
+        title=f"{PROVINCES[region].fr} — Consumer Price Index",
+        description="Date officielle.",
+        category="Inflation",
+        importance="Élevée",
+        importance_score=100,
+        starts_at=datetime.now(UTC) + timedelta(days=30),
+        time_is_estimated=True,
+        source="Official source",
+        source_kind="statistics",
+        source_url="https://example.test/calendar",
+        specificity="province-direct",
+    )
+
+
+def test_empty_calendar_cache_reloads_after_failure_ttl(monkeypatch) -> None:
+    import asyncio
+    import app.services.provincial_macro as module
+
+    service = ProvincialMacroService()
+    clock = [1_000.0]
+    calls = 0
+
+    async def fake_direct(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        events = [_test_event()] if calls > 1 else []
+        return events, _test_source("QC", "available" if events else "unavailable", len(events))
+
+    async def fake_statcan(*args, **kwargs):
+        return [], ProvincialMacroSource(
+            key="statcan-qc", label="StatCan QC", region="QC", kind="statcan",
+            url="https://example.test/statcan", status="unavailable", count=0,
+        )
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    first = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    clock[0] += 89
+    cached = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    clock[0] += 2
+    recovered = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+
+    assert not first.upcoming_events
+    assert cached is first
+    assert calls == 2
+    assert recovered.upcoming_events
+
+
+def test_populated_calendar_cache_uses_normal_ttl(monkeypatch) -> None:
+    import asyncio
+    import app.services.provincial_macro as module
+
+    service = ProvincialMacroService()
+    clock = [2_000.0]
+    calls = 0
+
+    async def fake_direct(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [_test_event()], _test_source("QC", "available", 1)
+
+    async def fake_statcan(*args, **kwargs):
+        return [], ProvincialMacroSource(
+            key="statcan-qc", label="StatCan QC", region="QC", kind="statcan",
+            url="https://example.test/statcan", status="unavailable", count=0,
+        )
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    first = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    clock[0] += 899
+    second = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+
+    assert second is first
+    assert calls == 1
+
+
+def test_cache_policy_is_identical_after_single_flight_lock(monkeypatch) -> None:
+    import asyncio
+    import app.services.provincial_macro as module
+
+    service = ProvincialMacroService()
+    clock = [3_000.0]
+    calls = 0
+
+    async def fake_direct(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return [], _test_source("QC", "unavailable", 0)
+
+    async def fake_statcan(*args, **kwargs):
+        return [], ProvincialMacroSource(
+            key="statcan-qc", label="StatCan QC", region="QC", kind="statcan",
+            url="https://example.test/statcan", status="unavailable", count=0,
+        )
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    async def scenario() -> None:
+        lock = service._lock_for(("calendar:QC", "fr"))
+        await lock.acquire()
+        task = asyncio.create_task(service.get_calendar_snapshot("QC", "fr"))
+        await asyncio.sleep(0)
+        service._calendar_cache[("QC", "fr")] = (
+            clock[0],
+            ProvincialMacroSnapshot(
+                region="QC", province="Québec", language="fr",
+                latest_releases=[], upcoming_events=[], sources=[],
+                generated_at=datetime.now(UTC), refresh_after_seconds=90,
+            ),
+        )
+        lock.release()
+        await task
+
+    asyncio.run(scenario())
+    assert calls == 0
+
+
+def test_transient_refresh_failure_serves_last_good_as_partial(monkeypatch) -> None:
+    import asyncio
+    import app.services.provincial_macro as module
+
+    service = ProvincialMacroService()
+    clock = [4_000.0]
+    calls = 0
+
+    async def fake_direct(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return [_test_event(event_id="retained")], _test_source("QC", "available", 1)
+        return [], _test_source("QC", "unavailable", 0)
+
+    async def fake_statcan(*args, **kwargs):
+        return [], ProvincialMacroSource(
+            key="statcan-qc", label="StatCan QC", region="QC", kind="statcan",
+            url="https://example.test/statcan", status="unavailable", count=0,
+        )
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    clock[0] += 901
+    stale = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+
+    assert [event.id for event in stale.upcoming_events] == ["retained"]
+    direct_status = next(source for source in stale.sources if source.key == "calendar-qc")
+    assert direct_status.status == "partial"
+    assert "Dernières dates vérifiables" in (direct_status.detail or "")
+    assert stale.refresh_after_seconds == 90
+    clock[0] += 89
+    assert asyncio.run(service.get_calendar_snapshot("QC", "fr")) is stale
+    clock[0] += 2
+    retried = asyncio.run(service.get_calendar_snapshot("QC", "fr"))
+    assert retried is not stale
+    assert calls == 3
+
+
+def test_empty_full_snapshot_uses_failure_ttl(monkeypatch) -> None:
+    import asyncio
+    import app.services.provincial_macro as module
+
+    service = ProvincialMacroService()
+    clock = [5_000.0]
+    calls = 0
+
+    async def fake_page(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        spec = kwargs["spec"]
+        return [], ProvincialMacroSource(
+            key=spec.key, label=spec.source, region="NL", kind=spec.kind,
+            url=spec.url, status="unavailable", count=0,
+        )
+
+    async def fake_direct(*args, **kwargs):
+        return [], _test_source("NL", "unavailable", 0)
+
+    async def fake_statcan(*args, **kwargs):
+        return [], ProvincialMacroSource(
+            key="statcan-nl", label="StatCan NL", region="NL", kind="statcan",
+            url="https://example.test/statcan", status="unavailable", count=0,
+        )
+
+    monkeypatch.setattr(module, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(service, "_fetch_page", fake_page)
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    asyncio.run(service.get_snapshot("NL", "fr"))
+    first_calls = calls
+    clock[0] += 91
+    asyncio.run(service.get_snapshot("NL", "fr"))
+    assert calls == first_calls + len(PROVINCES["NL"].pages)
+
+
+def test_direct_and_statcan_calendars_run_concurrently(monkeypatch) -> None:
+    import asyncio
+
+    service = ProvincialMacroService()
+
+    async def scenario() -> ProvincialMacroSnapshot:
+        statcan_started = asyncio.Event()
+
+        async def fake_direct(*args, **kwargs):
+            await asyncio.wait_for(statcan_started.wait(), timeout=0.2)
+            return [_test_event("QC", "direct")], _test_source("QC", "available", 1)
+
+        async def fake_statcan(*args, **kwargs):
+            statcan_started.set()
+            event = _test_event("QC", "statcan").model_copy(update={
+                "title": "Québec — Enquête sur la population active",
+                "source": "Statistique Canada — Québec",
+                "source_kind": "statcan",
+                "specificity": "province-normalized",
+            })
+            return [event], ProvincialMacroSource(
+                key="statcan-qc", label="StatCan QC", region="QC", kind="statcan",
+                url="https://example.test/statcan", status="available", count=1,
+            )
+
+        monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+        monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+        return await service.get_calendar_snapshot("QC", "fr")
+
+    snapshot = asyncio.run(scenario())
+    assert {event.id for event in snapshot.upcoming_events} == {"direct", "statcan"}
+    assert all(source.status == "available" for source in snapshot.sources)
+
+
+def test_one_failed_calendar_source_does_not_erase_the_other(monkeypatch) -> None:
+    import asyncio
+
+    service = ProvincialMacroService()
+
+    async def fake_direct(*args, **kwargs):
+        raise RuntimeError("secret upstream detail")
+
+    async def fake_statcan(*args, **kwargs):
+        event = _test_event("MB", "statcan-only").model_copy(update={
+            "source": "Statistique Canada — Manitoba",
+            "source_kind": "statcan",
+            "specificity": "province-normalized",
+        })
+        return [event], ProvincialMacroSource(
+            key="statcan-mb", label="StatCan MB", region="MB", kind="statcan",
+            url="https://example.test/statcan", status="available", count=1,
+        )
+
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    snapshot = asyncio.run(service.get_calendar_snapshot("MB", "fr"))
+    assert [event.id for event in snapshot.upcoming_events] == ["statcan-only"]
+    direct = next(source for source in snapshot.sources if source.key == "calendar-mb")
+    assert direct.status == "unavailable"
+    assert "secret upstream detail" not in (direct.detail or "")
+
+
+def test_slow_direct_calendar_respects_deadline_and_keeps_statcan(monkeypatch) -> None:
+    import asyncio
+
+    service = ProvincialMacroService()
+    service.calendar_source_timeout_seconds = 0.01
+
+    async def fake_direct(*args, **kwargs):
+        await asyncio.sleep(1)
+        return [_test_event("NS", "too-late")], _test_source("NS", "available", 1)
+
+    async def fake_statcan(*args, **kwargs):
+        event = _test_event("NS", "statcan-fast").model_copy(update={
+            "source": "Statistique Canada — Nouvelle-Écosse",
+            "source_kind": "statcan",
+            "specificity": "province-normalized",
+        })
+        return [event], ProvincialMacroSource(
+            key="statcan-ns", label="StatCan NS", region="NS", kind="statcan",
+            url="https://example.test/statcan", status="available", count=1,
+        )
+
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
+
+    snapshot = asyncio.run(service.get_calendar_snapshot("NS", "fr"))
+    assert [event.id for event in snapshot.upcoming_events] == ["statcan-fast"]
+    direct = next(source for source in snapshot.sources if source.key == "calendar-ns")
+    assert direct.status == "unavailable"
+    assert "délai" in (direct.detail or "")
+
+
+def test_slow_statcan_live_feed_uses_existing_official_schedule(monkeypatch) -> None:
+    import asyncio
+    import app.services.calendar as calendar_module
+
+    service = ProvincialMacroService()
+    service.calendar_source_timeout_seconds = 0.01
+    official_event = SimpleNamespace(
+        title="Consumer Price Index",
+        source="Statistics Canada",
+        starts_at=datetime.now(UTC) + timedelta(days=30),
+        url="https://www150.statcan.gc.ca/official-schedule.pdf",
+    )
+
+    async def fake_direct(*args, **kwargs):
+        return [], _test_source("BC", "unavailable", 0)
+
+    async def slow_statcan(*args, **kwargs):
+        await asyncio.sleep(1)
+        raise AssertionError("deadline should cancel the slow live feed")
+
+    monkeypatch.setattr(service, "_direct_calendar", fake_direct)
+    monkeypatch.setattr(service, "_statcan_calendar_fallback", slow_statcan)
+    monkeypatch.setattr(
+        calendar_module,
+        "statcan_official_schedule_events",
+        lambda **kwargs: [official_event],
+    )
+
+    snapshot = asyncio.run(service.get_calendar_snapshot("BC", "en"))
+    assert len(snapshot.upcoming_events) == 1
+    assert snapshot.upcoming_events[0].specificity == "province-normalized"
+    statcan = next(source for source in snapshot.sources if source.key == "statcan-bc")
+    assert statcan.status == "partial"
+    assert "official annual schedule" in (statcan.detail or "")
+    assert snapshot.refresh_after_seconds == 90

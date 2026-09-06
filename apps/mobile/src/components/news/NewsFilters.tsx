@@ -16,6 +16,9 @@ const regionOptions: { id: NewsRegionFilter; fr: string; en: string }[] = [
   { id: "all", fr: "Toutes régions", en: "All regions" }, { id: "CA", fr: "Canada", en: "Canada" },
   { id: "QC", fr: "QC", en: "QC" }, { id: "ON", fr: "ON", en: "ON" },
   { id: "BC", fr: "BC", en: "BC" }, { id: "AB", fr: "AB", en: "AB" },
+  { id: "SK", fr: "SK", en: "SK" }, { id: "MB", fr: "MB", en: "MB" },
+  { id: "NB", fr: "N.-B.", en: "N.B." }, { id: "NS", fr: "N.-É.", en: "N.S." },
+  { id: "PE", fr: "Î.-P.-É.", en: "P.E.I." }, { id: "NL", fr: "T.-N.-L.", en: "N.L." },
   { id: "prairies", fr: "Prairies", en: "Prairies" }, { id: "atlantic", fr: "Atlantique", en: "Atlantic" },
 ];
 

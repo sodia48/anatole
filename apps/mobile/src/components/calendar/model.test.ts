@@ -1,5 +1,5 @@
-import type { CalendarSnapshot, EarningsItem, EarningsSnapshot, EconomicEvent } from "@/src/lib/api/types";
-import { calendarRangeLabel, filterCalendarItems, formatEstimate, groupCalendarByTorontoDate, mergeCalendarEvents, nextMajorEvent, type CalendarFiltersState } from "./model";
+import type { CalendarSnapshot, EarningsItem, EarningsSnapshot, EconomicEvent, ProvincialMacroSnapshot } from "@/src/lib/api/types";
+import { calendarProvinceCodes, calendarRangeLabel, filterCalendarItems, formatEstimate, groupCalendarByTorontoDate, mergeCalendarEvents, nextMajorEvent, type CalendarFiltersState } from "./model";
 
 function economic(overrides: Partial<EconomicEvent> = {}): EconomicEvent {
   return { id: "jobs", title: "Enquête sur la population active", country: "Canada", currency: "CAD", category: "Travail", importance: "high", starts_at: "2026-09-03T12:30:00Z", source: "Statistique Canada", url: "https://statcan.gc.ca/jobs", description: "Données officielles.", regions: ["CA"], ...overrides };
@@ -71,5 +71,30 @@ describe("calendar intelligence model", () => {
     expect(formatEstimate(item.event.eps_estimate, item.event.estimate_currency, "fr")).toBe("N/D");
     expect(formatEstimate(item.event.revenue_estimate, item.event.estimate_currency, "fr")).toBe("N/D");
     expect(item.timeIsEstimated).toBe(true);
+  });
+
+  it("maps exact provinces and regional groups to bounded province-first queries", () => {
+    expect(calendarProvinceCodes("QC")).toEqual(["QC"]);
+    expect(calendarProvinceCodes("prairies")).toEqual(["AB", "SK", "MB"]);
+    expect(calendarProvinceCodes("atlantic")).toEqual(["NB", "NS", "PE", "NL"]);
+    expect(calendarProvinceCodes("CA")).toEqual([]);
+    expect(calendarProvinceCodes("all")).toEqual([]);
+  });
+
+  it("preserves provincial source metadata and estimated-time status", () => {
+    const provincial = {
+      region: "NL",
+      province: "Terre-Neuve-et-Labrador",
+      language: "fr",
+      mode: "province-first",
+      latest_releases: [],
+      upcoming_events: [{ id: "nl-jobs", region: "NL", province: "Terre-Neuve-et-Labrador", title: "Emploi — Terre-Neuve-et-Labrador", description: "Volet provincial vérifiable.", category: "Emploi", importance: "Élevée", importance_score: 100, starts_at: "2026-09-04T13:00:00Z", time_is_estimated: true, source: "Statistique Canada", source_kind: "statcan", source_url: "https://statcan.gc.ca/jobs", official: true, specificity: "province-normalized" }],
+      sources: [],
+      generated_at: "2026-09-03T10:00:00Z",
+      refresh_after_seconds: 900,
+      message: null,
+    } satisfies ProvincialMacroSnapshot;
+    const item = mergeCalendarEvents(null, null, [provincial])[0];
+    expect(item).toMatchObject({ kind: "economic", regions: ["NL"], source: "Statistique Canada", url: "https://statcan.gc.ca/jobs", timeIsEstimated: true });
   });
 });

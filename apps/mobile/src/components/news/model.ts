@@ -2,7 +2,21 @@ import type { FeedStatus, NewsItem, StockNewsItem, SyncedWorkspaceData } from "@
 
 export type NewsLanguage = "fr" | "en";
 export type NewsPrimaryFilter = "all" | "canada" | "provinces" | "boc" | "statcan" | "my-regions" | "personal";
-export type NewsRegionFilter = "all" | "CA" | "QC" | "ON" | "BC" | "AB" | "prairies" | "atlantic";
+export type NewsRegionFilter =
+  | "all"
+  | "CA"
+  | "QC"
+  | "ON"
+  | "BC"
+  | "AB"
+  | "SK"
+  | "MB"
+  | "NB"
+  | "NS"
+  | "PE"
+  | "NL"
+  | "prairies"
+  | "atlantic";
 export type NewsCategoryFilter = "all" | "monetary" | "inflation" | "labour" | "growth" | "trade" | "energy" | "public-finance" | "investment" | "housing" | "other";
 
 export type PersonalNewsItem = StockNewsItem & { personal_ticker: string };

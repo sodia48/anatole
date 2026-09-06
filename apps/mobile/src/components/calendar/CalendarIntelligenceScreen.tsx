@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type Query, useQueries, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { QueryState, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
-import type { FeedStatus } from "@/src/lib/api/types";
+import type { FeedStatus, ProvincialMacroSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
@@ -17,6 +17,7 @@ import { CalendarSourceHealth } from "./CalendarSourceHealth";
 import { CalendarTimeline } from "./CalendarTimeline";
 import {
   calendarRangeLabel,
+  calendarProvinceCodes,
   countdownLabel,
   filterCalendarItems,
   groupCalendarByTorontoDate,
@@ -30,12 +31,17 @@ import {
 } from "./model";
 
 const DEFAULT_FILTERS: CalendarFiltersState = { range: "7d", kind: "all", importance: "all", region: "all", category: "all", sector: "all", scope: "all", ticker: "", dayOffset: null };
-const REGIONS = new Set<CalendarRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "prairies", "atlantic"]);
+const REGIONS = new Set<CalendarRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "prairies", "atlantic"]);
 
 function rangeFromParam(value?: string): CalendarRange {
   if (value === "today" || value === "1" || value === "1d") return "today";
   if (value === "30" || value === "30d") return "30d";
   return "7d";
+}
+
+function regionFromParam(value?: string): CalendarRegionFilter {
+  const requested = value?.toLowerCase() === "prairies" || value?.toLowerCase() === "atlantic" ? value.toLowerCase() : value?.toUpperCase();
+  return requested && REGIONS.has(requested as CalendarRegionFilter) ? requested as CalendarRegionFilter : "all";
 }
 
 function uniqueStatuses(statuses: readonly FeedStatus[]): FeedStatus[] {
@@ -51,9 +57,16 @@ function uniqueStatuses(statuses: readonly FeedStatus[]): FeedStatus[] {
 export function CalendarIntelligenceScreen({ header, initialRegion, initialCategory, initialDateRange, initialKind, initialDayOffset, initialTicker, referenceNow }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; initialDateRange?: string; initialKind?: string; initialDayOffset?: string | number; initialTicker?: string; referenceNow?: Date }) {
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
-  const queryClient = useQueryClient();
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
-  const [filters, setFilters] = useState<CalendarFiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<CalendarFiltersState>(() => ({
+    ...DEFAULT_FILTERS,
+    region: regionFromParam(initialRegion),
+    range: rangeFromParam(initialDateRange),
+    kind: initialKind === "earnings" || initialKind === "economic" ? initialKind : "all",
+    category: initialCategory?.trim() || "all",
+    ticker: initialTicker?.trim().toUpperCase() || "",
+    dayOffset: Number.isInteger(Number(initialDayOffset)) && Number(initialDayOffset) >= 0 && Number(initialDayOffset) <= 30 ? Number(initialDayOffset) : null,
+  }));
   const [selected, setSelected] = useState<EconomicCalendarItem | null>(null);
   const [now, setNow] = useState(() => referenceNow ?? new Date());
 
@@ -62,13 +75,9 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
       const active = state === "active";
       setAppActive(active);
       if (active && !referenceNow) setNow(new Date());
-      if (!active) {
-        void queryClient.cancelQueries({ queryKey: ["calendar"] });
-        void queryClient.cancelQueries({ queryKey: ["earnings"] });
-      }
     });
     return () => subscription.remove();
-  }, [queryClient, referenceNow]);
+  }, [referenceNow]);
 
   useEffect(() => {
     if (referenceNow || !appActive) return;
@@ -77,8 +86,7 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   }, [appActive, referenceNow]);
 
   useEffect(() => {
-    const requestedRegion = initialRegion?.toLowerCase() === "prairies" || initialRegion?.toLowerCase() === "atlantic" ? initialRegion.toLowerCase() : initialRegion?.toUpperCase();
-    const region = requestedRegion && REGIONS.has(requestedRegion as CalendarRegionFilter) ? requestedRegion as CalendarRegionFilter : "all";
+    const region = regionFromParam(initialRegion);
     const range = rangeFromParam(initialDateRange);
     const kind = initialKind === "earnings" || initialKind === "economic" ? initialKind : "all";
     const parsedDayOffset = Number(initialDayOffset);
@@ -89,9 +97,18 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
     return () => clearTimeout(timer);
   }, [initialCategory, initialDateRange, initialDayOffset, initialKind, initialRegion, initialTicker]);
 
-  const calendar = useQuery({ queryKey: ["calendar", language], queryFn: ({ signal }) => marketApi.calendar(language, signal), enabled: appActive, staleTime: 600_000 });
+  const provinceCodes = useMemo(() => calendarProvinceCodes(filters.region), [filters.region]);
+  const provinceMode = provinceCodes.length > 0;
+  const calendar = useQuery({ queryKey: ["calendar", language], queryFn: ({ signal }) => marketApi.calendar(language, signal), enabled: appActive && !provinceMode, staleTime: 600_000 });
+  const provincialQueries = useQueries({ queries: provinceCodes.map((region) => ({
+    queryKey: ["provincial-calendar", region, language],
+    queryFn: ({ signal }: { signal: AbortSignal }) => marketApi.provincialCalendar(region, language, signal),
+    enabled: appActive,
+    staleTime: (query: Query<ProvincialMacroSnapshot>) => ((query.state.data?.refresh_after_seconds ?? 90) * 1_000),
+  })) });
   const earnings = useQuery({ queryKey: ["earnings", "composite"], queryFn: ({ signal }) => marketApi.earnings(signal), enabled: appActive, staleTime: 600_000 });
-  const merged = useMemo(() => mergeCalendarEvents(calendar.data, earnings.data), [calendar.data, earnings.data]);
+  const provincialSnapshots = useMemo(() => provincialQueries.map((query) => query.data).filter((snapshot): snapshot is ProvincialMacroSnapshot => Boolean(snapshot)), [provincialQueries]);
+  const merged = useMemo(() => mergeCalendarEvents(provinceMode ? null : calendar.data, earnings.data, provincialSnapshots), [calendar.data, earnings.data, provinceMode, provincialSnapshots]);
   const preferredRegions = useMemo(() => workspace.data.preferences?.preferred_regions ?? [], [workspace.data.preferences?.preferred_regions]);
   const personalSymbols = useMemo(() => [...new Set([...workspace.data.portfolio.map((item) => item.symbol), ...workspace.data.watchlist].map((symbol) => symbol.replace(/\.TO$/i, "").toUpperCase()))], [workspace.data.portfolio, workspace.data.watchlist]);
   const filtered = useMemo(() => filterCalendarItems(merged, filters, now, personalSymbols, preferredRegions), [filters, merged, now, personalSymbols, preferredRegions]);
@@ -99,24 +116,44 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   const major = useMemo(() => nextMajorEvent(filtered, now), [filtered, now]);
   const categories = useMemo(() => [...new Set(merged.filter((item) => item.kind === "economic").map((item) => item.category))].sort(), [merged]);
   const sectors = useMemo(() => [...new Set(merged.filter((item) => item.kind === "earnings").map((item) => item.sector).filter((value): value is string => Boolean(value)))].sort(), [merged]);
-  const statuses = useMemo(() => uniqueStatuses([...(calendar.data?.source_statuses ?? []), ...(earnings.data?.source_statuses ?? [])]), [calendar.data?.source_statuses, earnings.data?.source_statuses]);
-  const anyData = Boolean(calendar.data || earnings.data);
-  const stale = Boolean((calendar.data && calendar.isError) || (earnings.data && earnings.isError));
-  const refresh = () => { void calendar.refetch(); void earnings.refetch(); };
+  const statuses = useMemo(() => uniqueStatuses([
+    ...(provinceMode ? provincialSnapshots.flatMap((snapshot) => snapshot.sources.map((source) => ({ source: source.label, status: source.status, detail: source.detail }))) : (calendar.data?.source_statuses ?? [])),
+    ...(earnings.data?.source_statuses ?? []),
+  ]), [calendar.data?.source_statuses, earnings.data?.source_statuses, provinceMode, provincialSnapshots]);
+  const anyEconomicData = provinceMode ? provincialSnapshots.length > 0 : Boolean(calendar.data);
+  const anyData = Boolean(anyEconomicData || earnings.data);
+  const stale = Boolean(
+    (provinceMode ? provincialQueries.some((query) => Boolean(query.data && query.isError)) : calendar.data && calendar.isError)
+    || (earnings.data && earnings.isError),
+  );
+  const firstProvincialError = provincialQueries.find((query) => query.error instanceof Error)?.error;
+  const provincialLoading = provinceMode && provincialQueries.some((query) => query.isLoading);
+  const refresh = () => {
+    if (provinceMode) for (const query of provincialQueries) void query.refetch();
+    else void calendar.refetch();
+    void earnings.refetch();
+  };
   const reset = () => setFilters(DEFAULT_FILTERS);
   const open = (item: CalendarIntelligenceItem) => item.kind === "earnings" ? router.push({ pathname: "/focus/[ticker]", params: { ticker: item.ticker } }) : setSelected(item);
+  const provincialMessage = [...new Set(provincialSnapshots.map((snapshot) => snapshot.message).filter((message): message is string => Boolean(message)))].join(" ");
+  const majorMeta = major
+    ? major.timeIsEstimated
+      ? `${new Date(major.startsAt).toLocaleDateString(language === "fr" ? "fr-CA" : "en-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Toronto" })} · ${pick("heure non publiée", "time not published")}`
+      : `${new Date(major.startsAt).toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", timeZoneName: "short" })} · ${countdownLabel(major.startsAt, now, language)}`
+    : null;
 
   const contentHeader = <>
     {header}
     <ScreenHeader eyebrow={pick("CALENDRIER ÉCONOMIQUE", "ECONOMIC CALENDAR")} title={calendarRangeLabel(filters.range, language, filters.dayOffset)} subtitle={pick("Économie canadienne, provinces et résultats TSX.", "Canadian economy, provinces and TSX earnings.")} />
     {stale ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
-    <QueryState error={!anyData ? (calendar.error instanceof Error ? calendar.error : earnings.error instanceof Error ? earnings.error : null) : null} loading={!anyData && (calendar.isLoading || earnings.isLoading)} onRetry={refresh} />
-    {calendar.isError && !calendar.data && earnings.data ? <Text style={styles.partial}>{pick("Le calendrier économique est indisponible; les résultats demeurent accessibles.", "The economic calendar is unavailable; earnings remain available.")}</Text> : null}
-    {earnings.isError && !earnings.data && calendar.data ? <Text style={styles.partial}>{pick("Les résultats sont indisponibles; le calendrier économique demeure accessible.", "Earnings are unavailable; the economic calendar remains available.")}</Text> : null}
-    {major ? <View style={styles.major} testID="calendar-next-major"><Text style={styles.eyebrow}>{pick("PROCHAIN ÉVÉNEMENT MAJEUR", "NEXT MAJOR EVENT")}</Text><Text style={styles.majorTitle}>{major.title}</Text><Text style={styles.majorMeta}>{new Date(major.startsAt).toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { weekday: "long", hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", timeZoneName: "short" })} · {countdownLabel(major.startsAt, now, language)}</Text></View> : null}
+    <QueryState error={!anyData ? (provinceMode && firstProvincialError instanceof Error ? firstProvincialError : calendar.error instanceof Error ? calendar.error : earnings.error instanceof Error ? earnings.error : null) : null} loading={!anyData && (provincialLoading || calendar.isLoading || earnings.isLoading)} onRetry={refresh} />
+    {(provinceMode ? provincialQueries.every((query) => query.isError && !query.data) : calendar.isError && !calendar.data) && earnings.data ? <Text style={styles.partial}>{pick("Le calendrier économique est indisponible; les résultats demeurent accessibles.", "The economic calendar is unavailable; earnings remain available.")}</Text> : null}
+    {earnings.isError && !earnings.data && anyEconomicData ? <Text style={styles.partial}>{pick("Les résultats sont indisponibles; le calendrier économique demeure accessible.", "Earnings are unavailable; the economic calendar remains available.")}</Text> : null}
+    {provincialMessage ? <Text style={styles.partial}>{provincialMessage}</Text> : null}
+    {major ? <View style={styles.major} testID="calendar-next-major"><Text style={styles.eyebrow}>{pick("PROCHAIN ÉVÉNEMENT MAJEUR", "NEXT MAJOR EVENT")}</Text><Text style={styles.majorTitle}>{major.title}</Text><Text style={styles.majorMeta}>{majorMeta}</Text></View> : null}
     <CalendarFilters categories={categories} filters={filters} hasPersonal={personalSymbols.length > 0} onChange={setFilters} preferredRegions={preferredRegions} sectors={sectors} />
   </>;
-  return <SafeAreaView edges={["top"]} style={styles.safe} testID="calendar-intelligence-screen"><CalendarTimeline footer={<CalendarSourceHealth statuses={statuses} />} header={contentHeader} onOpen={open} onRefresh={refresh} onReset={reset} refreshing={calendar.isRefetching || earnings.isRefetching} sections={sections} /><CalendarEventModal item={selected} onClose={() => setSelected(null)} /></SafeAreaView>;
+  return <SafeAreaView edges={["top"]} style={styles.safe} testID="calendar-intelligence-screen"><CalendarTimeline footer={<CalendarSourceHealth statuses={statuses} />} header={contentHeader} onOpen={open} onRefresh={refresh} onReset={reset} refreshing={(provinceMode ? provincialQueries.some((query) => query.isRefetching) : calendar.isRefetching) || earnings.isRefetching} sections={sections} /><CalendarEventModal item={selected} onClose={() => setSelected(null)} /></SafeAreaView>;
 }
 
 const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, partial: { ...typography.caption, color: colors.textMuted }, major: { gap: spacing.xs, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface }, eyebrow: { ...typography.label, color: colors.primary, letterSpacing: 1 }, majorTitle: { ...typography.section, color: colors.text }, majorMeta: { ...typography.body, color: colors.textMuted } });

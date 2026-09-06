@@ -46,6 +46,7 @@ class ProvinceConfig:
     pages: tuple[PageSpec, ...]
     calendar_kind: str = "statcan"
     calendar_url: str | None = None
+    calendar_fallback_url: str | None = None
 
 
 QC_PAGES = (
@@ -339,6 +340,7 @@ PROVINCES: dict[str, ProvinceConfig] = {
     "QC": ProvinceConfig(
         "QC", "Québec", "Quebec", QC_PAGES, "quebec",
         "https://statistique.quebec.ca/fr/produit/tableau/calendrier-de-diffusion-principaux-indicateurs-economiques",
+        "https://statistique.quebec.ca/fr/statistiques/calendrier-diffusion",
     ),
     "ON": ProvinceConfig(
         "ON", "Ontario", "Ontario", ON_PAGES, "ontario",
@@ -386,7 +388,7 @@ ESSENTIAL_RULES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
     ("Emploi", 100, (
         "labour force survey", "enquete sur la population active", "employment", "unemployment",
         "labour force statistics", "emploi", "chomage", "payroll employment",
-        "earnings and hours", "weekly earnings",
+        "earnings and hours", "weekly earnings", "remuneration hebdomadaire",
     )),
     ("PIB", 100, (
         "gross domestic product", "produit interieur brut", "economic accounts", "comptes economiques",
@@ -402,7 +404,7 @@ ESSENTIAL_RULES: tuple[tuple[str, int, tuple[str, ...]], ...] = (
     ("Commerce", 84, (
         "international merchandise exports", "international merchandise trade",
         "exports", "imports", "exportations", "importations", "wholesale trade",
-        "commerce de gros",
+        "commerce de gros", "ventes en gros", "commerce international de marchandises",
     )),
     ("Logement", 84, (
         "building permits", "permis de batir", "housing starts", "mises en chantier",
@@ -473,24 +475,6 @@ STATCAN_PROVINCIAL_EVENT_PATTERNS = (
     "commerce international de marchandises par province",
     "exportations internationales de marchandises par province",
 )
-
-# Dated safety net copied from Statistique Québec's official main-indicator
-# release calendar, updated 2026-08-14. It is used ONLY if live parsing fails
-# and only through 2026-09-30, so Anatole never carries these dates forward
-# indefinitely. The live official page remains the primary source.
-QC_RELEASE_SCHEDULE_SNAPSHOT = (
-    ("2026-08-17", "Indice des prix à la consommation (Québec, Canada)", "Inflation", 100),
-    ("2026-08-18", "Exportations et importations internationales réelles de marchandises ($ de 2017)", "Commerce", 92),
-    ("2026-08-18", "Mises en chantier (Québec, Canada)", "Logement", 88),
-    ("2026-08-21", "Ventes au détail (Québec, Canada)", "Consommation", 92),
-    ("2026-08-27", "Rémunération hebdomadaire moyenne, incluant le temps supplémentaire (Québec, Canada)", "Emploi", 88),
-    ("2026-09-04", "Enquête sur la population active (EPA) (Québec, Canada)", "Emploi", 100),
-    ("2026-09-14", "Ventes de biens fabriqués (Québec, Canada)", "Industrie", 88),
-    ("2026-09-15", "Ventes en gros (Québec, Canada)", "Commerce", 86),
-    ("2026-09-16", "Permis de bâtir (Québec, Canada)", "Logement", 88),
-    ("2026-09-23", "Comptes économiques trimestriels — Québec", "PIB", 100),
-)
-QC_RELEASE_SCHEDULE_SNAPSHOT_VALID_UNTIL = date(2026, 9, 30)
 
 # Saskatchewan's own published 2026-27 report-release schedule.
 SK_RELEASE_SCHEDULE = (
@@ -697,6 +681,50 @@ class ContentParser(HTMLParser):
             self._row = None
 
 
+class QuebecGeneralCalendarParser(HTMLParser):
+    """Extract dated items from Statistique Québec's general release calendar."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.items: list[tuple[str, str, str | None]] = []
+        self._capture: str | None = None
+        self._parts: list[str] = []
+        self._href: str | None = None
+        self._date = ""
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        attributes = dict(attrs)
+        class_name = str(attributes.get("class") or "")
+        if "calendrier-diffusion_date" in class_name:
+            self._capture = "date"
+            self._parts = []
+            self._href = None
+        elif "calendrier-diffusion_title" in class_name:
+            self._capture = "title"
+            self._parts = []
+            href = str(attributes.get("href") or "").strip()
+            self._href = href or None
+
+    def handle_data(self, data: str) -> None:
+        if self._capture:
+            clean = re.sub(r"\s+", " ", html.unescape(data or "")).strip()
+            if clean:
+                self._parts.append(clean)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._capture == "date" and tag == "div":
+            self._date = re.sub(r"\s+", " ", " ".join(self._parts)).strip()
+            self._capture = None
+            self._parts = []
+        elif self._capture == "title" and tag in {"a", "span"}:
+            title = re.sub(r"\s+", " ", " ".join(self._parts)).strip()
+            if self._date and title:
+                self.items.append((self._date, title, self._href))
+            self._capture = None
+            self._parts = []
+            self._href = None
+
+
 def _best_title(parser: ContentParser, fallback: str) -> str:
     for tag, text in parser.blocks:
         if tag == "h1" and 4 <= len(text) <= 180:
@@ -839,51 +867,43 @@ def _extract_page_release(
     ]
 
 
-def _quebec_calendar_snapshot_fallback(
+def _quebec_general_calendar_events(
+    html_text: str,
     *,
     now: datetime,
     lang: str,
     source_url: str,
 ) -> list[ProvincialMacroEvent]:
-    today = now.astimezone(TORONTO).date()
-    if today > QC_RELEASE_SCHEDULE_SNAPSHOT_VALID_UNTIL:
-        return []
+    parser = QuebecGeneralCalendarParser()
+    parser.feed(html_text)
     province = province_name("QC", lang)
-    output: list[ProvincialMacroEvent] = []
-    for raw_day, title_fr, category, score in QC_RELEASE_SCHEDULE_SNAPSHOT:
-        release_day = date.fromisoformat(raw_day)
-        if release_day < today:
+    today = now.astimezone(TORONTO).date()
+    events: list[ProvincialMacroEvent] = []
+    for raw_date, raw_title, href in parser.items:
+        dates = _dates_in_text(raw_date)
+        if len(dates) != 1 or dates[0] < today:
             continue
-        title_base = title_fr
-        if lang == "en":
-            translations = {
-                "Indice des prix à la consommation (Québec, Canada)": "Consumer Price Index (Quebec, Canada)",
-                "Exportations et importations internationales réelles de marchandises ($ de 2017)": "Real international merchandise exports and imports (2017 dollars)",
-                "Mises en chantier (Québec, Canada)": "Housing starts (Quebec, Canada)",
-                "Ventes au détail (Québec, Canada)": "Retail sales (Quebec, Canada)",
-                "Rémunération hebdomadaire moyenne, incluant le temps supplémentaire (Québec, Canada)": "Average weekly earnings, including overtime (Quebec, Canada)",
-                "Enquête sur la population active (EPA) (Québec, Canada)": "Labour Force Survey (Quebec, Canada)",
-                "Ventes de biens fabriqués (Québec, Canada)": "Manufacturing sales (Quebec, Canada)",
-                "Ventes en gros (Québec, Canada)": "Wholesale sales (Quebec, Canada)",
-                "Permis de bâtir (Québec, Canada)": "Building permits (Quebec, Canada)",
-                "Comptes économiques trimestriels — Québec": "Quarterly economic accounts — Quebec",
-            }
-            title_base = translations.get(title_fr, title_fr)
-        if not _norm(title_base).startswith(_norm(province)):
-            title = f"{province} — {title_base}"
-        else:
-            title = title_base
-        starts_at = datetime.combine(release_day, time(9, 0), tzinfo=TORONTO)
-        output.append(
+        category, score = classify_macro(raw_title)
+        if not category:
+            continue
+        title_base = _translate_statcan_title(raw_title, lang)
+        title = (
+            title_base
+            if _norm(title_base).startswith(_norm(province))
+            else f"{province} — {title_base}"
+        )
+        starts_at = datetime.combine(dates[0], time(9, 0), tzinfo=TORONTO)
+        item_url = urljoin(source_url, href) if href else source_url
+        events.append(
             ProvincialMacroEvent(
-                id=_id("QC", "official-snapshot", title, starts_at.isoformat()),
+                id=_id("QC", title, starts_at.isoformat()),
                 region="QC",
                 province=province,
                 title=title[:240],
                 description=(
-                    "Date publiée dans le calendrier officiel des principaux indicateurs économiques de Statistique Québec; copie de secours datée du 14 août 2026 utilisée uniquement si la lecture live échoue."
+                    "Date explicite publiée dans le calendrier général de diffusion de Statistique Québec."
                     if lang == "fr"
-                    else "Date published in Québec Statistics' official main economic indicators calendar; dated Aug. 14, 2026 fallback used only if live parsing fails."
+                    else "Explicit date published in Québec Statistics' general release calendar."
                 ),
                 category=category,
                 importance=importance_label(score),
@@ -892,12 +912,12 @@ def _quebec_calendar_snapshot_fallback(
                 time_is_estimated=True,
                 source="Statistique Québec",
                 source_kind="statistics",
-                source_url=source_url,
+                source_url=item_url,
                 official=True,
                 specificity="province-direct",
             )
         )
-    return output
+    return _dedupe_events(events)
 
 
 def _translate_statcan_title(title: str, lang: str) -> str:
@@ -943,34 +963,64 @@ def _quebec_calendar_events(
     events: list[ProvincialMacroEvent] = []
     today = now.astimezone(TORONTO).date()
 
+    headers: list[str] = []
+    header_rows = 0
+    for row in parser.rows:
+        normalized_cells = [_norm(cell) for cell in row]
+        if any("prochaine" in cell or "next" in cell for cell in normalized_cells):
+            headers = list(row)
+            header_rows = 1
+            continue
+        if headers and header_rows == 1 and len(row) == len(headers):
+            headers = [
+                re.sub(r"\s+", " ", f"{left} {right}").strip()
+                for left, right in zip(headers, row, strict=False)
+            ]
+            header_rows = 2
+        if headers:
+            break
+
+    next_release_index: int | None = None
+    for index, header in enumerate(headers):
+        normalized_header = _norm(header)
+        if "prochaine diffusion" in normalized_header or "next release" in normalized_header:
+            next_release_index = index
+            break
+    if next_release_index is None:
+        return []
+
     for row in parser.rows:
         cells = [re.sub(r"\s+", " ", cell).strip() for cell in row if cell.strip()]
         if not cells:
             continue
         joined = " | ".join(cells)
         norm = _norm(joined)
-        if "quebec" not in norm:
-            # A header/indicator row may be separate; remember it.
-            first = cells[0]
-            if not _dates_in_text(joined) and len(first) > 5:
-                current_indicator = first
-            continue
-
         first = cells[0]
-        if _norm(first) not in {"quebec", "canada"} and not first.startswith("–"):
-            current_indicator = first
-
-        dates = _dates_in_text(joined)
-        future_dates = [item for item in dates if item >= today]
-        if not future_dates:
+        if "quebec" not in norm:
+            if len(cells) == 1 and not _dates_in_text(joined):
+                category, _score = classify_macro(first)
+                if category:
+                    current_indicator = first
             continue
-        release_day = max(future_dates)
+
+        if _norm(first) not in {"quebec", "canada"} and not first.startswith("–"):
+            candidate_category, _candidate_score = classify_macro(first)
+            if candidate_category:
+                current_indicator = first
+            elif current_indicator and first[:1].islower():
+                current_indicator = f"{current_indicator} {first}".strip()
+
+        if next_release_index >= len(row):
+            continue
+        next_dates = _dates_in_text(row[next_release_index])
+        if len(next_dates) != 1 or next_dates[0] < today:
+            continue
+        release_day = next_dates[0]
 
         title_base = current_indicator or cells[0]
         category, score = classify_macro(title_base)
         if not category:
-            # Québec's own main-indicator calendar is already curated.
-            category, score = "Vue d’ensemble", 82
+            continue
 
         title = (
             f"{province} — {title_base}"
@@ -1314,20 +1364,63 @@ def provincialize_statcan_events(
 
 
 def _dedupe_events(events: list[ProvincialMacroEvent]) -> list[ProvincialMacroEvent]:
+    indicator_patterns: tuple[tuple[str, tuple[str, ...]], ...] = (
+        ("cpi", ("consumer price index", "indice des prix a la consommation")),
+        ("lfs", ("labour force survey", "enquete sur la population active")),
+        ("payrolls", ("payroll", "earnings and hours", "remuneration hebdomadaire")),
+        ("retail", ("retail trade", "retail sales", "ventes au detail", "commerce de detail")),
+        ("wholesale", ("wholesale trade", "wholesale sales", "ventes en gros", "commerce de gros")),
+        ("manufacturing", ("manufacturing", "biens fabriques", "industries manufacturieres")),
+        ("building-permits", ("building permits", "permis de batir")),
+        ("building-construction", ("building construction", "construction de batiments")),
+        ("housing-starts", ("housing starts", "mises en chantier")),
+        ("population", ("population estimates", "demographic estimates", "estimations de la population", "estimations demographiques")),
+        ("gdp-industry", ("gdp by industry", "gross domestic product by industry", "pib reel aux prix de base", "produit interieur brut par industrie")),
+        ("economic-accounts", ("economic accounts", "comptes economiques")),
+        ("international-trade", ("international merchandise", "commerce international de marchandises", "exportations internationales")),
+    )
+
+    def indicator_key(event: ProvincialMacroEvent) -> str:
+        title = _norm(event.title)
+        for key, patterns in indicator_patterns:
+            if any(_norm(pattern) in title for pattern in patterns):
+                return key
+        province_tokens = set(_norm(event.province).split())
+        meaningful = [
+            token
+            for token in title.split()
+            if token not in province_tokens and token not in {"canada", "quebec", "statistique", "statistics"}
+        ]
+        return " ".join(meaningful)
+
     direct_keys = {
-        (event.category, event.starts_at.date())
+        (event.region, event.category, event.starts_at.date(), indicator_key(event))
         for event in events
         if event.specificity in {"province-direct", "fiscal-direct"}
     }
-    seen: set[tuple[str, str]] = set()
+    seen: set[tuple[str, str, str, str]] = set()
     output: list[ProvincialMacroEvent] = []
-    for event in sorted(events, key=lambda item: (item.starts_at, -item.importance_score)):
+    priority = {"fiscal-direct": 0, "province-direct": 0, "province-normalized": 1}
+    for event in sorted(
+        events,
+        key=lambda item: (
+            item.starts_at,
+            priority.get(item.specificity, 2),
+            -item.importance_score,
+        ),
+    ):
+        identity = (event.region, event.category, event.starts_at.date(), indicator_key(event))
         if (
             event.specificity == "province-normalized"
-            and (event.category, event.starts_at.date()) in direct_keys
+            and identity in direct_keys
         ):
             continue
-        key = (_norm(event.title), event.starts_at.date().isoformat())
+        key = (
+            event.region,
+            event.category,
+            event.starts_at.date().isoformat(),
+            indicator_key(event),
+        )
         if key in seen:
             continue
         seen.add(key)
@@ -1357,16 +1450,222 @@ def _dedupe_releases(items: list[ProvincialMacroRelease]) -> list[ProvincialMacr
 class ProvincialMacroService:
     cache_ttl_seconds = 900.0
     failure_cache_ttl_seconds = 90.0
+    calendar_source_timeout_seconds = 4.0
 
     def __init__(self) -> None:
         self._cache: dict[tuple[str, str], tuple[float, ProvincialMacroSnapshot]] = {}
         self._calendar_cache: dict[tuple[str, str], tuple[float, ProvincialMacroSnapshot]] = {}
+        self._calendar_last_good: dict[
+            tuple[str, str, str], list[ProvincialMacroEvent]
+        ] = {}
         self._locks: dict[tuple[str, str], asyncio.Lock] = {}
 
     def _lock_for(self, key: tuple[str, str]) -> asyncio.Lock:
         if key not in self._locks:
             self._locks[key] = asyncio.Lock()
         return self._locks[key]
+
+    def _cached_snapshot(
+        self,
+        cache: dict[tuple[str, str], tuple[float, ProvincialMacroSnapshot]],
+        key: tuple[str, str],
+        now_mono: float,
+        *,
+        calendar_only: bool,
+    ) -> ProvincialMacroSnapshot | None:
+        cached = cache.get(key)
+        if not cached:
+            return None
+        snapshot = cached[1]
+        ttl = self._snapshot_cache_ttl(snapshot, calendar_only=calendar_only)
+        return snapshot if now_mono - cached[0] < ttl else None
+
+    def _snapshot_cache_ttl(
+        self,
+        snapshot: ProvincialMacroSnapshot,
+        *,
+        calendar_only: bool,
+    ) -> float:
+        has_data = bool(
+            snapshot.upcoming_events
+            if calendar_only
+            else snapshot.latest_releases or snapshot.upcoming_events
+        )
+        stale_calendar = any(
+            source.status == "partial"
+            and source.key.startswith(("calendar-", "statcan-"))
+            for source in snapshot.sources
+        )
+        return (
+            self.cache_ttl_seconds
+            if has_data and not stale_calendar
+            else self.failure_cache_ttl_seconds
+        )
+
+    def _restore_calendar_last_good(
+        self,
+        events: list[ProvincialMacroEvent],
+        source: ProvincialMacroSource | None,
+        *,
+        region: str,
+        lang: str,
+        channel: str,
+        now: datetime,
+    ) -> tuple[list[ProvincialMacroEvent], ProvincialMacroSource | None]:
+        key = (region, lang, channel)
+        cutoff = now.astimezone(TORONTO) - timedelta(hours=2)
+        useful = [event for event in events if event.starts_at >= cutoff]
+        if useful:
+            self._calendar_last_good[key] = useful
+            return useful, source
+        cached = [
+            event
+            for event in self._calendar_last_good.get(key, [])
+            if event.starts_at >= cutoff
+        ]
+        if not cached or source is None:
+            return useful, source
+        stale_detail = (
+            "Dernières dates vérifiables conservées; la source live est temporairement indisponible."
+            if lang == "fr"
+            else "Latest verifiable dates retained; the live source is temporarily unavailable."
+        )
+        if source.detail:
+            stale_detail = f"{stale_detail} {source.detail}"
+        return cached, source.model_copy(
+            update={"status": "partial", "count": len(cached), "detail": stale_detail}
+        )
+
+    async def _direct_calendar_with_deadline(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        config: ProvinceConfig,
+        lang: str,
+        now: datetime,
+    ) -> tuple[list[ProvincialMacroEvent], ProvincialMacroSource | None]:
+        try:
+            return await asyncio.wait_for(
+                self._direct_calendar(client, config=config, lang=lang, now=now),
+                timeout=self.calendar_source_timeout_seconds,
+            )
+        except TimeoutError:
+            detail = (
+                "La source provinciale n’a pas répondu dans le délai imparti."
+                if lang == "fr"
+                else "The provincial source did not respond within its deadline."
+            )
+        except Exception:
+            detail = (
+                "La source provinciale est temporairement indisponible."
+                if lang == "fr"
+                else "The provincial source is temporarily unavailable."
+            )
+        return [], ProvincialMacroSource(
+            key=f"calendar-{config.code.lower()}",
+            label=f"{province_name(config.code, lang)} — calendrier provincial",
+            region=config.code,
+            kind="statistics",
+            url=config.calendar_url or config.pages[0].url,
+            status="unavailable",
+            count=0,
+            detail=detail,
+        )
+
+    async def _statcan_calendar_with_deadline(
+        self,
+        *,
+        region: str,
+        lang: str,
+        now: datetime,
+    ) -> tuple[list[ProvincialMacroEvent], ProvincialMacroSource]:
+        try:
+            return await asyncio.wait_for(
+                self._statcan_calendar_fallback(region=region, lang=lang, now=now),
+                timeout=self.calendar_source_timeout_seconds,
+            )
+        except TimeoutError:
+            detail = (
+                "Le flux live de Statistique Canada n’a pas répondu dans le délai imparti."
+                if lang == "fr"
+                else "The live Statistics Canada feed did not respond within its deadline."
+            )
+        except Exception:
+            detail = (
+                "Le relais Statistique Canada est temporairement indisponible."
+                if lang == "fr"
+                else "The Statistics Canada relay is temporarily unavailable."
+            )
+        fallback_events, fallback_source = self._statcan_official_calendar_fallback(
+            region=region,
+            lang=lang,
+            now=now,
+        )
+        if fallback_events:
+            fallback_detail = (
+                " Le calendrier annuel officiel daté est utilisé temporairement."
+                if lang == "fr"
+                else " The dated official annual schedule is used temporarily."
+            )
+            return fallback_events, fallback_source.model_copy(
+                update={"detail": f"{detail}{fallback_detail}"}
+            )
+        province = province_name(region, lang)
+        return [], ProvincialMacroSource(
+            key=f"statcan-{region.lower()}",
+            label=(
+                f"Statistique Canada — {province}"
+                if lang == "fr"
+                else f"Statistics Canada — {province}"
+            ),
+            region=region,
+            kind="statcan",
+            url="https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm",
+            status="unavailable",
+            count=0,
+            detail=detail,
+        )
+
+    def _statcan_official_calendar_fallback(
+        self,
+        *,
+        region: str,
+        lang: str,
+        now: datetime,
+    ) -> tuple[list[ProvincialMacroEvent], ProvincialMacroSource]:
+        from app.services.calendar import statcan_official_schedule_events
+
+        national_events = statcan_official_schedule_events(now=now, language=lang)
+        events = provincialize_statcan_events(
+            national_events,
+            region=region,
+            lang=lang,
+            now=now,
+        )
+        province = province_name(region, lang)
+        source_url = (
+            str(getattr(national_events[0], "url", "") or "")
+            if national_events
+            else ""
+        ) or "https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm"
+        return events, ProvincialMacroSource(
+            key=f"statcan-{region.lower()}",
+            label=(
+                f"Statistique Canada — {province}"
+                if lang == "fr"
+                else f"Statistics Canada — {province}"
+            ),
+            region=region,
+            kind="statcan",
+            url=source_url,
+            status="partial" if events else "unavailable",
+            count=len(events),
+            detail=(
+                "Calendrier annuel officiel daté utilisé comme relais borné."
+                if lang == "fr"
+                else "Dated official annual schedule used as a bounded fallback."
+            ),
+        )
 
     async def _fetch_page(
         self,
@@ -1398,9 +1697,17 @@ class ProvincialMacroService:
                 url=spec.url,
                 status="available" if releases else "partial",
                 count=len(releases),
-                detail=None if releases else "Page officielle accessible, aucun élément macro distinct extrait.",
+                detail=(
+                    None
+                    if releases
+                    else (
+                        "Page officielle accessible, aucun élément macro distinct extrait."
+                        if lang == "fr"
+                        else "Official page available; no distinct macro item was extracted."
+                    )
+                ),
             )
-        except Exception as exc:
+        except Exception:
             return [], ProvincialMacroSource(
                 key=spec.key,
                 label=spec.source,
@@ -1409,7 +1716,11 @@ class ProvincialMacroService:
                 url=spec.url,
                 status="unavailable",
                 count=0,
-                detail=type(exc).__name__,
+                detail=(
+                    "Source officielle temporairement indisponible."
+                    if lang == "fr"
+                    else "Official source temporarily unavailable."
+                ),
             )
 
     async def _direct_calendar(
@@ -1432,13 +1743,50 @@ class ProvincialMacroService:
                 region=config.code,
                 kind="statistics",
                 url=config.calendar_url,
-                status="available",
+                status="available" if events else "unavailable",
                 count=len(events),
-                detail="Calendrier officiel 2026-27 intégré et daté.",
+                detail=(
+                    (
+                        "Calendrier officiel 2026-27 intégré et daté."
+                        if lang == "fr"
+                        else "Dated official 2026-27 calendar integrated."
+                    )
+                    if events
+                    else (
+                        "Le calendrier officiel intégré ne contient plus de date future."
+                        if lang == "fr"
+                        else "The embedded official calendar no longer contains a future date."
+                    )
+                ),
             )
 
         if not config.calendar_url:
-            return [], None
+            province = province_name(config.code, lang)
+            return [], ProvincialMacroSource(
+                key=f"calendar-{config.code.lower()}",
+                label=f"{province} — calendrier provincial",
+                region=config.code,
+                kind="statistics",
+                url=config.pages[0].url,
+                status="unavailable",
+                count=0,
+                detail=(
+                    "Aucun calendrier provincial direct avec dates futures explicites n’est publié; le relais Statistique Canada est vérifié séparément."
+                    if lang == "fr"
+                    else "No direct provincial calendar with explicit future dates is published; the Statistics Canada relay is checked separately."
+                ),
+            )
+
+        labels = {
+            "quebec": ("Statistique Québec — calendrier", "statistics"),
+            "ontario": ("Ontario Economic Accounts — calendrier", "economic_accounts"),
+            "british_columbia": ("BC Stats — release schedule", "statistics"),
+            "alberta": ("Alberta Labour Market Information — calendrier", "statistics"),
+        }
+        label, kind = labels.get(
+            config.calendar_kind,
+            (f"{province_name(config.code, lang)} — calendrier", "statistics"),
+        )
 
         try:
             response = await client.get(config.calendar_url)
@@ -1448,101 +1796,93 @@ class ProvincialMacroService:
                     response.text,
                     now=now,
                     lang=lang,
-                    source_url=config.calendar_url,
+                    source_url=str(response.url),
                 )
-                used_snapshot_fallback = False
-                if not events:
-                    events = _quebec_calendar_snapshot_fallback(
-                        now=now,
-                        lang=lang,
-                        source_url=config.calendar_url,
-                    )
-                    used_snapshot_fallback = bool(events)
-                label = "Statistique Québec — calendrier"
-                kind = "statistics"
             elif config.calendar_kind == "ontario":
                 events = _ontario_calendar_events(
                     response.text,
                     now=now,
                     lang=lang,
-                    source_url=config.calendar_url,
+                    source_url=str(response.url),
                 )
-                label = "Ontario Economic Accounts — calendrier"
-                kind = "economic_accounts"
             elif config.calendar_kind == "british_columbia":
                 events = _british_columbia_calendar_events(
                     response.text,
                     now=now,
                     lang=lang,
-                    source_url=config.calendar_url,
+                    source_url=str(response.url),
                 )
-                label = "BC Stats — release schedule"
-                kind = "statistics"
             elif config.calendar_kind == "alberta":
                 events = _alberta_calendar_events(
                     response.text,
                     now=now,
                     lang=lang,
-                    source_url=config.calendar_url,
+                    source_url=str(response.url),
                 )
-                label = "Alberta Labour Market Information — calendrier"
-                kind = "statistics"
             else:
                 events = []
-                label = f"{province_name(config.code, lang)} — calendrier"
-                kind = "statistics"
+        except Exception:
+            events = []
 
+        if events:
             return events, ProvincialMacroSource(
                 key=f"calendar-{config.code.lower()}",
                 label=label,
                 region=config.code,
                 kind=kind,
                 url=config.calendar_url,
-                status="available" if events else "partial",
+                status="available",
                 count=len(events),
-                detail=(
-                    "Secours officiel daté du 14 août 2026; lecture live à retester."
-                    if config.calendar_kind == "quebec" and locals().get("used_snapshot_fallback", False)
-                    else None
-                    if events
-                    else (
-                        "Calendrier officiel accessible, mais aucune date future valide n’y est publiée."
-                        if lang == "fr"
-                        else "Official schedule accessible, but it publishes no valid future date."
-                    )
-                ),
+                detail=None,
             )
-        except Exception as exc:
-            if config.calendar_kind == "quebec" and config.calendar_url:
-                fallback_events = _quebec_calendar_snapshot_fallback(
+
+        if config.calendar_kind == "quebec" and config.calendar_fallback_url:
+            separator = "&" if "?" in config.calendar_fallback_url else "?"
+            secondary_url = (
+                f"{config.calendar_fallback_url}{separator}"
+                f"from={now.astimezone(TORONTO).date().isoformat()}&init=1"
+            )
+            try:
+                response = await client.get(secondary_url)
+                response.raise_for_status()
+                events = _quebec_general_calendar_events(
+                    response.text,
                     now=now,
                     lang=lang,
-                    source_url=config.calendar_url,
+                    source_url=str(response.url),
                 )
-                if fallback_events:
-                    return fallback_events, ProvincialMacroSource(
-                        key="calendar-qc",
-                        label="Statistique Québec — calendrier",
-                        region=config.code,
-                        kind="statistics",
-                        url=config.calendar_url,
-                        status="partial",
-                        count=len(fallback_events),
-                        detail=(
-                            "Source live temporairement indisponible; secours officiel daté du 14 août 2026. "
-                            f"Cause: {type(exc).__name__}."
-                        ),
-                    )
-            return [], ProvincialMacroSource(
-                key=f"calendar-{config.code.lower()}",
-                label=f"{province_name(config.code, lang)} — calendrier",
-                region=config.code,
-                kind="statistics",
-                url=config.calendar_url,
-                status="unavailable",
-                count=0,
-                detail=type(exc).__name__,
-            )
+            except Exception:
+                events = []
+            if events:
+                return events, ProvincialMacroSource(
+                    key="calendar-qc",
+                    label=label,
+                    region="QC",
+                    kind="statistics",
+                    url=secondary_url,
+                    status="available",
+                    count=len(events),
+                    detail=(
+                        "Calendrier général live utilisé après absence de résultat exploitable dans le tableau principal."
+                        if lang == "fr"
+                        else "Live general calendar used after the main table returned no usable result."
+                    ),
+                )
+
+        return [], ProvincialMacroSource(
+            key=f"calendar-{config.code.lower()}",
+            label=label,
+            region=config.code,
+            kind=kind,
+            url=config.calendar_url,
+            status="unavailable",
+            count=0,
+            detail=(
+                "Aucune date future explicite n’a pu être extraite de la source provinciale officielle."
+                if lang == "fr"
+                else "No explicit future date could be extracted from the official provincial source."
+            ),
+        )
 
     async def _statcan_calendar_fallback(
         self,
@@ -1574,9 +1914,20 @@ class ProvincialMacroService:
                 if lang == "fr"
                 else "Only essential releases with provincial breakdowns are retained."
             )
-            detail = policy_detail
-            if feed_status.detail:
-                detail = f"{policy_detail} {feed_status.detail}"
+            if not events:
+                detail = (
+                    f"{policy_detail} Aucune diffusion future correspondante n’est disponible pour le moment."
+                    if lang == "fr"
+                    else f"{policy_detail} No matching future release is currently available."
+                )
+            elif feed_status.status != "ok":
+                detail = (
+                    f"{policy_detail} Le flux live est dégradé; les dernières dates officielles encore vérifiables sont conservées."
+                    if lang == "fr"
+                    else f"{policy_detail} The live feed is degraded; the latest still-verifiable official dates are retained."
+                )
+            else:
+                detail = policy_detail
             source_url = (
                 str(getattr(national_events[0], "url", "") or "")
                 if national_events
@@ -1592,7 +1943,7 @@ class ProvincialMacroService:
                 count=len(events),
                 detail=detail,
             )
-        except Exception as exc:
+        except Exception:
             province = province_name(region, lang)
             return [], ProvincialMacroSource(
                 key=f"statcan-{region.lower()}",
@@ -1602,7 +1953,11 @@ class ProvincialMacroService:
                 url="https://www150.statcan.gc.ca/n1/dai-quo/cal2-eng.htm",
                 status="unavailable",
                 count=0,
-                detail=type(exc).__name__,
+                detail=(
+                    "Relais Statistique Canada temporairement indisponible."
+                    if lang == "fr"
+                    else "Statistics Canada relay temporarily unavailable."
+                ),
             )
 
     async def get_calendar_snapshot(
@@ -1621,24 +1976,29 @@ class ProvincialMacroService:
             )
         language = "en" if str(lang).lower().startswith("en") else "fr"
         cache_key = (code, language)
-        cached = self._calendar_cache.get(cache_key)
-        now_mono = monotonic()
+        cached = self._cached_snapshot(
+            self._calendar_cache,
+            cache_key,
+            monotonic(),
+            calendar_only=True,
+        )
         if cached:
-            age = now_mono - cached[0]
-            ttl = self.cache_ttl_seconds if cached[1].upcoming_events else self.failure_cache_ttl_seconds
-            if age < ttl:
-                return cached[1]
+            return cached
 
         lock = self._lock_for((f"calendar:{code}", language))
         async with lock:
-            cached = self._calendar_cache.get(cache_key)
-            now_mono = monotonic()
-            if cached and now_mono - cached[0] < self.cache_ttl_seconds:
-                return cached[1]
+            cached = self._cached_snapshot(
+                self._calendar_cache,
+                cache_key,
+                monotonic(),
+                calendar_only=True,
+            )
+            if cached:
+                return cached
 
             config = PROVINCES[code]
             now = datetime.now(UTC)
-            timeout = httpx.Timeout(connect=4.5, read=9.0, write=5.0, pool=5.0)
+            timeout = httpx.Timeout(connect=3.5, read=6.0, write=4.0, pool=4.0)
             headers = {
                 "User-Agent": (
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -1654,26 +2014,32 @@ class ProvincialMacroService:
                 timeout=timeout, headers=headers, follow_redirects=True
             ) as client:
                 direct_result, statcan_result = await asyncio.gather(
-                    self._direct_calendar(
+                    self._direct_calendar_with_deadline(
                         client, config=config, lang=language, now=now
                     ),
-                    self._statcan_calendar_fallback(
+                    self._statcan_calendar_with_deadline(
                         region=code, lang=language, now=now
                     ),
-                    return_exceptions=True,
                 )
 
             sources: list[ProvincialMacroSource] = []
-            direct_events: list[ProvincialMacroEvent] = []
-            statcan_events: list[ProvincialMacroEvent] = []
-
-            if not isinstance(direct_result, Exception):
-                direct_events, direct_source = direct_result
-                if direct_source is not None:
-                    sources.append(direct_source)
-
-            if not isinstance(statcan_result, Exception):
-                statcan_events, statcan_source = statcan_result
+            direct_events, direct_source = self._restore_calendar_last_good(
+                *direct_result,
+                region=code,
+                lang=language,
+                channel="direct",
+                now=now,
+            )
+            statcan_events, statcan_source = self._restore_calendar_last_good(
+                *statcan_result,
+                region=code,
+                lang=language,
+                channel="statcan",
+                now=now,
+            )
+            if direct_source is not None:
+                sources.append(direct_source)
+            if statcan_source is not None:
                 sources.append(statcan_source)
 
             events = _dedupe_events(direct_events + statcan_events)
@@ -1695,8 +2061,11 @@ class ProvincialMacroService:
                 upcoming_events=events[:80],
                 sources=sources,
                 generated_at=now,
-                refresh_after_seconds=900 if events else 90,
+                refresh_after_seconds=900,
                 message=message,
+            )
+            snapshot.refresh_after_seconds = int(
+                self._snapshot_cache_ttl(snapshot, calendar_only=True)
             )
             self._calendar_cache[cache_key] = (monotonic(), snapshot)
             return snapshot
@@ -1710,21 +2079,24 @@ class ProvincialMacroService:
             )
         language = "en" if str(lang).lower().startswith("en") else "fr"
         cache_key = (code, language)
-        cached = self._cache.get(cache_key)
-        now_mono = monotonic()
+        cached = self._cached_snapshot(
+            self._cache,
+            cache_key,
+            monotonic(),
+            calendar_only=False,
+        )
         if cached:
-            age = now_mono - cached[0]
-            ttl = self.cache_ttl_seconds if (
-                cached[1].latest_releases or cached[1].upcoming_events
-            ) else self.failure_cache_ttl_seconds
-            if age < ttl:
-                return cached[1]
+            return cached
 
         async with self._lock_for(cache_key):
-            cached = self._cache.get(cache_key)
-            now_mono = monotonic()
-            if cached and now_mono - cached[0] < self.cache_ttl_seconds:
-                return cached[1]
+            cached = self._cached_snapshot(
+                self._cache,
+                cache_key,
+                monotonic(),
+                calendar_only=False,
+            )
+            if cached:
+                return cached
 
             config = PROVINCES[code]
             now = datetime.now(UTC)
@@ -1749,41 +2121,66 @@ class ProvincialMacroService:
                     self._fetch_page(client, spec=spec, region=code, lang=language)
                     for spec in config.pages
                 ]
-                direct_calendar_task = self._direct_calendar(
+                direct_calendar_task = self._direct_calendar_with_deadline(
                     client,
                     config=config,
+                    lang=language,
+                    now=now,
+                )
+                statcan_calendar_task = self._statcan_calendar_with_deadline(
+                    region=code,
                     lang=language,
                     now=now,
                 )
                 results = await asyncio.gather(
                     *page_tasks,
                     direct_calendar_task,
+                    statcan_calendar_task,
                     return_exceptions=True,
                 )
 
             releases: list[ProvincialMacroRelease] = []
             sources: list[ProvincialMacroSource] = []
-            for result in results[:-1]:
+            for result in results[:-2]:
                 if isinstance(result, Exception):
                     continue
                 page_releases, source_status = result
                 releases.extend(page_releases)
                 sources.append(source_status)
 
-            direct_calendar_result = results[-1]
+            direct_calendar_result = results[-2]
             if isinstance(direct_calendar_result, Exception):
                 direct_events: list[ProvincialMacroEvent] = []
+                direct_source = None
             else:
                 direct_events, direct_source = direct_calendar_result
-                if direct_source is not None:
-                    sources.append(direct_source)
-
-            statcan_events, statcan_source = await self._statcan_calendar_fallback(
+            direct_events, direct_source = self._restore_calendar_last_good(
+                direct_events,
+                direct_source,
                 region=code,
                 lang=language,
+                channel="direct",
                 now=now,
             )
-            sources.append(statcan_source)
+            if direct_source is not None:
+                sources.append(direct_source)
+
+            statcan_calendar_result = results[-1]
+            if isinstance(statcan_calendar_result, Exception):
+                statcan_events: list[ProvincialMacroEvent] = []
+                statcan_source = None
+            else:
+                statcan_events, statcan_source = statcan_calendar_result
+            statcan_events, statcan_source = self._restore_calendar_last_good(
+                statcan_events,
+                statcan_source,
+                region=code,
+                lang=language,
+                channel="statcan",
+                now=now,
+            )
+            if statcan_source is not None:
+                sources.append(statcan_source)
 
             # Province-direct events take precedence on identical dates/categories.
             events = _dedupe_events(direct_events + statcan_events)
@@ -1807,8 +2204,11 @@ class ProvincialMacroService:
                 upcoming_events=events[:80],
                 sources=sources,
                 generated_at=now,
-                refresh_after_seconds=900 if (releases or events) else 90,
+                refresh_after_seconds=900,
                 message=message,
+            )
+            snapshot.refresh_after_seconds = int(
+                self._snapshot_cache_ttl(snapshot, calendar_only=False)
             )
             self._cache[cache_key] = (monotonic(), snapshot)
             return snapshot
