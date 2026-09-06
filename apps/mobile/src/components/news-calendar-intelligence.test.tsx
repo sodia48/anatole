@@ -4,14 +4,16 @@ import { AppState, Linking } from "react-native";
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
 import { NewsCard } from "@/src/components/market";
 import { NewsIntelligenceScreen } from "@/src/components/news/NewsIntelligenceScreen";
+import { marketApi } from "@/src/lib/api/market";
 
 const mockPush = jest.fn();
 const mockCancelQueries = jest.fn();
 const mockQueryClient = { cancelQueries: mockCancelQueries };
+const mockUseQueryClient = jest.fn(() => mockQueryClient);
 const errorRoots = new Set<string>();
 let mockLanguage: "fr" | "en" = "fr";
 let mockPreferredRegions: string[] = [];
-let mockAppStateHandler: ((state: "active" | "background") => void) | undefined;
+let mockAppStateHandler: ((state: "active" | "background" | "inactive") => void) | undefined;
 
 jest.mock("expo-router", () => ({ router: { push: (...args: unknown[]) => mockPush(...args) } }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: mockLanguage, pick: (fr: string, en: string) => mockLanguage === "fr" ? fr : en, t: (key: string) => key }) }));
@@ -20,7 +22,7 @@ jest.mock("@/src/lib/api/market", () => ({ marketApi: { news: jest.fn(), stockNe
 
 const newsItems = [
   { id: "ca", title: "Décision de la Banque du Canada", summary: "La banque publie sa décision.", url: "https://example.com/ca", source: "Banque du Canada", category: "Politique monétaire", published_at: "2026-09-03T13:00:00Z", sentiment: "Neutre", sentiment_score: 0, regions: ["CA"] },
-  { id: "qc", title: "Emploi au Québec", summary: "Nouvelles données régionales.", url: "https://example.com/qc", source: "Gouvernement du Québec", category: "Travail", published_at: "2026-09-03T12:00:00Z", sentiment: "Positive", sentiment_score: 12, regions: ["QC"] },
+  { id: "qc", title: "Emploi au Québec", summary: "Nouvelles données régionales.", url: "https://example.com/qc", source: "Gouvernement du Québec", category: "Travail", published_at: "2026-09-03T12:00:00Z", sentiment: "Positive", sentiment_score: 12, regions: ["QC"], image_url: "https://images.example.com/qc.jpg" },
 ];
 const economic = { id: "jobs", title: "Enquête sur la population active", country: "Canada", currency: "CAD", category: "Travail", importance: "high", starts_at: "2026-09-03T14:30:00Z", source: "Statistique Canada", url: "https://example.com/jobs", description: "Publication officielle.", regions: ["QC", "ON"] };
 const earnings = [
@@ -43,18 +45,20 @@ const mockUseQueries = jest.fn(({ queries }: { queries: { queryKey: unknown[]; e
   isLoading: false, isError: false, isRefetching: false, error: null, refetch: jest.fn(),
 })));
 
-jest.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => mockUseQuery(options as { queryKey: unknown[] }), useQueries: (options: unknown) => mockUseQueries(options as { queries: { queryKey: unknown[]; enabled: boolean }[] }), useQueryClient: () => mockQueryClient }));
+jest.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => mockUseQuery(options as { queryKey: unknown[] }), useQueries: (options: unknown) => mockUseQueries(options as { queries: { queryKey: unknown[]; enabled: boolean }[] }), useQueryClient: () => mockUseQueryClient() }));
 
 describe("mobile news and calendar intelligence", () => {
   beforeEach(() => {
     errorRoots.clear();
     mockPush.mockClear();
     mockCancelQueries.mockClear();
+    mockUseQueryClient.mockClear();
+    jest.mocked(marketApi.stockNews).mockClear();
     mockUseQueries.mockClear();
     mockLanguage = "fr";
     mockPreferredRegions = [];
     mockAppStateHandler = undefined;
-    jest.spyOn(AppState, "addEventListener").mockImplementation(((_event: string, callback: (state: "active" | "background") => void) => {
+    jest.spyOn(AppState, "addEventListener").mockImplementation(((_event: string, callback: (state: "active" | "background" | "inactive") => void) => {
       mockAppStateHandler = callback;
       return { remove: jest.fn() };
     }) as typeof AppState.addEventListener);
@@ -111,11 +115,20 @@ describe("mobile news and calendar intelligence", () => {
     await view.unmount();
   });
 
-  it("cancels background work without clearing the last valid news snapshot", async () => {
+  it("never globally cancels shared news queries when iOS becomes inactive", async () => {
     const view = await render(<NewsIntelligenceScreen />);
-    await act(async () => mockAppStateHandler?.("background"));
-    expect(mockCancelQueries).toHaveBeenCalledWith({ queryKey: ["news"] });
-    expect(mockCancelQueries).toHaveBeenCalledWith({ queryKey: ["stock-news"] });
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("news-primary-personal"));
+    const activeQueries = (mockUseQueries.mock.calls.at(-1)?.[0] as unknown as { queries: { enabled: boolean; queryFn: (context: { signal: AbortSignal }) => unknown }[] }).queries;
+    expect(activeQueries.some((query) => query.enabled)).toBe(true);
+    const controller = new AbortController();
+    await activeQueries[0]!.queryFn({ signal: controller.signal });
+    expect(marketApi.stockNews).toHaveBeenCalledWith("RY", "RY", "fr", controller.signal);
+    await act(async () => mockAppStateHandler?.("inactive"));
+    await act(async () => mockAppStateHandler?.("active"));
+    expect(mockUseQueryClient).not.toHaveBeenCalled();
+    expect(mockCancelQueries).not.toHaveBeenCalled();
+    expect((mockUseQueries.mock.calls.at(-1)?.[0] as { queries: { enabled: boolean }[] }).queries.some((query) => query.enabled)).toBe(true);
     expect(view.getAllByText("Décision de la Banque du Canada").length).toBeGreaterThan(0);
     await view.unmount();
   });
@@ -129,18 +142,35 @@ describe("mobile news and calendar intelligence", () => {
     expect(call.queries.every((query) => query.enabled)).toBe(true);
     await user.press(view.getByText("Ouvrir Focus · RY"));
     expect(mockPush).toHaveBeenCalledWith({ pathname: "/focus/[ticker]", params: { ticker: "RY" } });
+    expect(mockPush).toHaveBeenCalledTimes(1);
     await view.unmount();
   });
 
-  it("opens the actual article URL and labels lexical tone without claiming market impact", async () => {
+  it("opens the Anatole article reader and labels lexical tone without claiming market impact", async () => {
     const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
     const view = await render(<NewsCard item={newsItems[1]!} showCategory showRegion showTone />);
     const user = userEvent.setup();
     expect(view.getByText(/Tonalité lexicale/)).toBeTruthy();
     expect(view.getByText(/ne mesure pas l’impact de marché/)).toBeTruthy();
     await user.press(view.getByText("Emploi au Québec"));
-    expect(open).toHaveBeenCalledWith("https://example.com/qc");
+    expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: "/article", params: expect.objectContaining({ url: "https://example.com/qc", imageUrl: "https://images.example.com/qc.jpg" }) }));
+    expect(open).not.toHaveBeenCalled();
     open.mockRestore();
+    await view.unmount();
+  });
+
+  it("renders editorial thumbnails and falls back when an image fails", async () => {
+    const view = await render(<NewsCard item={newsItems[1]!} />);
+    expect(view.getByTestId("news-thumbnail-image")).toBeTruthy();
+    await act(async () => view.getByTestId("news-thumbnail-image").props.onError());
+    expect(view.getByTestId("news-thumbnail-fallback")).toBeTruthy();
+    await view.unmount();
+  });
+
+  it("renders a sober visual fallback when an article has no image", async () => {
+    const view = await render(<NewsCard item={newsItems[0]!} />);
+    expect(view.getByTestId("news-thumbnail-fallback")).toBeTruthy();
+    expect(view.queryByTestId("news-thumbnail-image")).toBeNull();
     await view.unmount();
   });
 

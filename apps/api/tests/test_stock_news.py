@@ -5,7 +5,12 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.services.stock_news import StockNewsService, _description_from_html
+from app.schemas.stocks import StockNewsItem
+from app.services.stock_news import (
+    StockNewsService,
+    _description_from_html,
+    _thumbnail_url,
+)
 
 
 def test_company_aliases_do_not_confuse_same_base_ticker() -> None:
@@ -57,6 +62,7 @@ def test_news_parser_keeps_only_company_related_articles() -> None:
                 "link": "https://example.com/cn-rail",
                 "providerPublishTime": timestamp + 60,
                 "relatedTickers": ["CNI"],
+                "thumbnail": {"resolutions": [{"url": "https://images.example.com/cn-rail.jpg", "width": 240, "height": 160}]},
             },
             {
                 "uuid": "right-company-syndicated",
@@ -93,6 +99,46 @@ def test_news_parser_keeps_only_company_related_articles() -> None:
 
     assert [item.id for item in items] == ["right-company"]
     assert items[0].related_tickers == ["CNI"]
+    assert items[0].image_url == "https://images.example.com/cn-rail.jpg"
+
+
+def test_yahoo_thumbnail_uses_a_suitable_https_resolution() -> None:
+    row = {
+        "thumbnail": {
+            "originalUrl": "https://images.example.com/original.jpg",
+            "resolutions": [
+                {"url": "https://images.example.com/120.jpg", "width": 120, "height": 80},
+                {"url": "https://images.example.com/320.jpg", "width": 320, "height": 210},
+                {"url": "https://images.example.com/640.jpg", "width": 640, "height": 420},
+            ],
+        }
+    }
+
+    assert _thumbnail_url(row) == "https://images.example.com/320.jpg"
+
+
+def test_yahoo_thumbnail_falls_back_to_original_url() -> None:
+    assert _thumbnail_url({"thumbnail": {"originalUrl": "https://images.example.com/original.jpg"}}) == (
+        "https://images.example.com/original.jpg"
+    )
+
+
+def test_yahoo_thumbnail_rejects_invalid_or_insecure_urls() -> None:
+    assert _thumbnail_url({"thumbnail": {"resolutions": [{"url": "javascript:alert(1)", "width": 240}]}}) is None
+    assert _thumbnail_url({"thumbnail": {"originalUrl": "http://images.example.com/original.jpg"}}) is None
+
+
+def test_yahoo_thumbnail_is_optional() -> None:
+    assert _thumbnail_url({}) is None
+    item = StockNewsItem(
+        id="no-image",
+        title="Company update",
+        summary="",
+        url="https://example.com/update",
+        publisher="Wire",
+        published_at=datetime(2026, 8, 29, 14, tzinfo=UTC),
+    )
+    assert item.image_url is None
 
 
 def test_article_description_is_cleaned_without_inventing_a_summary() -> None:

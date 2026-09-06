@@ -1,17 +1,22 @@
 import asyncio
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 
+from app.schemas.discovery import FeedStatus, NewsSnapshot
 from app.services.news import (
     BANK_FEEDS,
     STATCAN_URLS,
     FeedFormatError,
     NewsService,
     PROVINCIAL_RSS_FEEDS,
+    ParsedEntry,
     _classify_provincial,
     _classify_statcan,
+    _deduplicate,
     _parse_entries,
+    _to_news_item,
 )
 
 RSS_SAMPLE = b"""<?xml version='1.0' encoding='UTF-8'?>
@@ -60,6 +65,144 @@ def test_parse_atom_namespace_and_alternate_link() -> None:
     assert len(entries) == 1
     assert entries[0].url == "https://www150.statcan.gc.ca/labour"
     assert _classify_statcan(entries[0]) == "Travail"
+    assert entries[0].image_url is None
+
+
+@pytest.mark.parametrize(
+    ("metadata", "expected"),
+    [
+        (
+            "<media:thumbnail url='https://images.example.test/thumb.jpg'/>",
+            "https://images.example.test/thumb.jpg",
+        ),
+        (
+            "<media:content url='https://images.example.test/content.jpg' type='image/jpeg'/>",
+            "https://images.example.test/content.jpg",
+        ),
+        (
+            "<enclosure url='https://images.example.test/enclosure.jpg' type='image/webp'/>",
+            "https://images.example.test/enclosure.jpg",
+        ),
+        (
+            "<image><url>https://images.example.test/item.jpg</url></image>",
+            "https://images.example.test/item.jpg",
+        ),
+        (
+            "<description><![CDATA[<p>Summary</p><img src='https://images.example.test/html.jpg'>]]></description>",
+            "https://images.example.test/html.jpg",
+        ),
+    ],
+)
+def test_parse_rss_editorial_images(metadata: str, expected: str) -> None:
+    xml = f"""<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><item>
+    <title>Canadian economic update</title><link>https://example.test/update</link>
+    <description>Official release.</description>{metadata}
+    <pubDate>Wed, 15 Jul 2026 14:00:00 GMT</pubDate>
+    </item></channel></rss>""".encode()
+
+    entry = _parse_entries(xml, content_type="application/rss+xml", source="Test")[0]
+
+    assert entry.image_url == expected
+
+
+def test_parse_rss_rejects_invalid_image_url() -> None:
+    xml = b"""<rss version='2.0' xmlns:media='http://search.yahoo.com/mrss/'><channel><item>
+    <title>Canadian economic update</title><link>https://example.test/update</link>
+    <media:thumbnail url='javascript:alert(1)'/><description>Official release.</description>
+    <pubDate>Wed, 15 Jul 2026 14:00:00 GMT</pubDate>
+    </item></channel></rss>"""
+
+    entry = _parse_entries(xml, content_type="application/rss+xml", source="Test")[0]
+
+    assert entry.image_url is None
+
+
+def test_article_without_summary_or_image_remains_valid() -> None:
+    xml = b"""<rss version='2.0'><channel><item>
+    <title>Canadian economic update</title><link>https://example.test/update</link>
+    <pubDate>Wed, 15 Jul 2026 14:00:00 GMT</pubDate>
+    </item></channel></rss>"""
+
+    entry = _parse_entries(xml, content_type="application/rss+xml", source="Test")[0]
+    item = _to_news_item(entry, source="Test", category="Économie")
+
+    assert item.summary == ""
+    assert item.image_url is None
+
+
+def test_atom_text_content_is_not_confused_with_media_content() -> None:
+    xml = b"""<feed xmlns='http://www.w3.org/2005/Atom' xmlns:media='http://search.yahoo.com/mrss/'><entry>
+    <title>Labour update</title><content type='html'>&lt;p&gt;Employment increased.&lt;/p&gt;</content>
+    <media:content url='https://images.example.test/labour.jpg' type='image/jpeg'/>
+    <link rel='alternate' href='https://example.test/labour'/><published>2026-07-10T12:30:00Z</published>
+    </entry></feed>"""
+
+    entry = _parse_entries(xml, content_type="application/atom+xml", source="Test")[0]
+
+    assert entry.summary == "Employment increased."
+    assert entry.image_url == "https://images.example.test/labour.jpg"
+
+
+def test_deduplication_enriches_the_kept_article_with_a_real_image() -> None:
+    base = ParsedEntry(
+        title="Canadian economic update",
+        summary="Official release.",
+        url="https://example.test/update?utm_source=feed",
+        published_at=datetime(2026, 7, 15, 14, tzinfo=UTC),
+    )
+    richer = ParsedEntry(
+        title=base.title,
+        summary=base.summary,
+        url="https://example.test/update",
+        published_at=base.published_at,
+        image_url="https://images.example.test/update.jpg",
+    )
+
+    items = _deduplicate([
+        _to_news_item(base, source="Test", category="Économie"),
+        _to_news_item(richer, source="Test", category="Économie"),
+    ])
+
+    assert len(items) == 1
+    assert items[0].image_url == "https://images.example.test/update.jpg"
+
+
+def test_news_source_failure_is_isolated() -> None:
+    async def fail():
+        raise RuntimeError("feed failed")
+
+    items, statuses = asyncio.run(NewsService._fetch_source_safe("Broken feed", fail()))
+
+    assert items == []
+    assert statuses[0].status == "unavailable"
+
+
+def test_failed_source_reuses_last_good_items_with_stale_status() -> None:
+    service = NewsService()
+    item = _to_news_item(
+        ParsedEntry(
+            title="Canadian economic update",
+            summary="Official release.",
+            url="https://example.test/update",
+            published_at=datetime(2026, 7, 15, 14, tzinfo=UTC),
+        ),
+        source="Test",
+        category="Économie",
+    )
+    service._last_good["fr"] = NewsSnapshot(
+        items=[item],
+        source_statuses=[],
+        generated_at=datetime(2026, 7, 15, 14, tzinfo=UTC),
+    )
+
+    items, statuses = service._merge_last_good_for_failed_sources(
+        "fr",
+        [],
+        [FeedStatus(source="Test — Économie", status="unavailable", detail="timeout")],
+    )
+
+    assert items == [item]
+    assert statuses[0].status == "stale"
 
 
 def test_reject_html_response() -> None:

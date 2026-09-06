@@ -77,6 +77,7 @@ class StockNewsItem(BaseModel):
     publisher: str
     published_at: datetime
     related_tickers: list[str] = Field(default_factory=list)
+    image_url: str | None = None
 
 
 class StockNewsSnapshot(BaseModel):

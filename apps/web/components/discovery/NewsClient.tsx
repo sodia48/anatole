@@ -321,6 +321,8 @@ export function NewsClient() {
           status:
             item.status === "ok"
               ? "available"
+              : item.status === "stale"
+                ? "stale"
               : "unavailable",
           detail: item.detail,
         }));
@@ -436,6 +438,12 @@ export function NewsClient() {
                       "Disponible",
                       "Available",
                     )
+                  : item.status === "stale"
+                    ? pick(
+                        language,
+                        "Dernières données disponibles",
+                        "Latest available data",
+                      )
                   : item.status === "partial"
                     ? pick(
                         language,

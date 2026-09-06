@@ -1,7 +1,9 @@
 import { router } from "expo-router";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { NewsThumbnail } from "@/src/components/news/NewsThumbnail";
 import type { MarketTile, NewsItem, Quote, StockNewsItem } from "@/src/lib/api/types";
+import { articleHref } from "@/src/lib/article";
 import { useLocale } from "@/src/lib/i18n";
 import { normalizeTicker } from "@/src/lib/ticker";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
@@ -44,8 +46,7 @@ export function NewsCard({
   const { language, pick } = useLocale();
   const economic = "source" in item ? item : null;
   const source = "source" in item ? item.source : item.publisher;
-  const published = new Date(item.published_at);
-  const date = Number.isNaN(published.getTime()) ? "N/D" : published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "medium", timeStyle: "short" });
+  const date = formatNewsDate(item.published_at, language);
   const category = economic?.category;
   const regions = economic?.regions ?? [];
   const sentiment = economic?.sentiment.toLowerCase() ?? "";
@@ -53,16 +54,35 @@ export function NewsCard({
     : sentiment.includes("négat") || sentiment.includes("negat") ? pick("Négative", "Negative")
       : pick("Neutre", "Neutral");
   const accessibility = [item.title, source, date, category].filter(Boolean).join(", ");
+  const href = articleHref(item);
   return (
-    <Pressable accessibilityLabel={accessibility} accessibilityRole="link" onPress={() => void Linking.openURL(item.url)} style={({ pressed }) => [styles.news, compact && styles.newsCompact, pressed && styles.pressed]}>
-      <Text style={styles.newsTitle}>{item.title}</Text>
-      {item.summary ? <Text numberOfLines={compact ? 2 : 4} style={styles.summary}>{item.summary}</Text> : null}
+    <Pressable accessibilityLabel={accessibility} accessibilityRole="link" onPress={() => { if (href) router.push(href); }} style={({ pressed }) => [styles.news, compact && styles.newsCompact, pressed && styles.pressed]}>
+      <Text style={styles.newsMeta}>{source || pick("Actualité", "News")} · {date}</Text>
+      <View style={styles.newsMain}>
+        <View style={styles.newsCopy}>
+          <Text style={styles.newsTitle}>{item.title}</Text>
+          {item.summary ? <Text numberOfLines={compact ? 2 : 4} style={styles.summary}>{item.summary}</Text> : null}
+        </View>
+        <NewsThumbnail imageUrl={item.image_url} size={compact ? "compact" : "card"} source={source || "Anatole"} />
+      </View>
       {showCategory && category ? <Text style={styles.newsCategory}>{category}{showRegion && regions.length ? ` · ${regions.join(" · ")}` : ""}</Text> : showRegion && regions.length ? <Text style={styles.newsCategory}>{regions.join(" · ")}</Text> : null}
-      <Text style={styles.meta}>{economic ? `${pick("Source officielle", "Official source")} · ${source}` : source || pick("Actualité", "News")} · {date}</Text>
       {showTone && economic ? <View style={styles.tone}><Text style={styles.toneLabel}>{pick("Tonalité lexicale", "Lexical tone")} · {tone}</Text><Text style={styles.toneHelp}>{pick("Analyse automatique du vocabulaire du titre et du résumé; elle ne mesure pas l’impact de marché.", "Automated analysis of title and summary wording; it does not measure market impact.")}</Text></View> : null}
       {onExplore && exploreLabel ? <Pressable accessibilityRole="button" onPress={(event) => { event.stopPropagation(); onExplore(); }} style={styles.explore}><Text style={styles.exploreText}>{exploreLabel}</Text></Pressable> : null}
     </Pressable>
   );
+}
+
+export function formatNewsDate(value: string, language: "fr" | "en", now = Date.now()): string {
+  const published = new Date(value);
+  if (Number.isNaN(published.getTime())) return "N/D";
+  const minutes = Math.max(0, Math.floor((now - published.getTime()) / 60_000));
+  if (minutes < 1) return language === "fr" ? "à l’instant" : "now";
+  if (minutes < 60) return language === "fr" ? `${minutes} min` : `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return language === "fr" ? `${hours} h` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return language === "fr" ? `${days} j` : `${days}d`;
+  return published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "medium", timeStyle: "short" });
 }
 
 const styles = StyleSheet.create({
@@ -76,6 +96,9 @@ const styles = StyleSheet.create({
   priceText: { ...typography.body, color: colors.text, fontWeight: "700" },
   news: { gap: spacing.sm, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   newsCompact: { paddingVertical: spacing.sm },
+  newsMeta: { ...typography.caption, color: colors.textMuted },
+  newsMain: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
+  newsCopy: { flex: 1, minWidth: 0, gap: spacing.sm },
   newsTitle: { ...typography.body, color: colors.text, fontWeight: "700" },
   summary: { ...typography.body, color: colors.textMuted },
   newsCategory: { ...typography.caption, color: colors.primary, fontWeight: "800" },

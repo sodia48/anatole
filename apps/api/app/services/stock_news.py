@@ -78,6 +78,46 @@ def _safe_url(value: Any) -> str | None:
     return value.strip()
 
 
+def _safe_image_url(value: Any) -> str | None:
+    url = _safe_url(value)
+    if url is None or urlparse(url).scheme.casefold() != "https":
+        return None
+    return url
+
+
+def _thumbnail_url(row: dict[str, Any]) -> str | None:
+    thumbnail = row.get("thumbnail")
+    if not isinstance(thumbnail, dict):
+        return None
+
+    resolutions: list[tuple[str, int]] = []
+    for resolution in thumbnail.get("resolutions") or []:
+        if not isinstance(resolution, dict):
+            continue
+        url = _safe_image_url(resolution.get("url"))
+        if url is None:
+            continue
+        try:
+            width = max(0, int(resolution.get("width") or 0))
+            height = max(0, int(resolution.get("height") or 0))
+        except (TypeError, ValueError):
+            width = height = 0
+        resolutions.append((url, max(width, height)))
+
+    if resolutions:
+        # Prefer a reasonably sharp thumbnail without selecting the largest
+        # editorial asset. If every dimension is missing, preserve feed order.
+        return min(
+            resolutions,
+            key=lambda candidate: (
+                candidate[1] < 160,
+                abs(candidate[1] - 240) if candidate[1] else 10_000,
+            ),
+        )[0]
+
+    return _safe_image_url(thumbnail.get("originalUrl"))
+
+
 def _clean_summary(value: str) -> str:
     summary = re.sub(r"\s+", " ", html.unescape(value or "")).strip()
     boilerplate = re.search(r"\s+The post .+ appeared first on .+$", summary, re.I)
@@ -253,6 +293,7 @@ class StockNewsService:
                             if value
                         }
                     ),
+                    image_url=_thumbnail_url(row),
                 )
             )
 

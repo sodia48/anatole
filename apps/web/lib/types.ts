@@ -67,6 +67,7 @@ export type StockNewsItem = {
   publisher: string;
   published_at: string;
   related_tickers: string[];
+  image_url?: string | null;
 };
 
 export type StockNewsSnapshot = {
@@ -349,6 +350,7 @@ export type NewsItem = {
   sentiment: string;
   sentiment_score: number;
   regions?: string[];
+  image_url?: string | null;
 };
 
 export type NewsSnapshot = {
