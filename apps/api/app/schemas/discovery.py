@@ -54,6 +54,7 @@ class NewsItem(BaseModel):
     sentiment: str
     sentiment_score: float = Field(ge=-100, le=100)
     regions: list[str] = Field(default_factory=lambda: ["CA"])
+    image_url: str | None = None
 
 
 class NewsSnapshot(BaseModel):

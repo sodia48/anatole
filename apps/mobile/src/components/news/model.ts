@@ -115,12 +115,13 @@ function tokenSimilarity(left: string, right: string): number {
 export function dedupeNewsItems(items: readonly NewsItem[]): NewsItem[] {
   const kept: NewsItem[] = [];
   for (const item of [...items].sort((left, right) => new Date(right.published_at).getTime() - new Date(left.published_at).getTime())) {
-    const duplicate = kept.some((candidate) => {
+    const duplicateIndex = kept.findIndex((candidate) => {
       if (normalized(candidate.source) !== normalized(item.source)) return false;
       const distance = Math.abs(new Date(candidate.published_at).getTime() - new Date(item.published_at).getTime());
       return distance <= 6 * 3_600_000 && tokenSimilarity(candidate.title, item.title) >= 0.85;
     });
-    if (!duplicate) kept.push(item);
+    if (duplicateIndex < 0) kept.push(item);
+    else if (!kept[duplicateIndex]?.image_url && item.image_url) kept[duplicateIndex] = { ...kept[duplicateIndex]!, image_url: item.image_url };
   }
   return kept;
 }
@@ -139,13 +140,19 @@ export function selectPersonalNewsSymbols(workspace: SyncedWorkspaceData, limit 
 }
 
 export function dedupePersonalNews(items: readonly PersonalNewsItem[]): PersonalNewsItem[] {
-  const seen = new Set<string>();
-  return [...items].sort((left, right) => new Date(right.published_at).getTime() - new Date(left.published_at).getTime()).filter((item) => {
+  const indexes = new Map<string, number>();
+  const kept: PersonalNewsItem[] = [];
+  for (const item of [...items].sort((left, right) => new Date(right.published_at).getTime() - new Date(left.published_at).getTime())) {
     const key = item.url || `${normalized(item.publisher)}:${normalized(item.title)}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const duplicateIndex = indexes.get(key);
+    if (duplicateIndex === undefined) {
+      indexes.set(key, kept.length);
+      kept.push(item);
+    } else if (!kept[duplicateIndex]?.image_url && item.image_url) {
+      kept[duplicateIndex] = { ...kept[duplicateIndex]!, image_url: item.image_url };
+    }
+  }
+  return kept;
 }
 
 export function lexicalToneLabel(sentiment: string, language: NewsLanguage): string {

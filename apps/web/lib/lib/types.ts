@@ -187,6 +187,7 @@ export type NewsItem = {
   published_at: string;
   sentiment: string;
   sentiment_score: number;
+  image_url?: string | null;
 };
 
 export type NewsSnapshot = {

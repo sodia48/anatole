@@ -1,6 +1,6 @@
 # Anatole Mobile
 
-Application iOS et Android native d’Anatole, construite avec Expo SDK 57, React Native 0.86.3, Expo Router et TypeScript strict. L’application appelle directement la même API FastAPI que le web. Elle ne charge jamais le site complet dans une WebView; seul le moteur graphique de Focus utilise une WebView spécialisée et isolée.
+Application iOS et Android native d’Anatole, construite avec Expo SDK 57, React Native 0.86.3, Expo Router et TypeScript strict. L’application appelle directement la même API FastAPI que le web. Anatole ne charge jamais son propre site complet dans une WebView : Focus utilise une WebView spécialisée pour son moteur graphique, et le lecteur d’articles utilise une WebView isolée uniquement pour afficher la page originale de l’éditeur dans l’expérience native.
 
 ## Prérequis
 

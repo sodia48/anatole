@@ -61,10 +61,12 @@ describe("news intelligence model", () => {
   });
 
   it("deduplicates only near-identical stories from the same source and close window", () => {
-    const original = news({ id: "a", title: "Canada employment rises in August", source: "StatCan", published_at: "2026-09-03T13:00:00Z" });
+    const original = news({ id: "a", title: "Canada employment rises in August", source: "StatCan", published_at: "2026-09-03T13:00:00Z", image_url: "https://images.example.com/jobs.jpg" });
     const duplicate = news({ id: "b", title: "Canada employment rises in August", source: "StatCan", published_at: "2026-09-03T13:30:00Z" });
     const otherSource = news({ id: "c", title: duplicate.title, source: "Another publisher", published_at: duplicate.published_at });
     const distinct = news({ id: "d", title: "Canada unemployment rate changes", source: "StatCan", published_at: duplicate.published_at });
-    expect(dedupeNewsItems([original, duplicate, otherSource, distinct]).map((item) => item.id).sort()).toEqual(["b", "c", "d"]);
+    const deduplicated = dedupeNewsItems([original, duplicate, otherSource, distinct]);
+    expect(deduplicated.map((item) => item.id).sort()).toEqual(["b", "c", "d"]);
+    expect(deduplicated.find((item) => item.id === "b")?.image_url).toBe("https://images.example.com/jobs.jpg");
   });
 });

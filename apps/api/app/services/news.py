@@ -9,7 +9,9 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from html.parser import HTMLParser
 from time import monotonic
+from typing import Awaitable
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from xml.etree import ElementTree
 
@@ -331,6 +333,7 @@ class ParsedEntry:
     url: str
     published_at: datetime
     subjects: tuple[str, ...] = ()
+    image_url: str | None = None
 
 
 def _local_name(tag: str) -> str:
@@ -371,6 +374,121 @@ def _normalise_url(value: str) -> str:
         )
     except ValueError:
         return raw.casefold()
+
+
+def _safe_image_url(value: str | None) -> str | None:
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return None
+    if parts.scheme.casefold() not in {"http", "https"} or not parts.netloc:
+        return None
+    return raw
+
+
+class _FirstImageParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.image_url: str | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        if self.image_url is not None or tag.casefold() != "img":
+            return
+        values = {key.casefold(): value for key, value in attrs}
+        self.image_url = _safe_image_url(values.get("src"))
+
+
+def _image_from_html(value: str) -> str | None:
+    parser = _FirstImageParser()
+    try:
+        parser.feed(value[:250_000])
+        parser.close()
+    except (TypeError, ValueError):
+        return None
+    return parser.image_url
+
+
+def _tag_namespace(tag: str) -> str:
+    if tag.startswith("{") and "}" in tag:
+        return tag[1:].split("}", 1)[0].casefold()
+    return ""
+
+
+def _is_media_element(node: ElementTree.Element) -> bool:
+    namespace = _tag_namespace(node.tag)
+    return "search.yahoo.com/mrss" in namespace or namespace.endswith("/mrss")
+
+
+def _entry_summary(node: ElementTree.Element) -> str:
+    for name in ("summary", "description", "encoded", "content"):
+        for child in node:
+            if _local_name(child.tag) != name:
+                continue
+            if name == "content" and _is_media_element(child):
+                continue
+            value = _strip_html("".join(child.itertext()))
+            if value:
+                return value
+    return ""
+
+
+def _entry_image(node: ElementTree.Element) -> str | None:
+    for child in node:
+        if _local_name(child.tag) != "thumbnail" or not _is_media_element(child):
+            continue
+        if url := _safe_image_url(child.attrib.get("url")):
+            return url
+
+    for child in node:
+        if _local_name(child.tag) != "content" or not _is_media_element(child):
+            continue
+        media_type = (child.attrib.get("type") or "").casefold()
+        medium = (child.attrib.get("medium") or "").casefold()
+        if not media_type.startswith("image/") and medium != "image":
+            continue
+        if url := _safe_image_url(child.attrib.get("url")):
+            return url
+
+    for child in node:
+        if _local_name(child.tag) != "enclosure":
+            continue
+        if not (child.attrib.get("type") or "").casefold().startswith("image/"):
+            continue
+        if url := _safe_image_url(child.attrib.get("url")):
+            return url
+
+    for child in node:
+        if _local_name(child.tag) != "image":
+            continue
+        for candidate in (
+            child.attrib.get("url"),
+            child.attrib.get("href"),
+            child.attrib.get("src"),
+            _child_text(child, "url"),
+        ):
+            if url := _safe_image_url(candidate):
+                return url
+
+    for child in node:
+        name = _local_name(child.tag)
+        if name not in {"summary", "description", "encoded", "content"}:
+            continue
+        if name == "content" and _is_media_element(child):
+            continue
+        raw = "".join(child.itertext())
+        if url := _image_from_html(raw):
+            return url
+        serialized = ElementTree.tostring(child, encoding="unicode")
+        if url := _image_from_html(serialized):
+            return url
+    return None
 
 
 def _parse_datetime(value: str | None, *, source: str, title: str) -> datetime:
@@ -499,9 +617,7 @@ def _parse_entries(
             continue
 
         title = _strip_html(_child_text(node, "title"))
-        summary = _strip_html(
-            _child_text(node, "summary", "content", "description", "encoded")
-        )
+        summary = _entry_summary(node)
         url = _entry_link(node)
         published_raw = _child_text(
             node,
@@ -525,6 +641,7 @@ def _parse_entries(
                     title=title,
                 ),
                 subjects=_entry_subjects(node),
+                image_url=_entry_image(node),
             )
         )
 
@@ -598,23 +715,33 @@ def _to_news_item(
                 f"{entry.title} {entry.summary} {' '.join(entry.subjects)}"
             )
         ),
+        image_url=entry.image_url,
     )
 
 
 def _deduplicate(items: list[NewsItem]) -> list[NewsItem]:
     output: list[NewsItem] = []
-    seen_urls: set[str] = set()
-    seen_titles: set[tuple[str, str]] = set()
+    seen_urls: dict[str, int] = {}
+    seen_titles: dict[tuple[str, str], int] = {}
     for item in items:
         url_key = _normalise_url(item.url)
         title_key = (item.source.casefold(), _normalise_text(item.title))
-        if url_key and url_key in seen_urls:
-            continue
-        if title_key in seen_titles:
+        duplicate_index = seen_urls.get(url_key) if url_key else None
+        if duplicate_index is None:
+            duplicate_index = seen_titles.get(title_key)
+        if duplicate_index is not None:
+            existing = output[duplicate_index]
+            if existing.image_url is None and item.image_url is not None:
+                output[duplicate_index] = existing.model_copy(
+                    update={"image_url": item.image_url}
+                )
+            if url_key:
+                seen_urls.setdefault(url_key, duplicate_index)
+            seen_titles.setdefault(title_key, duplicate_index)
             continue
         if url_key:
-            seen_urls.add(url_key)
-        seen_titles.add(title_key)
+            seen_urls[url_key] = len(output)
+        seen_titles[title_key] = len(output)
         output.append(item)
     return output
 
@@ -890,6 +1017,29 @@ class NewsService:
                 )
             ]
 
+    @staticmethod
+    async def _fetch_source_safe(
+        source_label: str,
+        operation: Awaitable[tuple[list[NewsItem], list[FeedStatus]]],
+    ) -> tuple[list[NewsItem], list[FeedStatus]]:
+        try:
+            return await operation
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            logger.exception(
+                "news_source_unavailable source=%r exception=%s",
+                source_label,
+                type(exc).__name__,
+            )
+            return [], [
+                FeedStatus(
+                    source=source_label,
+                    status="unavailable",
+                    detail="Source temporairement indisponible",
+                )
+            ]
+
     async def _fetch_statcan(
         self,
         client: httpx.AsyncClient,
@@ -1029,7 +1179,7 @@ class NewsService:
                 if status.detail:
                     detail = f"{detail} ({status.detail})"
                 merged_statuses.append(
-                    FeedStatus(source=status.source, status="unavailable", detail=detail)
+                    FeedStatus(source=status.source, status="stale", detail=detail)
                 )
             else:
                 merged_statuses.append(status)
@@ -1119,14 +1269,44 @@ class NewsService:
                     ) in PROVINCIAL_RSS_FEEDS
                     if language in languages
                 ]
-                results = await asyncio.gather(
-                    *bank_tasks,
-                    self._fetch_statcan(
-                        client,
-                        language,
-                    ),
-                    *provincial_tasks,
+                guarded_tasks = [
+                    self._fetch_source_safe(
+                        f"{source} — {category}",
+                        task,
+                    )
+                    for (source, category, _url), task in zip(
+                        BANK_FEEDS[language],
+                        bank_tasks,
+                        strict=True,
+                    )
+                ]
+                guarded_tasks.append(
+                    self._fetch_source_safe(
+                        f"{STATCAN_SOURCE} — Tous les sujets",
+                        self._fetch_statcan(client, language),
+                    )
                 )
+                guarded_tasks.extend(
+                    self._fetch_source_safe(
+                        f"{source} — Économie provinciale",
+                        task,
+                    )
+                    for (
+                        _province,
+                        source,
+                        _url,
+                        _languages,
+                    ), task in zip(
+                        (
+                            feed
+                            for feed in PROVINCIAL_RSS_FEEDS
+                            if language in feed[3]
+                        ),
+                        provincial_tasks,
+                        strict=True,
+                    )
+                )
+                results = await asyncio.gather(*guarded_tasks)
 
             items: list[NewsItem] = []
             statuses: list[FeedStatus] = []

@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -47,7 +47,6 @@ function updatedLabel(value: string, language: "fr" | "en") {
 export function NewsIntelligenceScreen({ header, initialRegion, initialCategory, preferredRegions = EMPTY_PREFERRED_REGIONS }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; preferredRegions?: string[] }) {
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
-  const queryClient = useQueryClient();
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const [filters, setFilters] = useState<NewsFiltersState>(DEFAULT_FILTERS);
 
@@ -55,13 +54,9 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory,
     const subscription = AppState.addEventListener("change", (state) => {
       const active = state === "active";
       setAppActive(active);
-      if (!active) {
-        void queryClient.cancelQueries({ queryKey: ["news"] });
-        void queryClient.cancelQueries({ queryKey: ["stock-news"] });
-      }
     });
     return () => subscription.remove();
-  }, [queryClient]);
+  }, []);
 
   useEffect(() => {
     const requestedRegion = initialRegion?.toLowerCase() === "prairies" || initialRegion?.toLowerCase() === "atlantic" ? initialRegion.toLowerCase() : initialRegion?.toUpperCase();

@@ -144,9 +144,10 @@ export type NewsItem = {
   sentiment: string;
   sentiment_score: number;
   regions: string[];
+  image_url?: string | null;
 };
 export type NewsSnapshot = { items: NewsItem[]; source_statuses: FeedStatus[]; generated_at: string; refresh_after_seconds: number };
-export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[] };
+export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[]; image_url?: string | null };
 export type StockNewsSnapshot = { ticker: string; symbol: string; company: string; items: StockNewsItem[]; status: string; detail: string | null; generated_at: string; refresh_after_seconds: number };
 export type EarningsItem = {
   ticker: string;
