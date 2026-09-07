@@ -18,12 +18,15 @@ type PreferencesContextValue = {
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
 
-function applyPreferences(preferences: AnatolePreferences): void {
+export function applyPreferences(preferences: AnatolePreferences): void {
   const root = document.documentElement;
   root.dataset.theme = preferences.theme;
   root.dataset.density = preferences.density;
   root.dataset.language = preferences.language;
   root.lang = preferences.language === "en" ? "en-CA" : "fr-CA";
+  root.style.colorScheme = preferences.theme === "blue" ? "light" : "dark";
+  document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute("content", preferences.theme === "blue" ? "#DDF3FF" : "#050D15");
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {

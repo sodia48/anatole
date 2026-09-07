@@ -1,13 +1,14 @@
 import { buildCandleSessionFlow, type SessionFlowSnapshot } from "@anatole/shared";
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
-
+import { Text, View } from "react-native";
 import { Card } from "@/src/components/ui";
 import type { FocusSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { compactNumberOrNd } from "./format";
 import type { FocusPeriod } from "./MobileFocusOverview";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function width(value: number | null, total: number | null): `${number}%` {
   const percentage = value !== null && total !== null && total > 0 ? (value / total) * 100 : 0;
@@ -27,6 +28,7 @@ export function sessionFlowForFocus(ticker: string, snapshot: FocusSnapshot, per
 }
 
 export function MobileSessionFlow({ ticker, snapshot, period }: { ticker: string; snapshot: FocusSnapshot; period: FocusPeriod }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const flow = useMemo(() => sessionFlowForFocus(ticker, snapshot, period), [period, snapshot, ticker]);
   const buyerLabel = flow.estimated ? pick("Acheteurs estimés", "Estimated buyers") : pick("Acheteurs", "Buyers");
@@ -59,7 +61,7 @@ export function MobileSessionFlow({ ticker, snapshot, period }: { ticker: string
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   heading: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md },
   eyebrow: { ...typography.label, color: colors.textMuted, letterSpacing: 0.8 },
   total: { ...typography.title, color: colors.text, marginTop: spacing.xs },
@@ -76,4 +78,4 @@ const styles = StyleSheet.create({
   secondary: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
   secondaryText: { ...typography.caption, color: colors.textMuted },
   note: { ...typography.caption, color: colors.textSubtle },
-});
+}));

@@ -1,12 +1,14 @@
-import { StyleSheet, Text, View } from "react-native";
-
+import { Text, View } from "react-native";
 import { Card, Change, uiStyles } from "@/src/components/ui";
 import type { PortfolioSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
 import { formatPortfolioMoney, formatPortfolioNumber, topPortfolioMover } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function PortfolioOverview({ snapshot }: { snapshot: PortfolioSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const top = topPortfolioMover(snapshot.positions, "top");
   const bottom = topPortfolioMover(snapshot.positions, "bottom");
@@ -22,4 +24,4 @@ export function PortfolioOverview({ snapshot }: { snapshot: PortfolioSnapshot })
   </Card>;
 }
 
-const styles = StyleSheet.create({ grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg }, value: { ...typography.body, color: colors.text, fontWeight: "800" }, copy: { ...typography.caption, color: colors.textMuted } });
+const styles = createThemedStyles((colors) => ({ grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg }, value: { ...typography.body, color: colors.text, fontWeight: "800" }, copy: { ...typography.caption, color: colors.textMuted } }));

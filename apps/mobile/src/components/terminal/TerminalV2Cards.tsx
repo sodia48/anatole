@@ -2,11 +2,12 @@ import { router, type Href } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from "react-native-svg";
-
 import { percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import type { TerminalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export type PulseRange = "3m" | "6m" | "1y";
 
@@ -15,11 +16,13 @@ function metric(label: string, value: string) {
 }
 
 export function HorizonCards({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   return <View style={styles.card} testID="terminal-horizons"><View style={styles.heading}><Text style={styles.eyebrow}>MULTI-HORIZON</Text><Text style={styles.meta}>{pick(`Couverture ${snapshot.data_quality.real_symbols}/${snapshot.data_quality.expected_symbols} · Historique ${snapshot.data_quality.history_symbols}/${snapshot.data_quality.expected_symbols}`, `Coverage ${snapshot.data_quality.real_symbols}/${snapshot.data_quality.expected_symbols} · History ${snapshot.data_quality.history_symbols}/${snapshot.data_quality.expected_symbols}`)}</Text></View><View style={styles.grid}>{snapshot.regime_horizons.map((item) => <View key={item.key} style={styles.horizon}><Text style={styles.meta}>{item.label}</Text><Text style={styles.title}>{item.regime ?? "N/D"}</Text><Text style={styles.score}>{item.score == null ? "N/D" : `${item.score.toFixed(0)}/100`}</Text><Text style={styles.meta}>{percentOrNd(item.change_percent, language)}</Text></View>)}</View>{snapshot.data_quality.warnings.map((warning) => <Text key={warning} style={styles.warning}>{warning}</Text>)}</View>;
 }
 
 export function PulseCard({ snapshot, range, onRange }: { snapshot: TerminalSnapshot; range: PulseRange; onRange: (range: PulseRange) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const points = useMemo(() => {
     const days = range === "3m" ? 93 : range === "6m" ? 186 : 370;
@@ -38,6 +41,7 @@ export function PulseCard({ snapshot, range, onRange }: { snapshot: TerminalSnap
 }
 
 export function BreadthCard({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale(); const data = snapshot.breadth_pro;
   return <View style={styles.card} testID="terminal-breadth-pro"><Text style={styles.eyebrow}>BREADTH PRO</Text><View style={styles.grid}>{[
     metric(pick("Hausses / baisses", "Advancers / decliners"), `${data.advancers ?? "N/D"} / ${data.decliners ?? "N/D"}`),
@@ -51,6 +55,7 @@ export function BreadthCard({ snapshot }: { snapshot: TerminalSnapshot }) {
 }
 
 export function RotationCard({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const width = 340, height = 340;
   const scale = (value: number) => width / 2 + Math.max(-20, Math.min(20, value)) * 7;
@@ -60,16 +65,18 @@ export function RotationCard({ snapshot }: { snapshot: TerminalSnapshot }) {
 }
 
 export function DriversCard({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const statusLabel = (status: "available" | "stale" | "unavailable") => status === "available" ? pick("À jour", "Up to date") : status === "stale" ? pick("Dernières données", "Latest available") : pick("Indisponible", "Unavailable");
   return <View style={styles.card} testID="terminal-drivers"><Text style={styles.eyebrow}>{pick("DRIVERS DU MARCHÉ CANADIEN", "CANADIAN MARKET DRIVERS")}</Text><View style={styles.grid}>{snapshot.market_drivers.map((item) => <View key={item.key} style={styles.metric} testID={`terminal-driver-${item.key}`}><View style={styles.driverHeading}><Text style={styles.title}>{item.label}</Text><Text style={[styles.status, item.status === "stale" && styles.statusStale, item.status === "unavailable" && styles.statusUnavailable]} testID={`terminal-driver-status-${item.key}`}>{statusLabel(item.status)}</Text></View><Text style={styles.metricValue}>{item.value == null ? "N/D" : `${valueOrNd(item.value, 3, language)} ${item.unit}`}</Text><Text style={styles.score}>{item.change_5d == null ? "N/D" : `${valueOrNd(item.change_5d, 2, language)} ${item.change_unit} / 5J`}</Text><Text style={styles.meta}>{item.relationship_label ?? pick("Corrélation N/D", "Correlation N/A")}</Text></View>)}</View></View>;
 }
 
 export function AnomaliesCard({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { pick } = useLocale();
   return <View style={styles.card} testID="terminal-anomalies"><Text style={styles.eyebrow}>ANOMALY ENGINE</Text><Text style={styles.meta}>{pick("Rareté statistique, pas probabilité de hausse", "Statistical rarity, not upside probability")}</Text>{snapshot.anomalies.map((item) => <Pressable accessibilityRole="button" key={item.id} onPress={() => item.symbol && router.push({ pathname: "/stock/[ticker]", params: { ticker: item.symbol } })} style={styles.row} testID={`terminal-anomaly-${item.id}`}><View style={styles.rowText}><Text style={styles.title}>{item.title}</Text><Text style={styles.meta}>{item.detail}</Text></View><Text style={styles.score}>{item.rarity_score.toFixed(0)}/100</Text></Pressable>)}</View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   card: { gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface }, heading: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, eyebrow: { ...typography.label, color: colors.primary, letterSpacing: 1 }, title: { ...typography.section, color: colors.text }, meta: { ...typography.caption, color: colors.textMuted }, score: { ...typography.label, color: colors.primary }, warning: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm }, grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, horizon: { minWidth: "46%", flexGrow: 1, gap: 3, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, metric: { minWidth: "46%", flexGrow: 1, gap: 3, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, metricValue: { ...typography.section, color: colors.text }, driverHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.xs }, status: { ...typography.caption, color: colors.positive, paddingHorizontal: spacing.xs, paddingVertical: 2, borderWidth: 1, borderColor: colors.positive, borderRadius: radius.pill }, statusStale: { color: colors.warning, borderColor: colors.warning }, statusUnavailable: { color: colors.textMuted, borderColor: colors.border }, actions: { flexDirection: "row", gap: spacing.xs }, button: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, buttonText: { ...typography.caption, color: colors.text, fontWeight: "800" }, empty: { ...typography.body, color: colors.textMuted, textAlign: "center", padding: spacing.xl }, row: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, paddingVertical: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, rowText: { flex: 1, gap: 3 },
-});
+}));

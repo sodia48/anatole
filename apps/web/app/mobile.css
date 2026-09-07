@@ -42,7 +42,7 @@
       ),
       linear-gradient(
         180deg,
-        #050d15 0%,
+        var(--bg) 0%,
         #06111b 100%
       );
     background-attachment: fixed;
@@ -166,7 +166,7 @@
     background:
       linear-gradient(
         135deg,
-        #2d76ff,
+        var(--blue),
         #21c8ff
       );
     color: white;
@@ -192,7 +192,7 @@
   .mobile-appbar-brand small {
     max-width: 150px;
     overflow: hidden;
-    color: #7898ae;
+    color: var(--text-secondary);
     font-size: 9px;
     line-height: 1.15;
     text-overflow: ellipsis;
@@ -385,7 +385,7 @@
     border-radius: 13px;
     background:
       rgba(12, 36, 52, .92);
-    color: #eaf5fb;
+    color: var(--text);
     cursor: pointer;
   }
 
@@ -434,7 +434,7 @@
       1px solid
       rgba(64, 108, 133, .6);
     border-radius: 7px;
-    color: #7898ac;
+    color: var(--muted);
     font-size: 8px;
   }
 
@@ -492,7 +492,7 @@
     border:
       1px solid transparent;
     border-radius: 12px !important;
-    color: #8ca8ba !important;
+    color: var(--muted) !important;
     text-align: left !important;
   }
 
@@ -1651,7 +1651,7 @@
       rgba(38, 91, 120, .72);
     border-radius: 13px;
     background:
-      rgba(5, 25, 38, .72);
+      var(--panel);
   }
 
   body[data-anatole-section="etf"]
@@ -1802,7 +1802,7 @@
       rgba(38, 91, 120, .72);
     border-radius: 13px;
     background:
-      rgba(5, 25, 38, .72);
+      var(--panel);
   }
 
   body[data-anatole-section="ipo-insiders"]
@@ -2581,7 +2581,7 @@
     height: 44px !important;
     border-radius: 14px !important;
     border-color: rgba(69, 119, 147, .68) !important;
-    background: rgba(12, 39, 56, .88) !important;
+    background: var(--panel) !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04) !important;
   }
 
@@ -2606,7 +2606,7 @@
   .mobile-appbar-brand small {
     max-width: min(48vw, 210px) !important;
     overflow: hidden !important;
-    color: #77a2ba !important;
+    color: var(--text-secondary) !important;
     font-size: 9px !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -2646,7 +2646,7 @@
     border: 0;
     border-radius: 15px;
     background: transparent;
-    color: #7898ab;
+    color: var(--text-secondary);
     cursor: pointer;
     text-decoration: none;
   }
@@ -2668,16 +2668,15 @@
   }
 
   .mobile-bottom-nav > :is(a, button).is-active {
-    background:
-      linear-gradient(150deg, rgba(38, 111, 163, .42), rgba(11, 50, 72, .82));
-    color: #eff9ff;
+    background: var(--primary-surface);
+    color: var(--text);
     box-shadow:
       inset 0 0 0 1px rgba(76, 151, 198, .42),
       0 7px 18px rgba(0, 0, 0, .2);
   }
 
   .mobile-bottom-nav > :is(a, button).is-active svg {
-    color: #4cb4ff;
+    color: var(--interactive);
     filter: drop-shadow(0 0 8px rgba(44, 155, 255, .42));
   }
 
@@ -2691,7 +2690,7 @@
     padding: 6px !important;
     border: 1px solid rgba(45, 84, 107, .44);
     border-radius: 15px;
-    background: rgba(7, 25, 37, .52);
+    background: var(--panel);
   }
 
   .sidebar .nav-group-label {
@@ -2907,7 +2906,7 @@
     position: sticky;
     left: 0;
     z-index: 2;
-    background: #0a1d2a;
+    background: var(--panel);
   }
 
   /* Cards, lists and analysis columns collapse predictably. */
@@ -3135,13 +3134,13 @@
     justify-items: start !important;
     gap: 4px !important;
     border-radius: 11px !important;
-    background: rgba(7, 25, 37, .72) !important;
+    background: var(--panel) !important;
     font-size: 12px !important;
     white-space: normal !important;
   }
 
   .screener-row > :nth-child(n + 2)::before {
-    color: #6f93a9;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 850;
     letter-spacing: .08em;
@@ -3201,7 +3200,7 @@
     overflow: hidden;
     border: 1px solid rgba(45, 91, 118, .7) !important;
     border-radius: 16px;
-    background: rgba(7, 24, 36, .86);
+    background: var(--panel);
   }
 
   .watchlist-row-link {
@@ -3272,7 +3271,7 @@
     gap: 4px !important;
     border: 0 !important;
     border-radius: 10px !important;
-    background: rgba(6, 24, 36, .7) !important;
+    background: var(--panel) !important;
     text-align: left !important;
     white-space: normal !important;
     overflow-wrap: anywhere !important;
@@ -3280,7 +3279,7 @@
 
   table[data-mobile-cards] td::before {
     content: attr(data-label);
-    color: #6f93a9;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 850;
     letter-spacing: .08em;
@@ -3290,7 +3289,7 @@
   table[data-mobile-cards] td:first-child {
     grid-column: 1 / -1;
     min-height: 58px !important;
-    background: rgba(12, 43, 61, .82) !important;
+    background: var(--panel) !important;
   }
 
   table[data-mobile-cards] td input {
@@ -3310,7 +3309,7 @@
   /* Financial statements: labels are generated from their selected view. */
   table[data-mobile-cards="fundamentals"] td::before,
   table[data-mobile-cards="estimates"] td::before {
-    color: #6f93a9;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 850;
     letter-spacing: .06em;
@@ -3400,7 +3399,7 @@
     gap: 10px !important;
     border: 1px solid rgba(45, 91, 118, .68) !important;
     border-radius: 14px !important;
-    background: rgba(6, 24, 36, .72) !important;
+    background: var(--panel) !important;
   }
 
   [class*="_holdingIdentity__"] {
@@ -3426,7 +3425,7 @@
     justify-items: start;
     padding: 7px 8px;
     border-radius: 9px;
-    background: rgba(8, 29, 42, .76);
+    background: var(--panel);
     text-align: left !important;
   }
 
@@ -3440,7 +3439,7 @@
 
   [class*="_holdingRow__"] > span:nth-child(3)::before,
   [class*="_holdingRow__"] > span:nth-child(4)::before {
-    color: #6f93a9;
+    color: var(--muted);
     font-size: 8px;
     letter-spacing: .07em;
     text-transform: uppercase;
@@ -3617,14 +3616,14 @@
     justify-items: start !important;
     gap: 4px;
     border-radius: 10px;
-    background: rgba(6, 24, 36, .72);
+    background: var(--panel);
     text-align: left !important;
     white-space: normal !important;
     overflow-wrap: anywhere;
   }
 
   .app-main [class*="_tradeRow__"] > span::before {
-    color: #6f93a9;
+    color: var(--muted);
     font-size: 8px;
     font-weight: 850;
     letter-spacing: .07em;
@@ -3892,7 +3891,7 @@
   .mobile-appbar {
     min-height: 74px !important;
     padding-inline: 11px !important;
-    background: rgba(4, 14, 23, .91) !important;
+    background: var(--panel) !important;
     backdrop-filter: blur(24px) saturate(1.18) !important;
     box-shadow: 0 10px 30px rgba(0, 0, 0, .2) !important;
   }
@@ -3915,7 +3914,7 @@
     right: 10px !important;
     bottom: calc(7px + env(safe-area-inset-bottom, 0px)) !important;
     border-radius: 23px !important;
-    background: rgba(5, 19, 30, .91) !important;
+    background: var(--panel) !important;
     backdrop-filter: blur(25px) saturate(1.18) !important;
     box-shadow: 0 18px 50px rgba(0, 0, 0, .42) !important;
   }
@@ -3978,7 +3977,7 @@
     padding: 7px 9px !important;
     border: 1px solid rgba(46, 91, 118, .62);
     border-radius: 12px;
-    background: rgba(5, 22, 34, .66);
+    background: var(--panel);
   }
 
   body[data-anatole-section="cockpit"] .cockpit-market-score > span {
@@ -4008,7 +4007,7 @@
   body[data-anatole-section="cockpit"] .cockpit-universe-switcher legend {
     width: 100%;
     margin: 0 0 5px !important;
-    color: #6f91a7;
+    color: var(--muted);
     font-size: 7px !important;
     font-weight: 850;
     letter-spacing: .09em;
@@ -4215,7 +4214,7 @@ body.anatole-heatmap-focus {
         rgba(15, 48, 70, 0.98),
         rgba(7, 28, 43, 0.98)
       ) !important;
-    color: #eaf5fb !important;
+    color: var(--text) !important;
   }
 
   .sidebar .sidebar-account-shortcut > span {
@@ -4225,7 +4224,7 @@ body.anatole-heatmap-focus {
   }
 
   .sidebar .sidebar-account-shortcut strong {
-    color: #f4f9fc !important;
+    color: var(--text) !important;
     font-size: 13px !important;
   }
 

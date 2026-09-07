@@ -1,9 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { AppState, FlatList, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, FlatList, Linking, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Field, QueryState, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import type { InsiderTrade, InsiderTransactionType, IpoInstrumentType, IpoItem } from "@/src/lib/api/types";
@@ -22,19 +21,24 @@ import {
   type IpoCountryFilter,
   type IpoTypeFilter,
 } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type MainTab = "ipo" | "insiders";
 const EMPTY_IPO_ITEMS: IpoItem[] = [];
 
 function FilterChip({ active, label, onPress, testID }: { active: boolean; label: string; onPress: () => void; testID?: string }) {
+  useMobileTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.chip, active && styles.chipActive]} testID={testID}><Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text></Pressable>;
 }
 
 function FilterRow({ children }: { children: ReactNode }) {
+  useMobileTheme();
   return <ScrollView horizontal keyboardShouldPersistTaps="handled" showsHorizontalScrollIndicator={false}>{children}</ScrollView>;
 }
 
 function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "positive" | "negative" }) {
+  useMobileTheme();
   return <View style={styles.metric}><Text style={[styles.metricValue, tone === "positive" && styles.positive, tone === "negative" && styles.negative]}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
@@ -53,6 +57,7 @@ function formatMoney(value: number, language: Language): string {
 }
 
 function IpoCard({ item }: { item: IpoItem }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   return <View style={styles.card} testID={`ipo-card-${item.id}`}>
     <View style={styles.cardTop}><View style={styles.symbol}><Text style={styles.symbolText}>{item.symbol || "—"}</Text></View><View style={styles.cardCopy}><Text style={styles.cardTitle}>{item.company}</Text><Text style={styles.meta}>{item.exchange || "—"} · {item.country} · {item.instrument_label}</Text></View>{item.official ? <Text style={styles.official}>{pick("Officiel", "Official")}</Text> : null}</View>
@@ -66,6 +71,7 @@ function IpoCard({ item }: { item: IpoItem }) {
 }
 
 function IpoPanel() {
+  useMobileTheme();
   const { pick } = useLocale();
   const [search, setSearch] = useState("");
   const [country, setCountry] = useState<IpoCountryFilter>("all");
@@ -89,6 +95,7 @@ function IpoPanel() {
 }
 
 function InsiderCard({ trade }: { trade: InsiderTrade }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const tone = trade.transaction_type === "buy" ? styles.positive : trade.transaction_type === "sell" ? styles.negative : styles.neutral;
   return <View style={styles.card} testID={`insider-card-${trade.id}`}>
@@ -101,6 +108,7 @@ function InsiderCard({ trade }: { trade: InsiderTrade }) {
 }
 
 function InsiderPanel({ initialTicker = "" }: { initialTicker?: string }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const queryClient = useQueryClient();
   const [market, setMarket] = useState<InsiderMarket>("canada");
@@ -173,6 +181,7 @@ function InsiderPanel({ initialTicker = "" }: { initialTicker?: string }) {
 }
 
 export function IpoInsidersScreen({ initialTab = "ipo", initialTicker = "" }: { initialTab?: MainTab; initialTicker?: string } = {}) {
+  useMobileTheme();
   const { pick } = useLocale();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<MainTab>(initialTab);
@@ -183,20 +192,20 @@ export function IpoInsidersScreen({ initialTab = "ipo", initialTicker = "" }: { 
     setTab(next);
   }
   return <SafeAreaView edges={["bottom"]} style={styles.safe} testID="ipo-insiders-screen">
-    <View style={styles.top}><ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("IPO & initiés", "IPOs & insiders")} subtitle={pick("Événements publics et déclarations réglementaires vérifiables.", "Verifiable public events and regulatory filings.")} /><View style={styles.tabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "ipo" }} onPress={() => activate("ipo")} style={[styles.tab, tab === "ipo" && styles.tabActive]} testID="ipo-tab"><Text style={styles.tabText}>IPO</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "insiders" }} onPress={() => activate("insiders")} style={[styles.tab, tab === "insiders" && styles.tabActive]} testID="insiders-tab"><Text style={styles.tabText}>{pick("Initiés", "Insiders")}</Text></Pressable></View></View>
+    <View style={styles.top}><ScreenHeader eyebrow={pick("Marchés", "Markets")} title={pick("IPO & initiés", "IPOs & insiders")} subtitle={pick("Événements publics et déclarations réglementaires vérifiables.", "Verifiable public events and regulatory filings.")} /><View style={styles.tabs}><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "ipo" }} onPress={() => activate("ipo")} style={[styles.tab, tab === "ipo" && styles.tabActive]} testID="ipo-tab"><Text style={[styles.tabText, tab === "ipo" && styles.tabTextActive]}>IPO</Text></Pressable><Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === "insiders" }} onPress={() => activate("insiders")} style={[styles.tab, tab === "insiders" && styles.tabActive]} testID="insiders-tab"><Text style={[styles.tabText, tab === "insiders" && styles.tabTextActive]}>{pick("Initiés", "Insiders")}</Text></Pressable></View></View>
     {tab === "ipo" ? <IpoPanel /> : <InsiderPanel initialTicker={initialTicker} />}
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background }, top: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
-  tabs: { flexDirection: "row", padding: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, tab: { minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, tabActive: { backgroundColor: "#12588b" }, tabText: { ...typography.label, color: colors.text },
+  tabs: { flexDirection: "row", padding: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, tab: { minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, tabActive: { backgroundColor: colors.primarySurfaceStrong }, tabText: { ...typography.label, color: colors.text }, tabTextActive: { color: colors.onPrimary },
   content: { padding: spacing.lg, paddingBottom: 100, gap: spacing.md }, headerStack: { gap: spacing.md, marginBottom: spacing.md },
   stale: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm }, unavailable: { ...typography.body, color: colors.warning, padding: spacing.md, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md }, progress: { ...typography.caption, color: colors.primary },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, metric: { minWidth: "30%", flexGrow: 1, gap: 2, padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, metricValue: { ...typography.section, color: colors.text }, metricLabel: { ...typography.caption, color: colors.textMuted }, positive: { color: colors.positive }, negative: { color: colors.negative }, neutral: { color: colors.textMuted },
   filterLabel: { ...typography.label, color: colors.textMuted, textTransform: "uppercase" }, chip: { minHeight: 44, justifyContent: "center", marginRight: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, backgroundColor: colors.surface }, chipActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, chipText: { ...typography.caption, color: colors.textMuted }, chipTextActive: { color: colors.text, fontWeight: "800" },
-  card: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, cardTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, cardCopy: { flex: 1, minWidth: 0 }, symbol: { minWidth: 58, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: "#103d6f" }, symbolText: { ...typography.label, color: "#8cc9ff" }, cardTitle: { ...typography.body, color: colors.text, fontWeight: "800" }, meta: { ...typography.caption, color: colors.textMuted }, official: { ...typography.caption, color: colors.positive }, unusual: { ...typography.caption, color: colors.warning },
+  card: { gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, cardTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, cardCopy: { flex: 1, minWidth: 0 }, symbol: { minWidth: 58, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.primarySurface }, symbolText: { ...typography.label, color: colors.primary }, cardTitle: { ...typography.body, color: colors.text, fontWeight: "800" }, meta: { ...typography.caption, color: colors.textMuted }, official: { ...typography.caption, color: colors.positive }, unusual: { ...typography.caption, color: colors.warning },
   cardGrid: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: spacing.md }, caption: { ...typography.caption, color: colors.textMuted }, body: { ...typography.body, color: colors.text }, priceBlock: { flex: 1, alignItems: "flex-end" }, price: { ...typography.section, color: colors.text }, transaction: { ...typography.label },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, action: { minHeight: 44, minWidth: 100, flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.primary }, actionSecondary: { minHeight: 44, minWidth: 100, flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong }, actionText: { ...typography.label, color: colors.text },
   empty: { ...typography.body, color: colors.textMuted, paddingVertical: spacing.xl, textAlign: "center" },
-});
+}));

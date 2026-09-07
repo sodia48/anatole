@@ -1,13 +1,15 @@
 import { Link, router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, Text } from "react-native";
-
+import { Text } from "react-native";
 import { Button, Card, Field, Screen, ScreenHeader } from "@/src/components/ui";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export default function LoginScreen() {
+  useMobileTheme();
   const { t, pick } = useLocale();
   const { login } = useMobileAccount();
   const [email, setEmail] = useState("");
@@ -22,4 +24,4 @@ export default function LoginScreen() {
   }
   return <Screen><ScreenHeader eyebrow="Anatole mobile" title={t("login")} subtitle={t("signInToSync")} /><Card><Field label={pick("Courriel", "Email")} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" /><Field label={pick("Mot de passe", "Password")} value={password} onChangeText={setPassword} secureTextEntry autoComplete="current-password" />{error ? <Text style={styles.error}>{error}</Text> : null}<Button label={busy ? t("loading") : t("login")} onPress={() => void submit()} disabled={busy || !email || !password} /><Link href="/(auth)/register" style={styles.link}>{t("register")}</Link></Card></Screen>;
 }
-const styles = StyleSheet.create({ error: { ...typography.body, color: colors.negative }, link: { ...typography.body, color: colors.primary, padding: spacing.sm, textAlign: "center" } });
+const styles = createThemedStyles((colors) => ({ error: { ...typography.body, color: colors.negative }, link: { ...typography.body, color: colors.primary, padding: spacing.sm, textAlign: "center" } }));

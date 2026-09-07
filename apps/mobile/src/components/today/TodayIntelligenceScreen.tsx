@@ -2,9 +2,8 @@ import { isTerminalV2Snapshot } from "@anatole/shared";
 import { useQuery } from "@tanstack/react-query";
 import { router, type Href } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View, type ViewToken } from "react-native";
+import { AppState, FlatList, Linking, Pressable, RefreshControl, Text, View, type ViewToken } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { NewsCard } from "@/src/components/market";
 import { Card, QueryState, ScreenHeader } from "@/src/components/ui";
 import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
@@ -21,6 +20,8 @@ import { TodayMarketBrief } from "./TodayMarketBrief";
 import { TodayPersonalBrief } from "./TodayPersonalBrief";
 import { TodayTimeline } from "./TodayTimeline";
 import { buildTodayAttention, buildTodayTimeline, latestCockpitQuoteTime, personalNewsTargets, resolveTodayPhase, type TodayTarget, type TodayUniverse } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type Section = "header" | "market" | "drivers" | "attention" | "heatmap" | "personal" | "timeline" | "news" | "links";
 const SECTIONS: Section[] = ["header", "market", "drivers", "attention", "heatmap", "personal", "timeline", "news", "links"];
@@ -31,6 +32,7 @@ function firstName(value: string | null | undefined) {
 }
 
 export function TodayIntelligenceScreen() {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const { user, workspace } = useMobileAccount();
   const [universe, setUniverse] = useState<TodayUniverse>("composite");
@@ -137,6 +139,6 @@ export function TodayIntelligenceScreen() {
   return <SafeAreaView edges={["top"]} style={styles.safe} testID="today-intelligence-screen"><FlatList contentContainerStyle={styles.content} data={sections} initialNumToRender={4} keyExtractor={(item) => item} maxToRenderPerBatch={4} onViewableItemsChanged={onViewableItemsChanged} refreshControl={<RefreshControl onRefresh={refresh} refreshing={refreshing} tintColor={colors.primary} />} removeClippedSubviews={false} renderItem={renderSection} testID="today-sections" viewabilityConfig={TODAY_VIEWABILITY_CONFIG} windowSize={5} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background }, content: { gap: spacing.md, padding: spacing.lg, paddingBottom: 120 }, header: { gap: spacing.sm }, marketStatus: { alignSelf: "flex-start", ...typography.caption, color: colors.warning, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.pill }, current: { color: colors.positive, borderColor: colors.positive }, preferences: { ...typography.caption, color: colors.textMuted }, link: { minHeight: 44, justifyContent: "center" }, linkText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, muted: { ...typography.body, color: colors.textMuted }, stale: { ...typography.caption, color: colors.warning }, links: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, nav: { minHeight: 44, minWidth: "46%", flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, navText: { ...typography.label, color: colors.primary },
-});
+}));

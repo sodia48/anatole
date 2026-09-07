@@ -5,10 +5,10 @@ import { focusManager, onlineManager, QueryClient } from "@tanstack/react-query"
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { type PropsWithChildren, useEffect, useRef } from "react";
 import { AppState } from "react-native";
-
 import { LocaleProvider } from "@/src/lib/i18n";
 import { MOBILE_CACHE_BUSTER, MOBILE_CACHE_KEY, MOBILE_CACHE_MAX_AGE, scheduleReconnectRefresh, shouldDehydrateMobileQuery } from "@/src/lib/offlineCache";
 import { MobileAccountProvider } from "./MobileAccountProvider";
+import { MobileThemeProvider } from "@/src/providers/MobileThemeProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,7 +63,7 @@ export function AppProviders({ children }: PropsWithChildren) {
       },
     }}>
       <LocaleProvider>
-        <MobileAccountProvider>{children}</MobileAccountProvider>
+        <MobileAccountProvider><MobileThemeProvider>{children}</MobileThemeProvider></MobileAccountProvider>
       </LocaleProvider>
     </PersistQueryClientProvider>
   );

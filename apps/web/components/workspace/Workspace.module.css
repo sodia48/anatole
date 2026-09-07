@@ -144,7 +144,7 @@
 .primaryButton {
   padding: 0 14px;
   border: 0;
-  background: linear-gradient(135deg, #2d76ff, #1599ec);
+  background: linear-gradient(135deg, var(--blue), #1599ec);
   color: white;
   font-weight: 750;
   box-shadow: 0 10px 25px rgba(45, 118, 255, 0.22);
@@ -153,8 +153,8 @@
 .secondaryButton {
   padding: 0 13px;
   border: 1px solid var(--border);
-  background: rgba(5, 17, 27, 0.72);
-  color: #b9cddd;
+  background: var(--panel);
+  color: var(--muted);
 }
 
 .dangerButton {
@@ -168,7 +168,7 @@
   width: 38px;
   padding: 0;
   border: 1px solid var(--border);
-  background: rgba(5, 17, 27, 0.72);
+  background: var(--panel);
   color: var(--muted);
 }
 
@@ -228,7 +228,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   outline: 0;
-  background: rgba(3, 14, 23, 0.74);
+  background: var(--panel);
   color: var(--text);
   font: inherit;
 }
@@ -244,7 +244,7 @@
 .searchInput:focus,
 .chatInput:focus {
   border-color: rgba(74, 137, 255, 0.8);
-  box-shadow: 0 0 0 3px rgba(45, 118, 255, 0.11);
+  box-shadow: 0 0 0 3px var(--primary-surface);
 }
 
 .suggestions {
@@ -258,7 +258,7 @@
   padding: 7px;
   border: 1px solid var(--border);
   border-radius: 13px;
-  background: rgba(4, 16, 25, 0.99);
+  background: var(--panel);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
 }
 
@@ -394,7 +394,7 @@
 
 .table td {
   padding: 12px 10px;
-  border-top: 1px solid rgba(29, 68, 92, 0.58);
+  border-top: 1px solid var(--border);
   color: #d4e2ec;
   text-align: right;
   white-space: nowrap;
@@ -420,7 +420,7 @@
 .symbolBadge {
   min-width: 50px;
   padding: 6px 8px;
-  background: rgba(45, 118, 255, 0.15);
+  background: var(--primary-surface);
   color: #8bb7ff;
   font-weight: 800;
 }
@@ -445,7 +445,7 @@
 .scorePill {
   min-width: 55px;
   padding: 5px 8px;
-  background: rgba(45, 118, 255, 0.15);
+  background: var(--primary-surface);
   color: #91bdff;
   font-weight: 800;
 }
@@ -483,7 +483,7 @@
 .statusIdle,
 .statusMonitoring {
   border-color: rgba(73, 137, 255, 0.35);
-  background: rgba(45, 118, 255, 0.12);
+  background: var(--primary-surface);
   color: #92bbff;
 }
 
@@ -495,7 +495,7 @@
   background:
     linear-gradient(rgba(41, 78, 101, 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(41, 78, 101, 0.12) 1px, transparent 1px),
-    rgba(3, 14, 23, 0.58);
+    var(--panel);
   background-size: 100% 25%, 16.666% 100%, auto;
 }
 
@@ -553,7 +553,7 @@
   position: absolute;
   inset: 29px;
   border-radius: 50%;
-  background: #071722;
+  background: var(--input-bg);
   border: 1px solid rgba(42, 79, 101, 0.65);
   content: "";
 }
@@ -609,7 +609,7 @@
   height: 100%;
   display: block;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2d76ff, #16c79a);
+  background: linear-gradient(90deg, var(--blue), var(--teal));
 }
 
 .riskGrid {
@@ -621,9 +621,9 @@
 
 .riskMetric {
   padding: 12px;
-  border: 1px solid rgba(29, 68, 92, 0.65);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(4, 15, 24, 0.55);
+  background: var(--panel);
 }
 
 .riskMetric span {
@@ -645,7 +645,7 @@
 .chatMessage {
   border: 1px solid rgba(29, 68, 92, 0.64);
   border-radius: 13px;
-  background: rgba(4, 15, 24, 0.54);
+  background: var(--panel);
 }
 
 .contributorRow {
@@ -717,7 +717,7 @@
 
 .alertCardTriggered {
   border-color: rgba(22, 199, 154, 0.52);
-  box-shadow: inset 3px 0 0 #16c79a;
+  box-shadow: inset 3px 0 0 var(--teal);
 }
 
 .alertMain {
@@ -772,7 +772,7 @@
 }
 
 .toggleOn {
-  background: #2d76ff;
+  background: var(--blue);
 }
 
 .toggleOn i {
@@ -812,7 +812,7 @@
 .chatMessageUser {
   justify-self: end;
   margin-left: auto;
-  background: rgba(45, 118, 255, 0.14);
+  background: var(--primary-surface);
   border-color: rgba(45, 118, 255, 0.35);
 }
 
@@ -828,7 +828,7 @@
 .chatMessage time {
   display: block;
   margin-top: 8px;
-  color: #5f7c91;
+  color: var(--muted);
   font-size: 9px;
 }
 
@@ -843,7 +843,7 @@
   padding: 10px;
   border: 1px solid rgba(45, 82, 104, 0.62);
   border-radius: 10px;
-  background: rgba(1, 10, 17, 0.35);
+  background: var(--panel);
 }
 
 .fact span {
@@ -870,8 +870,8 @@
   padding: 7px 10px;
   border: 1px solid rgba(69, 112, 140, 0.62);
   border-radius: 999px;
-  background: rgba(10, 34, 49, 0.58);
-  color: #a9c8db;
+  background: var(--panel);
+  color: var(--text-secondary);
   font-size: 9px;
   cursor: pointer;
 }
@@ -990,7 +990,7 @@
 .skeleton {
   min-height: 120px;
   border-radius: 16px;
-  background: linear-gradient(90deg, #0b1a27, #153248, #0b1a27);
+  background: linear-gradient(90deg, var(--input-bg), #153248, var(--input-bg));
   background-size: 200% 100%;
   animation: pulse 1.4s infinite;
 }
@@ -1067,7 +1067,7 @@
   padding: 14px 17px;
   border: 1px solid rgba(22, 199, 154, 0.36);
   border-radius: 14px;
-  background: linear-gradient(110deg, rgba(22, 199, 154, 0.1), rgba(45, 118, 255, 0.08));
+  background: linear-gradient(110deg, rgba(22, 199, 154, 0.1), var(--primary-surface));
   color: #bfe8dc;
 }
 
@@ -1104,7 +1104,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(3, 14, 23, 0.74);
+  background: var(--panel);
 }
 
 .advisorCheckbox input {
@@ -1130,9 +1130,9 @@
   grid-template-columns: 28px minmax(0, 1fr);
   gap: 11px;
   padding: 13px;
-  border: 1px solid rgba(29, 68, 92, 0.65);
+  border: 1px solid var(--border);
   border-radius: 13px;
-  background: rgba(4, 15, 24, 0.56);
+  background: var(--panel);
 }
 
 .advisorPriority > span {
@@ -1141,7 +1141,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(45, 118, 255, 0.16);
+  background: var(--primary-surface);
   color: #8eb8ff;
   font-size: 10px;
   font-weight: 800;
@@ -1153,7 +1153,7 @@
 .advisorPriority small { color: #74a5c3; font-size: 9px; line-height: 1.45; }
 .priorityHigh { box-shadow: inset 3px 0 0 #ff6b78; }
 .priorityMedium { box-shadow: inset 3px 0 0 #ffb65c; }
-.priorityLow { box-shadow: inset 3px 0 0 #16c79a; }
+.priorityLow { box-shadow: inset 3px 0 0 var(--teal); }
 
 .advisorScenarioGrid {
   display: grid;
@@ -1165,9 +1165,9 @@
   display: grid;
   gap: 9px;
   padding: 16px;
-  border: 1px solid rgba(29, 68, 92, 0.65);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(4, 15, 24, 0.56);
+  background: var(--panel);
 }
 
 .advisorScenario > span {
@@ -1180,15 +1180,15 @@
 
 .advisorScenario strong { font-size: 21px; }
 .advisorScenario small { color: var(--muted); font-size: 9px; }
-.advisorScenario p { margin: 0; color: #a9bfcd; font-size: 10px; }
+.advisorScenario p { margin: 0; color: var(--muted); font-size: 10px; }
 
 .advisorDimension {
   display: grid;
   gap: 7px;
   padding: 13px;
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(4, 15, 24, 0.5);
+  background: var(--panel);
 }
 
 .advisorDimension > div {
@@ -1237,7 +1237,7 @@
 
 .guardrailMessage {
   border-color: rgba(22, 199, 154, 0.42);
-  box-shadow: inset 3px 0 0 #16c79a;
+  box-shadow: inset 3px 0 0 var(--teal);
 }
 
 .assistantDisclaimer {
@@ -1282,7 +1282,7 @@
   width: 430px;
   height: 430px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(45, 118, 255, 0.16), transparent 68%);
+  background: radial-gradient(circle, var(--primary-surface), transparent 68%);
   content: "";
   pointer-events: none;
 }
@@ -1429,13 +1429,13 @@
 }
 
 .guideStepActive > span {
-  border-color: #4a89ff;
-  background: #2d76ff;
+  border-color: var(--border);
+  background: var(--blue);
   color: white;
 }
 
 .guideStepActive strong {
-  color: white;
+  color: var(--text);
 }
 
 .guideStepDone > span {
@@ -1464,7 +1464,7 @@
   justify-content: space-between;
   gap: 18px;
   padding-bottom: 18px;
-  border-bottom: 1px solid rgba(29, 68, 92, 0.56);
+  border-bottom: 1px solid var(--border);
 }
 
 .guideHeader h2 {
@@ -1510,7 +1510,7 @@
   gap: 6px;
   border: 1px solid rgba(29, 68, 92, 0.7);
   border-radius: 13px;
-  background: rgba(3, 14, 23, 0.64);
+  background: var(--panel);
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -1534,8 +1534,8 @@
 
 .choiceCardActive {
   border-color: rgba(45, 118, 255, 0.78);
-  background: rgba(45, 118, 255, 0.11);
-  box-shadow: inset 0 0 0 1px rgba(45, 118, 255, 0.16);
+  background: var(--primary-surface);
+  box-shadow: inset 0 0 0 1px var(--primary-surface);
 }
 
 .choiceCardActive strong {
@@ -1556,9 +1556,9 @@
 
 .questionBlock {
   padding: 16px;
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(4, 15, 24, 0.48);
+  background: var(--panel);
 }
 
 .questionBlock > div:first-child {
@@ -1589,7 +1589,7 @@
   padding: 0 13px;
   border: 1px solid rgba(29, 68, 92, 0.72);
   border-radius: 10px;
-  background: rgba(3, 14, 23, 0.72);
+  background: var(--panel);
   color: #8fa7b8;
   font: inherit;
   font-size: 10px;
@@ -1598,7 +1598,7 @@
 
 .segmentedChoices .segmentedActive {
   border-color: rgba(45, 118, 255, 0.78);
-  background: rgba(45, 118, 255, 0.14);
+  background: var(--primary-surface);
   color: #b6d0ff;
 }
 
@@ -1609,7 +1609,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-top: 1px solid rgba(29, 68, 92, 0.56);
+  border-top: 1px solid var(--border);
 }
 
 .guideAside {
@@ -1680,7 +1680,7 @@
   align-items: center;
   border: 1px solid rgba(45, 118, 255, 0.34);
   border-radius: 15px;
-  background: linear-gradient(110deg, rgba(45, 118, 255, 0.11), rgba(22, 199, 154, 0.07));
+  background: linear-gradient(110deg, var(--primary-surface), rgba(22, 199, 154, 0.07));
 }
 
 .resultIntro h3 {
@@ -1704,7 +1704,7 @@
   padding: 20px 10px;
   border: 1px solid rgba(45, 118, 255, 0.38);
   border-radius: 50%;
-  background: rgba(3, 14, 23, 0.48);
+  background: var(--panel);
 }
 
 .resultScore strong {
@@ -1728,9 +1728,9 @@
   padding: 13px;
   display: grid;
   gap: 6px;
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(4, 15, 24, 0.48);
+  background: var(--panel);
 }
 
 .resultMetrics span {
@@ -1757,9 +1757,9 @@
   padding: 17px;
   display: grid;
   gap: 14px;
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 15px;
-  background: rgba(4, 15, 24, 0.38);
+  background: var(--panel);
 }
 
 .nextSteps {
@@ -1772,9 +1772,9 @@
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 11px;
   padding: 13px;
-  border: 1px solid rgba(29, 68, 92, 0.58);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(3, 14, 23, 0.55);
+  background: var(--panel);
 }
 
 .nextStep > span {
@@ -1783,7 +1783,7 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: rgba(45, 118, 255, 0.14);
+  background: var(--primary-surface);
   color: #9abfff;
   font-size: 10px;
   font-weight: 850;
@@ -1821,9 +1821,9 @@
   padding: 14px;
   display: grid;
   gap: 8px;
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: rgba(3, 14, 23, 0.55);
+  background: var(--panel);
 }
 
 .scenarioSimple > span {
@@ -1849,9 +1849,9 @@
 }
 
 .resultDetails {
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(4, 15, 24, 0.4);
+  background: var(--panel);
   overflow: hidden;
 }
 
@@ -1864,7 +1864,7 @@
 }
 
 .resultDetails[open] summary {
-  border-bottom: 1px solid rgba(29, 68, 92, 0.56);
+  border-bottom: 1px solid var(--border);
 }
 
 .resultDetailGrid {
@@ -1893,7 +1893,7 @@
   align-items: center;
   border: 1px solid rgba(45, 118, 255, 0.36);
   border-radius: 14px;
-  background: rgba(45, 118, 255, 0.08);
+  background: var(--primary-surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
@@ -1918,10 +1918,10 @@
 }
 
 .simpleChat {
-  border: 1px solid rgba(29, 68, 92, 0.62);
+  border: 1px solid var(--border);
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(3, 14, 23, 0.38);
+  background: var(--panel);
 }
 
 .simpleChat .chatScroll {

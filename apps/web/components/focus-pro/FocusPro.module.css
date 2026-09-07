@@ -1,16 +1,16 @@
 .workspace {
-  --focus-border: rgba(48, 92, 121, 0.72);
-  --focus-panel: rgba(5, 20, 31, 0.94);
+  --focus-border: var(--border);
+  --focus-panel: var(--panel);
   display: grid;
   gap: 10px;
   width: min(100%, 1920px);
   margin: 0 auto;
-  color: #dcecf6;
+  color: var(--text);
 }
 
 .eyebrow {
   display: block;
-  color: #65b8f5;
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 850;
   letter-spacing: 0.13em;
@@ -20,10 +20,16 @@
 .toolbar,
 .drawingToolbar,
 .bottomTabs,
-.panel,
-.chartPanel {
+.panel {
   border: 1px solid var(--focus-border);
   background: var(--focus-panel);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+.chartPanel {
+  border: 1px solid var(--focus-border);
+  background: var(--data-canvas);
+  color: var(--data-canvas-text);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
 }
 
@@ -64,8 +70,8 @@
 .textarea {
   border: 1px solid rgba(56, 105, 137, 0.76);
   border-radius: 7px;
-  background: #061722;
-  color: #e8f5fc;
+  background: var(--input-bg);
+  color: var(--text);
   outline: none;
 }
 
@@ -98,8 +104,8 @@
   min-height: 34px;
   border: 1px solid rgba(56, 105, 137, 0.68);
   border-radius: 7px;
-  background: rgba(9, 31, 45, 0.96);
-  color: #9fbbce;
+  background: var(--panel);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 760;
   cursor: pointer;
@@ -118,9 +124,9 @@
 .iconButton:hover,
 .tabButton:hover,
 .buttonActive {
-  border-color: #2c9cff;
-  background: rgba(35, 111, 164, 0.35);
-  color: #fff;
+  border-color: var(--blue);
+  background: var(--primary-surface);
+  color: var(--text);
 }
 
 .button:disabled,
@@ -134,15 +140,15 @@
 .primaryButton {
   padding: 0 12px;
   border-color: rgba(44, 156, 255, 0.78);
-  background: #1b66c9;
-  color: #fff;
+  background: var(--interactive);
+  color: var(--on-primary);
 }
 
 .dangerButton {
   padding: 0 10px;
   border-color: rgba(255, 77, 103, 0.48);
-  background: rgba(103, 25, 40, 0.5);
-  color: #ffb5c0;
+  background: var(--negative-surface);
+  color: var(--negative-text);
 }
 
 .mainGrid {
@@ -173,7 +179,7 @@
 }
 
 .drawingCount {
-  color: #5f8198;
+  color: var(--text-secondary);
   font-size: 9px;
   font-weight: 800;
 }
@@ -203,7 +209,7 @@
 .chartHeader h2,
 .sectionHeader h2 {
   margin: 3px 0 0;
-  color: #f1f8fc;
+  color: var(--text);
   font-size: 15px;
 }
 
@@ -212,16 +218,16 @@
   align-items: flex-end;
   flex-direction: column;
   gap: 3px;
-  color: #7898ad;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
 .chartStatus strong {
-  color: #f6b94a;
+  color: var(--warning);
 }
 
 .chartStatus i {
-  color: #65b8f5;
+  color: var(--accent-text);
 }
 
 .chartStage {
@@ -249,22 +255,22 @@
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(3, 13, 21, 0.68);
-  color: #b9d0df;
+  background: var(--panel);
+  color: var(--text);
 }
 
 .chartError {
   bottom: 14px;
   border: 1px solid rgba(255, 77, 103, 0.55);
-  background: rgba(91, 26, 42, 0.94);
-  color: #ffd9e0;
+  background: var(--negative-surface);
+  color: var(--negative-text);
 }
 
 .chartFooter {
   min-height: 32px;
   padding: 5px 12px;
   border-top: 1px solid rgba(48, 92, 121, 0.42);
-  color: #5f7c91;
+  color: var(--muted);
   font-size: 9px;
 }
 
@@ -294,7 +300,7 @@
 .field {
   display: grid;
   gap: 5px;
-  color: #7595aa;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -327,21 +333,21 @@
   padding: 8px;
   border: 1px solid rgba(48, 92, 121, 0.45);
   border-radius: 7px;
-  background: rgba(8, 29, 42, 0.7);
-  color: #9fbbce;
+  background: var(--panel);
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
 .listItem strong {
   display: block;
-  color: #e5f2f9;
+  color: var(--text);
   font-size: 11px;
 }
 
 .listItem small,
 .muted,
 .notice {
-  color: #6f8ca0;
+  color: var(--text-secondary);
   font-size: 9px;
   line-height: 1.45;
 }
@@ -350,8 +356,8 @@
   padding: 9px 10px;
   border: 1px solid rgba(246, 185, 74, 0.32);
   border-radius: 7px;
-  background: rgba(100, 70, 14, 0.12);
-  color: #c9a65e;
+  background: var(--warning-surface);
+  color: var(--warning);
 }
 
 .errorNotice,
@@ -363,12 +369,12 @@
 
 .errorNotice {
   border: 1px solid rgba(255, 77, 103, 0.42);
-  color: #ffb5c0;
+  color: var(--negative-text);
 }
 
 .successNotice {
   border: 1px solid rgba(22, 199, 154, 0.38);
-  color: #72d9bd;
+  color: var(--positive-text);
 }
 
 .bottomPanel {
@@ -403,30 +409,30 @@
   padding: 9px;
   border: 1px solid rgba(48, 92, 121, 0.45);
   border-radius: 7px;
-  background: rgba(8, 29, 42, 0.74);
+  background: var(--panel);
 }
 
 .kpi span {
-  color: #7898ad;
+  color: var(--text-secondary);
   font-size: 9px;
   text-transform: uppercase;
 }
 
 .kpi strong {
-  color: #f1f8fc;
+  color: var(--text);
   font-size: 15px;
 }
 
-.positive { color: #16c79a !important; }
-.negative { color: #ff5f76 !important; }
+.positive { color: var(--positive-text) !important; }
+.negative { color: var(--negative-text) !important; }
 .paperBadge {
   display: inline-flex;
   align-items: center;
   padding: 3px 7px;
   border: 1px solid rgba(246, 185, 74, 0.58);
   border-radius: 999px;
-  background: rgba(246, 185, 74, 0.12);
-  color: #f6b94a;
+  background: var(--warning-surface);
+  color: var(--warning);
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;

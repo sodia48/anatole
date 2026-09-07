@@ -1,13 +1,14 @@
 import { binaryTreemap } from "@anatole/shared/heatmap";
 import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import Svg, { G, Rect, Text as SvgText } from "react-native-svg";
-
 import { Card } from "@/src/components/ui";
 import type { CockpitSnapshot, TerminalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { buildTodayHeatmap, type TodayHeatmapMode, type TodayHeatmapNode, type TodayTarget, type TodayUniverse } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function fill(node: TodayHeatmapNode) {
   const strength = Math.min(Math.max(Math.abs(node.changePercent) / 5, 0.2), 1);
@@ -17,6 +18,7 @@ function fill(node: TodayHeatmapNode) {
 }
 
 export function TodayHeatmap({ cockpit, terminal, universe, onOpen }: { cockpit?: CockpitSnapshot; terminal: TerminalSnapshot | null; universe: TodayUniverse; onOpen: (target: TodayTarget) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const [mode, setMode] = useState<TodayHeatmapMode>("stocks");
   const [width, setWidth] = useState(320);
@@ -37,6 +39,6 @@ export function TodayHeatmap({ cockpit, terminal, universe, onOpen }: { cockpit?
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   segment: { flexDirection: "row", gap: spacing.xs }, segmentButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, segmentActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.2)" }, segmentText: { ...typography.caption, color: colors.text, fontWeight: "800" }, canvas: { width: "100%", minHeight: 250, overflow: "hidden", borderRadius: radius.sm, backgroundColor: "#07141e" }, empty: { height: 250, alignItems: "center", justifyContent: "center" }, emptyText: { ...typography.section, color: colors.textMuted }, unmapped: { gap: spacing.xs }, unmappedRow: { minHeight: 54, justifyContent: "center", gap: 2, paddingHorizontal: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, unmappedTitle: { ...typography.label, color: colors.text }, unmappedMeta: { ...typography.caption, color: colors.textMuted },
-});
+}));

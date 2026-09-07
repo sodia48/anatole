@@ -9,14 +9,14 @@
 .shell,
 .navigation,
 .content {
-  border: 1px solid rgba(76, 148, 190, 0.34);
+  border: 1px solid var(--border);
   background:
     linear-gradient(
       145deg,
-      rgba(10, 35, 50, 0.98),
-      rgba(5, 22, 34, 0.99)
+      var(--panel-gradient-start),
+      var(--panel-gradient-end)
     );
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 24px 70px var(--shadow);
 }
 
 .hero {
@@ -50,7 +50,7 @@
 }
 
 .eyebrow {
-  color: #78aaff;
+  color: var(--accent-text);
   font-size: 0.73rem;
   font-weight: 850;
   letter-spacing: 0.16em;
@@ -66,7 +66,7 @@
 .hero p,
 .contentHeader p {
   margin: 0;
-  color: #91abc0;
+  color: var(--muted);
   line-height: 1.55;
 }
 
@@ -79,7 +79,7 @@
   grid-template-columns: 46px minmax(0, 1fr);
   align-items: center;
   gap: 13px;
-  background: rgba(3, 19, 30, 0.72);
+  background: var(--panel);
 }
 
 .statusIcon,
@@ -88,9 +88,9 @@
 .navigationIcon {
   display: grid;
   place-items: center;
-  color: #6fa8ff;
-  background: rgba(47, 115, 228, 0.16);
-  border: 1px solid rgba(91, 151, 255, 0.32);
+  color: var(--accent-text);
+  background: var(--primary-surface);
+  border: 1px solid var(--borderStrong, var(--border));
 }
 
 .statusIcon {
@@ -110,7 +110,7 @@
 .navigationHeading small,
 .navigationText small,
 .navigationSummary span {
-  color: #7796aa;
+  color: var(--muted);
 }
 
 .heroStatus strong {
@@ -131,7 +131,7 @@
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 10px;
-  background: rgba(3, 16, 25, 0.78);
+  background: var(--panel);
 }
 
 .navigation,
@@ -198,26 +198,21 @@
 
 .navigationItem {
   border: 1px solid transparent;
-  color: #a8bfd0;
+  color: var(--text-secondary);
   background: transparent;
 }
 
 .navigationItem:hover {
   transform: translateX(2px);
   border-color: rgba(74, 136, 174, 0.35);
-  background: rgba(10, 39, 57, 0.62);
+  background: var(--panel);
 }
 
 .activeNavigationItem {
-  border: 1px solid rgba(88, 149, 255, 0.74);
-  color: #fff;
-  background:
-    linear-gradient(
-      135deg,
-      rgba(45, 110, 213, 0.3),
-      rgba(12, 45, 67, 0.9)
-    );
-  box-shadow: inset 3px 0 0 #5b98ff;
+  border: 1px solid var(--interactive);
+  color: var(--text);
+  background: var(--primary-surface);
+  box-shadow: inset 3px 0 0 var(--interactive);
 }
 
 .navigationIcon {
@@ -246,7 +241,7 @@
 }
 
 .navigationArrow {
-  color: #5e829a;
+  color: var(--text-secondary);
 }
 
 .navigationSummary {
@@ -258,11 +253,11 @@
   grid-template-columns: 22px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
-  background: rgba(3, 19, 30, 0.7);
+  background: var(--panel);
 }
 
 .navigationSummary > svg {
-  color: #61d0aa;
+  color: var(--positive-text);
 }
 
 .navigationSummary strong {

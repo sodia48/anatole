@@ -3,7 +3,6 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Field, QueryState, ScreenHeader } from "@/src/components/ui";
 import { EtfHeatmap } from "@/src/components/etf/EtfHeatmap";
 import { marketApi } from "@/src/lib/api/market";
@@ -11,6 +10,8 @@ import type { EtfDirectoryItem } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { compactNumberOrNd, moneyOrNd } from "@/src/components/focus/format";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const EMPTY_ETF_ITEMS: EtfDirectoryItem[] = [];
 
@@ -22,6 +23,7 @@ export function filterEtfDirectory(items: EtfDirectoryItem[], search: string, ca
 }
 
 function EtfRow({ item }: { item: EtfDirectoryItem }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const quoteAvailable = item.source.toLowerCase() !== "unavailable" && Number.isFinite(item.price) && item.price > 0;
   const change = quoteAvailable && Number.isFinite(item.change_percent) ? item.change_percent : null;
@@ -47,10 +49,12 @@ function EtfRow({ item }: { item: EtfDirectoryItem }) {
 }
 
 function Chip({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
+  useMobileTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.chip, active && styles.chipActive]}><Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text></Pressable>;
 }
 
 export default function EtfDirectoryScreen() {
+  useMobileTheme();
   const { pick } = useLocale();
   const [view, setView] = useState<"map" | "list">("map");
   const [search, setSearch] = useState("");
@@ -98,14 +102,14 @@ export default function EtfDirectoryScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.lg, paddingBottom: 80 },
   header: { gap: spacing.md, marginBottom: spacing.md },
   stale: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm },
   viewSwitch: { flexDirection: "row", padding: spacing.xs, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   viewButton: { minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm },
-  viewButtonActive: { backgroundColor: "#12588b" }, viewText: { ...typography.label, color: colors.textMuted }, viewTextActive: { color: colors.text },
+  viewButtonActive: { backgroundColor: colors.primarySurfaceStrong }, viewText: { ...typography.label, color: colors.textMuted }, viewTextActive: { color: colors.onPrimary },
   filterLabel: { ...typography.label, color: colors.textMuted, textTransform: "uppercase" },
   chip: { minHeight: 40, justifyContent: "center", marginRight: spacing.sm, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, backgroundColor: colors.surface },
   chipActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" },
@@ -113,8 +117,8 @@ const styles = StyleSheet.create({
   chipTextActive: { color: colors.text, fontWeight: "800" },
   row: { minHeight: 90, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   pressed: { opacity: 0.7 },
-  badge: { minWidth: 58, alignItems: "center", paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: "#103d6f" },
-  badgeText: { ...typography.label, color: "#8cc9ff" },
+  badge: { minWidth: 58, alignItems: "center", paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.primarySurface },
+  badgeText: { ...typography.label, color: colors.primary },
   rowCopy: { flex: 1, minWidth: 0 },
   name: { ...typography.body, color: colors.text, fontWeight: "700" },
   meta: { ...typography.caption, color: colors.textMuted },
@@ -124,4 +128,4 @@ const styles = StyleSheet.create({
   change: { ...typography.caption, color: colors.textMuted },
   volume: { ...typography.caption, color: colors.textSubtle },
   empty: { ...typography.body, color: colors.textMuted, paddingVertical: spacing.xl, textAlign: "center" },
-});
+}));

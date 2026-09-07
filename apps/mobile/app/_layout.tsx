@@ -4,14 +4,16 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-
 import { AppProviders } from "@/src/providers/AppProviders";
+import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { useLocale } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/tokens";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 void SplashScreen.preventAutoHideAsync();
 
 function NotificationNavigation() {
+  useMobileTheme();
   useEffect(() => {
     const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data ?? {};
@@ -29,23 +31,30 @@ function NotificationNavigation() {
 }
 
 export default function RootLayout() {
-  useEffect(() => { void SplashScreen.hideAsync(); }, []);
+  useMobileTheme();
+  return <AppProviders><ThemedRoot /></AppProviders>;
+}
+
+function ThemedRoot() {
+  const { colors: themeColors, isSky } = useMobileTheme();
+  const { state } = useMobileAccount();
+  useEffect(() => { if (state !== "booting") void SplashScreen.hideAsync(); }, [state]);
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppProviders>
-        <NotificationNavigation />
-        <StatusBar style="light" />
-        <AppStack />
-      </AppProviders>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: themeColors.background }}>
+      <NotificationNavigation />
+      <StatusBar style={isSky ? "dark" : "light"} />
+      <AppStack />
     </GestureHandlerRootView>
   );
 }
 
 function AppStack() {
+  useMobileTheme();
   const { pick } = useLocale();
   return <Stack screenOptions={{ headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text, contentStyle: { backgroundColor: colors.background }, headerBackButtonDisplayMode: "minimal" }}>
     <Stack.Screen name="index" options={{ headerShown: false }} />
     <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
+    <Stack.Screen name="appearance" options={{ headerShown: false, gestureEnabled: false }} />
     <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
     <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: "modal" }} />
     <Stack.Screen name="article" options={{ headerShown: false, gestureEnabled: true }} />

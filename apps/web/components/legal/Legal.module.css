@@ -73,7 +73,7 @@
   border: 1px solid rgba(82, 145, 184, 0.45);
   border-radius: 12px;
   color: #dfeef7;
-  background: rgba(5, 26, 39, 0.86);
+  background: var(--panel);
 }
 
 @media (max-width: 820px) {

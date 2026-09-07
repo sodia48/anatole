@@ -1,11 +1,12 @@
 import Constants from "expo-constants";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-
 import { sessionStore } from "@/src/lib/api/session";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type Command = "indicators" | "draw" | "compare" | "alert" | "layouts" | "strategy" | "paper" | "fundamentals" | "undo" | "redo";
 type BridgeInbound = { type: "ready" | "configured" | "tickerSelected" | "alertCreated" | "paperOrderChanged" | "layoutSaved" | "heightChanged" | "error"; ticker?: string; timeframe?: string; chartType?: string; height?: number; message?: string };
@@ -24,6 +25,7 @@ const drawingTools = [
 ] as const;
 
 export function MobileFocusPro({ ticker, onOpenClassic }: { ticker: string; onOpenClassic?: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const ref = useRef<WebView>(null);
   const bridgeReadyRef = useRef(false);
@@ -142,6 +144,6 @@ export function MobileFocusPro({ ticker, onOpenClassic }: { ticker: string; onOp
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   shell: { overflow: "hidden", borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface }, selectors: { gap: spacing.xs, padding: spacing.sm }, chip: { minHeight: 44, minWidth: 52, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, marginRight: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" }, disabled: { opacity: 0.45 }, chipText: { ...typography.caption, color: colors.text }, actions: { paddingHorizontal: spacing.sm, gap: spacing.xs }, command: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, commandText: { ...typography.caption, color: colors.text }, webviewFrame: { height: 580, marginTop: spacing.sm, backgroundColor: colors.background }, webviewFrameLoading: { height: 360 }, webview: { flex: 1, backgroundColor: colors.background }, loading: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.surface }, loadingTitle: { ...typography.body, color: colors.text, fontWeight: "700" }, skeletonWide: { width: "88%", height: 12, borderRadius: 6, backgroundColor: colors.surfaceRaised }, skeletonShort: { width: "58%", height: 12, borderRadius: 6, backgroundColor: colors.surfaceRaised }, status: { ...typography.caption, color: colors.textMuted, padding: spacing.sm, textAlign: "center" }, recovery: { gap: spacing.md, padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border }, errorText: { ...typography.body, color: colors.warning, textAlign: "center" }, recoveryActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: spacing.sm }, recoveryButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, scrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,.6)" }, sheet: { gap: spacing.md, padding: spacing.lg, paddingBottom: spacing.lg * 2, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface }, sheetTitle: { ...typography.title, color: colors.text }, toolGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, tool: { minHeight: 48, minWidth: "31%", flexGrow: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, undoRow: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
-});
+}));

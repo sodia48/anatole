@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-
 import { useLocale } from "@/src/lib/i18n";
 import { colors } from "@/src/theme/tokens";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export default function TabLayout() {
+  useMobileTheme();
   const { t } = useLocale();
   return (
     <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarInactiveTintColor: colors.textMuted, tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border, height: 66, paddingTop: 6 }, tabBarLabelStyle: { fontSize: 11, fontWeight: "700" } }}>

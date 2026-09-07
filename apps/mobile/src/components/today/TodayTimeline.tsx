@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { Card } from "@/src/components/ui";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import type { TodayTarget, TodayTimelineItem } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function eventTime(value: string, language: "fr" | "en") {
   const date = new Date(value);
@@ -12,6 +13,7 @@ function eventTime(value: string, language: "fr" | "en") {
 }
 
 export function TodayTimeline({ items, stale, onOpen, onCalendar }: { items: readonly TodayTimelineItem[]; stale: boolean; onOpen: (target: TodayTarget) => void; onCalendar: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   return <Card action={<Pressable accessibilityRole="button" onPress={onCalendar} style={styles.link} testID="today-calendar-all"><Text style={styles.linkText}>{pick("Voir tout", "View all")} →</Text></Pressable>} title={pick("AGENDA DU JOUR", "TODAY’S AGENDA")} testID="today-timeline">
     {stale ? <Text style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
@@ -21,6 +23,6 @@ export function TodayTimeline({ items, stale, onOpen, onCalendar }: { items: rea
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   link: { minHeight: 44, justifyContent: "center" }, linkText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, stale: { ...typography.caption, color: colors.warning }, item: { minHeight: 66, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, time: { width: 64 }, timeText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, copy: { flex: 1, minWidth: 0, gap: 2 }, title: { ...typography.label, color: colors.text }, meta: { ...typography.caption, color: colors.textMuted }, arrow: { fontSize: 22, color: colors.primary }, empty: { minHeight: 72, justifyContent: "center" },
-});
+}));

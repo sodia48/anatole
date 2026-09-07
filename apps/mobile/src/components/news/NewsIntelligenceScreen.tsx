@@ -2,14 +2,13 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AppState, StyleSheet, Text } from "react-native";
+import { AppState, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { QueryState, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
 import { NewsFeed, type NewsFeedEntry } from "./NewsFeed";
 import { NewsFilters } from "./NewsFilters";
 import { NewsHero } from "./NewsHero";
@@ -24,6 +23,8 @@ import {
   type NewsFiltersState,
   type NewsRegionFilter,
 } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const DEFAULT_FILTERS: NewsFiltersState = { primary: "all", region: "all", category: "all", search: "" };
 const EMPTY_PREFERRED_REGIONS: string[] = [];
@@ -50,6 +51,7 @@ function updatedLabel(value: string, language: "fr" | "en") {
 }
 
 export function NewsIntelligenceScreen({ header, initialRegion, initialCategory, preferredRegions = EMPTY_PREFERRED_REGIONS }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; preferredRegions?: string[] }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
@@ -111,4 +113,4 @@ export function NewsIntelligenceScreen({ header, initialRegion, initialCategory,
   return <SafeAreaView edges={["top"]} style={styles.safe} testID="news-intelligence-screen"><NewsFeed entries={entries} footer={<NewsSourceHealth statuses={news.data?.source_statuses ?? []} />} header={contentHeader} onRefresh={refresh} onReset={reset} onTicker={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })} refreshing={refreshing} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, updated: { ...typography.caption, color: colors.textMuted }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, scope: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm } });
+const styles = createThemedStyles((colors) => ({ safe: { flex: 1, backgroundColor: colors.background }, updated: { ...typography.caption, color: colors.textMuted }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, scope: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm } }));

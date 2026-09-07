@@ -1,20 +1,14 @@
-export const colors = {
-  background: "#050d15",
-  surface: "#081b29",
-  surfaceRaised: "#0c2435",
-  border: "#17445f",
-  borderStrong: "#256a91",
-  text: "#edf8ff",
-  textMuted: "#8fb1c6",
-  textSubtle: "#5f849b",
-  primary: "#2c9cff",
-  primaryPressed: "#1777c5",
-  cyan: "#21d4d2",
-  positive: "#00d7ad",
-  negative: "#ff365f",
-  warning: "#f6b94a",
-  overlay: "rgba(5, 13, 21, 0.78)",
-} as const;
+import { colors } from "./palettes";
+
+export {
+  colors,
+  createThemedStyles,
+  mobilePalettes,
+  originalPalette,
+  skyPalette,
+  type MobileThemeName,
+  type ThemeColors,
+} from "./palettes";
 
 export const spacing = {
   xs: 4,
@@ -43,7 +37,7 @@ export const typography = {
 
 export const shadows = {
   card: {
-    shadowColor: "#000000",
+    get shadowColor() { return colors.shadow; },
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.22,
     shadowRadius: 16,

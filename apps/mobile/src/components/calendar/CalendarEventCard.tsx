@@ -1,8 +1,9 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { formatEstimate, type CalendarIntelligenceItem } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function eventTime(value: string, language: "fr" | "en", estimated: boolean) {
   if (estimated) return language === "fr" ? "Heure non publiée" : "Time not published";
@@ -11,6 +12,7 @@ function eventTime(value: string, language: "fr" | "en", estimated: boolean) {
 }
 
 export function CalendarEventCard({ item, onPress }: { item: CalendarIntelligenceItem; onPress: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const dateOnly = item.kind === "economic" && item.timeIsEstimated;
   const time = eventTime(item.startsAt, language, dateOnly);
@@ -22,4 +24,4 @@ export function CalendarEventCard({ item, onPress }: { item: CalendarIntelligenc
   </Pressable>;
 }
 
-const styles = StyleSheet.create({ card: { minHeight: 88, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, pressed: { opacity: .72 }, time: { width: 86, gap: 2 }, timeText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, estimated: { ...typography.caption, color: colors.warning }, confirmed: { ...typography.caption, color: colors.positive }, copy: { flex: 1, minWidth: 0, gap: 3 }, title: { ...typography.body, color: colors.text, fontWeight: "800" }, meta: { ...typography.caption, color: colors.textMuted }, estimates: { ...typography.caption, color: colors.text }, importance: { ...typography.caption, color: colors.textMuted }, arrow: { fontSize: 24, color: colors.primary } });
+const styles = createThemedStyles((colors) => ({ card: { minHeight: 88, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, pressed: { opacity: .72 }, time: { width: 86, gap: 2 }, timeText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, estimated: { ...typography.caption, color: colors.warning }, confirmed: { ...typography.caption, color: colors.positive }, copy: { flex: 1, minWidth: 0, gap: 3 }, title: { ...typography.body, color: colors.text, fontWeight: "800" }, meta: { ...typography.caption, color: colors.textMuted }, estimates: { ...typography.caption, color: colors.text }, importance: { ...typography.caption, color: colors.textMuted }, arrow: { fontSize: 24, color: colors.primary } }));

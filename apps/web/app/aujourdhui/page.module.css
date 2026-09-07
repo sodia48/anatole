@@ -6,7 +6,7 @@
   padding: 28px;
   display: grid;
   gap: 22px;
-  color: #eef7fb;
+  color: var(--text);
   overflow-x: clip;
 }
 
@@ -17,11 +17,11 @@
 .calendarSection,
 .readingSection {
   min-width: 0;
-  border: 1px solid rgba(61, 124, 159, 0.43);
+  border: 1px solid var(--border);
   background:
-    radial-gradient(circle at 92% 8%, rgba(37, 108, 160, 0.12), transparent 30%),
-    linear-gradient(145deg, rgba(11, 39, 56, 0.98), rgba(4, 22, 34, 0.98));
-  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.14), inset 0 1px rgba(255, 255, 255, 0.03);
+    radial-gradient(circle at 92% 8%, var(--primary-surface), transparent 30%),
+    linear-gradient(145deg, var(--panel-gradient-start), var(--panel-gradient-end));
+  box-shadow: 0 24px 56px var(--shadow), inset 0 1px rgba(255, 255, 255, 0.03);
 }
 
 .hero {
@@ -75,7 +75,7 @@
   grid-template-columns: 10px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  background: rgba(3, 20, 31, 0.68);
+  background: var(--panel);
 }
 
 .heroStatus div {
@@ -90,7 +90,7 @@
 
 .heroStatus small {
   overflow: hidden;
-  color: #7193a8;
+  color: var(--text-secondary);
   font-size: 0.72rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -102,8 +102,8 @@
 .readingLinks a {
   border: 1px solid rgba(75, 141, 180, 0.5);
   border-radius: 11px;
-  color: #dcecf6;
-  background: rgba(9, 36, 53, 0.84);
+  color: var(--text);
+  background: var(--panel);
   font: inherit;
   font-weight: 800;
   text-decoration: none;
@@ -121,7 +121,7 @@
 .emptyActions a:hover,
 .readingLinks a:hover {
   border-color: #639cff;
-  background: rgba(42, 92, 143, 0.5);
+  background: var(--hover-bg);
   transform: translateY(-1px);
 }
 
@@ -201,7 +201,7 @@
   min-width: 0;
   border: 1px solid rgba(55, 111, 143, 0.38);
   border-radius: 18px;
-  background: rgba(3, 20, 31, 0.7);
+  background: var(--panel);
 }
 
 .primaryMarketCard {
@@ -220,7 +220,7 @@
 .primaryMarketCard > div > span,
 .metricCard > span,
 .personalCard small {
-  color: #7899ae;
+  color: var(--muted);
 }
 
 .primaryMarketCard > div > strong {
@@ -229,7 +229,7 @@
 }
 
 .primaryMarketCard > div > small {
-  color: #a3bdcc;
+  color: var(--muted);
 }
 
 .primaryMarketCard dl {
@@ -243,11 +243,11 @@
   padding: 12px;
   border: 1px solid rgba(54, 104, 134, 0.31);
   border-radius: 12px;
-  background: rgba(2, 16, 25, 0.48);
+  background: var(--panel);
 }
 
 .primaryMarketCard dt {
-  color: #6f91a5;
+  color: var(--muted);
   font-size: 0.7rem;
 }
 
@@ -259,12 +259,12 @@
 
 .positiveCard > div > strong,
 .positiveText {
-  color: #51d5a6 !important;
+  color: var(--positive-text) !important;
 }
 
 .negativeCard > div > strong,
 .negativeText {
-  color: #ff6678 !important;
+  color: var(--negative-text) !important;
 }
 
 .metricCard {
@@ -288,7 +288,7 @@
 }
 
 .metricCard small {
-  color: #7898ac;
+  color: var(--muted);
   line-height: 1.35;
 }
 
@@ -321,7 +321,7 @@
 
 .personalCard:hover {
   border-color: #5994f1;
-  background: rgba(17, 50, 73, 0.8);
+  background: var(--panel);
   transform: translateY(-2px);
 }
 
@@ -350,7 +350,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  background: rgba(3, 20, 31, 0.4);
+  background: var(--panel);
 }
 
 .emptyPersonal > div:first-child {
@@ -365,7 +365,7 @@
 .emptyPersonal p {
   max-width: 720px;
   margin: 0;
-  color: #82a3b7;
+  color: var(--muted);
   line-height: 1.55;
 }
 
@@ -400,8 +400,8 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  color: #dceaf3;
-  background: rgba(2, 17, 26, 0.45);
+  color: var(--text);
+  background: var(--panel);
   text-decoration: none;
 }
 
@@ -427,8 +427,8 @@
   grid-template-columns: 8px minmax(0, 1fr) auto;
   align-items: center;
   gap: 13px;
-  color: #eaf5fa;
-  background: rgba(3, 19, 29, 0.62);
+  color: var(--text);
+  background: var(--panel);
   text-decoration: none;
   transition: border-color 150ms ease, transform 150ms ease;
 }
@@ -464,7 +464,7 @@
 .attentionItem p {
   margin: 0;
   overflow: hidden;
-  color: #8daabd;
+  color: var(--text-secondary);
   font-size: 0.84rem;
   line-height: 1.4;
   text-overflow: ellipsis;
@@ -474,7 +474,7 @@
 .attentionItem small,
 .eventList span,
 .eventList small {
-  color: #6f8fa3;
+  color: var(--text-secondary);
   font-size: 0.72rem;
 }
 
@@ -490,7 +490,7 @@
   grid-template-columns: 7px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  background: rgba(3, 19, 29, 0.6);
+  background: var(--panel);
 }
 
 .eventList article > div {
@@ -520,11 +520,11 @@
   justify-items: center;
   gap: 8px;
   text-align: center;
-  color: #7897aa;
+  color: var(--muted);
 }
 
 .emptyList strong {
-  color: #dceaf2;
+  color: var(--text);
 }
 
 .readingSection {
@@ -543,7 +543,7 @@
   border-radius: 16px;
   display: grid;
   place-items: center;
-  background: rgba(14, 48, 70, 0.8);
+  background: var(--panel);
 }
 
 .readingCopy {
@@ -756,7 +756,7 @@
   border: 1px solid
     rgba(67, 128, 164, 0.43);
   border-radius: 13px;
-  background: rgba(3, 20, 31, 0.72);
+  background: var(--panel);
 }
 
 .universeSwitch button {
@@ -766,7 +766,7 @@
   border: 1px solid transparent;
   border-radius: 9px;
   background: transparent;
-  color: #83a6ba;
+  color: var(--muted);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 850;
@@ -780,20 +780,14 @@
 }
 
 .universeSwitch button:hover {
-  color: #e9f5fc;
-  background: rgba(32, 79, 110, 0.38);
+  color: var(--text);
+  background: var(--hover-bg);
 }
 
 .universeSwitch button.universeActive {
-  border-color:
-    rgba(92, 151, 255, 0.72);
-  background:
-    linear-gradient(
-      145deg,
-      rgba(33, 83, 144, 0.82),
-      rgba(18, 53, 92, 0.88)
-    );
-  color: #ffffff;
+  border-color: var(--interactive);
+  background: var(--interactive);
+  color: var(--on-primary);
   box-shadow:
     0 8px 20px
     rgba(24, 78, 143, 0.18);

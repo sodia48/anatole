@@ -1,11 +1,13 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import type { Quote } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { compactSessionVolume, liveQuoteStatus, type LiveQuoteState } from "./liveStatus";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function MobileFocusHeader({ quote, company, followed, liveState, onFollow }: { quote: Quote; company: string; followed: boolean; liveState: LiveQuoteState; onFollow: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const positive = quote.change_percent >= 0;
   const isLive = liveState === "live" && !quote.delayed;
@@ -17,8 +19,8 @@ export function MobileFocusHeader({ quote, company, followed, liveState, onFollo
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   shell: { gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, backgroundColor: colors.surface },
-  instrument: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, badge: { minWidth: 54, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: "#103d6f" }, badgeText: { ...typography.label, color: "#8cc9ff", textAlign: "center" }, copy: { flex: 1 }, company: { ...typography.body, color: colors.text, fontWeight: "700" }, meta: { ...typography.caption, color: colors.textMuted }, follow: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md }, followed: { backgroundColor: "rgba(44,156,255,.18)" }, followText: { fontSize: 24, color: colors.text },
+  instrument: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, badge: { minWidth: 54, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.primarySurface }, badgeText: { ...typography.label, color: colors.primary, textAlign: "center" }, copy: { flex: 1 }, company: { ...typography.body, color: colors.text, fontWeight: "700" }, meta: { ...typography.caption, color: colors.textMuted }, follow: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md }, followed: { backgroundColor: colors.primarySurface }, followText: { fontSize: 24, color: colors.text },
   quote: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", gap: spacing.md }, price: { ...typography.hero, color: colors.text }, change: { ...typography.label }, status: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing.sm }, live: { ...typography.caption, paddingHorizontal: spacing.sm, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: colors.warning, color: colors.warning }, liveOn: { borderColor: colors.positive, color: colors.positive }, liveOff: { borderColor: colors.negative, color: colors.negative },
-});
+}));

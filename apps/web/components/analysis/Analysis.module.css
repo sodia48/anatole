@@ -121,13 +121,13 @@
   padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(4, 15, 24, 0.74);
+  background: var(--panel);
   color: var(--muted);
 }
 
 .symbolSearch:focus-within {
   border-color: rgba(74, 137, 255, 0.8);
-  box-shadow: 0 0 0 3px rgba(45, 118, 255, 0.12);
+  box-shadow: 0 0 0 3px var(--primary-surface);
 }
 
 .symbolSearch input {
@@ -141,7 +141,7 @@
 }
 
 .symbolSearch small {
-  color: #5f7f96;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -156,7 +156,7 @@
   padding: 7px;
   border: 1px solid var(--border);
   border-radius: 14px;
-  background: rgba(5, 18, 28, 0.99);
+  background: var(--panel);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.48);
 }
 
@@ -211,7 +211,7 @@
   padding: 0 18px;
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2d76ff, #1a9cf0);
+  background: linear-gradient(135deg, var(--blue), #1a9cf0);
   color: white;
   font-weight: 750;
   cursor: pointer;
@@ -238,8 +238,8 @@
   padding: 0 9px 0 12px;
   border: 1px solid rgba(53, 101, 131, 0.8);
   border-radius: 999px;
-  background: rgba(13, 40, 57, 0.75);
-  color: #dceaf4;
+  background: var(--panel);
+  color: var(--text);
   font-size: 12px;
   font-weight: 700;
 }
@@ -274,14 +274,14 @@
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(5, 17, 27, 0.65);
+  background: var(--panel);
   color: var(--muted);
   cursor: pointer;
 }
 
 .rangeButtonActive {
   border-color: rgba(45, 118, 255, 0.78);
-  background: rgba(45, 118, 255, 0.16);
+  background: var(--primary-surface);
   color: #a8c9ff;
 }
 
@@ -295,7 +295,7 @@
 
 .notice {
   border: 1px solid rgba(35, 111, 135, 0.58);
-  background: rgba(12, 57, 75, 0.35);
+  background: var(--panel);
   color: #9fc7db;
 }
 
@@ -392,7 +392,7 @@
   background:
     linear-gradient(rgba(41, 78, 101, 0.12) 1px, transparent 1px),
     linear-gradient(90deg, rgba(41, 78, 101, 0.12) 1px, transparent 1px),
-    rgba(3, 14, 23, 0.58);
+    var(--panel);
   background-size: 100% 25%, 16.666% 100%, auto;
 }
 
@@ -442,7 +442,7 @@
 .compareTable td,
 .rankTable td {
   padding: 12px 10px;
-  border-top: 1px solid rgba(29, 68, 92, 0.58);
+  border-top: 1px solid var(--border);
   color: #d3e1eb;
   text-align: right;
   white-space: nowrap;
@@ -462,7 +462,7 @@
   display: grid;
   place-items: center;
   border-radius: 9px;
-  background: rgba(45, 118, 255, 0.16);
+  background: var(--primary-surface);
   color: #84b2ff;
   font-weight: 800;
 }
@@ -500,7 +500,7 @@
 .scorePill {
   min-width: 54px;
   padding: 5px 8px;
-  background: rgba(45, 118, 255, 0.15);
+  background: var(--primary-surface);
   color: #8eb9ff;
 }
 
@@ -651,7 +651,7 @@
 
 .methodology {
   padding: 13px 16px;
-  color: #68889e;
+  color: var(--muted);
   font-size: 10px;
   line-height: 1.55;
 }
@@ -679,7 +679,7 @@
   width: 34px;
   height: 34px;
   border: 3px solid rgba(110, 156, 185, 0.22);
-  border-top-color: #4f91ff;
+  border-color: var(--border);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -717,7 +717,7 @@
   position: absolute;
   inset: 10px;
   border-radius: 50%;
-  background: #091a27;
+  background: var(--panel);
   content: "";
 }
 
@@ -804,7 +804,7 @@
   height: 100%;
   display: block;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2d76ff, #19c8a0);
+  background: linear-gradient(90deg, var(--blue), #19c8a0);
 }
 
 .componentCard b {
@@ -904,7 +904,7 @@
   gap: 10px;
   border: 1px solid rgba(34, 75, 99, 0.62);
   border-radius: 12px;
-  background: rgba(5, 17, 27, 0.54);
+  background: var(--panel);
 }
 
 .alertIcon {
@@ -913,7 +913,7 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: rgba(45, 118, 255, 0.12);
+  background: var(--primary-surface);
   color: #75a8ff;
 }
 
@@ -991,7 +991,7 @@
   display: grid;
   place-items: center;
   border-radius: 12px;
-  background: rgba(45, 118, 255, 0.15);
+  background: var(--primary-surface);
   color: #8eb9ff;
   font-weight: 850;
 }
@@ -1006,13 +1006,13 @@
   min-width: 0;
   padding: 8px;
   border-radius: 9px;
-  background: rgba(5, 16, 25, 0.65);
+  background: var(--panel);
   text-align: center;
 }
 
 .opportunityMetrics span {
   display: block;
-  color: #68889e;
+  color: var(--muted);
   font-size: 7px;
   text-transform: uppercase;
 }
@@ -1034,7 +1034,7 @@
 .reasonList li {
   position: relative;
   padding-left: 12px;
-  color: #a9bfcd;
+  color: var(--muted);
   font-size: 9px;
   line-height: 1.4;
 }
@@ -1271,7 +1271,7 @@
 }
 
 .marketEventCopy span {
-  color: #6f91a7;
+  color: var(--muted);
   font-size: 8px;
   font-weight: 850;
   letter-spacing: .1em;
@@ -1280,7 +1280,7 @@
 
 .marketEventCopy strong {
   overflow: hidden;
-  color: #edf7fd;
+  color: var(--text);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1374,8 +1374,8 @@
   padding: 0 11px;
   border: 1px solid rgba(49, 91, 117, .72);
   border-radius: 11px;
-  background: rgba(5, 18, 28, .82);
-  color: #8ca8ba;
+  background: var(--panel);
+  color: var(--muted);
   font: inherit;
   font-size: 9px;
   font-weight: 800;
@@ -1528,7 +1528,7 @@
   top: 50%;
   width: 13px;
   height: 13px;
-  border: 2px solid #131c2a;
+  border: 2px solid var(--border);
   border-radius: 50%;
   background: #66d887;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, .08);
@@ -1563,7 +1563,7 @@
   gap: 4px;
   padding: 7px;
   border-radius: 9px;
-  background: rgba(5, 15, 27, .5);
+  background: var(--panel);
 }
 
 .signalMetrics span {
@@ -1625,7 +1625,7 @@
   padding: 12px;
   border: 1px solid rgba(44, 84, 109, .68);
   border-radius: 13px;
-  background: rgba(5, 21, 33, .72);
+  background: var(--panel);
 }
 
 .terminalSectorTop {
@@ -1736,7 +1736,7 @@
 }
 
 .terminalDetails > summary small {
-  color: #6f8da1;
+  color: var(--muted);
   font-size: 9px;
   text-align: right;
 }
@@ -2030,14 +2030,14 @@
 .v2Heading h2 { margin: 3px 0 0; }
 .v2Heading small { color: var(--text-muted); }
 .horizonGrid, .v2MetricGrid, .driverGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 9px; }
-.horizonGrid article, .v2MetricGrid article, .driverGrid article { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(7,31,45,.72); }
+.horizonGrid article, .v2MetricGrid article, .driverGrid article { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
 .horizonGrid span, .v2MetricGrid span, .driverGrid span { color: var(--text-muted); font-size: 11px; }
 .horizonGrid strong, .v2MetricGrid strong, .driverGrid strong { font-size: 18px; }
-.horizonGrid b, .driverGrid b { color: #2c9cff; }
+.horizonGrid b, .driverGrid b { color: var(--blue); }
 .v2Warning { margin: 10px 0 0; padding: 9px 11px; border: 1px solid rgba(246,185,74,.5); border-radius: 9px; color: #f6c86d; }
 .v2Actions, .presetBar, .radarControls, .radarActions, .activeFilters, .sectorLinks { display: flex; flex-wrap: wrap; gap: 7px; }
-.v2Actions button, .presetBar button, .radarControls button, .radarActions button, .activeFilters button { min-height: 36px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: rgba(10,39,56,.8); color: var(--text); }
-.v2Active { border-color: #2c9cff !important; background: rgba(44,156,255,.18) !important; }
+.v2Actions button, .presetBar button, .radarControls button, .radarActions button, .activeFilters button { min-height: 36px; padding: 0 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); color: var(--text); }
+.v2Active { border-color: var(--blue) !important; background: rgba(44,156,255,.18) !important; }
 .pulseChart, .rotationMatrix { display: block; width: 100%; max-height: 390px; border: 1px solid var(--border); border-radius: 12px; background: #061925; }
 .v2Empty { min-height: 140px; display: grid; place-items: center; color: var(--text-muted); }
 .sectorLinks { margin-top: 10px; }
@@ -2046,21 +2046,21 @@
 .rotationUnavailable span { padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; }
 .anomalyGrid, .radarTable { display: grid; gap: 8px; }
 .anomalyGrid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-.anomalyGrid a, .radarTable a { display: grid; gap: 4px; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: rgba(7,31,45,.72); color: var(--text); }
+.anomalyGrid a, .radarTable a { display: grid; gap: 4px; padding: 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); }
 .anomalyGrid span, .anomalyGrid small, .radarTable span, .radarTable small { color: var(--text-muted); }
-.anomalyGrid b, .radarTable b { color: #2c9cff; }
+.anomalyGrid b, .radarTable b { color: var(--blue); }
 .radarControls { align-items: end; margin: 10px 0; }
 .radarControls label { display: grid; gap: 4px; color: var(--text-muted); font-size: 10px; }
-.radarControls input, .radarControls select { min-height: 36px; width: 135px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: #071f2d; color: var(--text); }
+.radarControls input, .radarControls select { min-height: 36px; width: 135px; padding: 0 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); }
 .anomalyFilters { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 8px 0; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
 .anomalyFilters legend { padding: 0 6px; color: var(--text-muted); font-size: 11px; }
 .anomalyFilters label { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 12px; }
 .activeFilters { margin: 8px 0; }
-.activeFilters button { min-height: 32px; border-color: #2c9cff; background: rgba(44,156,255,.12); }
+.activeFilters button { min-height: 32px; border-color: var(--blue); background: rgba(44,156,255,.12); }
 .radarActions { margin: 10px 0; }
 .driverTitle { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .driverTitle i { padding: 3px 6px; border: 1px solid; border-radius: 999px; font-size: 9px; font-style: normal; }
-.statusAvailable { border-color: #20caa3 !important; color: #67e2c5 !important; }
+.statusAvailable { border-color: var(--border) !important; color: #67e2c5 !important; }
 .statusStale { border-color: #f6b94a !important; color: #f6c86d !important; }
 .statusUnavailable { border-color: #7894a8 !important; color: var(--text-muted) !important; }
 .radarTable { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }

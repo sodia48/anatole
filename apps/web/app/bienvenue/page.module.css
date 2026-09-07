@@ -45,7 +45,7 @@
   padding: 22px;
   border: 1px solid rgba(65, 121, 158, 0.35);
   border-radius: 20px;
-  background: rgba(6, 27, 41, 0.92);
+  background: var(--panel);
 }
 
 .steps strong {
@@ -71,7 +71,7 @@
   border: 1px solid rgba(85, 146, 184, 0.46);
   border-radius: 14px;
   color: #ecf6fb;
-  background: rgba(7, 29, 43, 0.94);
+  background: var(--panel);
   font-weight: 800;
 }
 

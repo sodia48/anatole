@@ -8,13 +8,13 @@ import {
 import {
   usePreferences,
 } from "@/components/providers/PreferencesProvider";
+import { AppearanceChooser } from "@/components/appearance/AppearanceChooser";
 import {
   pick,
 } from "@/lib/i18n";
 import type {
   AnatoleDensity,
   AnatoleLanguage,
-  AnatoleTheme,
   AnatoleTimeRange,
 } from "@/lib/preferences";
 
@@ -165,93 +165,11 @@ export function PreferencesForm() {
       </section>
 
       <section className="panel preference-card">
-        <div className="preference-heading">
-          <span className="eyebrow">
-            {pick(
-              language,
-              "APPARENCE",
-              "APPEARANCE",
-            )}
-          </span>
-          <h2>
-            {pick(
-              language,
-              "Thème Anatole",
-              "Anatole theme",
-            )}
-          </h2>
-          <p>
-            {pick(
-              language,
-              "Le mode sombre reste le thème principal. Le thème bleu accentue les surfaces et les repères.",
-              "Dark mode remains the primary theme. The blue theme emphasizes surfaces and financial markers.",
-            )}
-          </p>
-        </div>
-
-        <div className="choice-grid two-columns">
-          {(
-            [
-              "dark",
-              "blue",
-            ] as AnatoleTheme[]
-          ).map((theme) => (
-            <button
-              key={theme}
-              type="button"
-              className={`choice-card ${
-                preferences.theme === theme
-                  ? "is-selected"
-                  : ""
-              }`}
-              onClick={() =>
-                updatePreferences({
-                  theme,
-                })
-              }
-            >
-              <span
-                className={`theme-preview theme-preview-${theme}`}
-              >
-                <i />
-                <i />
-                <i />
-              </span>
-              <span>
-                <strong>
-                  {theme === "dark"
-                    ? pick(
-                        language,
-                        "Sombre",
-                        "Dark",
-                      )
-                    : pick(
-                        language,
-                        "Bleu",
-                        "Blue",
-                      )}
-                </strong>
-                <small>
-                  {theme === "dark"
-                    ? pick(
-                        language,
-                        "Contraste maximal",
-                        "Maximum contrast",
-                      )
-                    : pick(
-                        language,
-                        "Accent financier bleu",
-                        "Blue financial accent",
-                      )}
-                </small>
-              </span>
-              {preferences.theme ===
-              theme ? (
-                <Check size={17} />
-              ) : null}
-            </button>
-          ))}
-        </div>
+        <AppearanceChooser
+          language={language}
+          theme={preferences.theme}
+          onSelect={(theme) => updatePreferences({ theme })}
+        />
       </section>
 
       <section className="panel preference-card">

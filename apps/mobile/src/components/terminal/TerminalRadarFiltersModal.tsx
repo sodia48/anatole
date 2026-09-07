@@ -1,9 +1,10 @@
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import type { TerminalAnomalyType, TerminalRadarFilters } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const ANOMALIES: TerminalAnomalyType[] = ["volume_spike", "gap", "momentum_acceleration", "rsi_extreme", "sma_cross", "price_volume_divergence", "sector_dislocation", "score_shift"];
 const TRENDS = ["Haussière", "Mixte", "Baissière", "Indéterminée"];
@@ -28,6 +29,7 @@ function signalLabel(value: string, language: "fr" | "en"): string {
 type NumericKey = "score_min" | "score_max" | "momentum_20d_min" | "momentum_20d_max" | "relative_volume_min" | "rsi_min" | "rsi_max" | "change_percent_min" | "change_percent_max";
 
 function FilterChip({ active, label, onPress, testID }: { active: boolean; label: string; onPress: () => void; testID?: string }) {
+  useMobileTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.chip, active && styles.chipActive]} testID={testID}><Text style={styles.chipText}>{label}</Text></Pressable>;
 }
 
@@ -46,6 +48,7 @@ export function terminalFilterLabels(filters: TerminalRadarFilters, language: "f
 }
 
 export function TerminalRadarFiltersModal({ filters, sectors, visible, onChange, onClose, onReset }: { filters: TerminalRadarFilters; sectors: string[]; visible: boolean; onChange: (filters: TerminalRadarFilters) => void; onClose: () => void; onReset: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const numeric: { key: NumericKey; label: string }[] = [
     { key: "score_min", label: "Score min" }, { key: "score_max", label: "Score max" },
@@ -74,7 +77,7 @@ export function TerminalRadarFiltersModal({ filters, sectors, visible, onChange,
   </Modal>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background }, header: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }, title: { ...typography.title, color: colors.text }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, closeText: { fontSize: 30, color: colors.text },
   content: { gap: spacing.lg, padding: spacing.lg, paddingBottom: spacing.xl * 2 }, numberGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, field: { minWidth: "46%", flexGrow: 1, gap: spacing.xs }, label: { ...typography.caption, color: colors.textMuted }, input: { minHeight: 48, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised, color: colors.text }, section: { ...typography.section, color: colors.text }, wrap: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, chip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, backgroundColor: colors.surfaceRaised }, chipActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.2)" }, chipText: { ...typography.caption, color: colors.text }, footer: { flexDirection: "row", gap: spacing.sm }, primary: { minHeight: 48, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.primary }, secondary: { minHeight: 48, flex: 1, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md }, buttonText: { ...typography.label, color: colors.text },
-});
+}));

@@ -1,14 +1,17 @@
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import type { CalendarFiltersState, CalendarImportanceFilter, CalendarKindFilter, CalendarRange, CalendarRegionFilter } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function Chip({ label, selected, onPress, testID }: { label: string; selected: boolean; onPress: () => void; testID?: string }) {
+  useMobileTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, selected && styles.active]} testID={testID}><Text style={[styles.text, selected && styles.activeText]}>{label}</Text></Pressable>;
 }
 
 export function CalendarFilters({ filters, categories, sectors, hasPersonal, preferredRegions = [], onChange }: { filters: CalendarFiltersState; categories: readonly string[]; sectors: readonly string[]; hasPersonal: boolean; preferredRegions?: readonly string[]; onChange: (filters: CalendarFiltersState) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const ranges: { id: CalendarRange; label: string }[] = [{ id: "today", label: pick("Aujourd’hui", "Today") }, { id: "7d", label: pick("7 jours", "7 days") }, { id: "30d", label: pick("30 jours", "30 days") }];
   const kinds: { id: CalendarKindFilter; label: string }[] = [{ id: "all", label: pick("Tous", "All") }, { id: "economic", label: pick("Économie", "Economy") }, { id: "earnings", label: pick("Résultats", "Earnings") }];
@@ -33,4 +36,4 @@ export function CalendarFilters({ filters, categories, sectors, hasPersonal, pre
   </View>;
 }
 
-const styles = StyleSheet.create({ container: { gap: spacing.sm }, segment: { flexDirection: "row", gap: spacing.xs }, row: { gap: spacing.xs, paddingRight: spacing.lg }, chip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, text: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, activeText: { color: colors.text }, input: { minHeight: 48, paddingHorizontal: spacing.md, color: colors.text, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised } });
+const styles = createThemedStyles((colors) => ({ container: { gap: spacing.sm }, segment: { flexDirection: "row", gap: spacing.xs }, row: { gap: spacing.xs, paddingRight: spacing.lg }, chip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, text: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, activeText: { color: colors.text }, input: { minHeight: 48, paddingHorizontal: spacing.md, color: colors.text, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised } }));

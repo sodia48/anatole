@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
 import { GlobalSearchButton } from "@/src/components/search/GlobalSearchButton";
 import { MarketHeatmap } from "@/src/components/cockpit/MarketHeatmap";
@@ -14,7 +13,9 @@ import { marketApi } from "@/src/lib/api/market";
 import type { MarketTile } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const hubs = [
   { id: "cockpit", fr: "Cockpit", en: "Cockpit" },
@@ -38,6 +39,7 @@ function isHub(value?: string): value is Hub {
 }
 
 function ConstituentsModal({ visible, onClose, items }: { visible: boolean; onClose: () => void; items: MarketTile[] }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("all");
@@ -50,6 +52,7 @@ function ConstituentsModal({ visible, onClose, items }: { visible: boolean; onCl
 }
 
 function MarketsNavigation({ hub, onHub }: { hub: Hub; onHub: (hub: Hub) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const open = (value: Hub) => {
     if (value === "psychology") router.push("/psychology" as Href);
@@ -63,6 +66,7 @@ function MarketsNavigation({ hub, onHub }: { hub: Hub; onHub: (hub: Hub) => void
 }
 
 export default function MarketsScreen() {
+  useMobileTheme();
   const params = useLocalSearchParams<{ universe?: string | string[]; sector?: string | string[]; hub?: string | string[]; region?: string | string[]; category?: string | string[]; dateRange?: string | string[]; kind?: string | string[]; dayOffset?: string | string[]; ticker?: string | string[] }>();
   const { pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
@@ -114,9 +118,9 @@ export default function MarketsScreen() {
   </Screen>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   hubs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, hub: { minHeight: 44, flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, hubActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, hubText: { ...typography.caption, color: colors.textMuted, textAlign: "center" }, hubTextActive: { color: colors.text, fontWeight: "800" },
-  segment: { flexDirection: "row", padding: spacing.xs, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }, segmentButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, segmentActive: { backgroundColor: "#12588b" }, segmentText: { ...typography.label, color: colors.textMuted }, segmentTextActive: { color: colors.text },
+  segment: { flexDirection: "row", padding: spacing.xs, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }, segmentButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, segmentActive: { backgroundColor: colors.primarySurfaceStrong }, segmentText: { ...typography.label, color: colors.textMuted }, segmentTextActive: { color: colors.onPrimary },
   link: { minHeight: 44, justifyContent: "center" }, linkText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, breadth: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: spacing.md }, breadthValue: { ...typography.section, color: colors.text }, positive: { ...typography.caption, color: colors.positive }, negative: { ...typography.caption, color: colors.negative }, neutral: { ...typography.caption, color: colors.textMuted }, subhead: { ...typography.label, color: colors.primary, marginTop: spacing.sm, textTransform: "uppercase" }, coming: { ...typography.body, color: colors.textMuted },
   listSafe: { flex: 1, backgroundColor: colors.background }, listHeader: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }, listTitle: { ...typography.title, color: colors.text }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, closeText: { fontSize: 30, color: colors.text }, filters: { gap: spacing.sm, padding: spacing.lg }, filter: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, marginRight: spacing.xs, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border }, filterActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, filterText: { ...typography.caption, color: colors.text }, listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-});
+}));

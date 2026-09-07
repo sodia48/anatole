@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View } from "react-native";
-
+import { Text, View } from "react-native";
 import { Card, QueryState, uiStyles } from "@/src/components/ui";
 import type { FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
 import { moneyOrNd, percentOrNd, valueOrNd } from "./format";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type Metric = { key: keyof FundamentalMetrics; fr: string; en: string; format?: "money" | "percent" | "number" };
 const groups: { fr: string; en: string; items: Metric[] }[] = [
@@ -27,6 +28,7 @@ function display(value: number | null, format: Metric["format"], currency: strin
 }
 
 export function MobileFocusFundamentals({ snapshot, loading, error, onRetry }: { snapshot?: FundamentalSnapshot; loading: boolean; error: Error | null; onRetry: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const currency = snapshot?.financial_currency ?? snapshot?.currency ?? "CAD";
   return <View style={styles.stack} testID="focus-fundamentals-section"><QueryState error={!snapshot ? error : null} loading={loading} onRetry={onRetry} />{snapshot ? <>
@@ -35,4 +37,4 @@ export function MobileFocusFundamentals({ snapshot, loading, error, onRetry }: {
     <Card title={pick("Couverture et provenance", "Coverage and provenance")}><Text style={styles.status}>{snapshot.status.toUpperCase()} · {snapshot.official_coverage.status.toUpperCase()}</Text><Text style={styles.source}>{snapshot.source}</Text>{snapshot.official_coverage.message || snapshot.message ? <Text style={styles.source}>{snapshot.official_coverage.message ?? snapshot.message}</Text> : null}<Text style={styles.source}>{pick("Périodes officielles", "Official periods")}: {snapshot.official_coverage.official_periods} · {pick("Champs officiels", "Official fields")}: {snapshot.official_coverage.official_fields}</Text></Card>
   </> : null}</View>;
 }
-const styles = StyleSheet.create({ stack: { gap: spacing.md }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right", flexShrink: 1 }, status: { ...typography.label, color: colors.primary }, source: { ...typography.caption, color: colors.textMuted } });
+const styles = createThemedStyles((colors) => ({ stack: { gap: spacing.md }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right", flexShrink: 1 }, status: { ...typography.label, color: colors.primary }, source: { ...typography.caption, color: colors.textMuted } }));

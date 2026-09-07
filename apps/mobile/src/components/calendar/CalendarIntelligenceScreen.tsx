@@ -2,15 +2,14 @@ import { type Query, useQueries, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { AppState, StyleSheet, Text, View } from "react-native";
+import { AppState, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { QueryState, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import type { FeedStatus, ProvincialMacroSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { CalendarEventModal } from "./CalendarEventModal";
 import { CalendarFilters } from "./CalendarFilters";
 import { CalendarSourceHealth } from "./CalendarSourceHealth";
@@ -29,6 +28,8 @@ import {
   type CalendarRegionFilter,
   type EconomicCalendarItem,
 } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const DEFAULT_FILTERS: CalendarFiltersState = { range: "7d", kind: "all", importance: "all", region: "all", category: "all", sector: "all", scope: "all", ticker: "", dayOffset: null };
 const REGIONS = new Set<CalendarRegionFilter>(["all", "CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "prairies", "atlantic"]);
@@ -55,6 +56,7 @@ function uniqueStatuses(statuses: readonly FeedStatus[]): FeedStatus[] {
 }
 
 export function CalendarIntelligenceScreen({ header, initialRegion, initialCategory, initialDateRange, initialKind, initialDayOffset, initialTicker, referenceNow }: { header?: ReactNode; initialRegion?: string; initialCategory?: string; initialDateRange?: string; initialKind?: string; initialDayOffset?: string | number; initialTicker?: string; referenceNow?: Date }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const { workspace } = useMobileAccount();
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
@@ -156,4 +158,4 @@ export function CalendarIntelligenceScreen({ header, initialRegion, initialCateg
   return <SafeAreaView edges={["top"]} style={styles.safe} testID="calendar-intelligence-screen"><CalendarTimeline footer={<CalendarSourceHealth statuses={statuses} />} header={contentHeader} onOpen={open} onRefresh={refresh} onReset={reset} refreshing={(provinceMode ? provincialQueries.some((query) => query.isRefetching) : calendar.isRefetching) || earnings.isRefetching} sections={sections} /><CalendarEventModal item={selected} onClose={() => setSelected(null)} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.background }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, partial: { ...typography.caption, color: colors.textMuted }, major: { gap: spacing.xs, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface }, eyebrow: { ...typography.label, color: colors.primary, letterSpacing: 1 }, majorTitle: { ...typography.section, color: colors.text }, majorMeta: { ...typography.body, color: colors.textMuted } });
+const styles = createThemedStyles((colors) => ({ safe: { flex: 1, backgroundColor: colors.background }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, partial: { ...typography.caption, color: colors.textMuted }, major: { gap: spacing.xs, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: colors.surface }, eyebrow: { ...typography.label, color: colors.primary, letterSpacing: 1 }, majorTitle: { ...typography.section, color: colors.text }, majorMeta: { ...typography.body, color: colors.textMuted } }));
