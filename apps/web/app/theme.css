@@ -9,7 +9,7 @@
   --shadow: rgba(0, 0, 0, .22);
   --overlay: rgba(5, 13, 21, .72);
   --primary-surface: rgba(45, 118, 255, .14);
-  --interactive: var(--blue);
+  --interactive: #1777C5;
   --text-secondary: var(--muted);
   --accent-text: #85B6FF;
   --positive-text: #7CE2C4;
