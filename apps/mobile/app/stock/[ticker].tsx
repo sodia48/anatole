@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, InteractionManager, Pressable, StyleSheet, Text, View } from "react-native";
-
+import { AppState, InteractionManager, Pressable, Text, View } from "react-native";
 import { MobileFocusActions } from "@/src/components/focus/MobileFocusActions";
 import { MobileFocusAnalysts } from "@/src/components/focus/MobileFocusAnalysts";
 import { MobileFocusEcosystem } from "@/src/components/focus/MobileFocusEcosystem";
@@ -20,9 +19,12 @@ import { marketApi } from "@/src/lib/api/market";
 import { useLocale } from "@/src/lib/i18n";
 import { normalizeTicker } from "@/src/lib/ticker";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export default function StockDetailScreen() {
+  useMobileTheme();
   const params = useLocalSearchParams<{ ticker: string }>();
   const ticker = normalizeTicker(String(params.ticker ?? "RY"));
   const { language, pick } = useLocale();
@@ -69,4 +71,4 @@ export default function StockDetailScreen() {
     <Text style={styles.disclaimer}>{pick("Les données peuvent être différées. Information générale seulement; aucune recommandation de placement.", "Data may be delayed. General information only; not investment advice.")}</Text>
   </Screen>;
 }
-const styles = StyleSheet.create({ terminalLink: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, terminalLinkText: { ...typography.label, color: colors.primary }, periods: { flexDirection: "row", gap: spacing.xs }, period: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, periodActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" }, periodText: { ...typography.label, color: colors.textMuted }, periodTextActive: { color: colors.text }, proVisible: { width: "100%" }, proPreloaded: { position: "absolute", top: 0, left: -10_000, width: 1, height: 1, opacity: 0, overflow: "hidden" }, disclaimer: { ...typography.caption, color: colors.textSubtle, textAlign: "center", padding: spacing.lg } });
+const styles = createThemedStyles((colors) => ({ terminalLink: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, terminalLinkText: { ...typography.label, color: colors.primary }, periods: { flexDirection: "row", gap: spacing.xs }, period: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, periodActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" }, periodText: { ...typography.label, color: colors.textMuted }, periodTextActive: { color: colors.text }, proVisible: { width: "100%" }, proPreloaded: { position: "absolute", top: 0, left: -10_000, width: 1, height: 1, opacity: 0, overflow: "hidden" }, disclaimer: { ...typography.caption, color: colors.textSubtle, textAlign: "center", padding: spacing.lg } }));

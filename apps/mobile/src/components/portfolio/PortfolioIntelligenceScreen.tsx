@@ -1,15 +1,14 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { AppState, StyleSheet, Text } from "react-native";
-
+import { AppState, Text } from "react-native";
 import { Button, Card, QueryState, Screen, ScreenHeader } from "@/src/components/ui";
 import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
 import { workspaceApi } from "@/src/lib/api/workspace";
 import type { PortfolioPositionInput } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
 import { PortfolioAllocation } from "./PortfolioAllocation";
 import { PortfolioContribution } from "./PortfolioContribution";
 import { PortfolioCorrelation } from "./PortfolioCorrelation";
@@ -19,8 +18,11 @@ import { PortfolioPerformance } from "./PortfolioPerformance";
 import { PortfolioPositions } from "./PortfolioPositions";
 import { PortfolioRisk } from "./PortfolioRisk";
 import { PortfolioStressTests } from "./PortfolioStressTests";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function PortfolioIntelligenceScreen() {
+  useMobileTheme();
   const { state, workspace, saveWorkspace } = useMobileAccount();
   const { pick } = useLocale();
   const queryClient = useQueryClient();
@@ -49,4 +51,4 @@ export function PortfolioIntelligenceScreen() {
 }
 
 function normalizeSymbol(value: string) { return value.replace(/\.TO$/i, "").toUpperCase(); }
-const styles = StyleSheet.create({ muted: { ...typography.body, color: colors.textMuted }, empty: { ...typography.body, color: colors.textMuted, textAlign: "center", padding: spacing.lg }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, methodology: { ...typography.caption, color: colors.textSubtle, paddingBottom: spacing.xl } });
+const styles = createThemedStyles((colors) => ({ muted: { ...typography.body, color: colors.textMuted }, empty: { ...typography.body, color: colors.textMuted, textAlign: "center", padding: spacing.lg }, stale: { ...typography.caption, color: colors.warning, fontWeight: "800" }, methodology: { ...typography.caption, color: colors.textSubtle, paddingBottom: spacing.xl } }));

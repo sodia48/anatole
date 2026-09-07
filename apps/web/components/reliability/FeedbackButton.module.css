@@ -10,8 +10,8 @@
   padding: 0 15px;
   border: 1px solid rgba(92, 164, 221, 0.38);
   border-radius: 999px;
-  background: rgba(6, 22, 34, 0.92);
-  color: #dceaf4;
+  background: var(--panel);
+  color: var(--text);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
   font: inherit;
@@ -23,7 +23,7 @@
 .trigger:hover,
 .trigger:focus-visible {
   border-color: rgba(91, 160, 255, 0.8);
-  background: rgba(11, 43, 66, 0.98);
+  background: var(--panel);
   outline: none;
 }
 
@@ -34,7 +34,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(1, 8, 14, 0.78);
+  background: var(--panel);
   backdrop-filter: blur(14px);
 }
 
@@ -46,7 +46,7 @@
   padding: 28px;
   border: 1px solid rgba(80, 153, 207, 0.36);
   border-radius: 24px;
-  background: linear-gradient(180deg, #0b2232 0%, #071722 100%);
+  background: linear-gradient(180deg, #0b2232 0%, var(--input-bg) 100%);
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.58);
   color: #e9f2f8;
 }
@@ -73,7 +73,7 @@
   place-items: center;
   border: 1px solid rgba(103, 158, 198, 0.3);
   border-radius: 12px;
-  background: rgba(2, 16, 25, 0.66);
+  background: var(--panel);
   color: #bdcfdb;
   cursor: pointer;
 }
@@ -92,7 +92,7 @@
   width: 100%;
   border: 1px solid rgba(76, 139, 183, 0.42);
   border-radius: 14px;
-  background: #04131d;
+  background: var(--panel);
   color: #edf6fb;
   font: inherit;
 }
@@ -111,7 +111,7 @@
 
 .field select:focus,
 .field textarea:focus {
-  border-color: #5b9fff;
+  border-color: var(--blue);
   outline: 2px solid rgba(91, 159, 255, 0.2);
 }
 
@@ -129,7 +129,7 @@
   padding: 13px;
   border: 1px solid rgba(69, 127, 168, 0.3);
   border-radius: 14px;
-  background: rgba(3, 16, 25, 0.48);
+  background: var(--panel);
   cursor: pointer;
 }
 
@@ -137,7 +137,7 @@
   width: 18px;
   height: 18px;
   margin-top: 1px;
-  accent-color: #5b9fff;
+  accent-color: var(--blue);
 }
 
 .consent span {
@@ -187,7 +187,7 @@
 }
 
 .primary {
-  border: 1px solid #5b9fff;
+  border: 1px solid var(--blue);
   background: #246fcb;
   color: white;
 }

@@ -1,13 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { Card, QueryState } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import type { FocusSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { buildStockPsychology } from "./stockPsychology";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const labels: Record<string, [string, string]> = {
   momentum_20d: ["Momentum 20J", "20D momentum"], momentum_50d: ["Momentum 50J", "50D momentum"], rsi_14: ["RSI 14", "RSI 14"],
@@ -21,6 +22,7 @@ const metricLabel = (key: string, pick: (fr: string, en: string) => string) => {
 };
 
 export function MobileFocusInsights({ ticker, snapshot }: { ticker: string; snapshot: FocusSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const psychology = buildStockPsychology(snapshot);
   const screener = useQuery({ queryKey: ["focus-comparables", ticker], queryFn: ({ signal }) => marketApi.screener("composite", signal), staleTime: 5 * 60_000 });
@@ -36,4 +38,4 @@ export function MobileFocusInsights({ ticker, snapshot }: { ticker: string; snap
   </View>;
 }
 
-const styles = StyleSheet.create({ stack: { gap: spacing.md }, score: { ...typography.hero, color: colors.text }, coverage: { ...typography.caption, color: colors.primary }, row: { minHeight: 44, flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, label: { ...typography.body, color: colors.textMuted, flex: 1 }, value: { ...typography.body, color: colors.text, fontWeight: "800" }, note: { ...typography.caption, color: colors.textSubtle }, item: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, itemTitle: { ...typography.body, color: colors.text, fontWeight: "800" }, button: { minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm }, buttonText: { ...typography.label, color: colors.primary } });
+const styles = createThemedStyles((colors) => ({ stack: { gap: spacing.md }, score: { ...typography.hero, color: colors.text }, coverage: { ...typography.caption, color: colors.primary }, row: { minHeight: 44, flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, label: { ...typography.body, color: colors.textMuted, flex: 1 }, value: { ...typography.body, color: colors.text, fontWeight: "800" }, note: { ...typography.caption, color: colors.textSubtle }, item: { minHeight: 56, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, itemTitle: { ...typography.body, color: colors.text, fontWeight: "800" }, button: { minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.primary, borderRadius: radius.sm }, buttonText: { ...typography.label, color: colors.primary } }));

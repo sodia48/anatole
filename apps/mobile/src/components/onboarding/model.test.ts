@@ -1,14 +1,16 @@
 import type { SyncedWorkspaceData } from "@/src/lib/api/types";
 import { completeOnboarding, explicitOnboardingAlerts, ONBOARDING_VERSION, shouldShowOnboarding, skipOnboarding, type OnboardingDraft } from "./model";
+import { ONBOARDING_STEP_COUNT } from "./model";
 
 const workspace = (): SyncedWorkspaceData => ({
   watchlist: ["CNR"], portfolio: [], alerts: [],
   preferences: { theme: "dark", density: "comfortable", decimals: 2, default_range: "1y", default_universe: "tsx60", language: "fr" },
   cockpit_universe: "tsx60", comparator_symbols: [], focus_layouts: [], focus_scripts: [], terminal_presets: [],
 });
-const draft = (templates: OnboardingDraft["alertTemplates"] = []): OnboardingDraft => ({ language: "en", universe: "composite", symbols: ["RY", "TD", "BMO"], sectors: ["Financials"], regions: ["QC", "CA"], alertTemplates: templates });
+const draft = (templates: OnboardingDraft["alertTemplates"] = []): OnboardingDraft => ({ language: "en", theme: "blue", universe: "composite", symbols: ["RY", "TD", "BMO"], sectors: ["Financials"], regions: ["QC", "CA"], alertTemplates: templates });
 
 it("appears on first launch and not after versioned completion", () => {
+  expect(ONBOARDING_STEP_COUNT).toBe(8);
   expect(shouldShowOnboarding()).toBe(true);
   expect(shouldShowOnboarding(1)).toBe(true);
   expect(shouldShowOnboarding(ONBOARDING_VERSION)).toBe(false);
@@ -18,7 +20,7 @@ it("persists language, universe, watchlist, sectors and regions", () => {
   const result = completeOnboarding(workspace(), draft());
   expect(result.watchlist).toEqual(["CNR", "RY", "TD", "BMO"]);
   expect(result.cockpit_universe).toBe("composite");
-  expect(result.preferences).toEqual(expect.objectContaining({ language: "en", default_universe: "composite", preferred_sectors: ["Financials"], preferred_regions: ["QC", "CA"], onboarding_version: 2 }));
+  expect(result.preferences).toEqual(expect.objectContaining({ theme: "blue", language: "en", default_universe: "composite", preferred_sectors: ["Financials"], preferred_regions: ["QC", "CA"], onboarding_version: 2 }));
 });
 
 it("creates optional alerts only after explicit selection", () => {

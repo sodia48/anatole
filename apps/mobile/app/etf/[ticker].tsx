@@ -3,7 +3,6 @@ import { calculateEtfXRay } from "@anatole/shared/etf-xray";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { ChartWebView } from "@/src/components/ChartWebView";
 import { EtfRiskPanel, EtfXRay } from "@/src/components/etf/EtfXRay";
 import { compactNumberOrNd, moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
@@ -13,6 +12,8 @@ import type { EtfHistoryRange, EtfHoldingDriver } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const ranges: { key: EtfHistoryRange; label: string }[] = [
   { key: "5d", label: "1S" },
@@ -26,6 +27,7 @@ const ranges: { key: EtfHistoryRange; label: string }[] = [
 type DetailSection = "overview" | "xray" | "holdings" | "risk";
 
 function Holding({ item }: { item: EtfHoldingDriver }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   return <Pressable
     accessibilityLabel={`${pick("Ouvrir Focus", "Open Focus")} ${item.display_symbol}`}
@@ -41,6 +43,7 @@ function Holding({ item }: { item: EtfHoldingDriver }) {
 }
 
 export default function EtfDetailScreen() {
+  useMobileTheme();
   const params = useLocalSearchParams<{ ticker?: string | string[] }>();
   const rawTicker = Array.isArray(params.ticker) ? params.ticker[0] : params.ticker;
   const ticker = (rawTicker ?? "").trim().toUpperCase();
@@ -113,7 +116,7 @@ export default function EtfDetailScreen() {
   </Screen>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   star: { width: 48, height: 48, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
   starText: { fontSize: 26, color: colors.primary },
   stale: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm },
@@ -130,7 +133,7 @@ const styles = StyleSheet.create({
   periodStats: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm },
   sectionTabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, padding: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface },
   sectionTab: { minWidth: 70, minHeight: 44, flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm },
-  sectionTabActive: { backgroundColor: "#12588b" }, sectionTabText: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, sectionTabTextActive: { color: colors.text },
+  sectionTabActive: { backgroundColor: colors.primarySurfaceStrong }, sectionTabText: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, sectionTabTextActive: { color: colors.onPrimary },
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.lg },
   sectionNote: { ...typography.caption, color: colors.textMuted },
   holding: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
@@ -144,4 +147,4 @@ const styles = StyleSheet.create({
   itemValue: { ...typography.label, color: colors.text },
   contributor: { minHeight: 58, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   contribution: { ...typography.label },
-});
+}));

@@ -1,10 +1,11 @@
 import type { ReactElement } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
-
+import { FlatList, Pressable, Text, View } from "react-native";
 import { NewsCard } from "@/src/components/market";
 import type { NewsItem, StockNewsItem } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export type NewsFeedEntry = { id: string; item: NewsItem | StockNewsItem; ticker?: string };
 
@@ -17,6 +18,7 @@ export function NewsFeed({ entries, header, footer, refreshing, onRefresh, onRes
   onReset: () => void;
   onTicker: (ticker: string) => void;
 }) {
+  useMobileTheme();
   const { pick } = useLocale();
   return <FlatList
     contentContainerStyle={styles.content}
@@ -36,4 +38,4 @@ export function NewsFeed({ entries, header, footer, refreshing, onRefresh, onRes
   />;
 }
 
-const styles = StyleSheet.create({ content: { padding: spacing.lg, paddingBottom: 120, backgroundColor: colors.background, flexGrow: 1 }, header: { gap: spacing.md, marginBottom: spacing.sm }, card: { paddingHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg }, emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }, reset: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong }, resetText: { ...typography.label, color: colors.primary } });
+const styles = createThemedStyles((colors) => ({ content: { padding: spacing.lg, paddingBottom: 120, backgroundColor: colors.background, flexGrow: 1 }, header: { gap: spacing.md, marginBottom: spacing.sm }, card: { paddingHorizontal: spacing.md, marginBottom: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg }, emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }, reset: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong }, resetText: { ...typography.label, color: colors.primary } }));

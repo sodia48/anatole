@@ -1,28 +1,13 @@
-import {
-  binaryTreemap,
-  groupHeatmapTiles,
-  heatmapTileDetailLevel,
-  layoutTileWeight,
-  normalizeHeatmapTile,
-  type HeatmapGroupingMode,
-  type HeatmapGroup,
-  type HeatmapRect,
-  type NormalizedHeatmapTile,
-} from "@anatole/shared/heatmap";
+import { binaryTreemap, groupHeatmapTiles, heatmapTileDetailLevel, layoutTileWeight, normalizeHeatmapTile, type HeatmapGroupingMode, type HeatmapGroup, type HeatmapRect, type NormalizedHeatmapTile, } from "@anatole/shared/heatmap";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+  Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
 import Svg, { G, Rect, Text as SvgText } from "react-native-svg";
-
 import type { MarketTile } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type TileLayout = { tile: NormalizedHeatmapTile; rect: HeatmapRect; group: HeatmapGroup };
 
@@ -81,6 +66,7 @@ export function MarketHeatmap({
   initialSector?: string | null;
   onOpenSector?: (sector: string) => void;
 }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const window = useWindowDimensions();
   const [width, setWidth] = useState(Math.max(320, window.width - spacing.lg * 2));
@@ -184,7 +170,7 @@ export function MarketHeatmap({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   toolbar: { flexDirection: "row", gap: spacing.xs, marginBottom: spacing.sm },
   mode: { minHeight: 44, minWidth: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   modeActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
@@ -200,4 +186,4 @@ const styles = StyleSheet.create({
   actionSecondary: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong },
   actionText: { ...typography.label, color: colors.text },
   fullscreen: { flex: 1, backgroundColor: colors.background }, close: { minHeight: 56, alignItems: "flex-end", justifyContent: "center", paddingHorizontal: spacing.lg }, fullscreenMap: { flex: 1, alignItems: "center", justifyContent: "center" },
-});
+}));

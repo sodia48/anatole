@@ -6,6 +6,7 @@ import type {
 
 import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
 import { AccountProvider } from "@/components/providers/AccountProvider";
+import { AppearanceChoiceModal } from "@/components/appearance/AppearanceChoiceModal";
 
 /**
  * Point unique pour les contextes globaux d’Anatole.
@@ -23,6 +24,7 @@ export function AppProviders({
     <PreferencesProvider>
       <AccountProvider>
         {children}
+        <AppearanceChoiceModal />
       </AccountProvider>
     </PreferencesProvider>
   );

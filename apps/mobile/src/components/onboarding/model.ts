@@ -1,9 +1,10 @@
 import type { AlertRule, SyncedWorkspaceData } from "@/src/lib/api/types";
-
 export const ONBOARDING_VERSION = 2;
+export const ONBOARDING_STEP_COUNT = 8;
 
 export type OnboardingDraft = {
   language: "fr" | "en";
+  theme: "dark" | "blue";
   universe: "tsx60" | "composite";
   symbols: string[];
   sectors: string[];
@@ -38,6 +39,7 @@ export function completeOnboarding(current: SyncedWorkspaceData, draft: Onboardi
     cockpit_universe: draft.universe,
     preferences: {
       ...current.preferences,
+      theme: draft.theme,
       language: draft.language,
       default_universe: draft.universe,
       preferred_regions: draft.regions,

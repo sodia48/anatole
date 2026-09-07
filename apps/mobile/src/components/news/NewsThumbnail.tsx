@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
-
+import { Image, Text, View } from "react-native";
 import { safeWebUrl } from "@/src/lib/article";
-import { colors, radius, typography } from "@/src/theme/tokens";
+import { radius, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type ThumbnailSize = "compact" | "card" | "hero";
 
@@ -18,6 +19,7 @@ export function NewsThumbnail({ imageUrl, source, size = "card", testID = "news-
   size?: ThumbnailSize;
   testID?: string;
 }) {
+  useMobileTheme();
   const uri = safeWebUrl(imageUrl);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const initials = useMemo(() => sourceInitials(source), [source]);
@@ -41,7 +43,7 @@ export function NewsThumbnail({ imageUrl, source, size = "card", testID = "news-
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   base: { flexShrink: 0, overflow: "hidden", borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
   compact: { width: 88, height: 72 },
   card: { width: 104, height: 92 },
@@ -50,4 +52,4 @@ const styles = StyleSheet.create({
   initials: { ...typography.section, color: colors.primary, fontWeight: "800" },
   heroInitials: { fontSize: 32, lineHeight: 38 },
   fallbackLabel: { ...typography.caption, color: colors.textSubtle, fontSize: 9, fontWeight: "800" },
-});
+}));

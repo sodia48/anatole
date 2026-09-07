@@ -1,5 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { NewsCard } from "@/src/components/market";
 import { Card } from "@/src/components/ui";
@@ -7,8 +6,11 @@ import type { AlertSnapshot, PortfolioSnapshot, StockNewsItem, TerminalSnapshot,
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { selectPersonalMovers, type TodayTarget } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function Stat({ label, value }: { label: string; value: string }) {
+  useMobileTheme();
   return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
 }
 
@@ -38,6 +40,7 @@ export function TodayPersonalBrief({
   onOpen: (target: TodayTarget) => void;
   onPersonalize: () => void;
 }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const movers = selectPersonalMovers(watchlist);
   const topSector = [...(portfolio?.sector_allocation ?? [])].sort((left, right) => right.weight_percent - left.weight_percent)[0];
@@ -64,6 +67,6 @@ export function TodayPersonalBrief({
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   cta: { minHeight: 96, justifyContent: "center", gap: spacing.xs, padding: spacing.md, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, backgroundColor: "rgba(44,156,255,.1)" }, ctaTitle: { ...typography.section, color: colors.text }, copy: { ...typography.caption, color: colors.textMuted }, stale: { ...typography.caption, color: colors.warning }, block: { gap: spacing.sm }, heading: { ...typography.label, color: colors.primary, textTransform: "uppercase" }, mover: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, symbol: { ...typography.label, color: colors.text }, right: { alignItems: "flex-end" }, price: { ...typography.label, color: colors.text }, grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, stat: { minWidth: "46%", flexGrow: 1, minHeight: 64, justifyContent: "center", gap: 2, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, statValue: { ...typography.label, color: colors.text }, statLabel: { ...typography.caption, color: colors.textMuted }, alert: { minHeight: 58, justifyContent: "center", gap: 2, padding: spacing.sm, borderLeftWidth: 3, borderLeftColor: colors.warning, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
-});
+}));

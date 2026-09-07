@@ -1,13 +1,15 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { valueOrNd } from "@/src/components/focus/format";
 import { Card, QueryState } from "@/src/components/ui";
 import type { TerminalMarketDriver } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { driverMove, driverRelationship, selectTodayDrivers } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function TodayDrivers({ drivers, stale, loading, onOpenTerminal }: { drivers: readonly TerminalMarketDriver[]; stale: boolean; loading: boolean; onOpenTerminal: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const selected = selectTodayDrivers(drivers);
   const status = (value: TerminalMarketDriver["status"]) => value === "available" ? pick("À jour", "Up to date") : value === "stale" ? pick("Dernières données", "Latest available") : pick("Indisponible", "Unavailable");
@@ -25,6 +27,6 @@ export function TodayDrivers({ drivers, stale, loading, onOpenTerminal }: { driv
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   link: { minHeight: 44, justifyContent: "center" }, linkText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, stale: { ...typography.caption, color: colors.warning }, driver: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, top: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.sm }, identity: { flex: 1 }, name: { ...typography.section, color: colors.text }, category: { ...typography.caption, color: colors.textMuted }, status: { ...typography.caption, color: colors.positive }, statusStale: { color: colors.warning }, values: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: spacing.md }, value: { ...typography.section, color: colors.text }, move: { ...typography.label }, relationship: { ...typography.caption, color: colors.textMuted }, empty: { minHeight: 88, justifyContent: "center", gap: spacing.xs }, emptyTitle: { ...typography.section, color: colors.text }, emptyText: { ...typography.body, color: colors.textMuted },
-});
+}));

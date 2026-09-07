@@ -1,13 +1,15 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { Card, QueryState } from "@/src/components/ui";
 import type { CockpitSnapshot, PsychologySnapshot, TerminalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { buildTodayMarketReading, classifyTrailingSector, latestCockpitQuoteTime, type TodayUniverse } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function Metric({ label, value, onPress, testID }: { label: string; value: string; onPress?: () => void; testID?: string }) {
+  useMobileTheme();
   const content = <><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></>;
   return onPress
     ? <Pressable accessibilityRole="button" onPress={onPress} style={styles.metric} testID={testID}>{content}</Pressable>
@@ -47,6 +49,7 @@ export function TodayMarketBrief({
   onTerminal: () => void;
   onPsychology: () => void;
 }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const reading = buildTodayMarketReading({ cockpit, terminal, psychology, universe, language });
   const sectors = [...(cockpit?.sectors ?? [])].sort((left, right) => right.change_percent - left.change_percent);
@@ -82,8 +85,8 @@ export function TodayMarketBrief({
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   stack: { gap: spacing.md }, segment: { flexDirection: "row", padding: spacing.xs, borderRadius: radius.md, backgroundColor: colors.surfaceRaised }, segmentButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, segmentActive: { backgroundColor: "rgba(44,156,255,.25)", borderWidth: 1, borderColor: colors.primary }, segmentText: { ...typography.label, color: colors.textMuted }, segmentTextActive: { color: colors.text },
   hero: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md }, marketName: { ...typography.section, color: colors.text }, asOf: { ...typography.caption, color: colors.textMuted }, change: { ...typography.title }, grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, metric: { minWidth: "46%", flexGrow: 1, minHeight: 66, justifyContent: "center", gap: 2, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, metricValue: { ...typography.label, color: colors.text }, metricLabel: { ...typography.caption, color: colors.textMuted },
   readingHeadline: { ...typography.section, color: colors.text }, readingDetail: { ...typography.body, color: colors.textMuted }, disclaimer: { ...typography.caption, color: colors.textSubtle }, positive: { color: colors.positive }, negative: { color: colors.negative },
-});
+}));

@@ -3,7 +3,7 @@
 .hero h1, .stateCard h1 { margin: 6px 0 8px; font-size: clamp(1.6rem, 3vw, 2.45rem); }
 .hero p, .stateCard p { margin: 0; color: var(--muted); max-width: 720px; line-height: 1.6; }
 .eyebrow, .panelHeading span { color: #5c98ff; font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
-.unread { display: grid; min-width: 116px; place-items: center; padding: 16px; border: 1px solid rgba(86, 154, 255, .38); border-radius: 16px; background: rgba(5, 15, 28, .64); }
+.unread { display: grid; min-width: 116px; place-items: center; padding: 16px; border: 1px solid rgba(86, 154, 255, .38); border-radius: 16px; background: var(--panel); }
 .unread strong { font-size: 1.8rem; }
 .unread span { color: var(--muted); font-size: .78rem; }
 .actions, .digestActions, .itemActions { display: flex; flex-wrap: wrap; gap: 9px; }

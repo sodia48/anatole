@@ -87,7 +87,7 @@
   padding: 15px;
   border: 1px solid rgba(76, 165, 219, 0.22);
   border-radius: 17px;
-  background: rgba(5, 24, 37, 0.86);
+  background: var(--panel);
 }
 
 .topline {
@@ -176,7 +176,7 @@
 .warning {
   padding: 14px;
   border-radius: 14px;
-  background: rgba(4, 20, 31, 0.76);
+  background: var(--panel);
   color: #a9cadb;
   font-size: 13px;
 }

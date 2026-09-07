@@ -1,11 +1,13 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, Text, View } from "react-native";
 import { Card } from "@/src/components/ui";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import type { TodayAttentionItem, TodayTarget } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function TodayAttention({ items, stale, onOpen }: { items: readonly TodayAttentionItem[]; stale: boolean; onOpen: (target: TodayTarget) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   return <Card title={pick("5 CHOSES À SURVEILLER", "5 THINGS TO WATCH")} testID="today-attention">
     {stale ? <Text style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
@@ -16,6 +18,6 @@ export function TodayAttention({ items, stale, onOpen }: { items: readonly Today
   </Card>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   stale: { ...typography.caption, color: colors.warning }, item: { minHeight: 72, flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, pressed: { opacity: 0.72 }, marker: { width: 4, alignSelf: "stretch", borderRadius: radius.pill, backgroundColor: colors.textMuted }, markerPositive: { backgroundColor: colors.positive }, markerNegative: { backgroundColor: colors.negative }, markerWatch: { backgroundColor: colors.warning }, copy: { flex: 1, minWidth: 0, gap: 2 }, title: { ...typography.label, color: colors.text }, detail: { ...typography.caption, color: colors.textMuted }, badge: { ...typography.caption, color: colors.primary }, arrow: { fontSize: 24, color: colors.primary }, empty: { minHeight: 80, justifyContent: "center", gap: spacing.xs },
-});
+}));

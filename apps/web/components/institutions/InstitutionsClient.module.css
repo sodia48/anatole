@@ -5,7 +5,7 @@
   display: grid;
   gap: 16px;
   padding: 18px 22px 44px;
-  color: #eef7ff;
+  color: var(--text);
 }
 
 .hero,
@@ -18,7 +18,7 @@
 .holdingsPanel,
 .loading,
 .failure {
-  border: 1px solid #183f56;
+  border: 1px solid var(--border);
   background: linear-gradient(145deg, rgba(11, 35, 51, 0.97), rgba(6, 23, 35, 0.97));
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.18);
 }
@@ -50,7 +50,7 @@
 
 .eyebrow {
   display: block;
-  color: #6e9fff;
+  color: var(--blue);
   font-size: 10px;
   font-weight: 850;
   letter-spacing: 0.16em;
@@ -92,7 +92,7 @@
 
 .heroAside small {
   margin-top: 18px;
-  color: #6e9fff;
+  color: var(--blue);
   font-weight: 700;
 }
 
@@ -128,7 +128,7 @@
   padding: 14px 16px;
   border-color: rgba(110, 159, 255, 0.35);
   border-radius: 14px;
-  background: rgba(45, 118, 255, 0.08);
+  background: var(--primary-surface);
   color: #a9c3d5;
   font-size: 12px;
   line-height: 1.55;
@@ -136,7 +136,7 @@
 
 .disclosure svg {
   flex: 0 0 auto;
-  color: #6e9fff;
+  color: var(--blue);
   margin-top: 2px;
 }
 
@@ -184,7 +184,7 @@
 .sectionHeading p,
 .sources p {
   margin: 7px 0 0;
-  color: #819fb3;
+  color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -193,7 +193,7 @@
 .filters > label > span {
   display: block;
   margin-bottom: 6px;
-  color: #819fb3;
+  color: var(--muted);
   font-size: 10px;
   font-weight: 750;
   text-transform: uppercase;
@@ -208,9 +208,9 @@
   align-items: center;
   gap: 9px;
   padding-left: 13px;
-  border: 1px solid #1e4b65;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #061722;
+  background: var(--input-bg);
 }
 
 .activity input,
@@ -220,7 +220,7 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #eef7ff;
+  color: var(--text);
 }
 
 .activity button,
@@ -229,7 +229,7 @@
 .failure a {
   border: 0;
   border-radius: 10px;
-  background: #2d76ff;
+  background: var(--blue);
   color: white;
   padding: 10px 14px;
   cursor: pointer;
@@ -279,7 +279,7 @@
 
 .activityTitle span,
 .cardHeading span {
-  color: #819fb3;
+  color: var(--muted);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
@@ -304,12 +304,12 @@
   padding: 11px;
   border: 1px solid rgba(30, 75, 101, 0.62);
   border-radius: 10px;
-  background: rgba(4, 18, 28, 0.7);
+  background: var(--panel);
 }
 
 .activityResult dt,
 .cardStats dt {
-  color: #819fb3;
+  color: var(--muted);
   font-size: 10px;
 }
 
@@ -326,9 +326,9 @@
 .emptyInline {
   margin: 14px 0 0;
   padding: 18px;
-  border: 1px dashed #28546d;
+  border: 1px dashed var(--border);
   border-radius: 12px;
-  color: #8ca8ba;
+  color: var(--muted);
   text-align: center;
 }
 
@@ -378,9 +378,9 @@
 .filters select {
   width: 100%;
   height: 44px;
-  border: 1px solid #1e4b65;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #061722;
+  background: var(--input-bg);
   color: #d9ebf8;
   padding: 0 11px;
 }
@@ -439,7 +439,7 @@
 
 .institutionLink svg {
   flex: 0 0 auto;
-  color: #6e9fff;
+  color: var(--blue);
 }
 
 .institutionLink span {
@@ -480,10 +480,10 @@
 .tabList button,
 .holdingTabs button {
   flex: 0 0 auto;
-  border: 1px solid #1c455d;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: transparent;
-  color: #819fb3;
+  color: var(--muted);
   padding: 7px 9px;
   font-size: 10px;
   cursor: pointer;
@@ -571,7 +571,7 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  border: 1px solid #1c455d;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 10px;
   color: #a8c2d4;
@@ -652,7 +652,7 @@
 }
 
 .holdingsPanel .sectionHeading > strong {
-  color: #6e9fff;
+  color: var(--blue);
   font-size: 30px;
 }
 
@@ -668,7 +668,7 @@
 .optionBadge {
   display: inline-flex;
   width: fit-content;
-  border: 1px solid #2a5068;
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 5px 7px;
   color: #99b1c0;
@@ -729,7 +729,7 @@
 .spinner {
   width: 19px;
   height: 19px;
-  border: 2px solid #28506a;
+  border: 2px solid var(--border);
   border-top-color: #5b91ff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -845,7 +845,7 @@
     padding: 14px;
     border: 1px solid rgba(30, 75, 101, 0.68);
     border-radius: 13px;
-    background: rgba(4, 18, 28, 0.65);
+    background: var(--panel);
   }
 
   .cardHeading strong {
@@ -857,7 +857,7 @@
     gap: 5px;
   }
 
-  .cardValue span { color: #819fb3; font-size: 10px; }
+  .cardValue span { color: var(--muted); font-size: 10px; }
   .cardValue strong { font-size: 22px; }
 
   .cardStats {
@@ -871,7 +871,7 @@
     min-width: 0;
     padding: 9px;
     border-radius: 9px;
-    background: rgba(17, 45, 62, 0.52);
+    background: var(--panel);
   }
 
   .cardStats dd { overflow-wrap: anywhere; }

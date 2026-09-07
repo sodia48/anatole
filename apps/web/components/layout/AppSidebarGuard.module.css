@@ -17,7 +17,7 @@
   place-items: start center;
   padding: clamp(72px, 12vh, 130px) 20px 24px;
   overflow-y: auto;
-  background: rgba(0, 5, 10, .76);
+  background: var(--panel);
   backdrop-filter: blur(12px) saturate(1.08);
   -webkit-backdrop-filter: blur(12px) saturate(1.08);
 }
@@ -64,7 +64,7 @@
 
 .searchHeader h2 {
   margin: 6px 0 0;
-  color: #edf7fd;
+  color: var(--text);
   font-size: clamp(21px, 4vw, 28px);
   line-height: 1.08;
   letter-spacing: -.025em;
@@ -79,7 +79,7 @@
   padding: 0;
   border: 1px solid rgba(62, 108, 135, .72);
   border-radius: 12px;
-  background: rgba(10, 32, 46, .94);
+  background: var(--panel);
   color: #dfeef7;
   cursor: pointer;
 }
@@ -94,7 +94,7 @@
   gap: 10px;
   border: 1px solid rgba(61, 111, 140, .82);
   border-radius: 15px;
-  background: rgba(3, 15, 24, .88);
+  background: var(--panel);
   color: #7da2b8;
   box-shadow: 0 0 0 3px rgba(45, 118, 255, .06);
 }
@@ -129,7 +129,7 @@
   padding: 4px 7px;
   border: 1px solid rgba(67, 110, 135, .58);
   border-radius: 7px;
-  color: #6f93a9;
+  color: var(--muted);
   font-size: 9px;
   font-family: inherit;
 }
@@ -178,7 +178,7 @@
   place-items: center;
   border: 1px solid rgba(61, 112, 141, .55);
   border-radius: 11px;
-  background: rgba(8, 30, 44, .88);
+  background: var(--panel);
   color: #8cc5ef;
 }
 
@@ -190,7 +190,7 @@
 
 .searchResult strong {
   overflow: hidden;
-  color: #edf7fd;
+  color: var(--text);
   font-size: 13px;
   line-height: 1.2;
   text-overflow: ellipsis;

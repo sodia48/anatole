@@ -3,13 +3,15 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
-
 import { NewsThumbnail } from "@/src/components/news/NewsThumbnail";
 import { isExternalScheme, parseArticleParams, safeWebUrl } from "@/src/lib/article";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function ArticleReaderScreen() {
+  useMobileTheme();
   const rawParams = useLocalSearchParams();
   const { language, pick } = useLocale();
   const article = useMemo(() => parseArticleParams(rawParams), [rawParams]);
@@ -81,7 +83,7 @@ export function ArticleReaderScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background },
   topbar: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
   iconButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.pill },
@@ -103,4 +105,4 @@ const styles = StyleSheet.create({
   webFallback: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
   externalButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong },
   externalText: { ...typography.label, color: colors.primary },
-});
+}));

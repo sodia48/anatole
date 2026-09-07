@@ -1,10 +1,11 @@
 import { binaryTreemap, heatmapTileDetailLevel } from "@anatole/shared/heatmap";
 import { useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import Svg, { G, Rect, Text as SvgText } from "react-native-svg";
-
 import type { EtfHoldingDriver } from "@/src/lib/api/types";
-import { colors, radius } from "@/src/theme/tokens";
+import { radius } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function fill(change: number | null): string {
   if (change === null || !Number.isFinite(change)) return "#334655";
@@ -15,6 +16,7 @@ function fill(change: number | null): string {
 }
 
 export function EtfHoldingsHeatmap({ holdings, height = 230, onOpen }: { holdings: EtfHoldingDriver[]; height?: number; onOpen: (ticker: string) => void }) {
+  useMobileTheme();
   const [width, setWidth] = useState(320);
   const visible = holdings.filter((holding) => holding.weight_percent > 0);
   const layout = binaryTreemap(visible.map((holding) => ({ item: holding, weight: holding.weight_percent })), { x: 0, y: 0, width, height });
@@ -35,6 +37,6 @@ export function EtfHoldingsHeatmap({ holdings, height = 230, onOpen }: { holding
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   canvas: { width: "100%", overflow: "hidden", borderRadius: radius.sm, backgroundColor: colors.background },
-});
+}));

@@ -1,12 +1,14 @@
 import { StyleSheet, Text, View } from "react-native";
-
 import { Card, QueryState, uiStyles } from "@/src/components/ui";
 import type { FundamentalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, spacing, typography } from "@/src/theme/tokens";
+import { spacing, typography } from "@/src/theme/tokens";
 import { moneyOrNd, percentOrNd, valueOrNd } from "./format";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function MobileFocusAnalysts({ snapshot, loading, error, onRetry }: { snapshot?: FundamentalSnapshot; loading: boolean; error: Error | null; onRetry: () => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const a = snapshot?.analysts;
   const currency = snapshot?.currency ?? "CAD";
@@ -18,4 +20,4 @@ export function MobileFocusAnalysts({ snapshot, loading, error, onRetry }: { sna
     <Card title={pick("Événements", "Events")}><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Résultats", "Earnings")}</Text><Text style={styles.value}>{snapshot.events.earnings_dates[0] ? new Date(snapshot.events.earnings_dates[0]).toLocaleDateString(language === "fr" ? "fr-CA" : "en-CA") : "N/D"}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>Ex-dividende</Text><Text style={styles.value}>{snapshot.events.ex_dividend_date ? new Date(snapshot.events.ex_dividend_date).toLocaleDateString(language === "fr" ? "fr-CA" : "en-CA") : "N/D"}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Dividende", "Dividend")}</Text><Text style={styles.value}>{snapshot.events.dividend_date ? new Date(snapshot.events.dividend_date).toLocaleDateString(language === "fr" ? "fr-CA" : "en-CA") : "N/D"}</Text></View></Card>
   </> : null}</View>;
 }
-const styles = StyleSheet.create({ stack: { gap: spacing.md }, recommendation: { ...typography.title, color: colors.primary }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right" }, ratings: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, rating: { flexGrow: 1, minWidth: "28%", padding: spacing.sm, borderWidth: 1, borderColor: colors.border, alignItems: "center" }, ratingValue: { ...typography.section, color: colors.text }, ratingLabel: { ...typography.caption, color: colors.textMuted }, block: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, blockTitle: { ...typography.label, color: colors.text }, line: { ...typography.caption, color: colors.textMuted } });
+const styles = createThemedStyles((colors) => ({ stack: { gap: spacing.md }, recommendation: { ...typography.title, color: colors.primary }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right" }, ratings: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, rating: { flexGrow: 1, minWidth: "28%", padding: spacing.sm, borderWidth: 1, borderColor: colors.border, alignItems: "center" }, ratingValue: { ...typography.section, color: colors.text }, ratingLabel: { ...typography.caption, color: colors.textMuted }, block: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, blockTitle: { ...typography.label, color: colors.text }, line: { ...typography.caption, color: colors.textMuted } }));

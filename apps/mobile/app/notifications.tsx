@@ -1,17 +1,19 @@
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useQuery } from "@tanstack/react-query";
 import { router, type Href } from "expo-router";
-import { Pressable, RefreshControl, StyleSheet, Text, View, FlatList } from "react-native";
+import { Pressable, RefreshControl, Text, View, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { Button, Card, QueryState, Screen, ScreenHeader } from "@/src/components/ui";
 import { notificationApi } from "@/src/lib/api/notifications";
 import type { NotificationItem } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export default function NotificationsScreen() {
+  useMobileTheme();
   const { state } = useMobileAccount(); const { language, pick } = useLocale(); const network = useNetInfo();
   const query = useQuery({ queryKey: ["notifications"], queryFn: notificationApi.feed, enabled: state === "authenticated" });
   async function open(item: NotificationItem) { if (!item.read_at) await notificationApi.markRead(item.id); await query.refetch(); if (item.symbol) router.push({ pathname: "/focus/[ticker]", params: { ticker: item.symbol } }); else if (item.route?.startsWith("/")) router.push(item.route as Href); }
@@ -32,9 +34,9 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background }, list: { flexGrow: 1, padding: spacing.lg, paddingBottom: 80, gap: spacing.sm, backgroundColor: colors.background }, headerStack: { gap: spacing.md, marginBottom: spacing.md },
   muted: { ...typography.body, color: colors.textMuted }, link: { ...typography.label, color: colors.primary, minHeight: 44, textAlignVertical: "center" }, offline: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: "rgba(246,185,74,0.1)", textAlign: "center" },
   item: { minHeight: 80, flexDirection: "row", gap: spacing.md, padding: spacing.md, opacity: 0.72, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, unread: { opacity: 1, borderColor: colors.borderStrong, backgroundColor: "rgba(44,156,255,0.08)" },
   dot: { width: 8, height: 8, borderRadius: radius.pill, marginTop: 7 }, title: { ...typography.body, color: colors.text, fontWeight: "700" }, message: { ...typography.body, color: colors.textMuted }, date: { ...typography.caption, color: colors.textSubtle },
-});
+}));

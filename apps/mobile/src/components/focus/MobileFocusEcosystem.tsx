@@ -3,25 +3,29 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G, Line, Text as SvgText } from "react-native-svg";
-
 import { Button, Card, Field, QueryState } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import type { CompanyNetworkNode, CompanyRelationship } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type EcosystemTab = "chain" | "network" | "evidence";
 function NodeCard({ node, central = false }: { node: CompanyNetworkNode; central?: boolean }) {
+  useMobileTheme();
   const { pick } = useLocale();
   return <Pressable disabled={!node.ticker} onPress={() => node.ticker && router.push({ pathname: "/focus/[ticker]", params: { ticker: node.ticker.replace(/\.TO$/i, "") } })} style={[styles.node, central && styles.central]}><Text style={styles.nodeName}>{node.name}</Text><Text style={styles.nodeMeta}>{node.ticker ?? node.node_type} · {node.sector ?? pick("secteur N/D", "sector N/A")}</Text></Pressable>;
 }
 function RelationCard({ relationship, nodes }: { relationship: CompanyRelationship; nodes: Map<string, CompanyNetworkNode> }) {
+  useMobileTheme();
   const { pick } = useLocale();
   const source = nodes.get(relationship.source_node_id); const target = nodes.get(relationship.target_node_id);
   return <View style={styles.relation}><Text style={styles.relationTitle}>{source?.name ?? relationship.source_node_id} → {target?.name ?? relationship.target_node_id}</Text><Text style={styles.relationMeta}>{relationship.relationship_type.replaceAll("_", " ")} · {relationship.confidence} · {relationship.materiality}</Text><Text style={styles.relationMeta}>{pick("Sources", "Sources")}: {relationship.source_count} · {relationship.last_verified_at ? new Date(relationship.last_verified_at).toLocaleDateString() : "N/D"}</Text>{relationship.evidence[0] ? <Text numberOfLines={3} style={styles.excerpt}>{relationship.evidence[0].excerpt}</Text> : null}</View>;
 }
 
 function NetworkGraph({ center, nodes, relationships }: { center: CompanyNetworkNode; nodes: CompanyNetworkNode[]; relationships: CompanyRelationship[] }) {
+  useMobileTheme();
   const width = 340; const height = 320; const cx = width / 2; const cy = height / 2;
   const visible = nodes.filter((node) => node.id !== center.id).slice(0, 16);
   const positions = new Map<string, { x: number; y: number }>([[center.id, { x: cx, y: cy }]]);
@@ -29,11 +33,12 @@ function NetworkGraph({ center, nodes, relationships }: { center: CompanyNetwork
   const open = (node: CompanyNetworkNode) => node.ticker && router.push({ pathname: "/focus/[ticker]", params: { ticker: node.ticker.replace(/\.TO$/i, "") } });
   return <View style={styles.graph} testID="company-network-graph"><Svg height={height} viewBox={`0 0 ${width} ${height}`} width="100%">
     {relationships.map((relation) => { const from = positions.get(relation.source_node_id); const to = positions.get(relation.target_node_id); return from && to ? <Line key={relation.id} stroke={relation.confidence === "verified" ? colors.primary : colors.textSubtle} strokeOpacity={relation.confidence === "secondary" ? 0.45 : 0.8} strokeWidth={relation.materiality === "critical" ? 3 : 1.5} x1={from.x} x2={to.x} y1={from.y} y2={to.y} /> : null; })}
-    {[center, ...visible].map((node) => { const point = positions.get(node.id)!; const central = node.id === center.id; return <G key={node.id} onPress={() => open(node)}><Circle cx={point.x} cy={point.y} fill={central ? "#12588b" : "#0c2a3d"} r={central ? 31 : 22} stroke={central ? colors.primary : colors.borderStrong} strokeWidth={central ? 3 : 1.5} /><SvgText fill={colors.text} fontSize={central ? 11 : 8} fontWeight="800" textAnchor="middle" x={point.x} y={point.y + 3}>{(node.ticker?.replace(/\.TO$/i, "") ?? node.name).slice(0, central ? 9 : 7)}</SvgText></G>; })}
+    {[center, ...visible].map((node) => { const point = positions.get(node.id)!; const central = node.id === center.id; return <G key={node.id} onPress={() => open(node)}><Circle cx={point.x} cy={point.y} fill={central ? colors.primaryPressed : colors.dataCanvas} r={central ? 31 : 22} stroke={central ? colors.primary : colors.borderStrong} strokeWidth={central ? 3 : 1.5} /><SvgText fill={central ? colors.onPrimary : colors.dataCanvasText} fontSize={central ? 11 : 8} fontWeight="800" textAnchor="middle" x={point.x} y={point.y + 3}>{(node.ticker?.replace(/\.TO$/i, "") ?? node.name).slice(0, central ? 9 : 7)}</SvgText></G>; })}
   </Svg></View>;
 }
 
 export function MobileFocusEcosystem({ ticker }: { ticker: string }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const [tab, setTab] = useState<EcosystemTab>("chain"); const [depth, setDepth] = useState<1 | 2>(1); const [target, setTarget] = useState("");
   const network = useQuery({ queryKey: ["company-network", ticker, depth], queryFn: ({ signal }) => marketApi.companyNetwork(ticker, depth, signal), staleTime: 15 * 60_000, refetchInterval: (query) => query.state.data?.coverage.build_status === "building" ? (query.state.data.coverage.retry_after_seconds ?? 5) * 1000 : false });
@@ -53,4 +58,4 @@ export function MobileFocusEcosystem({ ticker }: { ticker: string }) {
     </> : null}
   </View>;
 }
-const styles = StyleSheet.create({ stack: { gap: spacing.md }, tabs: { flexDirection: "row", gap: spacing.xs }, tab: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.2)" }, tabText: { ...typography.label, color: colors.text }, copy: { ...typography.body, color: colors.textMuted }, warning: { ...typography.caption, color: colors.warning }, label: { ...typography.label, color: colors.primary, textTransform: "uppercase", marginTop: spacing.sm }, node: { minHeight: 60, justifyContent: "center", padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surfaceRaised }, central: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, nodeName: { ...typography.body, color: colors.text, fontWeight: "800" }, nodeMeta: { ...typography.caption, color: colors.textMuted }, arrow: { fontSize: 24, color: colors.primary, textAlign: "center" }, empty: { ...typography.body, color: colors.textSubtle }, graph: { width: "100%", minHeight: 320, alignItems: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.background }, relation: { gap: spacing.xs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, relationTitle: { ...typography.body, color: colors.text, fontWeight: "700" }, relationMeta: { ...typography.caption, color: colors.primary }, excerpt: { ...typography.caption, color: colors.textMuted }, depth: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm } });
+const styles = createThemedStyles((colors) => ({ stack: { gap: spacing.md }, tabs: { flexDirection: "row", gap: spacing.xs }, tab: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm }, active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.2)" }, tabText: { ...typography.label, color: colors.text }, copy: { ...typography.body, color: colors.textMuted }, warning: { ...typography.caption, color: colors.warning }, label: { ...typography.label, color: colors.primary, textTransform: "uppercase", marginTop: spacing.sm }, node: { minHeight: 60, justifyContent: "center", padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surfaceRaised }, central: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, nodeName: { ...typography.body, color: colors.text, fontWeight: "800" }, nodeMeta: { ...typography.caption, color: colors.textMuted }, arrow: { fontSize: 24, color: colors.primary, textAlign: "center" }, empty: { ...typography.body, color: colors.textSubtle }, graph: { width: "100%", minHeight: 320, alignItems: "center", overflow: "hidden", borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.background }, relation: { gap: spacing.xs, paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, relationTitle: { ...typography.body, color: colors.text, fontWeight: "700" }, relationMeta: { ...typography.caption, color: colors.primary }, excerpt: { ...typography.caption, color: colors.textMuted }, depth: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm } }));

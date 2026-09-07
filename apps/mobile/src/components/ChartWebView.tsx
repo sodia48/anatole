@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-
 import type { Candle } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type BridgeMessage =
   | { type: "chart-ready" }
@@ -61,6 +62,7 @@ function compactVolume(value: number | null, language: "fr" | "en"): string {
 }
 
 export function ChartWebView({ candles, currency = "CAD", label, ticker, timeframe, chartType = "candles", theme = "dark" }: { candles: Candle[]; currency?: string; label: string; ticker: string; timeframe: string; chartType?: "candles" | "line"; theme?: "dark" }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const ref = useRef<WebView>(null);
   const [ready, setReady] = useState(false);
@@ -81,4 +83,4 @@ export function ChartWebView({ candles, currency = "CAD", label, ticker, timefra
   }
   return <View style={styles.shell} accessibilityLabel={`${pick("Graphique", "Chart")} ${label}`}><WebView ref={ref} source={{ html: chartHtml, baseUrl: "about:blank" }} originWhitelist={["about:blank"]} onMessage={onMessage} javaScriptEnabled scrollEnabled={false} bounces={false} style={styles.webview} testID="focus-chart-webview" />{selection ? <Text style={styles.selection}>{selection}</Text> : null}</View>;
 }
-const styles = StyleSheet.create({ shell: { overflow: "hidden", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, webview: { height: 380, backgroundColor: colors.surface }, selection: { ...typography.caption, color: colors.textMuted, padding: spacing.sm, textAlign: "center", lineHeight: 19 } });
+const styles = createThemedStyles((colors) => ({ shell: { overflow: "hidden", borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, webview: { height: 380, backgroundColor: colors.surface }, selection: { ...typography.caption, color: colors.textMuted, padding: spacing.sm, textAlign: "center", lineHeight: 19 } }));

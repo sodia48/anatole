@@ -12,8 +12,8 @@
   padding: 13px 16px;
   border: 1px solid rgba(61, 178, 255, .25);
   border-radius: 16px;
-  background: rgba(8, 31, 45, .72);
-  color: #dcecf6;
+  background: var(--panel);
+  color: var(--text);
 }
 
 .provinceBar > div {
@@ -48,7 +48,7 @@
 .empty {
   border: 1px solid rgba(64, 153, 204, .25);
   border-radius: 18px;
-  background: rgba(7, 28, 41, .88);
+  background: var(--panel);
 }
 
 .newsCard {
@@ -116,7 +116,7 @@
 
 .newsCard a,
 .open {
-  color: #67aaff;
+  color: var(--blue);
   text-decoration: none;
 }
 

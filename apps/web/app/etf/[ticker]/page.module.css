@@ -2,7 +2,7 @@
   display: grid;
   gap: 16px;
   padding: 18px 22px 42px;
-  color: #f2f7fb;
+  color: var(--text);
 }
 
 .topActions {
@@ -15,9 +15,9 @@
 .backButton {
   min-height: 38px;
   padding: 0 13px;
-  border: 1px solid #17445b;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: #071d2b;
+  background: var(--surface-raised);
   color: #8fc3df;
   cursor: pointer;
   font: inherit;
@@ -28,19 +28,19 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #7faec9;
+  color: var(--text-secondary);
   font-size: 11px;
 }
 
 .liveStatus strong {
-  color: #20d5a6;
+  color: var(--teal);
 }
 
 .liveDot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #20d5a6;
+  background: var(--teal);
   box-shadow: 0 0 12px rgba(32, 213, 166, 0.7);
 }
 
@@ -51,9 +51,9 @@
 .description,
 .loadingPanel,
 .errorPanel {
-  border: 1px solid #17445b;
+  border: 1px solid var(--border);
   border-radius: 20px;
-  background: #082232;
+  background: var(--panel-2);
 }
 
 .hero {
@@ -79,8 +79,8 @@
   justify-content: center;
   padding: 0 13px;
   border-radius: 13px;
-  background: #0d3765;
-  color: #67aaff;
+  background: var(--panel);
+  color: var(--blue);
   font-size: 22px;
   font-weight: 900;
 }
@@ -131,7 +131,7 @@
   border: 1px solid rgba(255, 196, 92, 0.38);
   border-radius: 12px;
   background: rgba(255, 180, 67, 0.08);
-  color: #ffd587;
+  color: var(--warning);
   font-size: 12px;
 }
 
@@ -150,7 +150,7 @@
 }
 
 .metrics span {
-  color: #7faec9;
+  color: var(--text-secondary);
   font-size: 11px;
 }
 
@@ -180,12 +180,12 @@
   justify-content: space-between;
   gap: 20px;
   padding: 19px 20px 17px;
-  border-bottom: 1px solid #17445b;
+  border-bottom: 1px solid var(--border);
 }
 
 .eyebrow {
   display: block;
-  color: #5b9dff;
+  color: var(--blue);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.14em;
@@ -201,7 +201,7 @@
 .panelHeader p {
   max-width: 350px;
   margin: 0;
-  color: #6f9eb9;
+  color: var(--text-secondary);
   font-size: 11px;
   text-align: right;
 }
@@ -225,8 +225,8 @@
 .tableHeader {
   min-height: 43px;
   padding: 0 17px;
-  border-bottom: 1px solid #17445b;
-  color: #6f9eb9;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
   font-size: 9px;
   letter-spacing: 0.06em;
 }
@@ -275,7 +275,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: #0c365e;
+  background: var(--panel);
   color: #65aaff;
   font-size: 12px;
   font-weight: 850;
@@ -392,9 +392,9 @@
   display: grid;
   gap: 5px;
   padding: 11px;
-  border: 1px solid #17445b;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #071d2b;
+  background: var(--surface-raised);
 }
 
 .assetGrid span {
@@ -420,7 +420,7 @@
 
 .footer {
   padding: 10px 4px 0;
-  color: #4f83a0;
+  color: var(--text-secondary);
   font-size: 10px;
   text-align: center;
 }
@@ -430,7 +430,7 @@
 }
 
 .positive {
-  color: #20d5a6;
+  color: var(--teal);
 }
 
 .negative {
@@ -476,7 +476,7 @@
 .loadingPanel p,
 .errorPanel p {
   margin: 7px 0 0;
-  color: #7faec9;
+  color: var(--text-secondary);
 }
 
 @media (max-width: 1050px) {
@@ -568,9 +568,9 @@
 
 .performancePanel {
   overflow: hidden;
-  border: 1px solid #17445b;
+  border: 1px solid var(--border);
   border-radius: 20px;
-  background: #082232;
+  background: var(--panel-2);
 }
 
 .performanceHeader {
@@ -580,7 +580,7 @@
   justify-content: space-between;
   gap: 20px;
   padding: 19px 20px 16px;
-  border-bottom: 1px solid #17445b;
+  border-bottom: 1px solid var(--border);
 }
 
 .performanceHeader h2 {
@@ -590,7 +590,7 @@
 
 .performanceHeader p {
   margin: 6px 0 0;
-  color: #6f9eb9;
+  color: var(--text-secondary);
   font-size: 11px;
 }
 
@@ -599,9 +599,9 @@
   align-items: center;
   gap: 4px;
   padding: 4px;
-  border: 1px solid #17445b;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  background: #041723;
+  background: var(--panel);
 }
 
 .rangeTab,
@@ -636,19 +636,19 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
-  border-bottom: 1px solid #17445b;
-  background: #17445b;
+  border-bottom: 1px solid var(--border);
+  background: var(--border);
 }
 
 .performanceSummary > div {
   display: grid;
   gap: 6px;
   padding: 13px 16px;
-  background: #071e2d;
+  background: var(--panel);
 }
 
 .performanceSummary span {
-  color: #6f9eb9;
+  color: var(--text-secondary);
   font-size: 9px;
   letter-spacing: 0.04em;
 }

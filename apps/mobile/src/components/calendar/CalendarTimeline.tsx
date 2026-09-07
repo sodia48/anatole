@@ -1,12 +1,14 @@
 import type { ReactElement } from "react";
-import { Pressable, SectionList, StyleSheet, Text, View } from "react-native";
-
+import { Pressable, SectionList, Text, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { CalendarEventCard } from "./CalendarEventCard";
 import type { CalendarIntelligenceItem, CalendarSection } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function CalendarTimeline({ sections, header, footer, refreshing, onRefresh, onReset, onOpen }: { sections: readonly CalendarSection[]; header: ReactElement; footer?: ReactElement | null; refreshing: boolean; onRefresh: () => void; onReset: () => void; onOpen: (item: CalendarIntelligenceItem) => void }) {
+  useMobileTheme();
   const { pick } = useLocale();
   return <SectionList
     contentContainerStyle={styles.content}
@@ -27,4 +29,4 @@ export function CalendarTimeline({ sections, header, footer, refreshing, onRefre
   />;
 }
 
-const styles = StyleSheet.create({ content: { padding: spacing.lg, paddingBottom: 120, backgroundColor: colors.background, flexGrow: 1 }, header: { gap: spacing.md }, section: { paddingTop: spacing.lg, paddingBottom: spacing.sm, backgroundColor: colors.background }, sectionTitle: { ...typography.label, color: colors.primary, letterSpacing: 1 }, empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg }, emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }, reset: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong }, resetText: { ...typography.label, color: colors.primary } });
+const styles = createThemedStyles((colors) => ({ content: { padding: spacing.lg, paddingBottom: 120, backgroundColor: colors.background, flexGrow: 1 }, header: { gap: spacing.md }, section: { paddingTop: spacing.lg, paddingBottom: spacing.sm, backgroundColor: colors.background }, sectionTitle: { ...typography.label, color: colors.primary, letterSpacing: 1 }, empty: { minHeight: 180, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.lg }, emptyText: { ...typography.body, color: colors.textMuted, textAlign: "center" }, reset: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong }, resetText: { ...typography.label, color: colors.primary } }));

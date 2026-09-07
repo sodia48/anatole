@@ -1,6 +1,5 @@
 import { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
-
+import { Text, View } from "react-native";
 import { ChartWebView } from "@/src/components/ChartWebView";
 import { NewsCard } from "@/src/components/market";
 import { Card, Change, QueryState, uiStyles } from "@/src/components/ui";
@@ -9,12 +8,15 @@ import { useLocale } from "@/src/lib/i18n";
 import { colors, spacing, typography } from "@/src/theme/tokens";
 import { compactSessionVolume, liveQuoteStatus, type LiveQuoteState } from "./liveStatus";
 import { MobileSessionFlow } from "./MobileSessionFlow";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const periods = [{ label: "LIVE", range: "1d", interval: "1m" }, { label: "1S", range: "5d", interval: "5m" }, { label: "3M", range: "3mo", interval: "1d" }, { label: "6M", range: "6mo", interval: "1d" }, { label: "1A", range: "1y", interval: "1d" }, { label: "5A", range: "5y", interval: "1wk" }] as const;
 export type FocusPeriod = (typeof periods)[number];
 export { periods as focusPeriods };
 
 export function MobileFocusOverview({ ticker, snapshot, period, liveState, news, newsLoading, newsError }: { ticker: string; snapshot: FocusSnapshot; period: FocusPeriod; liveState: LiveQuoteState; news?: StockNewsSnapshot; newsLoading: boolean; newsError: Error | null }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const performance = useMemo(() => { const first = snapshot.history[0]?.close; const last = snapshot.history.at(-1)?.close; return first && last ? ((last - first) / first) * 100 : null; }, [snapshot.history]);
   const technicals = snapshot.technicals;
@@ -30,4 +32,4 @@ export function MobileFocusOverview({ ticker, snapshot, period, liveState, news,
     <Card title={pick("Dernières nouvelles", "Latest news")}><QueryState empty={Boolean(news && news.items.length === 0)} error={!news ? newsError : null} loading={newsLoading} />{news?.items.slice(0, 10).map((item) => <NewsCard item={item} key={item.id} />)}</Card>
   </View>;
 }
-const styles = StyleSheet.create({ stack: { gap: spacing.md }, liveBand: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surfaceRaised }, liveState: { ...typography.caption, color: colors.warning, fontWeight: "800" }, liveOn: { color: colors.positive }, liveOff: { color: colors.negative }, liveVolume: { ...typography.caption, color: colors.textMuted, marginTop: 3 }, liveQuote: { alignItems: "flex-end" }, livePrice: { ...typography.section, color: colors.text }, liveChange: { ...typography.label }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right" } });
+const styles = createThemedStyles((colors) => ({ stack: { gap: spacing.md }, liveBand: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: 8, backgroundColor: colors.surfaceRaised }, liveState: { ...typography.caption, color: colors.warning, fontWeight: "800" }, liveOn: { color: colors.positive }, liveOff: { color: colors.negative }, liveVolume: { ...typography.caption, color: colors.textMuted, marginTop: 3 }, liveQuote: { alignItems: "flex-end" }, livePrice: { ...typography.section, color: colors.text }, liveChange: { ...typography.label }, value: { ...typography.body, color: colors.text, fontWeight: "700", textAlign: "right" } }));

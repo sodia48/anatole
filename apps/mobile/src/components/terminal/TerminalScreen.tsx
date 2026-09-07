@@ -4,7 +4,6 @@ import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { AppState, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
 import { moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { QueryState, ScreenHeader } from "@/src/components/ui";
 import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
@@ -17,6 +16,8 @@ import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { alertCopy, opportunityLabel, regimeLabel, riskLabel, sectorStateLabel, type TerminalFeedMode } from "./model";
 import { TerminalRadarFiltersModal, terminalFilterLabels } from "./TerminalRadarFiltersModal";
 import { AnomaliesCard, BreadthCard, DriversCard, HorizonCards, PulseCard, RotationCard, type PulseRange } from "./TerminalV2Cards";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type TerminalEntry =
   | { id: string; kind: "heading"; title: string; subtitle: string }
@@ -75,10 +76,12 @@ function scoreText(value: number | null | undefined, suffix = "/100"): string {
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
+  useMobileTheme();
   return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
 function RadarCard({ item }: { item: TerminalOpportunity }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const [expanded, setExpanded] = useState(false);
   return <View style={styles.card} testID={`terminal-radar-${item.symbol}`}>
@@ -93,12 +96,14 @@ function RadarCard({ item }: { item: TerminalOpportunity }) {
 }
 
 function SectorCard({ item }: { item: TerminalSector }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const relativeVolume = valueOrNd(item.relative_volume, 1, language);
   return <View style={styles.card} testID={`terminal-sector-${item.sector}`}><View style={styles.cardTop}><Text style={styles.symbol}>{item.sector}</Text><Text style={styles.tag}>{sectorStateLabel(item.state, language)}</Text></View>{item.leadership_score != null ? <View style={styles.leadership} testID={`terminal-sector-bar-${item.sector}`}><View style={[styles.leadershipFill, { width: `${Math.max(0, Math.min(100, item.leadership_score))}%` }]} /></View> : null}<View style={styles.metrics}><Metric label={pick("Leadership", "Leadership")} value={scoreText(item.leadership_score)} /><Metric label={pick("Séance", "Session")} value={percentOrNd(item.change_percent, language)} /><Metric label="Momentum 20j" value={percentOrNd(item.momentum_20d, language)} /><Metric label={pick("Volume relatif", "Relative volume")} value={relativeVolume === "N/D" ? relativeVolume : `${relativeVolume}×`} /><Metric label={pick("Largeur", "Breadth")} value={`${item.advancers}↑ ${item.decliners}↓`} /><Metric label={pick("Score moyen", "Average score")} value={scoreText(item.average_score)} /></View></View>;
 }
 
 function AlertCard({ raw }: { raw: TerminalAlert }) {
+  useMobileTheme();
   const { language } = useLocale();
   const item = alertCopy(raw, language);
   const content = <><View style={styles.alertTop}><Text style={[styles.severity, item.severity === "high" ? styles.severityHigh : item.severity === "watch" ? styles.severityWatch : undefined]}>{item.severity.toUpperCase()}</Text><Text style={styles.meta}>{item.category}{item.symbol ? ` · ${item.symbol}` : ""}</Text></View><Text style={styles.alertTitle}>{item.title}</Text><Text style={styles.body}>{item.detail}</Text></>;
@@ -106,6 +111,7 @@ function AlertCard({ raw }: { raw: TerminalAlert }) {
 }
 
 function DetailedAnalysis({ snapshot }: { snapshot: TerminalSnapshot }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const [open, setOpen] = useState(false);
   return <View style={styles.detailCard} testID="terminal-details"><Pressable accessibilityRole="button" onPress={() => setOpen((value) => !value)} style={styles.detailToggle} testID="terminal-details-toggle"><View><Text style={styles.sectionTitle}>{pick("Analyse détaillée", "Detailed analysis")}</Text><Text style={styles.sectionSubtitle}>{pick("Composantes, leaders, pression et méthodologie", "Components, leaders, pressure, and methodology")}</Text></View><Text style={styles.detailChevron}>{open ? "−" : "+"}</Text></Pressable>{open ? <View style={styles.detailBody}>
@@ -117,6 +123,7 @@ function DetailedAnalysis({ snapshot }: { snapshot: TerminalSnapshot }) {
 }
 
 export function TerminalScreen() {
+  useMobileTheme();
   const params = useLocalSearchParams<{ symbol?: string | string[]; anomaly?: string | string[] }>();
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
@@ -199,7 +206,7 @@ export function TerminalScreen() {
   return <SafeAreaView edges={["bottom"]} style={styles.safe} testID="terminal-screen"><FlatList ListHeaderComponent={header} contentContainerStyle={styles.content} data={entries} initialNumToRender={10} keyExtractor={(item) => item.id} maxToRenderPerBatch={12} refreshControl={<RefreshControl onRefresh={() => void query.refetch()} refreshing={query.isRefetching} tintColor={colors.primary} />} removeClippedSubviews renderItem={({ item }) => item.kind === "heading" ? <View style={styles.heading}><Text style={styles.headingText}>{item.title}</Text><Text style={styles.sectionSubtitle}>{item.subtitle}</Text></View> : item.kind === "radar" ? <RadarCard item={item.item} /> : item.kind === "sector" ? <SectorCard item={item.item} /> : item.kind === "alert" ? <AlertCard raw={item.item} /> : snapshot && item.kind === "horizons" ? <HorizonCards snapshot={snapshot} /> : snapshot && item.kind === "pulse" ? <PulseCard onRange={setPulseRange} range={pulseRange} snapshot={snapshot} /> : snapshot && item.kind === "breadth" ? <BreadthCard snapshot={snapshot} /> : snapshot && item.kind === "rotation" ? <RotationCard snapshot={snapshot} /> : snapshot && item.kind === "drivers" ? <DriversCard snapshot={snapshot} /> : snapshot && item.kind === "anomalies" ? <AnomaliesCard snapshot={snapshot} /> : snapshot ? <DetailedAnalysis snapshot={snapshot} /> : null} testID="terminal-list" windowSize={7} /><TerminalRadarFiltersModal filters={filters} onChange={setFilters} onClose={() => setAdvancedFiltersOpen(false)} onReset={() => setFilters({})} sectors={sectors} visible={snapshot != null && advancedFiltersOpen} /></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.background }, content: { padding: spacing.lg, paddingBottom: 100, gap: spacing.md }, header: { gap: spacing.md }, headerActions: { flexDirection: "row", alignItems: "center" }, linkButton: { minHeight: 44, maxWidth: 128, justifyContent: "center", paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.sm }, linkText: { ...typography.caption, color: colors.primary, textAlign: "center", fontWeight: "800" },
   regimeCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, padding: spacing.lg, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.lg, backgroundColor: colors.surface }, scoreHero: { ...typography.hero, color: colors.positive }, regimeCopy: { flex: 1, alignItems: "flex-end" }, regime: { ...typography.title, color: colors.text }, risk: { ...typography.label, color: colors.warning }, universe: { ...typography.caption, color: colors.textMuted }, kpis: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, metric: { minWidth: "30%", flexGrow: 1, gap: 2, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, metricValue: { ...typography.section, color: colors.text }, metricLabel: { ...typography.caption, color: colors.textMuted }, stale: { ...typography.caption, color: colors.warning, padding: spacing.sm, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm },
   devDiagnostic: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, devDiagnosticText: { ...typography.caption, color: colors.textSubtle }, freshness: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surface }, freshnessText: { ...typography.caption, color: colors.textMuted }, delayed: { ...typography.caption, color: colors.warning, paddingHorizontal: spacing.sm, paddingVertical: 3, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.pill }, contractNotice: { ...typography.body, color: colors.warning, padding: spacing.md, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.sm, backgroundColor: "rgba(246,185,74,.08)" },
@@ -209,4 +216,4 @@ const styles = StyleSheet.create({
   heading: { gap: spacing.xs, marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }, headingText: { ...typography.section, color: colors.primary, letterSpacing: 1 }, sectionTitle: { ...typography.section, color: colors.text }, sectionSubtitle: { ...typography.caption, color: colors.textMuted }, card: { gap: spacing.md, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface }, cardMain: { gap: spacing.md }, pressed: { opacity: 0.7 }, cardTop: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: spacing.md }, identity: { flex: 1, minWidth: 0 }, symbol: { ...typography.section, color: colors.text }, name: { ...typography.body, color: colors.text }, meta: { ...typography.caption, color: colors.textMuted }, quote: { alignItems: "flex-end" }, price: { ...typography.label, color: colors.text }, change: { ...typography.caption }, metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, tag: { ...typography.label, color: colors.primary }, signal: { ...typography.caption, color: colors.textMuted }, expand: { minHeight: 44, alignItems: "center", justifyContent: "center", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }, expandText: { ...typography.label, color: colors.primary }, reasons: { gap: spacing.xs }, reason: { ...typography.body, color: colors.textMuted },
   leadership: { height: 8, overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.surfaceRaised }, leadershipFill: { height: "100%", backgroundColor: colors.cyan }, alertTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, severity: { ...typography.label, color: colors.primary }, severityWatch: { color: colors.warning }, severityHigh: { color: colors.negative }, alertTitle: { ...typography.section, color: colors.text }, body: { ...typography.body, color: colors.textMuted },
   detailCard: { marginTop: spacing.md, borderWidth: 1, borderColor: colors.borderStrong, borderRadius: radius.md, backgroundColor: colors.surface }, detailToggle: { minHeight: 64, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md, padding: spacing.md }, detailChevron: { fontSize: 28, color: colors.primary }, detailBody: { gap: spacing.md, padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }, component: { gap: spacing.sm, padding: spacing.md, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, detailHeading: { ...typography.label, color: colors.primary, marginTop: spacing.sm, textTransform: "uppercase" }, ranking: { ...typography.body, color: colors.text },
-});
+}));

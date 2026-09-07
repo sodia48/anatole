@@ -54,7 +54,7 @@
   padding: 4px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(5, 16, 25, 0.72);
+  background: var(--panel);
 }
 
 .universeButtons button {
@@ -91,7 +91,7 @@
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: rgba(5, 16, 25, 0.88);
+  background: var(--panel);
   color: var(--text);
   font: inherit;
   letter-spacing: normal;
@@ -111,7 +111,7 @@
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 9px;
-  background: rgba(5, 16, 25, 0.88);
+  background: var(--panel);
 }
 
 .search input {
@@ -161,8 +161,8 @@
   place-items: center;
   border: 1px solid rgba(45, 118, 255, 0.52);
   border-radius: 8px;
-  background: rgba(45, 118, 255, 0.15);
-  color: #8ab8ff;
+  background: var(--primary-surface);
+  color: var(--blue);
   font-size: 11px;
   font-weight: 900;
 }
@@ -205,7 +205,7 @@
   gap: 2px;
   border: 1px solid var(--border);
   border-radius: 7px;
-  background: rgba(4, 19, 30, 0.42);
+  background: var(--panel);
 }
 
 .consensus span,

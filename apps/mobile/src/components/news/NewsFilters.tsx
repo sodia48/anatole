@@ -1,8 +1,9 @@
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import type { NewsCategoryFilter, NewsFiltersState, NewsPrimaryFilter, NewsRegionFilter } from "./model";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 const primaryOptions: { id: NewsPrimaryFilter; fr: string; en: string }[] = [
   { id: "all", fr: "Tout", en: "All" },
@@ -37,10 +38,12 @@ const categoryOptions: { id: NewsCategoryFilter; fr: string; en: string }[] = [
 ];
 
 function Chip({ label, selected, onPress, testID }: { label: string; selected: boolean; onPress: () => void; testID?: string }) {
+  useMobileTheme();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.chip, selected && styles.selected]} testID={testID}><Text style={[styles.chipText, selected && styles.selectedText]}>{label}</Text></Pressable>;
 }
 
 export function NewsFilters({ filters, hasPersonal, onChange, preferredRegions = [] }: { filters: NewsFiltersState; hasPersonal: boolean; onChange: (next: NewsFiltersState) => void; preferredRegions?: string[] }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const primary = [
     ...primaryOptions,
@@ -61,9 +64,9 @@ export function NewsFilters({ filters, hasPersonal, onChange, preferredRegions =
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   container: { gap: spacing.sm }, row: { gap: spacing.xs, paddingRight: spacing.lg },
   chip: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   selected: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, chipText: { ...typography.caption, color: colors.textMuted, fontWeight: "700" }, selectedText: { color: colors.text },
   search: { minHeight: 48, paddingHorizontal: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, color: colors.text, backgroundColor: colors.surfaceRaised },
-});
+}));

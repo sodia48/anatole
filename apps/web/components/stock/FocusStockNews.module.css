@@ -2,10 +2,9 @@
   display: grid;
   gap: 11px;
   padding: 16px;
-  border: 1px solid rgba(35, 73, 96, 0.88);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background:
-    linear-gradient(180deg, rgba(7, 28, 43, 0.94), rgba(4, 18, 29, 0.94));
+  background: linear-gradient(180deg, var(--panel-gradient-start), var(--panel-gradient-end));
 }
 
 .header {
@@ -19,7 +18,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #55b9ff;
+  color: var(--accent-text);
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.12em;
@@ -27,12 +26,12 @@
 
 .header h2 {
   margin: 5px 0 0;
-  color: #eef8fd;
+  color: var(--text);
   font-size: 17px;
 }
 
 .count {
-  color: #7694a8;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -49,9 +48,9 @@
   display: flex;
   flex-direction: column;
   gap: 9px;
-  border: 1px solid rgba(44, 89, 116, 0.72);
+  border: 1px solid var(--border);
   border-radius: 9px;
-  background: rgba(5, 23, 36, 0.76);
+  background: var(--panel);
   color: inherit;
   transition:
     border-color 140ms ease,
@@ -61,7 +60,7 @@
 
 .card:hover {
   border-color: rgba(69, 161, 224, 0.78);
-  background: rgba(9, 36, 54, 0.88);
+  background: var(--panel);
   transform: translateY(-1px);
 }
 
@@ -75,14 +74,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 9px;
-  color: #7392a7;
+  color: var(--text-secondary);
   font-size: 9px;
 }
 
 .meta span {
   min-width: 0;
   overflow: hidden;
-  color: #7bbfff;
+  color: var(--accent-text);
   font-weight: 750;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -96,7 +95,7 @@
   margin: 0;
   display: -webkit-box;
   overflow: hidden;
-  color: #e5f2f9;
+  color: var(--text);
   font-size: 12px;
   line-height: 1.5;
   -webkit-box-orient: vertical;
@@ -107,7 +106,7 @@
   margin: 0;
   display: -webkit-box;
   overflow: hidden;
-  color: #91aebe;
+  color: var(--text-secondary);
   font-size: 10px;
   line-height: 1.55;
   -webkit-box-orient: vertical;
@@ -119,7 +118,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #8db7d1;
+  color: var(--accent-text);
   font-size: 9px;
   font-weight: 750;
 }
@@ -129,9 +128,9 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  border: 1px dashed rgba(48, 88, 113, 0.64);
+  border: 1px dashed var(--border);
   border-radius: 9px;
-  color: #718fa3;
+  color: var(--text-secondary);
   font-size: 10px;
   text-align: center;
 }

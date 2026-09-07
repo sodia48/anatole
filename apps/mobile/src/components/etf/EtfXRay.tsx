@@ -1,23 +1,27 @@
 import { etfXRaySummary, type EtfXRayAnalytics, type EtfXRayScore } from "@anatole/shared/etf-xray";
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-
 import { compactNumberOrNd, percentOrNd } from "@/src/components/focus/format";
 import { Card } from "@/src/components/ui";
 import type { EtfHoldingsSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { EtfHoldingsHeatmap } from "./EtfHoldingsHeatmap";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 function Metric({ label, value }: { label: string; value: string }) {
+  useMobileTheme();
   return <View style={styles.metric}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
 }
 
 function Allocation({ label, value }: { label: string; value: number }) {
+  useMobileTheme();
   return <View style={styles.allocation}><View style={styles.allocationLine}><Text style={styles.bodyStrong}>{label}</Text><Text style={styles.value}>{percentOrNd(value)}</Text></View><View style={styles.track}><View style={[styles.fill, { width: `${Math.max(0, Math.min(100, value))}%` }]} /></View></View>;
 }
 
 function Score({ label, score, explanation }: { label: string; score: EtfXRayScore; explanation: string }) {
+  useMobileTheme();
   return <View style={styles.score} testID={`etf-xray-score-${label.toLowerCase()}`}>
     <View style={styles.scoreLine}><Text style={styles.bodyStrong}>{label}</Text><Text style={styles.scoreValue}>{score.value === null ? "N/D" : `${score.value}/100`}</Text></View>
     <View style={styles.track}><View style={[styles.scoreFill, { width: `${score.value ?? 0}%`, backgroundColor: score.value === null ? colors.textSubtle : colors.cyan }]} /></View>
@@ -26,6 +30,7 @@ function Score({ label, score, explanation }: { label: string; score: EtfXRaySco
 }
 
 export function EtfXRay({ snapshot, analytics, onOpen }: { snapshot: EtfHoldingsSnapshot; analytics: EtfXRayAnalytics; onOpen: (ticker: string) => void }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const summary = useMemo(() => etfXRaySummary(snapshot.ticker, analytics, language), [analytics, language, snapshot.ticker]);
   const currency = analytics.currencyWeights;
@@ -68,6 +73,7 @@ export function EtfXRay({ snapshot, analytics, onOpen }: { snapshot: EtfHoldings
 }
 
 export function EtfRiskPanel({ analytics }: { analytics: EtfXRayAnalytics }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   return <View style={styles.stack} testID="etf-risk-panel">
     <Card title={pick("Risque observé", "Observed risk")}>
@@ -79,10 +85,10 @@ export function EtfRiskPanel({ analytics }: { analytics: EtfXRayAnalytics }) {
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   stack: { gap: spacing.md }, summary: { gap: spacing.sm }, summaryText: { ...typography.body, color: colors.text },
   metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm }, metric: { minWidth: "30%", flexGrow: 1, gap: 2, padding: spacing.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised }, metricValue: { ...typography.section, color: colors.text }, metricLabel: { ...typography.caption, color: colors.textMuted },
   subheading: { ...typography.label, color: colors.primary, marginTop: spacing.sm, textTransform: "uppercase" }, bodyStrong: { ...typography.body, color: colors.text, fontWeight: "700" }, value: { ...typography.label, color: colors.text }, note: { ...typography.caption, color: colors.textMuted },
   allocation: { gap: spacing.xs }, allocationLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, track: { height: 7, overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.surfaceRaised }, fill: { height: "100%", backgroundColor: colors.primary },
   score: { gap: spacing.xs, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }, scoreLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm }, scoreValue: { ...typography.section, color: colors.text }, scoreFill: { height: "100%" }, formula: { ...typography.caption, color: colors.textSubtle },
-});
+}));

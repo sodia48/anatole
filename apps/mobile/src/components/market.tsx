@@ -1,15 +1,17 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { NewsThumbnail } from "@/src/components/news/NewsThumbnail";
 import type { MarketTile, NewsItem, Quote, StockNewsItem } from "@/src/lib/api/types";
 import { articleHref } from "@/src/lib/article";
 import { useLocale } from "@/src/lib/i18n";
 import { normalizeTicker } from "@/src/lib/ticker";
-import { colors, radius, spacing, typography } from "@/src/theme/tokens";
+import { radius, spacing, typography } from "@/src/theme/tokens";
 import { Change } from "./ui";
+import { createThemedStyles } from "@/src/theme/palettes";
+import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 export function StockRow({ quote }: { quote: Quote | MarketTile }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const ticker = normalizeTicker(quote.ticker || quote.symbol);
   return (
@@ -43,6 +45,7 @@ export function NewsCard({
   exploreLabel?: string;
   onExplore?: () => void;
 }) {
+  useMobileTheme();
   const { language, pick } = useLocale();
   const economic = "source" in item ? item : null;
   const source = "source" in item ? item.source : item.publisher;
@@ -85,10 +88,10 @@ export function formatNewsDate(value: string, language: "fr" | "en", now = Date.
   return published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "medium", timeStyle: "short" });
 }
 
-const styles = StyleSheet.create({
+const styles = createThemedStyles((colors) => ({
   stockRow: { minHeight: 68, flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  tickerBadge: { minWidth: 54, paddingHorizontal: spacing.sm, paddingVertical: 7, alignItems: "center", backgroundColor: "#103d6f", borderRadius: radius.sm },
-  ticker: { ...typography.label, color: "#8cc9ff" },
+  tickerBadge: { minWidth: 54, paddingHorizontal: spacing.sm, paddingVertical: 7, alignItems: "center", backgroundColor: colors.primarySurface, borderRadius: radius.sm },
+  ticker: { ...typography.label, color: colors.primary },
   stockCopy: { flex: 1, minWidth: 0 },
   name: { ...typography.body, color: colors.text, fontWeight: "700" },
   meta: { ...typography.caption, color: colors.textMuted },
@@ -108,4 +111,4 @@ const styles = StyleSheet.create({
   explore: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.borderStrong },
   exploreText: { ...typography.caption, color: colors.primary, fontWeight: "800" },
   pressed: { opacity: 0.7 },
-});
+}));
