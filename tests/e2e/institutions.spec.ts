@@ -177,3 +177,28 @@ test("la section Institutions suit la préférence anglaise", async ({ page }) =
   await expect(page.getByRole("heading", { name: /Track major institutional managers/ })).toBeVisible();
   await expect(page.getByText(/Changes are inferred by comparing quarterly 13F filings/)).toBeVisible();
 });
+
+test("la page Institutions conserve un contraste lisible avec Anatole Ciel", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
+      theme: "blue",
+      density: "comfortable",
+      decimals: 2,
+      defaultRange: "1y",
+      defaultUniverse: "tsx60",
+      language: "fr",
+    }));
+    localStorage.setItem("anatole.appearance-choice.v1", "1");
+  });
+
+  await page.goto("/institutions");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
+
+  const heading = page.getByRole("heading", { name: /Suivre les grands gestionnaires/i });
+  const metric = page.getByText("Valeur 13F suivie", { exact: true }).locator("..").locator("strong");
+  const ranking = page.getByRole("heading", { name: "Principaux gestionnaires 13F" });
+
+  await expect(heading).toHaveCSS("color", "rgb(8, 32, 51)");
+  await expect(metric).toHaveCSS("color", "rgb(8, 32, 51)");
+  await expect(ranking).toHaveCSS("color", "rgb(8, 32, 51)");
+});
