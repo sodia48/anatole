@@ -15,6 +15,8 @@ function holding(index: number): EtfHoldingDriver {
     currency: index < 7 ? "CAD" : index < 9 ? "USD" : "EUR",
     change_percent: index % 2 === 0 ? 1 : -1,
     contribution_percent_points: 0,
+    sector: null,
+    region: null,
     source: "Official holdings",
     delayed: true,
   };
@@ -38,6 +40,7 @@ function snapshot(): EtfHoldingsSnapshot {
       { key: "energy", label: "Énergie", weight_percent: 30 },
       { key: "technology", label: "Technologie", weight_percent: 25 },
     ],
+    regions: [],
     asset_classes: [{ key: "equity", label: "Actions", weight_percent: 100 }],
     top_holdings_weight_percent: 72,
     net_driver_contribution_percent_points: 0,
@@ -49,6 +52,9 @@ function snapshot(): EtfHoldingsSnapshot {
     message: null,
     source_name: "Official holdings",
     source_url: null,
+    composition_as_of: null,
+    official: false,
+    stale: false,
     generated_at: "2026-08-31T12:00:00Z",
     refresh_after_seconds: 600,
   };

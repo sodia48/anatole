@@ -85,6 +85,10 @@ function holdingDestination(
       )}`;
 }
 
+function formatCount(value: number | null): string {
+  return value === null ? "N/D" : String(value);
+}
+
 export default function EtfHoldingsPage() {
   const params = useParams<{
     ticker: string;
@@ -228,6 +232,34 @@ export default function EtfHoldingsPage() {
     );
   }
 
+  if (
+    snapshot.status === "unavailable" &&
+    snapshot.holdings.length === 0
+  ) {
+    return (
+      <main className={styles.page}>
+        <button
+          type="button"
+          className={styles.backButton}
+          onClick={() => router.push("/etf")}
+        >
+          ← Retour aux ETF
+        </button>
+        <section className={styles.compactEmpty}>
+          <span className={styles.ticker}>{snapshot.ticker}</span>
+          <div>
+            <h1>Composition temporairement indisponible</h1>
+            <p>
+              {snapshot.message ??
+                "Aucune position vérifiable n'est disponible pour cet ETF."}
+            </p>
+          </div>
+          <strong>N/D</strong>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className={styles.page}>
       <div
@@ -330,10 +362,9 @@ export default function EtfHoldingsPage() {
             positions
           </span>
           <strong>
-            {snapshot.top_holdings_weight_percent.toFixed(
-              1,
-            )}
-            %
+            {snapshot.top_holdings_weight_percent === null
+              ? "N/D"
+              : `${snapshot.top_holdings_weight_percent.toFixed(1)} %`}
           </strong>
         </article>
 
@@ -357,10 +388,8 @@ export default function EtfHoldingsPage() {
             Positions avec cotation
           </span>
           <strong>
-            {snapshot.quoted_holdings}/
-            {
-              snapshot.total_holdings_returned
-            }
+            {formatCount(snapshot.quoted_holdings)}/
+            {formatCount(snapshot.total_holdings_returned)}
           </strong>
         </article>
 
@@ -692,6 +721,13 @@ export default function EtfHoldingsPage() {
         ) : (
           snapshot.source_name
         )}
+        {snapshot.official ? " · Source officielle" : ""}
+        {snapshot.composition_as_of
+          ? ` · Composition au ${new Intl.DateTimeFormat("fr-CA", {
+              dateStyle: "medium",
+              timeZone: "UTC",
+            }).format(new Date(snapshot.composition_as_of))}`
+          : ""}
         {" · "}
         Mise à jour :{" "}
         {new Intl.DateTimeFormat(

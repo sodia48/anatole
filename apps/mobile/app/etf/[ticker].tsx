@@ -26,6 +26,10 @@ const ranges: { key: EtfHistoryRange; label: string }[] = [
 ];
 type DetailSection = "overview" | "xray" | "holdings" | "risk";
 
+function countOrNd(value: number | null, language: "fr" | "en"): string {
+  return value === null ? (language === "fr" ? "N/D" : "N/A") : String(value);
+}
+
 function Holding({ item }: { item: EtfHoldingDriver }) {
   useMobileTheme();
   const { language, pick } = useLocale();
@@ -107,7 +111,7 @@ export default function EtfDetailScreen() {
       {section === "xray" && analytics ? <EtfXRay analytics={analytics} onOpen={(symbol) => router.push({ pathname: "/stock/[ticker]", params: { ticker: symbol } })} snapshot={snapshot} /> : null}
 
       {section === "holdings" ? <>
-        {snapshot.holdings.length ? <Card title={pick("Composition", "Holdings")}><Text style={styles.sectionNote}>{snapshot.total_holdings_returned} {pick("positions retournées", "holdings returned")} · {snapshot.quoted_holdings} {pick("cotées", "quoted")}</Text>{snapshot.holdings.map((item) => <Holding item={item} key={`${item.rank}-${item.symbol}`} />)}</Card> : <Card title="Holdings"><Text style={styles.sectionNote}>N/D</Text></Card>}
+        {snapshot.holdings.length ? <Card title={pick("Composition", "Holdings")}><Text style={styles.sectionNote}>{countOrNd(snapshot.total_holdings_returned, language)} {pick("positions retournées", "holdings returned")} · {countOrNd(snapshot.quoted_holdings, language)} {pick("cotées", "quoted")}</Text>{snapshot.holdings.map((item) => <Holding item={item} key={`${item.rank}-${item.symbol}`} />)}</Card> : <Card title="Holdings"><Text style={styles.sectionNote}>{pick("Composition indisponible · N/D", "Holdings unavailable · N/A")}</Text></Card>}
         {contributors.length ? <Card title={pick("Principaux contributeurs", "Top contributors")}><Text style={styles.sectionNote}>{pick("Contribution calculée comme poids × variation avec les cotations déjà disponibles.", "Contribution calculated as weight × change from already available quotes.")}</Text>{contributors.map((item) => <View key={item.symbol} style={styles.contributor}><View><Text style={styles.itemName}>{item.display_symbol}</Text><Text style={styles.itemMeta}>{percentOrNd(item.weight_percent, language)} {pick("poids", "weight")} · {item.change_percent === null ? "N/D" : percentOrNd(item.change_percent, language)}</Text></View><Text style={[styles.contribution, { color: (item.contribution_percent_points ?? 0) >= 0 ? colors.positive : colors.negative }]}>{(item.contribution_percent_points ?? 0) >= 0 ? "+" : ""}{valueOrNd(item.contribution_percent_points, 3, language)} pt</Text></View>)}</Card> : null}
       </> : null}
 

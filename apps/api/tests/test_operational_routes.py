@@ -91,9 +91,13 @@ def test_operational_routes_are_registered(monkeypatch) -> None:
     monkeypatch.setattr(insider_service, "snapshot", fake_insiders)
 
     with TestClient(app) as client:
-        assert client.get(
+        holdings_response = client.get(
             "/api/v1/discovery/etfs/XIC/holdings?limit=5"
-        ).status_code == 200
+        )
+        assert holdings_response.status_code == 200
+        assert holdings_response.json()["top_holdings_weight_percent"] is None
+        assert holdings_response.json()["quoted_holdings"] is None
+        assert holdings_response.json()["total_holdings_returned"] is None
         assert client.get(
             "/api/v1/discovery/etfs/XIC/history?range=1mo"
         ).status_code == 200

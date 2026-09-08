@@ -123,17 +123,19 @@ export type EtfHoldingDriver = {
   rank: number; symbol: string; display_symbol: string; name: string;
   instrument_type: "equity" | "etf" | "other"; weight_percent: number;
   price: number | null; currency: string | null; change_percent: number | null;
-  contribution_percent_points: number | null; source: string; delayed: boolean;
+  contribution_percent_points: number | null; sector: string | null; region: string | null;
+  source: string; delayed: boolean;
 };
 export type EtfAllocationItem = { key: string; label: string; weight_percent: number };
 export type EtfHoldingsSnapshot = {
   ticker: string; normalized_symbol: string; name: string; provider: string; category: string; exposure: string;
   description: string | null; currency: string; price: number | null; change_percent: number | null;
-  holdings: EtfHoldingDriver[]; sectors: EtfAllocationItem[]; asset_classes: EtfAllocationItem[];
-  top_holdings_weight_percent: number; net_driver_contribution_percent_points: number | null;
+  holdings: EtfHoldingDriver[]; sectors: EtfAllocationItem[]; regions: EtfAllocationItem[]; asset_classes: EtfAllocationItem[];
+  top_holdings_weight_percent: number | null; net_driver_contribution_percent_points: number | null;
   positive_driver_contribution_percent_points: number | null; negative_driver_contribution_percent_points: number | null;
-  quoted_holdings: number; total_holdings_returned: number; status: "available" | "partial" | "unavailable";
-  message: string | null; source_name: string; source_url: string | null; generated_at: string; refresh_after_seconds: number;
+  quoted_holdings: number | null; total_holdings_returned: number | null; status: "available" | "partial" | "unavailable";
+  message: string | null; source_name: string; source_url: string | null; composition_as_of: string | null;
+  official: boolean; stale: boolean; generated_at: string; refresh_after_seconds: number;
 };
 export type EtfHistoryRange = "5d" | "1mo" | "ytd" | "6mo" | "1y" | "5y" | "10y";
 export type EtfHistoryPoint = { timestamp: string; open: number; high: number; low: number; close: number; volume: number };

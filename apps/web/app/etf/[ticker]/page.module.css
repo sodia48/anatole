@@ -18,7 +18,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface-raised);
-  color: #8fc3df;
+  color: var(--accent-text);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -54,6 +54,39 @@
   border: 1px solid var(--border);
   border-radius: 20px;
   background: var(--panel-2);
+}
+
+.compactEmpty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  max-width: 880px;
+  min-height: 116px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-2);
+}
+
+.compactEmpty h1,
+.compactEmpty p {
+  margin: 0;
+}
+
+.compactEmpty h1 {
+  font-size: 20px;
+}
+
+.compactEmpty p {
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.compactEmpty > strong {
+  color: var(--text-secondary);
+  font-size: 24px;
 }
 
 .hero {
@@ -94,7 +127,7 @@
 .identity p,
 .exposure {
   margin: 6px 0 0;
-  color: #82b4d0;
+  color: var(--text-secondary);
 }
 
 .exposure {
@@ -122,7 +155,7 @@
 
 .heroQuote small {
   margin-top: 7px;
-  color: #6f9db7;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -240,7 +273,7 @@
   min-height: 72px;
   padding: 10px 17px;
   border: 0;
-  border-bottom: 1px solid rgba(23, 68, 91, 0.78);
+  border-bottom: 1px solid var(--border);
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -250,7 +283,7 @@
 }
 
 .holdingRow:hover {
-  background: rgba(31, 91, 119, 0.13);
+  background: var(--hover-bg);
 }
 
 .holdingRow:last-child {
@@ -265,7 +298,7 @@
 }
 
 .holdingIdentity > b {
-  color: #668ba1;
+  color: var(--text-secondary);
   font-size: 10px;
 }
 
@@ -276,7 +309,7 @@
   justify-content: center;
   border-radius: 8px;
   background: var(--panel);
-  color: #65aaff;
+  color: var(--accent-text);
   font-size: 12px;
   font-weight: 850;
 }
@@ -295,7 +328,7 @@
 }
 
 .holdingIdentity small {
-  color: #668fa6;
+  color: var(--text-secondary);
   font-size: 9px;
 }
 
@@ -314,7 +347,7 @@
   height: 5px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(92, 129, 151, 0.18);
+  background: var(--surface-raised);
 }
 
 .weightTrack i {
@@ -364,14 +397,14 @@
 }
 
 .allocationList strong {
-  color: #b9d9eb;
+  color: var(--text);
 }
 
 .allocationList i {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(92, 129, 151, 0.16);
+  background: var(--surface-raised);
 }
 
 .allocationList em {
@@ -398,7 +431,7 @@
 }
 
 .assetGrid span {
-  color: #79a8c2;
+  color: var(--text-secondary);
   font-size: 9px;
 }
 
@@ -413,7 +446,7 @@
 .description p {
   max-width: 1050px;
   margin: 14px 0 0;
-  color: #86b5ce;
+  color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.7;
 }
@@ -426,23 +459,23 @@
 }
 
 .footer a {
-  color: #72b9e1;
+  color: var(--accent-text);
 }
 
 .positive {
-  color: var(--teal);
+  color: var(--positive-text);
 }
 
 .negative {
-  color: #ff4c70;
+  color: var(--negative-text);
 }
 
 .neutral {
-  color: #8ba5b4;
+  color: var(--text-secondary);
 }
 
 .muted {
-  color: #6d99b1;
+  color: var(--text-secondary);
   font-size: 11px;
   line-height: 1.55;
 }
@@ -452,7 +485,7 @@
   display: grid;
   place-items: center;
   padding: 30px;
-  color: #769eb4;
+  color: var(--text-secondary);
   text-align: center;
 }
 
@@ -612,7 +645,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #7eabc4;
+  color: var(--text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: 11px;
@@ -623,13 +656,13 @@
 }
 
 .rangeTab:hover {
-  color: #e8f4fa;
+  color: var(--text);
 }
 
 .rangeTabActive {
-  background: #176390;
-  color: #ffffff;
-  box-shadow: inset 0 0 0 1px #2a8fc3;
+  background: var(--interactive);
+  color: var(--on-primary);
+  box-shadow: inset 0 0 0 1px var(--interactive);
 }
 
 .performanceSummary {
@@ -661,12 +694,8 @@
   position: relative;
   min-height: 410px;
   padding: 12px 15px 4px;
-  background:
-    linear-gradient(
-      180deg,
-      rgba(4, 23, 35, 0.78),
-      rgba(5, 28, 42, 0.48)
-    );
+  background: var(--data-canvas);
+  color: var(--data-canvas-text);
 }
 
 .performanceChart {
@@ -681,7 +710,7 @@
   min-height: 390px;
   display: grid;
   place-items: center;
-  color: #739db5;
+  color: var(--data-canvas-text);
   font-size: 12px;
   text-align: center;
 }
@@ -689,7 +718,7 @@
 .chartWarning {
   margin: 0;
   padding: 0 18px 15px;
-  color: #e0b76f;
+  color: var(--warning);
   font-size: 10px;
 }
 

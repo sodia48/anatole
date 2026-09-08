@@ -1015,21 +1015,24 @@ class FundamentalsService:
             if cached and now - cached[0] < cached[1].refresh_after_seconds:
                 return cached[1]
 
+            quote_summary_failed = False
             try:
                 payload = await self._request_summary(symbol)
                 snapshot = self._snapshot(ticker, symbol, payload)
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
+                quote_summary_failed = True
                 snapshot = self._unavailable(
                     ticker,
                     symbol,
                     (
-                        "La source fondamentale publique est temporairement "
-                        f"indisponible ({type(exc).__name__})."
+                        "Les données fondamentales sont temporairement "
+                        "indisponibles."
                     ),
                 )
 
             snapshot = await official_financials_service.enrich(
-                snapshot
+                snapshot,
+                upstream_failed=quote_summary_failed,
             )
             snapshot.ttm = self._ttm(
                 snapshot.quarterly_financials,
@@ -1041,6 +1044,25 @@ class FundamentalsService:
                 snapshot.quarterly_financials,
                 snapshot.ttm,
             )
+
+            stale = self._cache.get(symbol)
+            if (
+                snapshot.status == "unavailable"
+                and stale is not None
+                and stale[1].status != "unavailable"
+            ):
+                snapshot = stale[1].model_copy(
+                    update={
+                        "status": "partial",
+                        "message": (
+                            "Dernières données disponibles; "
+                            "l'actualisation a temporairement échoué."
+                        ),
+                        "refresh_after_seconds": (
+                            self.unavailable_ttl_seconds
+                        ),
+                    }
+                )
 
             self._cache[symbol] = (monotonic(), snapshot)
             return snapshot

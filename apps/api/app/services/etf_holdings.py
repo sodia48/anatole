@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import math
 import re
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from dataclasses import dataclass, replace
+from datetime import UTC, date, datetime
 from time import monotonic
 from typing import Any
 
@@ -17,9 +17,12 @@ from app.schemas.etf_holdings import (
     EtfHoldingsSnapshot,
     EtfSectorAllocation,
 )
+from app.services.etf_official_holdings import (
+    vanguard_canada_holdings_provider,
+)
 
 
-COMPOSITION_CACHE_SECONDS = 21_600
+COMPOSITION_CACHE_SECONDS = 86_400
 QUOTE_CACHE_SECONDS = 30
 REQUEST_TIMEOUT_SECONDS = 35
 DEFAULT_HOLDING_LIMIT = 12
@@ -63,8 +66,15 @@ class Composition:
     overview: dict[str, Any]
     rows: list[dict[str, Any]]
     sectors: dict[str, float]
+    regions: dict[str, float]
     asset_classes: dict[str, float]
     fetched_at: datetime
+    source_name: str
+    source_url: str | None
+    composition_as_of: date | None = None
+    official: bool = False
+    stale: bool = False
+    source_warning: str | None = None
 
 
 def _normalize_etf_symbol(ticker: str) -> str:
@@ -305,8 +315,14 @@ def _fetch_composition_sync(
         overview=overview,
         rows=rows,
         sectors=sectors,
+        regions={},
         asset_classes=asset_classes,
         fetched_at=datetime.now(UTC),
+        source_name="Yahoo Finance public fund holdings via yfinance",
+        source_url=(
+            "https://finance.yahoo.com/quote/"
+            f"{normalized_symbol}/holdings/"
+        ),
     )
 
 
@@ -381,11 +397,68 @@ class EtfHoldingsService:
         ):
             return cached[1]
 
-        composition = await asyncio.to_thread(
-            _fetch_composition_sync,
-            normalized_symbol,
-            limit,
-        )
+        clean_ticker = _display_symbol(normalized_symbol)
+        source_warning: str | None = None
+
+        try:
+            if vanguard_canada_holdings_provider.supports(clean_ticker):
+                try:
+                    official = await (
+                        vanguard_canada_holdings_provider.get_composition(
+                            clean_ticker,
+                            limit=MAX_HOLDING_LIMIT,
+                        )
+                    )
+                except Exception:  # noqa: BLE001
+                    source_warning = (
+                        "La composition officielle est temporairement "
+                        "indisponible; une source secondaire est affichée."
+                    )
+                else:
+                    composition = Composition(
+                        ticker=clean_ticker,
+                        normalized_symbol=normalized_symbol,
+                        description=None,
+                        overview={"name": official.name},
+                        rows=official.rows,
+                        sectors=official.sectors,
+                        regions=official.regions,
+                        asset_classes=official.asset_classes,
+                        fetched_at=datetime.now(UTC),
+                        source_name=official.source_name,
+                        source_url=official.source_url,
+                        composition_as_of=official.composition_as_of,
+                        official=True,
+                    )
+                    self._composition_cache[normalized_symbol] = (
+                        monotonic(),
+                        composition,
+                    )
+                    return composition
+
+            composition = await asyncio.to_thread(
+                _fetch_composition_sync,
+                normalized_symbol,
+                MAX_HOLDING_LIMIT,
+            )
+            if not composition.rows:
+                raise ValueError("No published ETF holdings")
+            composition = replace(
+                composition,
+                source_warning=source_warning,
+            )
+        except Exception:  # noqa: BLE001
+            if cached is not None and cached[1].rows:
+                return replace(
+                    cached[1],
+                    stale=True,
+                    source_warning=(
+                        "Dernière composition disponible; "
+                        "l'actualisation a temporairement échoué."
+                    ),
+                )
+            raise
+
         self._composition_cache[normalized_symbol] = (
             monotonic(),
             composition,
@@ -483,6 +556,28 @@ class EtfHoldingsService:
             reverse=True,
         )
 
+    @staticmethod
+    def _region_items(
+        values: dict[str, float],
+    ) -> list[EtfSectorAllocation]:
+        output: list[EtfSectorAllocation] = []
+        for key, raw_value in values.items():
+            value = _percent(raw_value)
+            if value is None or value <= 0:
+                continue
+            output.append(
+                EtfSectorAllocation(
+                    key=key,
+                    label=key,
+                    weight_percent=value,
+                )
+            )
+        return sorted(
+            output,
+            key=lambda item: item.weight_percent,
+            reverse=True,
+        )
+
     async def snapshot(
         self,
         ticker: str,
@@ -536,36 +631,25 @@ class EtfHoldingsService:
             )
 
             try:
-                async with asyncio.timeout(
-                    REQUEST_TIMEOUT_SECONDS
-                ):
+                async with asyncio.timeout(REQUEST_TIMEOUT_SECONDS):
                     composition = await self._composition(
                         normalized_symbol,
                         bounded_limit,
                         force_refresh=force_refresh,
                     )
-                    symbols = [
-                        normalized_symbol,
-                        *[
-                            row["symbol"]
-                            for row in composition.rows
-                        ],
-                    ]
-                    quotes = await asyncio.to_thread(
-                        _download_quotes_sync,
-                        symbols,
-                    )
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 stale = self._snapshot_cache.get(
                     cache_key
                 )
 
-                if stale is not None:
+                if stale is not None and stale[1].holdings:
                     stale_snapshot = stale[1].model_copy(
                         update={
+                            "status": "partial",
+                            "stale": True,
                             "message": (
-                                "Les dernières positions chargées "
-                                "sont affichées; la mise à jour a échoué."
+                                "Dernière composition disponible; "
+                                "l'actualisation a temporairement échoué."
                             )
                         }
                     )
@@ -581,19 +665,43 @@ class EtfHoldingsService:
                     status="unavailable",
                     message=(
                         "Les positions détaillées de cet ETF "
-                        "sont temporairement indisponibles. "
-                        f"{type(exc).__name__}"
+                        "sont temporairement indisponibles."
                     ),
-                    source_name=(
-                        "Yahoo Finance public fund data "
-                        "via yfinance"
-                    ),
-                    source_url=(
-                        "https://finance.yahoo.com/quote/"
-                        f"{normalized_symbol}/holdings/"
-                    ),
+                    source_name="Source de composition ETF",
+                    source_url=None,
                     generated_at=datetime.now(UTC),
                 )
+
+            rows = composition.rows[:bounded_limit]
+            symbols = [
+                normalized_symbol,
+                *[
+                    row["symbol"]
+                    for row in rows
+                    if row.get("symbol")
+                ],
+            ]
+            quotes: dict[str, dict[str, float | None]] = {}
+            quote_failed = False
+            try:
+                quotes = await asyncio.to_thread(
+                    _download_quotes_sync,
+                    symbols,
+                )
+            except Exception:  # noqa: BLE001
+                quote_failed = True
+                stale = self._snapshot_cache.get(cache_key)
+                if stale is not None and stale[1].holdings:
+                    return stale[1].model_copy(
+                        update={
+                            "status": "partial",
+                            "stale": True,
+                            "message": (
+                                "Dernières données disponibles; "
+                                "les cotations n'ont pas pu être actualisées."
+                            ),
+                        }
+                    )
 
             etf_quote = quotes.get(
                 normalized_symbol,
@@ -602,7 +710,7 @@ class EtfHoldingsService:
             holdings: list[EtfHoldingDriver] = []
 
             for rank, row in enumerate(
-                composition.rows,
+                rows,
                 start=1,
             ):
                 quote = quotes.get(
@@ -639,6 +747,9 @@ class EtfHoldingsService:
                         ),
                         change_percent=change_percent,
                         contribution_percent_points=contribution,
+                        sector=row.get("sector"),
+                        region=row.get("region"),
+                        source=composition.source_name,
                     )
                 )
 
@@ -689,12 +800,16 @@ class EtfHoldingsService:
                 sectors=self._sector_items(
                     composition.sectors
                 ),
+                regions=self._region_items(
+                    composition.regions
+                ),
                 asset_classes=self._asset_items(
                     composition.asset_classes
                 ),
-                top_holdings_weight_percent=sum(
-                    item.weight_percent
-                    for item in holdings
+                top_holdings_weight_percent=(
+                    sum(item.weight_percent for item in holdings)
+                    if holdings
+                    else None
                 ),
                 net_driver_contribution_percent_points=net,
                 positive_driver_contribution_percent_points=(
@@ -707,13 +822,18 @@ class EtfHoldingsService:
                     if contributions
                     else None
                 ),
-                quoted_holdings=quoted_holdings,
-                total_holdings_returned=len(
-                    holdings
+                quoted_holdings=(
+                    None if quote_failed else quoted_holdings
+                ),
+                total_holdings_returned=(
+                    len(holdings) if holdings else None
                 ),
                 status=(
                     "available"
                     if holdings
+                    and not composition.stale
+                    and not composition.source_warning
+                    and not quote_failed
                     and quoted_holdings
                     == len(holdings)
                     else "partial"
@@ -721,22 +841,28 @@ class EtfHoldingsService:
                     else "unavailable"
                 ),
                 message=(
-                    "La contribution est une approximation calculée "
-                    "comme poids du titre × variation de séance."
+                    (
+                        "Les positions sont disponibles, mais les "
+                        "cotations et contributions sont temporairement N/D."
+                        if quote_failed
+                        else composition.source_warning
+                        if composition.source_warning
+                        else (
+                            "La contribution est une approximation calculée "
+                            "comme poids du titre × variation de séance."
+                        )
+                    )
                     if holdings
                     else (
                         "Aucune position détaillée n'a été publiée "
                         "pour cet ETF."
                     )
                 ),
-                source_name=(
-                    "Yahoo Finance public fund holdings "
-                    "via yfinance"
-                ),
-                source_url=(
-                    "https://finance.yahoo.com/quote/"
-                    f"{normalized_symbol}/holdings/"
-                ),
+                source_name=composition.source_name,
+                source_url=composition.source_url,
+                composition_as_of=composition.composition_as_of,
+                official=composition.official,
+                stale=composition.stale,
                 generated_at=datetime.now(UTC),
                 refresh_after_seconds=QUOTE_CACHE_SECONDS,
             )
