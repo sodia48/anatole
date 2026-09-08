@@ -369,11 +369,29 @@ type StatementView =
 
 
 const panelStyle = {
-  border: "1px solid rgba(35,73,96,.88)",
+  border: "1px solid var(--border)",
   borderRadius: 14,
-  background: "rgba(8,29,43,.92)",
+  background: "var(--panel-2)",
   padding: 18,
 } as const;
+
+function signedColor(value: number | null): string {
+  return value === null
+    ? "var(--text-secondary)"
+    : value >= 0
+      ? "var(--positive-text)"
+      : "var(--negative-text)";
+}
+
+function signedTone(
+  value: number | null,
+): "positive" | "negative" | undefined {
+  return value === null
+    ? undefined
+    : value >= 0
+      ? "positive"
+      : "negative";
+}
 
 function Metric({
   label,
@@ -392,22 +410,22 @@ function Metric({
         alignContent: "center",
         gap: 7,
         padding: "12px 14px",
-        border: "1px solid rgba(38,77,101,.72)",
+        border: "1px solid var(--border)",
         borderRadius: 11,
-        background: "rgba(4,20,31,.76)",
+        background: "var(--panel)",
       }}
     >
-      <span style={{ color: "#819db0", fontSize: 11 }}>
+      <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>
         {label}
       </span>
       <strong
         style={{
           color:
             tone === "positive"
-              ? "#16c79a"
+              ? "var(--positive-text)"
               : tone === "negative"
-                ? "#ff4d67"
-                : "#edf7fd",
+                ? "var(--negative-text)"
+                : "var(--text)",
           fontSize: 18,
         }}
       >
@@ -483,8 +501,8 @@ function Fundamentals({
         <Metric label={pick(language, "Marge brute", "Gross margin")} value={pct(m.gross_margin)} />
         <Metric label={pick(language, "Marge opérationnelle", "Operating margin")} value={pct(m.operating_margin)} />
         <Metric label={pick(language, "Marge nette", "Net margin")} value={pct(m.profit_margin)} />
-        <Metric label={pick(language, "Croissance des revenus", "Revenue growth")} value={pct(m.revenue_growth)} tone={(m.revenue_growth ?? 0) >= 0 ? "positive" : "negative"} />
-        <Metric label={pick(language, "Croissance des bénéfices", "Earnings growth")} value={pct(m.earnings_growth)} tone={(m.earnings_growth ?? 0) >= 0 ? "positive" : "negative"} />
+        <Metric label={pick(language, "Croissance des revenus", "Revenue growth")} value={pct(m.revenue_growth)} tone={signedTone(m.revenue_growth)} />
+        <Metric label={pick(language, "Croissance des bénéfices", "Earnings growth")} value={pct(m.earnings_growth)} tone={signedTone(m.earnings_growth)} />
       </Group>
 
       <Group title={pick(language, "Bilan et trésorerie", "Balance sheet and cash flow")}>
@@ -561,7 +579,7 @@ function MiniTrend({
                 gap: 10,
               }}
             >
-              <span style={{ color: "#819db0", fontSize: 10 }}>
+              <span style={{ color: "var(--text-secondary)", fontSize: 10 }}>
                 {new Date(row.period_end).getUTCFullYear()}
               </span>
               <div
@@ -569,7 +587,7 @@ function MiniTrend({
                   height: 10,
                   overflow: "hidden",
                   borderRadius: 999,
-                  background: "rgba(44,76,96,.42)",
+                  background: "var(--surface-raised)",
                 }}
               >
                 <div
@@ -579,8 +597,8 @@ function MiniTrend({
                     borderRadius: 999,
                     background:
                       value !== null && value < 0
-                        ? "#e34f6a"
-                        : "#23b68e",
+                        ? "var(--negative-text)"
+                        : "var(--positive-text)",
                   }}
                 />
               </div>
@@ -588,8 +606,8 @@ function MiniTrend({
                 style={{
                   color:
                     value !== null && value < 0
-                      ? "#ff7188"
-                      : "#dcecf6",
+                      ? "var(--negative-text)"
+                      : "var(--text)",
                   textAlign: "right",
                   fontSize: 11,
                 }}
@@ -678,7 +696,7 @@ function FinancialTable({
         }}
       >
         <thead>
-          <tr style={{ color: "#7898ad", textAlign: "right" }}>
+          <tr style={{ color: "var(--text-secondary)", textAlign: "right" }}>
             {headers.map((header, index) => (
               <th
                 key={header}
@@ -700,8 +718,8 @@ function FinancialTable({
                 key={`${view}-${row.period_end}`}
                 style={{
                   borderTop:
-                    "1px solid rgba(38,77,101,.58)",
-                  color: "#dcecf6",
+                    "1px solid var(--border)",
+                  color: "var(--text)",
                   textAlign: "right",
                 }}
               >
@@ -728,10 +746,7 @@ function FinancialTable({
                     <td
                       style={{
                         padding: 11,
-                        color:
-                          (row.revenue_growth_yoy ?? 0) >= 0
-                            ? "#16c79a"
-                            : "#ff4d67",
+                        color: signedColor(row.revenue_growth_yoy),
                       }}
                     >
                       {pct(row.revenue_growth_yoy)}
@@ -739,10 +754,7 @@ function FinancialTable({
                     <td
                       style={{
                         padding: 11,
-                        color:
-                          (row.net_income_growth_yoy ?? 0) >= 0
-                            ? "#16c79a"
-                            : "#ff4d67",
+                        color: signedColor(row.net_income_growth_yoy),
                       }}
                     >
                       {pct(row.net_income_growth_yoy)}
@@ -759,10 +771,7 @@ function FinancialTable({
                     <td
                       style={{
                         padding: 11,
-                        color:
-                          (row.free_cash_flow_growth_yoy ?? 0) >= 0
-                            ? "#16c79a"
-                            : "#ff4d67",
+                        color: signedColor(row.free_cash_flow_growth_yoy),
                       }}
                     >
                       {pct(row.free_cash_flow_growth_yoy)}
@@ -788,10 +797,7 @@ function FinancialTable({
                     <td
                       style={{
                         padding: 11,
-                        color:
-                          (row.eps_growth_yoy ?? 0) >= 0
-                            ? "#16c79a"
-                            : "#ff4d67",
+                        color: signedColor(row.eps_growth_yoy),
                       }}
                     >
                       {pct(row.eps_growth_yoy)}
@@ -807,7 +813,7 @@ function FinancialTable({
                 colSpan={headers.length}
                 style={{
                   padding: 28,
-                  color: "#7f9db1",
+                  color: "var(--text-secondary)",
                   textAlign: "left",
                 }}
               >
@@ -875,9 +881,9 @@ function Financials({
           maxWidth: "100%",
           padding: 4,
           overflowX: "auto",
-          border: "1px solid rgba(39,78,102,.8)",
+          border: "1px solid var(--border)",
           borderRadius: 11,
-          background: "rgba(4,18,29,.82)",
+          background: "var(--panel)",
         }}
       >
         {resultTabs.map((tab) => {
@@ -892,13 +898,13 @@ function Financials({
                 height: 34,
                 padding: "0 12px",
                 border: active
-                  ? "1px solid rgba(54,163,241,.72)"
+                  ? "1px solid var(--interactive)"
                   : "1px solid transparent",
                 borderRadius: 8,
                 background: active
-                  ? "rgba(27,105,159,.82)"
+                  ? "var(--interactive)"
                   : "transparent",
-                color: active ? "#fff" : "#86a4b8",
+                color: active ? "var(--on-primary)" : "var(--text-secondary)",
                 fontSize: 10,
                 fontWeight: 800,
                 cursor: "pointer",
@@ -1065,9 +1071,9 @@ function Financials({
                 padding: 4,
                 maxWidth: "100%",
                 overflowX: "auto",
-                border: "1px solid rgba(39,78,102,.72)",
+                border: "1px solid var(--border)",
                 borderRadius: 9,
-                background: "rgba(4,18,29,.65)",
+                background: "var(--panel)",
               }}
             >
               {statementTabs.map((tab) => {
@@ -1083,9 +1089,9 @@ function Financials({
                       border: "none",
                       borderRadius: 7,
                       background: active
-                        ? "rgba(36,106,151,.82)"
+                        ? "var(--interactive)"
                         : "transparent",
-                      color: active ? "#fff" : "#86a4b8",
+                      color: active ? "var(--on-primary)" : "var(--text-secondary)",
                       fontSize: 9,
                       fontWeight: 750,
                       cursor: "pointer",
@@ -1126,7 +1132,7 @@ function Financials({
               }}
             >
               <thead>
-                <tr style={{ color: "#7898ad", textAlign: "right" }}>
+                <tr style={{ color: "var(--text-secondary)", textAlign: "right" }}>
                   {(language === "fr" ? [
                     "Période",
                     "Fin",
@@ -1160,8 +1166,8 @@ function Financials({
                       key={`${estimate.period}-${estimate.end_date}`}
                       style={{
                         borderTop:
-                          "1px solid rgba(38,77,101,.58)",
-                        color: "#dcecf6",
+                          "1px solid var(--border)",
+                        color: "var(--text)",
                         textAlign: "right",
                       }}
                     >
@@ -1179,10 +1185,7 @@ function Financials({
                       <td
                         style={{
                           padding: 11,
-                          color:
-                            (estimate.eps_growth ?? 0) >= 0
-                              ? "#16c79a"
-                              : "#ff4d67",
+                          color: signedColor(estimate.eps_growth),
                         }}
                       >
                         {pct(estimate.eps_growth)}
@@ -1195,10 +1198,7 @@ function Financials({
                       <td
                         style={{
                           padding: 11,
-                          color:
-                            (estimate.revenue_growth ?? 0) >= 0
-                              ? "#16c79a"
-                              : "#ff4d67",
+                          color: signedColor(estimate.revenue_growth),
                         }}
                       >
                         {pct(estimate.revenue_growth)}
@@ -1208,7 +1208,7 @@ function Financials({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={11} style={{ padding: 28, color: "#7f9db1" }}>
+                    <td colSpan={11} style={{ padding: 28, color: "var(--text-secondary)" }}>
                       {pick(language, "Aucun consensus détaillé publié pour ce titre.", "No detailed consensus is published for this security.")}
                     </td>
                   </tr>
@@ -1238,25 +1238,22 @@ function Financials({
                     key={quarter.period}
                     style={{
                       padding: 14,
-                      border: "1px solid rgba(38,77,101,.72)",
+                      border: "1px solid var(--border)",
                       borderRadius: 11,
-                      background: "rgba(4,20,31,.76)",
+                      background: "var(--panel)",
                     }}
                   >
                     <strong>{quarter.period}</strong>
-                    <div style={{ marginTop: 9, color: "#dcecf6" }}>
+                    <div style={{ marginTop: 9, color: "var(--text)" }}>
                       {pick(language, "Réel", "Actual")}: {money(quarter.actual, currency)}
                     </div>
-                    <div style={{ color: "#819db0" }}>
+                    <div style={{ color: "var(--text-secondary)" }}>
                       Consensus : {money(quarter.estimate, currency)}
                     </div>
                     <div
                       style={{
                         marginTop: 7,
-                        color:
-                          (quarter.surprise_percent ?? 0) >= 0
-                            ? "#16c79a"
-                            : "#ff4d67",
+                        color: signedColor(quarter.surprise_percent),
                         fontWeight: 750,
                       }}
                     >
@@ -1265,7 +1262,7 @@ function Financials({
                   </div>
                 ))
               ) : (
-                <span style={{ color: "#7f9db1" }}>N/D</span>
+                <span style={{ color: "var(--text-secondary)" }}>N/D</span>
               )}
             </div>
           </section>
@@ -1306,11 +1303,11 @@ function AnalystsView({
   const a = snapshot.analysts;
   const currency = snapshot.currency ?? "CAD";
   const distribution = [
-    [pick(language, "Achat fort", "Strong buy"), a.strong_buy, "#12d8a5"],
-    [pick(language, "Achat", "Buy"), a.buy, "#49b98f"],
-    [pick(language, "Conserver", "Hold"), a.hold, "#6f8ca0"],
-    [pick(language, "Vente", "Sell"), a.sell, "#dc6c79"],
-    [pick(language, "Vente forte", "Strong sell"), a.strong_sell, "#ff4669"],
+    [pick(language, "Achat fort", "Strong buy"), a.strong_buy, "var(--positive-text)"],
+    [pick(language, "Achat", "Buy"), a.buy, "var(--positive-text)"],
+    [pick(language, "Conserver", "Hold"), a.hold, "var(--text-secondary)"],
+    [pick(language, "Vente", "Sell"), a.sell, "var(--negative-text)"],
+    [pick(language, "Vente forte", "Strong sell"), a.strong_sell, "var(--negative-text)"],
   ] as const;
   const total = distribution.reduce(
     (sum, [, value]) => sum + (value ?? 0),
@@ -1335,7 +1332,7 @@ function AnalystsView({
               ? a.recommendation_key.replaceAll("_", " ").toUpperCase()
               : "N/D"}
           </h2>
-          <p style={{ color: "#819db0", margin: 0 }}>
+          <p style={{ color: "var(--text-secondary)", margin: 0 }}>
             {pick(language, "Note moyenne", "Average rating")}: {n(a.recommendation_mean)} ·{" "}
             {a.analyst_count ?? "N/D"} {pick(language, "analystes", "analysts")}
           </p>
@@ -1344,12 +1341,12 @@ function AnalystsView({
         <div
           style={{
             padding: 16,
-            border: "1px solid rgba(38,77,101,.72)",
+            border: "1px solid var(--border)",
             borderRadius: 12,
-            background: "rgba(4,20,31,.76)",
+            background: "var(--panel)",
           }}
         >
-          <span style={{ color: "#819db0", fontSize: 11 }}>
+          <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>
             {pick(language, "Potentiel vers la cible moyenne", "Upside to average target")}
           </span>
           <strong
@@ -1357,10 +1354,7 @@ function AnalystsView({
               display: "block",
               marginTop: 8,
               fontSize: 30,
-              color:
-                (a.upside_to_mean_percent ?? 0) >= 0
-                  ? "#16c79a"
-                  : "#ff4d67",
+              color: signedColor(a.upside_to_mean_percent),
             }}
           >
             {pct(a.upside_to_mean_percent)}
@@ -1392,7 +1386,7 @@ function AnalystsView({
                     justifyContent: "space-between",
                     gap: 12,
                     marginBottom: 5,
-                    color: "#b9cfdd",
+                    color: "var(--text-secondary)",
                     fontSize: 12,
                   }}
                 >
@@ -1404,7 +1398,7 @@ function AnalystsView({
                     height: 9,
                     overflow: "hidden",
                     borderRadius: 999,
-                    background: "rgba(44,76,96,.48)",
+                    background: "var(--surface-raised)",
                   }}
                 >
                   <div
@@ -1463,9 +1457,11 @@ export function FocusFundamentals({
           )
         ) {
           setError(
-            reason instanceof Error
-              ? reason.message
-              : pick(language, "Chargement impossible.", "Unable to load data."),
+            pick(
+              language,
+              "La source fondamentale est temporairement indisponible.",
+              "The fundamental data source is temporarily unavailable.",
+            ),
           );
         }
       } finally {
@@ -1495,7 +1491,7 @@ export function FocusFundamentals({
           minHeight: 360,
           display: "grid",
           placeItems: "center",
-          color: "#819db0",
+          color: "var(--text-secondary)",
         }}
       >
         {pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
@@ -1505,7 +1501,7 @@ export function FocusFundamentals({
 
   if (error && !snapshot) {
     return (
-      <section className="panel" style={{ ...panelStyle, color: "#ffd9e0" }}>
+      <section className="panel" style={{ ...panelStyle, color: "var(--negative-text)" }}>
         {pick(language, "Données fondamentales indisponibles", "Fundamental data unavailable")}: {language === "fr" ? error : "The data provider did not return a usable response."}
       </section>
     );
@@ -1533,7 +1529,7 @@ export function FocusFundamentals({
           <h2 style={{ margin: "4px 0 0" }}>
             {snapshot.name}
           </h2>
-          <p style={{ margin: "6px 0 0", color: "#819db0" }}>
+          <p style={{ margin: "6px 0 0", color: "var(--text-secondary)" }}>
             {[snapshot.sector, snapshot.industry]
               .filter(Boolean)
               .join(" · ") || pick(language, "Classification non disponible", "Classification unavailable")}
@@ -1544,10 +1540,10 @@ export function FocusFundamentals({
             style={{
               color:
                 snapshot.status === "available"
-                  ? "#16c79a"
+                  ? "var(--positive-text)"
                   : snapshot.status === "partial"
-                    ? "#d2a45e"
-                    : "#ff4d67",
+                    ? "var(--warning)"
+                    : "var(--negative-text)",
             }}
           >
             {snapshot.status === "available"
@@ -1561,7 +1557,7 @@ export function FocusFundamentals({
               style={{
                 maxWidth: 460,
                 marginTop: 4,
-                color: "#819db0",
+                color: "var(--text-secondary)",
                 fontSize: 10,
               }}
             >

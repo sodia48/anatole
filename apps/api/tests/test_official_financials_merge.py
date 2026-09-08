@@ -5,6 +5,7 @@ from app.schemas.fundamentals import (
     FinancialSource,
 )
 from app.services.official_financials import (
+    classify_fundamental_status,
     merge_periods,
 )
 
@@ -60,3 +61,30 @@ def test_official_values_override_only_when_present() -> None:
     assert merged.total_cash == 25
     assert merged.source is not None
     assert merged.source.confidence == "official"
+
+
+def test_public_status_reflects_real_coverage_and_source_failures() -> None:
+    assert classify_fundamental_status(
+        metric_fields=0,
+        statement_fields=0,
+        usable_periods=0,
+        source_failed=True,
+    ) == "unavailable"
+    assert classify_fundamental_status(
+        metric_fields=18,
+        statement_fields=30,
+        usable_periods=4,
+        source_failed=False,
+    ) == "available"
+    assert classify_fundamental_status(
+        metric_fields=18,
+        statement_fields=30,
+        usable_periods=4,
+        source_failed=True,
+    ) == "partial"
+    assert classify_fundamental_status(
+        metric_fields=2,
+        statement_fields=3,
+        usable_periods=1,
+        source_failed=False,
+    ) == "partial"

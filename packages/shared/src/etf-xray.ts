@@ -111,7 +111,7 @@ function currencyWeights(holdings: readonly EtfHoldingDriver[]): EtfXRayAnalytic
  */
 export function calculateEtfXRay(snapshot: EtfHoldingsSnapshot, history: readonly EtfHistoryPoint[]): EtfXRayAnalytics {
   const holdings = [...snapshot.holdings];
-  const holdingCount = snapshot.total_holdings_returned || holdings.length;
+  const holdingCount = snapshot.total_holdings_returned ?? holdings.length;
   const top5 = topConcentration(holdings, 5, holdingCount);
   const top10 = topConcentration(holdings, 10, holdingCount);
   const largest = holdings.length ? Math.max(...holdings.map((holding) => holding.weight_percent)) : null;

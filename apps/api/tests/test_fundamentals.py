@@ -1,5 +1,8 @@
 from datetime import UTC, datetime
 
+import pytest
+
+from app.schemas.fundamentals import FinancialPeriod
 from app.services.fundamentals import FundamentalsService, percent
 
 
@@ -159,3 +162,42 @@ def test_snapshot_maps_real_fields_without_invention() -> None:
     assert snapshot.analysts.upside_to_mean_percent is not None
     assert snapshot.annual_financials[0].free_cash_flow == 18_000_000_000
     assert snapshot.earnings_history[0].surprise_percent is not None
+
+
+@pytest.mark.asyncio
+async def test_quote_summary_failure_still_uses_structured_financials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = FundamentalsService()
+
+    async def fail_summary(symbol: str) -> dict:
+        raise RuntimeError("private upstream diagnostic")
+
+    async def enrich(snapshot, *, upstream_failed: bool = False):
+        assert upstream_failed is True
+        return snapshot.model_copy(
+            update={
+                "status": "partial",
+                "message": "Certaines sources sont temporairement indisponibles.",
+                "annual_financials": [
+                    FinancialPeriod(
+                        period_end=datetime(2025, 12, 31, tzinfo=UTC),
+                        period_type="annual",
+                        currency="CAD",
+                        total_revenue=42_000_000_000,
+                    )
+                ],
+            }
+        )
+
+    monkeypatch.setattr(service, "_request_summary", fail_summary)
+    monkeypatch.setattr(
+        "app.services.fundamentals.official_financials_service.enrich",
+        enrich,
+    )
+
+    snapshot = await service.get_snapshot("CNQ")
+
+    assert snapshot.status == "partial"
+    assert snapshot.annual_financials[0].total_revenue == 42_000_000_000
+    assert "RuntimeError" not in (snapshot.message or "")

@@ -69,6 +69,52 @@ test("les réglages présentent les deux identités localisées", async ({ page 
   await expect(page.getByText("Sky blue · bright and refined", { exact: true })).toBeVisible();
 });
 
+test("les cartes fondamentales utilisent la palette Ciel", async ({ page }) => {
+  await page.addInitScript((value) => {
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value));
+    localStorage.setItem("anatole.appearance-choice.v1", "1");
+  }, preferences("blue"));
+  await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      ticker: "RY.TO",
+      symbol: "RY",
+      name: "Royal Bank of Canada",
+      sector: "Financial Services",
+      industry: "Banks",
+      currency: "CAD",
+      financial_currency: "CAD",
+      status: "available",
+      message: null,
+      metrics: { market_cap: 200_000_000_000 },
+      annual_financials: [],
+      quarterly_financials: [],
+      ttm: {},
+      highlights: {},
+      earnings_history: [],
+      earnings_estimates: [],
+      analysts: {},
+      events: { earnings_dates: [] },
+      source: "E2E verified source",
+      generated_at: new Date().toISOString(),
+      refresh_after_seconds: 1800,
+    }),
+  }));
+
+  await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+  await page.getByRole("button", { name: "Fondamentaux", exact: true }).click();
+  const metric = page.getByText("Capitalisation", { exact: true }).locator("..");
+  await expect(metric).toBeVisible();
+  const colors = await metric.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  expect(colors.background).toBe("rgb(247, 252, 255)");
+  expect(colors.color).toBe("rgb(8, 32, 51)");
+});
+
 for (const route of ["/aujourdhui", "/focus/RY", "/actualites", "/calendrier", "/portefeuille", "/screener", "/parametres?section=preferences"]) {
   test(`Anatole Ciel reste accessible sur ${route}`, async ({ page }) => {
     await page.addInitScript((value) => {

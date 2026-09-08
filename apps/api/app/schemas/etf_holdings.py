@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -17,6 +17,8 @@ class EtfHoldingDriver(BaseModel):
     currency: str | None = None
     change_percent: float | None = None
     contribution_percent_points: float | None = None
+    sector: str | None = None
+    region: str | None = None
     source: str = "Yahoo Finance public fund data"
     delayed: bool = True
 
@@ -46,16 +48,20 @@ class EtfHoldingsSnapshot(BaseModel):
     change_percent: float | None = None
     holdings: list[EtfHoldingDriver] = Field(default_factory=list)
     sectors: list[EtfSectorAllocation] = Field(default_factory=list)
+    regions: list[EtfSectorAllocation] = Field(default_factory=list)
     asset_classes: list[EtfAssetAllocation] = Field(default_factory=list)
-    top_holdings_weight_percent: float = 0
+    top_holdings_weight_percent: float | None = None
     net_driver_contribution_percent_points: float | None = None
     positive_driver_contribution_percent_points: float | None = None
     negative_driver_contribution_percent_points: float | None = None
-    quoted_holdings: int = 0
-    total_holdings_returned: int = 0
+    quoted_holdings: int | None = None
+    total_holdings_returned: int | None = None
     status: Literal["available", "partial", "unavailable"]
     message: str | None = None
     source_name: str
     source_url: str | None = None
+    composition_as_of: date | None = None
+    official: bool = False
+    stale: bool = False
     generated_at: datetime
     refresh_after_seconds: int = 30

@@ -14,6 +14,11 @@ export type EtfHoldingDriver = {
   contribution_percent_points:
     | number
     | null;
+  sector: string | null;
+  region: string | null;
+  currency: string | null;
+  source: string;
+  delayed: boolean;
 };
 
 export type EtfAllocationItem = {
@@ -35,8 +40,9 @@ export type EtfHoldingsSnapshot = {
   change_percent: number | null;
   holdings: EtfHoldingDriver[];
   sectors: EtfAllocationItem[];
+  regions: EtfAllocationItem[];
   asset_classes: EtfAllocationItem[];
-  top_holdings_weight_percent: number;
+  top_holdings_weight_percent: number | null;
   net_driver_contribution_percent_points:
     | number
     | null;
@@ -46,8 +52,8 @@ export type EtfHoldingsSnapshot = {
   negative_driver_contribution_percent_points:
     | number
     | null;
-  quoted_holdings: number;
-  total_holdings_returned: number;
+  quoted_holdings: number | null;
+  total_holdings_returned: number | null;
   status:
     | "available"
     | "partial"
@@ -56,6 +62,9 @@ export type EtfHoldingsSnapshot = {
   message: string | null;
   source_name: string;
   source_url: string | null;
+  composition_as_of: string | null;
+  official: boolean;
+  stale: boolean;
   generated_at: string;
   refresh_after_seconds: number;
 };
@@ -216,7 +225,7 @@ function cacheKey(
     kind,
     ticker.toUpperCase(),
     range ?? "",
-    "v2",
+    "v3",
   ].join(":");
 }
 
@@ -599,6 +608,17 @@ function normalizeHoldings(
             item.contribution_percent_points ??
               item.contribution,
           ),
+        sector:
+          stringValue(item.sector) || null,
+        region:
+          stringValue(item.region) || null,
+        currency:
+          stringValue(item.currency) || null,
+        source: stringValue(
+          item.source,
+          "Anatole API",
+        ),
+        delayed: item.delayed !== false,
       } satisfies EtfHoldingDriver;
     })
     .filter(
@@ -610,19 +630,13 @@ function normalizeHoldings(
     );
 
   const quotedHoldings =
-    Math.max(
-      0,
-      Math.round(
-        numberValue(
-          raw.quoted_holdings,
-          holdings.filter(
-            (item) =>
-              item.change_percent !==
-              null,
-          ).length,
-        ),
-      ),
-    );
+    raw.quoted_holdings === null ||
+    raw.quoted_holdings === undefined
+      ? null
+      : Math.max(
+          0,
+          Math.round(numberValue(raw.quoted_holdings)),
+        );
 
   return {
     ticker,
@@ -668,23 +682,22 @@ function normalizeHoldings(
       normalizeAllocation(
         raw.sectors,
       ),
+    regions:
+      normalizeAllocation(
+        raw.regions,
+      ),
     asset_classes:
       normalizeAllocation(
         raw.asset_classes,
       ),
     top_holdings_weight_percent:
-      Math.max(
-        0,
-        numberValue(
-          raw.top_holdings_weight_percent,
-          holdings.reduce(
-            (sum, item) =>
-              sum +
-              item.weight_percent,
+      nullableNumber(raw.top_holdings_weight_percent) ??
+      (holdings.length
+        ? holdings.reduce(
+            (sum, item) => sum + item.weight_percent,
             0,
-          ),
-        ),
-      ),
+          )
+        : null),
     net_driver_contribution_percent_points:
       nullableNumber(
         raw.net_driver_contribution_percent_points,
@@ -700,15 +713,13 @@ function normalizeHoldings(
     quoted_holdings:
       quotedHoldings,
     total_holdings_returned:
-      Math.max(
-        holdings.length,
-        Math.round(
-          numberValue(
-            raw.total_holdings_returned,
+      raw.total_holdings_returned === null ||
+      raw.total_holdings_returned === undefined
+        ? holdings.length || null
+        : Math.max(
             holdings.length,
+            Math.round(numberValue(raw.total_holdings_returned)),
           ),
-        ),
-      ),
     status: validStatus(
       raw.status,
       holdings.length
@@ -727,6 +738,10 @@ function normalizeHoldings(
       stringValue(
         raw.source_url,
       ) || null,
+    composition_as_of:
+      stringValue(raw.composition_as_of) || null,
+    official: raw.official === true,
+    stale: raw.stale === true,
     generated_at:
       stringValue(
         raw.generated_at,
@@ -923,6 +938,8 @@ function staleHoldings(
 ): EtfHoldingsSnapshot {
   return {
     ...snapshot,
+    status: "partial",
+    stale: true,
     message:
       "La connexion a échoué; la dernière fiche ETF enregistrée sur cet appareil est affichée.",
   };

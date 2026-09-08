@@ -73,6 +73,26 @@ VALUE_FIELDS = (
 )
 
 
+def classify_fundamental_status(
+    *,
+    metric_fields: int,
+    statement_fields: int,
+    usable_periods: int,
+    source_failed: bool,
+) -> str:
+    has_usable_data = bool(metric_fields or statement_fields)
+    if not has_usable_data:
+        return "unavailable"
+
+    has_sufficient_data = bool(
+        (metric_fields >= 18 and usable_periods >= 4)
+        or (statement_fields >= 25 and usable_periods >= 2)
+    )
+    if source_failed or not has_sufficient_data:
+        return "partial"
+    return "available"
+
+
 def _number(value: Any) -> float | None:
     if value is None or isinstance(value, bool):
         return None
@@ -449,6 +469,8 @@ class OfficialFinancialsService:
     async def enrich(
         self,
         snapshot: FundamentalSnapshot,
+        *,
+        upstream_failed: bool = False,
     ) -> FundamentalSnapshot:
         ticker = snapshot.symbol
         constituent = await (
@@ -468,8 +490,8 @@ class OfficialFinancialsService:
                 sec_result = await (
                     sec_edgar_financials_provider.get_financials(ticker)
                 )
-            except Exception as exc:  # noqa: BLE001
-                errors.append(f"SEC EDGAR: {type(exc).__name__}")
+            except Exception:  # noqa: BLE001
+                errors.append("SEC EDGAR indisponible")
 
         async def issuer_task() -> None:
             nonlocal issuer_result
@@ -479,10 +501,8 @@ class OfficialFinancialsService:
                         ticker, snapshot.website
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
-                errors.append(
-                    f"Site investisseurs: {type(exc).__name__}"
-                )
+            except Exception:  # noqa: BLE001
+                errors.append("Site investisseurs indisponible")
 
         async def yahoo_task() -> None:
             nonlocal yahoo_result
@@ -494,10 +514,8 @@ class OfficialFinancialsService:
                         or snapshot.currency,
                     )
                 )
-            except Exception as exc:  # noqa: BLE001
-                errors.append(
-                    f"Yahoo structuré: {type(exc).__name__}"
-                )
+            except Exception:  # noqa: BLE001
+                errors.append("Yahoo structuré indisponible")
 
         await asyncio.gather(sec_task(), issuer_task(), yahoo_task())
 
@@ -638,9 +656,51 @@ class OfficialFinancialsService:
             and issuer_result.error
             and not official_periods
         ):
-            message += f" Site investisseurs: {issuer_result.error}"
+            message += " Site investisseurs indisponible."
         if errors:
             message += " " + " · ".join(errors)
+
+        provider_failure = bool(
+            upstream_failed
+            or errors
+            or (issuer_result is not None and issuer_result.error)
+            or (yahoo_result is not None and yahoo_result.error)
+        )
+        metric_fields = sum(
+            value is not None
+            for value in snapshot.metrics.model_dump().values()
+        )
+        statement_fields = sum(
+            1
+            for period in annual + quarterly
+            for field in VALUE_FIELDS
+            if getattr(period, field) is not None
+        )
+        usable_periods = sum(
+            any(getattr(period, field) is not None for field in VALUE_FIELDS)
+            for period in annual + quarterly
+        )
+        public_status = classify_fundamental_status(
+            metric_fields=metric_fields,
+            statement_fields=statement_fields,
+            usable_periods=usable_periods,
+            source_failed=provider_failure,
+        )
+        public_message = (
+            "Les données fondamentales sont temporairement indisponibles."
+            if public_status == "unavailable"
+            else (
+                "Certaines sources sont temporairement indisponibles; "
+                "les données valides disponibles sont affichées."
+                if provider_failure
+                else (
+                    "Certaines données fondamentales ne sont pas "
+                    "publiées par les sources disponibles."
+                    if public_status == "partial"
+                    else None
+                )
+            )
+        )
 
         data = snapshot.model_dump()
         data["annual_financials"] = annual
@@ -675,26 +735,23 @@ class OfficialFinancialsService:
             structured_fields=structured_fields,
             calculated_fields=calculated_fields,
             yahoo_statements_error=(
-                yahoo_result.error if yahoo_result else None
+                "Yahoo structuré indisponible"
+                if yahoo_result is not None and yahoo_result.error
+                else None
             ),
             discovery_url=discovery_url,
             message=message,
         )
-        data["status"] = (
-            "available"
-            if official_fields + structured_fields >= 25
-            else "partial"
-            if official_periods or structured_periods
-            else snapshot.status
-        )
-        data["source"] = (
-            "Official filings + Yahoo Finance structured "
-            "statements + quoteSummary"
-            if official_periods
-            else "Yahoo Finance structured statements + quoteSummary"
-            if structured_periods
-            else snapshot.source
-        )
+        data["status"] = public_status
+        data["message"] = public_message
+        source_parts: list[str] = []
+        if official_periods:
+            source_parts.append("Official filings")
+        if structured_periods:
+            source_parts.append("Yahoo Finance structured statements")
+        if not upstream_failed and snapshot.status != "unavailable":
+            source_parts.append("Yahoo Finance quoteSummary")
+        data["source"] = " + ".join(source_parts) or snapshot.source
         return FundamentalSnapshot(**data)
 
     async def coverage(

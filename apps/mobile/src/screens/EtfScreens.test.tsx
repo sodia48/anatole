@@ -35,13 +35,14 @@ const directory = {
 const holdings = {
   ticker: "XIU", normalized_symbol: "XIU.TO", name: "iShares S&P/TSX 60", provider: "BlackRock", category: "Actions", exposure: "Canada large cap", description: "Tracks the S&P/TSX 60.", currency: "CAD", price: 41.2, change_percent: 0.8,
   holdings: [
-    { rank: 1, symbol: "RY.TO", display_symbol: "RY", name: "Royal Bank", instrument_type: "equity", weight_percent: 8.2, price: 200, currency: "CAD", change_percent: 1.2, contribution_percent_points: 0.098, source: "Yahoo Finance", delayed: true },
-    { rank: 2, symbol: "TD.TO", display_symbol: "TD", name: "Toronto-Dominion Bank", instrument_type: "equity", weight_percent: 6.5, price: null, currency: "CAD", change_percent: null, contribution_percent_points: null, source: "Yahoo Finance", delayed: true },
+    { rank: 1, symbol: "RY.TO", display_symbol: "RY", name: "Royal Bank", instrument_type: "equity", weight_percent: 8.2, price: 200, currency: "CAD", change_percent: 1.2, contribution_percent_points: 0.098, sector: "Services financiers", region: "CA", source: "Yahoo Finance", delayed: true },
+    { rank: 2, symbol: "TD.TO", display_symbol: "TD", name: "Toronto-Dominion Bank", instrument_type: "equity", weight_percent: 6.5, price: null, currency: "CAD", change_percent: null, contribution_percent_points: null, sector: "Services financiers", region: "CA", source: "Yahoo Finance", delayed: true },
   ],
   sectors: [{ key: "financial-services", label: "Services financiers", weight_percent: 36.4 }],
+  regions: [{ key: "CA", label: "CA", weight_percent: 100 }],
   asset_classes: [{ key: "equity", label: "Actions", weight_percent: 99.6 }],
   top_holdings_weight_percent: 14.7, net_driver_contribution_percent_points: 0.098, positive_driver_contribution_percent_points: 0.098, negative_driver_contribution_percent_points: 0,
-  quoted_holdings: 1, total_holdings_returned: 2, status: "partial", message: null, source_name: "Yahoo Finance", source_url: null, generated_at: "2026-08-30T14:00:00Z", refresh_after_seconds: 30,
+  quoted_holdings: 1, total_holdings_returned: 2, status: "partial", message: null, source_name: "Yahoo Finance", source_url: null, composition_as_of: null, official: false, stale: false, generated_at: "2026-08-30T14:00:00Z", refresh_after_seconds: 30,
 };
 
 const history = {
@@ -149,6 +150,32 @@ describe("Canadian ETF mobile experience", () => {
     expect(view.getByText("Principaux contributeurs")).toBeTruthy();
     await user.press(view.getByTestId("etf-holding-RY"));
     expect(router.push).toHaveBeenCalledWith({ pathname: "/stock/[ticker]", params: { ticker: "RY" } });
+    await act(async () => view.unmount());
+  });
+
+  it("renders unavailable quote coverage as N/D instead of a fabricated 0/0", async () => {
+    mockUseQuery.mockImplementation(({ queryKey }: { queryKey: unknown[] }) => {
+      if (queryKey[0] === "etf-holdings") {
+        return {
+          ...queryResult(queryKey),
+          data: {
+            ...holdings,
+            quoted_holdings: null,
+            total_holdings_returned: null,
+          },
+        };
+      }
+      return queryResult(queryKey);
+    });
+
+    const view = await render(<EtfDetailScreen />);
+    await act(async () => {
+      fireEvent.press(view.getByTestId("etf-section-holdings"));
+    });
+    expect(
+      view.getByText("N/D positions retournées · N/D cotées"),
+    ).toBeTruthy();
+    expect(view.queryByText("0/0")).toBeNull();
     await act(async () => view.unmount());
   });
 });
