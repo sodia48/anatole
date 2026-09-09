@@ -38,7 +38,7 @@
   width: 390px;
   height: 390px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(57, 130, 255, 0.2), transparent 68%);
+  background: radial-gradient(circle, var(--light-raised, rgba(57, 130, 255, 0.2)), transparent 68%);
   content: "";
   pointer-events: none;
 }
@@ -73,7 +73,7 @@
 .heroStatus {
   min-width: 310px;
   padding: 16px 18px;
-  border: 1px solid rgba(89, 149, 190, 0.34);
+  border: 1px solid var(--light-border, rgba(89, 149, 190, 0.34));
   border-radius: 18px;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
@@ -152,7 +152,7 @@
 
 .navigationHeading {
   padding: 4px 5px 15px;
-  border-bottom: 1px solid rgba(80, 136, 170, 0.2);
+  border-bottom: 1px solid var(--light-border, rgba(80, 136, 170, 0.2));
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: center;
@@ -204,7 +204,7 @@
 
 .navigationItem:hover {
   transform: translateX(2px);
-  border-color: rgba(74, 136, 174, 0.35);
+  border-color: var(--light-border, rgba(74, 136, 174, 0.35));
   background: var(--panel);
 }
 
@@ -247,7 +247,7 @@
 .navigationSummary {
   margin-top: auto;
   padding: 14px;
-  border: 1px solid rgba(73, 134, 169, 0.28);
+  border: 1px solid var(--light-border, rgba(73, 134, 169, 0.28));
   border-radius: 15px;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr);
@@ -277,7 +277,7 @@
 .contentHeader {
   min-height: 106px;
   padding: 3px 4px 20px;
-  border-bottom: 1px solid rgba(79, 139, 174, 0.22);
+  border-bottom: 1px solid var(--light-border, rgba(79, 139, 174, 0.22));
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr);
   align-items: center;
@@ -383,7 +383,7 @@
   }
 
   .activeNavigationItem {
-    box-shadow: inset 0 -3px 0 #5b98ff;
+    box-shadow: inset 0 -3px 0 var(--light-shadow, #5b98ff);
   }
 
   .navigationIcon {

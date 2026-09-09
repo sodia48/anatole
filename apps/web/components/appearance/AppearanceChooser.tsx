@@ -15,7 +15,7 @@ type Props = {
 
 const choices: Array<{ theme: AnatoleTheme; labelFr: string; labelEn: string; detailFr: string; detailEn: string }> = [
   { theme: "dark", labelFr: "Anatole Original", labelEn: "Anatole Original", detailFr: "Bleu nuit · contraste maximal", detailEn: "Midnight blue · maximum contrast" },
-  { theme: "blue", labelFr: "Anatole Ciel", labelEn: "Anatole Sky", detailFr: "Bleu ciel · lumineux et épuré", detailEn: "Sky blue · bright and refined" },
+  { theme: "blue", labelFr: "Anatole Blanc", labelEn: "Anatole White", detailFr: "Blanc · clair et lisible", detailEn: "White · clear and readable" },
 ];
 
 function CockpitPreview({ value }: { value: AnatoleTheme }) {

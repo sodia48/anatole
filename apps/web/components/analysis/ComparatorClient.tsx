@@ -233,10 +233,10 @@ function PerformanceChart({
         {series.map((item, index) => (
           <span
             className={styles.legendItem}
-            style={{ color: CHART_COLORS[index % CHART_COLORS.length] }}
+            style={{ color: `var(--light-text, ${CHART_COLORS[index % CHART_COLORS.length]})` }}
             key={item.symbol}
           >
-            <span className={styles.legendDot} />
+            <span className={styles.legendDot} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />
             {item.symbol}
           </span>
         ))}
@@ -332,7 +332,7 @@ function CorrelationGrid({
   const columns = `repeat(${symbols.length + 1}, minmax(0, 1fr))`;
 
   return (
-    <div className={styles.tableWrap}>
+    <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Correlations">
       <div
         className={styles.correlationGrid}
         style={{ gridTemplateColumns: columns }}
@@ -795,7 +795,7 @@ export function ComparatorClient() {
               </div>
               <Trophy size={21} color="#f2b84b" />
             </div>
-            <div className={styles.tableWrap}>
+            <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={pick(language, "Rendement, risque et valorisation", "Return, risk, and valuation")}>
               <table className={styles.compareTable} data-mobile-cards="compare">
                 <thead>
                   <tr>

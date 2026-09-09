@@ -156,7 +156,7 @@ function AllocationCard({ title, items, totalLabel, language }: { title: string;
         <div><span className="eyebrow">{pick(language, "RÉPARTITION", "ALLOCATION")}</span><h3>{title}</h3></div>
       </div>
       <div className={styles.allocationLayout}>
-        <div className={styles.donut} style={{ background: items.length ? `conic-gradient(${stops.join(",")})` : "#173246" }}>
+        <div className={styles.donut} style={{ background: items.length ? `conic-gradient(${stops.join(",")})` : "var(--surface-raised)" }}>
           <strong>{items.length}</strong><small>{totalLabel}</small>
         </div>
         <div className={styles.allocationList}>
@@ -353,7 +353,7 @@ export function PortfolioClient() {
         <div className={styles.formGrid}>
           <div className={styles.searchField}>
             <label htmlFor="portfolio-symbol">{pick(language, "Symbole ou entreprise", "Symbol or company")}</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
             {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
           </div>
           <div className={styles.field}><label htmlFor="portfolio-quantity">{pick(language, "Quantité", "Quantity")}</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
@@ -391,8 +391,8 @@ export function PortfolioClient() {
                     const result = snapshot?.positions.find((item) => item.symbol === position.symbol);
                     return <tr key={position.symbol}>
                       <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? pick(language, "En attente", "Pending")}</small></span></div></td>
-                      <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
-                      <td data-label={pick(language, "Coût moyen", "Average cost")}><input aria-label={pick(language, `Coût moyen de ${position.symbol}`, `${position.symbol} average cost`)} style={{ width: 96, background: "transparent", border: "1px solid #23465d", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
+                      <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
+                      <td data-label={pick(language, "Coût moyen", "Average cost")}><input aria-label={pick(language, `Coût moyen de ${position.symbol}`, `${position.symbol} average cost`)} style={{ width: 96, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
                       <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.price, result.currency, language) : "…"}</td>
                       <td data-label={pick(language, "Valeur", "Value")}>{result ? money(result.market_value, snapshot?.base_currency, language) : "…"}</td>
                       <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : "…"}</td>
@@ -412,7 +412,7 @@ export function PortfolioClient() {
               <div className={styles.gridTwo}>
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.sectionHeading}><div><span className="eyebrow">PERFORMANCE</span><h2>{pick(language, "Portefeuille vs TSX Composite", "Portfolio vs TSX Composite")}</h2><p>{pick(language, "Indice base 100 fondé sur les poids actuels, et non sur les flux historiques réels.", "Base-100 index using current weights rather than actual historical cash flows.")}</p></div></div>
-                  <div className={styles.legend}><span style={{ color: "#2d76ff" }}><i /> {pick(language, "Portefeuille", "Portfolio")}</span><span style={{ color: "#16c79a" }}><i /> TSX Composite</span></div>
+                  <div className={styles.legend}><span style={{ color: "var(--accent-text)" }}><i /> {pick(language, "Portefeuille", "Portfolio")}</span><span style={{ color: "var(--positive-text)" }}><i /> TSX Composite</span></div>
                   <PerformanceChart points={snapshot.performance} language={language} />
                 </section>
                 <section className={`panel ${styles.panel}`}>
@@ -448,7 +448,7 @@ export function PortfolioClient() {
       )}
 
       <div className={styles.notice}>{pick(language, "Portefeuille de suivi uniquement. Les quantités et coûts moyens restent sur cet appareil en mode anonyme et sont synchronisés uniquement lorsqu’un compte Anatole est connecté.", "Tracking portfolio only. Quantities and average costs remain on this device while anonymous and synchronize only when an Anatole account is connected.")}</div>
-      <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}>{snapshot ? <>{pick(language, "Dernière analyse", "Last analysis")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · <Link href="/parametres?section=quality">{pick(language, "Vérifier les sources", "Check sources")}</Link></> : null}</div>
+      <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}>{snapshot ? <>{pick(language, "Dernière analyse", "Last analysis")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · <Link href="/parametres?section=quality">{pick(language, "Vérifier les sources", "Check sources")}</Link></> : null}</div>
     </main>
   );
 }

@@ -99,9 +99,10 @@ test.describe("contrôles fonctionnels Anatole", () => {
     });
 
     await gotoReady(page, "/calendrier");
-    await page.getByRole("button", { name: /Résultats TSX|TSX earnings/i }).click();
-    const earnings = page.getByRole("region", { name: /Résultats TSX à venir|Upcoming TSX earnings/i });
+    await page.getByRole("button", { name: /Résultats Canada|Canadian earnings/i }).click();
+    const earnings = page.getByRole("region", { name: /Résultats Canada à venir|Upcoming Canadian earnings/i });
     await expect(earnings).toBeVisible();
+    await expect.poll(() => requestedUniverses).toContain("canada");
     await expect(earnings.getByText("Royal Bank of Canada")).toBeVisible();
     await expect(earnings.getByText(/EPS estimé|Estimated EPS/i)).toBeVisible();
     await expect(earnings.getByText(/Revenus estimés|Estimated revenue/i)).toBeVisible();

@@ -8,11 +8,11 @@
   gap: 8px;
   min-height: 42px;
   padding: 0 15px;
-  border: 1px solid rgba(92, 164, 221, 0.38);
+  border: 1px solid var(--light-border, rgba(92, 164, 221, 0.38));
   border-radius: 999px;
   background: var(--panel);
   color: var(--text);
-  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 14px 40px var(--light-shadow, rgba(0, 0, 0, 0.28));
   backdrop-filter: blur(18px);
   font: inherit;
   font-size: 12px;
@@ -22,7 +22,7 @@
 
 .trigger:hover,
 .trigger:focus-visible {
-  border-color: rgba(91, 160, 255, 0.8);
+  border-color: var(--light-accent, rgba(91, 160, 255, 0.8));
   background: var(--panel);
   outline: none;
 }
@@ -44,11 +44,11 @@
   max-height: min(760px, calc(100dvh - 40px));
   overflow: auto;
   padding: 28px;
-  border: 1px solid rgba(80, 153, 207, 0.36);
+  border: 1px solid var(--light-border, rgba(80, 153, 207, 0.36));
   border-radius: 24px;
-  background: linear-gradient(180deg, #0b2232 0%, var(--input-bg) 100%);
-  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.58);
-  color: #e9f2f8;
+  background: linear-gradient(180deg, var(--light-panel, #0b2232) 0%, var(--input-bg) 100%);
+  box-shadow: 0 30px 100px var(--light-shadow, rgba(0, 0, 0, 0.58));
+  color: var(--light-text, #e9f2f8);
 }
 
 .dialog h2 {
@@ -59,7 +59,7 @@
 
 .intro {
   margin: 0 0 22px;
-  color: #9eb5c6;
+  color: var(--light-muted, #9eb5c6);
   line-height: 1.6;
 }
 
@@ -71,10 +71,10 @@
   width: 38px;
   height: 38px;
   place-items: center;
-  border: 1px solid rgba(103, 158, 198, 0.3);
+  border: 1px solid var(--light-border, rgba(103, 158, 198, 0.3));
   border-radius: 12px;
   background: var(--panel);
-  color: #bdcfdb;
+  color: var(--light-muted, #bdcfdb);
   cursor: pointer;
 }
 
@@ -82,7 +82,7 @@
   display: grid;
   gap: 8px;
   margin-top: 18px;
-  color: #d4e2ec;
+  color: var(--light-muted, #d4e2ec);
   font-size: 13px;
   font-weight: 740;
 }
@@ -90,10 +90,10 @@
 .field select,
 .field textarea {
   width: 100%;
-  border: 1px solid rgba(76, 139, 183, 0.42);
+  border: 1px solid var(--light-border, rgba(76, 139, 183, 0.42));
   border-radius: 14px;
   background: var(--panel);
-  color: #edf6fb;
+  color: var(--light-text, #edf6fb);
   font: inherit;
 }
 
@@ -112,12 +112,12 @@
 .field select:focus,
 .field textarea:focus {
   border-color: var(--blue);
-  outline: 2px solid rgba(91, 159, 255, 0.2);
+  outline: 2px solid var(--light-accent, rgba(91, 159, 255, 0.2));
 }
 
 .field small {
   justify-self: end;
-  color: #6f8da2;
+  color: var(--light-muted, #6f8da2);
   font-size: 10px;
 }
 
@@ -127,7 +127,7 @@
   gap: 11px;
   margin-top: 18px;
   padding: 13px;
-  border: 1px solid rgba(69, 127, 168, 0.3);
+  border: 1px solid var(--light-border, rgba(69, 127, 168, 0.3));
   border-radius: 14px;
   background: var(--panel);
   cursor: pointer;
@@ -150,7 +150,7 @@
 }
 
 .consent small {
-  color: #8fa8b9;
+  color: var(--light-muted, #8fa8b9);
   font-size: 10px;
   line-height: 1.5;
 }
@@ -160,7 +160,7 @@
   align-items: center;
   gap: 8px;
   margin-top: 12px;
-  color: #70d3b1;
+  color: var(--light-positive, #70d3b1);
   font-size: 11px;
 }
 
@@ -188,8 +188,8 @@
 
 .primary {
   border: 1px solid var(--blue);
-  background: #246fcb;
-  color: white;
+  background: var(--light-raised, #246fcb);
+  color: var(--light-text, white);
 }
 
 .primary:disabled {
@@ -198,18 +198,18 @@
 }
 
 .secondary {
-  border: 1px solid rgba(92, 145, 183, 0.36);
+  border: 1px solid var(--light-border, rgba(92, 145, 183, 0.36));
   background: transparent;
-  color: #aec3d1;
+  color: var(--light-muted, #aec3d1);
 }
 
 .error {
   margin-top: 14px;
   padding: 11px 13px;
-  border: 1px solid rgba(255, 99, 117, 0.42);
+  border: 1px solid var(--light-border, rgba(255, 99, 117, 0.42));
   border-radius: 12px;
-  background: rgba(93, 19, 31, 0.26);
-  color: #ff9eaa;
+  background: var(--light-negative-surface, rgba(93, 19, 31, 0.26));
+  color: var(--light-negative, #ff9eaa);
   font-size: 11px;
 }
 
@@ -221,12 +221,12 @@
 }
 
 .success > svg {
-  color: #64d9b2;
+  color: var(--light-positive, #64d9b2);
 }
 
 .success p {
   max-width: 420px;
-  color: #9fb6c6;
+  color: var(--light-muted, #9fb6c6);
   line-height: 1.6;
 }
 

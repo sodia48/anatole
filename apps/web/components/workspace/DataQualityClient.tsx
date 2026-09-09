@@ -242,7 +242,7 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
                   <div><small>{language === "en" ? SOURCE_EN[source.key]?.category ?? source.category : source.category}</small><h3>{language === "en" ? SOURCE_EN[source.key]?.label ?? source.label : source.label}</h3></div>
                     <span className={`${styles.statusPill} ${sourceStatusClass(source.status)}`}>{sourceStatusLabel(source.status, language)}</span>
                   </div>
-                  <p style={{ margin: 0, color: "#9eb2c1", fontSize: 10, lineHeight: 1.55 }}>{language === "en" ? SOURCE_EN[source.key]?.detail ?? source.detail : source.detail}</p>
+                  <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 10, lineHeight: 1.55 }}>{language === "en" ? SOURCE_EN[source.key]?.detail ?? source.detail : source.detail}</p>
                   <div>
                     <div className={styles.sourceMeta}><span>{pick(language, "Couverture", "Coverage")}</span><strong>{source.coverage_percent.toFixed(0)} %</strong></div>
                     <div className={styles.coverageBar} style={{ marginTop: 7 }}><i style={{ width: `${source.coverage_percent}%` }} /></div>
@@ -286,7 +286,7 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Lecture", "Assessment")}</span><strong>{degradedCount ? <><AlertTriangle size={20} /> {pick(language, "À surveiller", "Monitor")}</> : <><CheckCircle2 size={20} /> Stable</>}</strong><small>{degradedCount} {pick(language, `source${degradedCount > 1 ? "s" : ""} dégradée${degradedCount > 1 ? "s" : ""}`, `degraded source${degradedCount === 1 ? "" : "s"}`)}</small></article>
           </section>
 
-          <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}><Activity size={12} style={{ verticalAlign: "middle", marginRight: 5 }} />{pick(language, "Généré", "Generated")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · {pick(language, "actualisation 60 s", "refresh 60 s")}</div>
+          <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}><Activity size={12} style={{ verticalAlign: "middle", marginRight: 5 }} />{pick(language, "Généré", "Generated")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · {pick(language, "actualisation 60 s", "refresh 60 s")}</div>
         </>
       ) : null}
     </main>

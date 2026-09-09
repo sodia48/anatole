@@ -10,16 +10,16 @@ const preferences = (theme: "dark" | "blue", language: "fr" | "en" = "fr") => ({
   language,
 });
 
-test("restaure Anatole Ciel avant l'hydratation et applique une vraie palette claire", async ({ page }) => {
+test("restaure Anatole Blanc avant l'hydratation et applique une vraie palette claire", async ({ page }) => {
   await page.addInitScript((value) => localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value)), preferences("blue"));
   await page.goto("/aujourdhui");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
-  expect((await page.locator("html").evaluate((node) => getComputedStyle(node).getPropertyValue("--bg").trim())).toLowerCase()).toBe("#ddf3ff");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
   expect(await page.locator("html").evaluate((node) => node.style.colorScheme)).toBe("light");
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#DDF3FF");
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute("content", "#FFFFFF");
 });
 
-test("affiche le chooser une fois, prévisualise Ciel et mémorise le choix blue", async ({ page }) => {
+test("affiche le chooser une fois, prévisualise Blanc et mémorise le choix blue", async ({ page }) => {
   await page.addInitScript(() => {
     if (sessionStorage.getItem("anatole.appearance-test-initialized") !== "1") {
       localStorage.removeItem("anatole.appearance-choice.v1");
@@ -29,7 +29,7 @@ test("affiche le chooser une fois, prévisualise Ciel et mémorise le choix blue
   await page.goto("/aujourdhui");
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Choisis ton Anatole" })).toBeVisible();
-  await dialog.getByRole("radio", { name: "Anatole Ciel" }).click();
+  await dialog.getByRole("radio", { name: "Anatole Blanc" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
   await dialog.getByRole("button", { name: "Continuer avec ce thème" }).click();
   await expect(dialog).toBeHidden();
@@ -60,16 +60,16 @@ test("n'affiche jamais le chooser dans Focus embarqué", async ({ page }) => {
 test("les réglages présentent les deux identités localisées", async ({ page }) => {
   await page.goto("/parametres?section=preferences");
   await expect(page.getByText("Anatole Original", { exact: true })).toBeVisible();
-  await expect(page.getByText("Anatole Ciel", { exact: true })).toBeVisible();
-  await expect(page.getByText("Bleu ciel · lumineux et épuré", { exact: true })).toBeVisible();
+  await expect(page.getByText("Anatole Blanc", { exact: true })).toBeVisible();
+  await expect(page.getByText("Blanc · clair et lisible", { exact: true })).toBeVisible();
 
   await page.addInitScript((value) => localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value)), preferences("blue", "en"));
   await page.reload();
-  await expect(page.getByText("Anatole Sky", { exact: true })).toBeVisible();
-  await expect(page.getByText("Sky blue · bright and refined", { exact: true })).toBeVisible();
+  await expect(page.getByText("Anatole White", { exact: true })).toBeVisible();
+  await expect(page.getByText("White · clear and readable", { exact: true })).toBeVisible();
 });
 
-test("les cartes fondamentales utilisent la palette Ciel", async ({ page }) => {
+test("les cartes fondamentales utilisent la palette blanche", async ({ page }) => {
   await page.addInitScript((value) => {
     localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value));
     localStorage.setItem("anatole.appearance-choice.v1", "1");
@@ -111,18 +111,26 @@ test("les cartes fondamentales utilisent la palette Ciel", async ({ page }) => {
     const style = getComputedStyle(node);
     return { background: style.backgroundColor, color: style.color };
   });
-  expect(colors.background).toBe("rgb(247, 252, 255)");
+  expect(colors.background).toBe("rgb(255, 255, 255)");
   expect(colors.color).toBe("rgb(8, 32, 51)");
 });
 
-for (const route of ["/aujourdhui", "/focus/RY", "/actualites", "/calendrier", "/portefeuille", "/screener", "/parametres?section=preferences"]) {
-  test(`Anatole Ciel reste accessible sur ${route}`, async ({ page }) => {
+for (const route of [
+  "/aujourdhui", "/focus/RY", "/actualites", "/calendrier", "/portefeuille", "/screener",
+  "/parametres?section=preferences", "/cockpit", "/etf", "/ipo-insiders", "/institutions",
+  "/terminal", "/comparateur", "/psychologie", "/watchlist", "/alertes", "/assistant", "/qualite",
+  "/compte", "/notifications", "/conditions", "/confidentialite", "/avis-financier",
+  "/roadmap", "/bienvenue", "/admin",
+]) {
+  test(`Anatole Blanc reste accessible sur ${route}`, async ({ page }) => {
     await page.addInitScript((value) => {
       localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value));
       localStorage.setItem("anatole.appearance-choice.v1", "1");
     }, preferences("blue"));
     await page.goto(route);
-    await expect(page.locator("body")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Signaler un problème" })).toHaveAttribute("data-client-ready", "true");
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    await expect(page.locator(".discovery-loading, .cockpit-loading")).toHaveCount(0);
     const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     expect(results.violations.filter(({ impact }) => impact === "serious" || impact === "critical")).toEqual([]);
   });

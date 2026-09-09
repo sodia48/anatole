@@ -37,19 +37,19 @@
   justify-items: end;
   gap: 2px;
   padding: 9px 11px;
-  border: 1px solid rgba(58, 108, 137, .62);
+  border: 1px solid var(--light-border, rgba(58, 108, 137, .62));
   border-radius: 12px;
-  background: rgba(6, 24, 36, .64);
+  background: var(--light-raised, rgba(6, 24, 36, .64));
 }
 
 .countBadge strong {
-  color: #e9f5fc;
+  color: var(--light-text, #e9f5fc);
   font-size: 20px;
   line-height: 1;
 }
 
 .countBadge span {
-  color: #7395aa;
+  color: var(--light-muted, #7395aa);
   font-size: 8px;
   font-weight: 800;
   letter-spacing: .08em;
@@ -78,10 +78,10 @@
 .resetButton,
 .searchForm button {
   min-height: 38px;
-  border: 1px solid rgba(50, 94, 120, .72);
+  border: 1px solid var(--light-accent, rgba(50, 94, 120, .72));
   border-radius: 10px;
-  background: rgba(5, 18, 29, .88);
-  color: #8caabd;
+  background: var(--light-raised, rgba(5, 18, 29, .88));
+  color: var(--light-muted, #8caabd);
   font: inherit;
   font-size: 10px;
   font-weight: 750;
@@ -97,10 +97,10 @@
 }
 
 .modeButtonActive {
-  border-color: rgba(78, 141, 255, .86);
-  background: linear-gradient(135deg, rgba(35, 95, 179, .42), rgba(18, 67, 111, .42));
-  color: #d8e8ff;
-  box-shadow: inset 0 0 0 1px rgba(111, 166, 255, .14);
+  border-color: var(--light-accent, rgba(78, 141, 255, .86));
+  background: linear-gradient(135deg, var(--light-raised, rgba(35, 95, 179, .42)), var(--light-raised, rgba(18, 67, 111, .42)));
+  color: var(--light-text, #d8e8ff);
+  box-shadow: inset 0 0 0 1px var(--light-shadow, rgba(111, 166, 255, .14));
 }
 
 .utilityButton:hover,
@@ -108,14 +108,14 @@
 .modeButton:hover,
 .modeButtonActive:hover,
 .searchForm button:hover {
-  border-color: rgba(85, 151, 191, .86);
-  color: white;
+  border-color: var(--light-accent, rgba(85, 151, 191, .86));
+  color: var(--light-text, white);
   transform: translateY(-1px);
 }
 
 .resetButton {
-  border-color: rgba(71, 148, 126, .68);
-  color: #77d8bd;
+  border-color: var(--light-border, rgba(71, 148, 126, .68));
+  color: var(--light-positive, #77d8bd);
 }
 
 .searchForm {
@@ -125,7 +125,7 @@
 }
 
 .searchForm label {
-  color: #7396ad;
+  color: var(--light-muted, #7396ad);
   font-size: 8px;
   font-weight: 850;
   letter-spacing: .1em;
@@ -142,17 +142,17 @@
   min-width: 0;
   height: 38px;
   padding: 0 11px;
-  border: 1px solid rgba(50, 94, 120, .72);
+  border: 1px solid var(--light-border, rgba(50, 94, 120, .72));
   border-right: 0;
   border-radius: 10px 0 0 10px;
   outline: none;
-  background: rgba(4, 16, 26, .9);
-  color: white;
+  background: var(--light-panel, rgba(4, 16, 26, .9));
+  color: var(--light-text, white);
 }
 
 .searchForm input:focus {
-  border-color: rgba(78, 141, 255, .86);
-  box-shadow: 0 0 0 3px rgba(45, 118, 255, .12);
+  border-color: var(--light-accent, rgba(78, 141, 255, .86));
+  box-shadow: 0 0 0 3px var(--light-shadow, rgba(45, 118, 255, .12));
 }
 
 .searchForm button {
@@ -167,7 +167,7 @@
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 8px;
-  color: #7797aa;
+  color: var(--light-muted, #7797aa);
   font-size: 9px;
 }
 
@@ -264,10 +264,10 @@
   display: none;
 }
 
-.groupPositive,
-.inspectorPositive { color: #38ddb4; }
-.groupNegative,
-.inspectorNegative { color: #ff6c83; }
+.groupPositive { color: #38ddb4; }
+.inspectorPositive { color: var(--light-positive, #38ddb4); }
+.groupNegative { color: #ff6c83; }
+.inspectorNegative { color: var(--light-negative, #ff6c83); }
 
 .tile,
 .microTile {
@@ -417,12 +417,12 @@
   gap: 14px;
   margin-top: 10px;
   padding: 12px 14px;
-  border: 1px solid rgba(61, 118, 151, .72);
+  border: 1px solid var(--light-border, rgba(61, 118, 151, .72));
   border-radius: 14px;
   background:
-    radial-gradient(circle at 0% 0%, rgba(48, 121, 178, .18), transparent 45%),
-    rgba(5, 20, 31, .95);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, .22);
+    radial-gradient(circle at 0% 0%, var(--light-raised, rgba(48, 121, 178, .18)), transparent 45%),
+    var(--light-panel, rgba(5, 20, 31, .95));
+  box-shadow: 0 16px 36px var(--light-shadow, rgba(0, 0, 0, .22));
 }
 
 .inspectorIdentity {
@@ -435,7 +435,7 @@
 
 .inspectorIdentity > span {
   grid-column: 1 / -1;
-  color: #6f91a7;
+  color: var(--light-muted, #6f91a7);
   font-size: 8px;
   font-weight: 850;
   letter-spacing: .1em;
@@ -443,7 +443,7 @@
 }
 
 .inspectorIdentity strong {
-  color: white;
+  color: var(--light-text, white);
   font-size: 22px;
 }
 
@@ -451,7 +451,7 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: #8ca7b8;
+  color: var(--light-muted, #8ca7b8);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -469,7 +469,7 @@
 }
 
 .inspectorMetrics span {
-  color: #6f91a7;
+  color: var(--light-muted, #6f91a7);
   font-size: 8px;
   text-transform: uppercase;
 }
@@ -491,10 +491,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 11px;
-  border: 1px solid rgba(68, 126, 161, .72);
+  border: 1px solid var(--light-border, rgba(68, 126, 161, .72));
   border-radius: 10px;
-  background: rgba(12, 42, 60, .8);
-  color: #dcecf6;
+  background: var(--light-panel, rgba(12, 42, 60, .8));
+  color: var(--light-text, #dcecf6);
   font-size: 9px;
   font-weight: 800;
   cursor: pointer;
@@ -502,7 +502,7 @@
 
 .inspectorActions button {
   background: transparent;
-  color: #88a4b6;
+  color: var(--light-muted, #88a4b6);
 }
 
 .empty,
@@ -516,6 +516,7 @@
 .loadingCanvas {
   position: absolute;
   inset: 0;
+  color: var(--data-canvas-text);
   font-size: 11px;
 }
 
@@ -527,7 +528,7 @@
   height: 100dvh;
   padding: 14px;
   border-radius: 0;
-  background: #03101a;
+  background: var(--light-panel, #03101a);
 }
 
 .panel:fullscreen .treemap {
@@ -704,7 +705,7 @@
   .inspectorMetrics div {
     padding: 6px 8px;
     border-radius: 8px;
-    background: rgba(7, 27, 40, .76);
+    background: var(--light-panel, rgba(7, 27, 40, .76));
   }
 
   .inspectorActions {
@@ -782,7 +783,7 @@
   padding: 12px;
   overflow: hidden;
   border-radius: 0 !important;
-  background: #03101a;
+  background: var(--light-panel, #03101a);
 }
 
 .panel[data-fullscreen="true"] .treemap {

@@ -65,7 +65,7 @@ async def calendar(
     response_model=EarningsCalendarSnapshot,
 )
 async def earnings_calendar(
-    universe: str = Query("composite"),
+    universe: str = Query("canada"),
 ) -> EarningsCalendarSnapshot:
     try:
         return await earnings_calendar_service.get_snapshot(universe)
@@ -73,7 +73,7 @@ async def earnings_calendar(
         raise HTTPException(
             status_code=400,
             detail=(
-                "Univers invalide. Utilise 'composite' ou 'tsx60'."
+                "Univers invalide. Utilise 'canada', 'composite' ou 'tsx60'."
             ),
         ) from exc
 

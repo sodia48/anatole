@@ -24,27 +24,28 @@
 }
 
 html[data-theme="blue"] {
-  --bg: #DDF3FF;
-  --panel: #F7FCFF;
-  --panel-2: #EAF6FD;
-  --surface-raised: #E1F1FA;
-  --border: #B7DAEC;
+  /* Keep the stored "blue" preference compatible with the new white theme. */
+  --bg: #FFFFFF;
+  --panel: #FFFFFF;
+  --panel-2: #F6F7F9;
+  --surface-raised: #EFF1F4;
+  --border: #D4D9E0;
   --text: #082033;
-  --muted: #56758A;
-  --blue: #168FE0;
+  --muted: #526171;
+  --blue: #1268B3;
   --teal: #008F73;
   --red: #CC3150;
-  --sidebar-bg: rgba(247, 252, 255, .96);
-  --panel-gradient-start: #F7FCFF;
-  --panel-gradient-end: #EAF6FD;
-  --input-bg: #F7FCFF;
-  --hover-bg: rgba(22, 143, 224, .09);
-  --subtle: #7897AA;
+  --sidebar-bg: rgba(255, 255, 255, .98);
+  --panel-gradient-start: #FFFFFF;
+  --panel-gradient-end: #FFFFFF;
+  --input-bg: #FFFFFF;
+  --hover-bg: #F0F2F5;
+  --subtle: #586575;
   --shadow: rgba(8, 32, 51, .14);
   --overlay: rgba(8, 32, 51, .34);
-  --primary-surface: rgba(22, 143, 224, .12);
+  --primary-surface: #EFF1F4;
   --interactive: #0E73BA;
-  --text-secondary: #49697D;
+  --text-secondary: #465362;
   --accent-text: #075F99;
   --positive-text: #006853;
   --negative-text: #A92342;
@@ -52,14 +53,31 @@ html[data-theme="blue"] {
   --negative-surface: rgba(204, 49, 80, .1);
   --warning-surface: rgba(169, 105, 0, .1);
   --on-primary: #FFFFFF;
-  --warning: #A96900;
+  --warning: #855300;
   --data-canvas: #061722;
   --data-canvas-text: #EDF8FF;
+  /* Legacy component colors retain their Original fallback, while light
+     surfaces and their text are always resolved as a matching pair. */
+  --light-text: var(--text);
+  --light-muted: var(--text-secondary);
+  --light-accent: var(--accent-text);
+  --light-interactive: var(--interactive);
+  --light-positive: var(--positive-text);
+  --light-negative: var(--negative-text);
+  --light-warning: var(--warning);
+  --light-panel: var(--panel);
+  --light-raised: var(--surface-raised);
+  --light-border: var(--border);
+  --light-shadow: var(--shadow);
+  --light-overlay: var(--overlay);
+  --light-positive-surface: var(--positive-surface);
+  --light-negative-surface: var(--negative-surface);
+  --light-warning-surface: var(--warning-surface);
   color-scheme: light;
 }
 
 html[data-theme="blue"] body {
-  background: radial-gradient(circle at 85% 0%, #F7FCFF 0%, var(--bg) 38%);
+  background: var(--bg);
 }
 
 html[data-theme="blue"] .panel {
@@ -71,6 +89,7 @@ html[data-theme="blue"] .sidebar { background: var(--sidebar-bg); }
 html[data-theme="blue"] .nav-item:hover,
 html[data-theme="blue"] .nav-item.is-active { background: var(--surface-raised); }
 html[data-theme="blue"] :where(input, select, textarea) { color-scheme: light; }
+html[data-theme="blue"] :where(input, textarea)::placeholder { color: var(--muted); opacity: 1; }
 html[data-theme="blue"] :where(.primary-button, .appearance-confirm) {
   background: var(--interactive);
   color: var(--on-primary);
@@ -149,7 +168,7 @@ html[data-theme="blue"] :where(.primary-button, .appearance-confirm) {
   overflow: hidden;
 }
 .anatole-preview-dark { background: #050D15; border: 1px solid #17445F; }
-.anatole-preview-blue { background: #DDF3FF; border: 1px solid #B7DAEC; }
+.anatole-preview-blue { background: #FFFFFF; border: 1px solid #D4D9E0; }
 .anatole-preview-bar { display: flex; justify-content: space-between; }
 .anatole-preview-bar i:first-child { width: 38%; }
 .anatole-preview-bar i:last-child { width: 19%; }
@@ -159,8 +178,8 @@ html[data-theme="blue"] :where(.primary-button, .appearance-confirm) {
 .anatole-preview i { display: block; border-radius: 5px; }
 .anatole-preview-dark .anatole-preview-bar i { background: #256A91; }
 .anatole-preview-dark .anatole-preview-kpis i { background: #0C2435; }
-.anatole-preview-blue .anatole-preview-bar i { background: #7FB9D8; }
-.anatole-preview-blue .anatole-preview-kpis i { background: #F7FCFF; }
+.anatole-preview-blue .anatole-preview-bar i { background: #8693A1; }
+.anatole-preview-blue .anatole-preview-kpis i { background: #EFF1F4; }
 .anatole-preview-market i:nth-child(3n+1) { background: #008F73; }
 .anatole-preview-market i:nth-child(3n+2) { background: #CC3150; }
 .anatole-preview-market i:nth-child(3n) { background: #168FE0; }

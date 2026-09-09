@@ -906,7 +906,7 @@ export default function AdminPage() {
           padding: 28px;
           display: grid;
           gap: 22px;
-          color: #eef7fb;
+          color: var(--light-text, #eef7fb);
         }
 
         .hero,
@@ -915,15 +915,15 @@ export default function AdminPage() {
         .tabs,
         .loading,
         .error {
-          border: 1px solid rgba(62, 121, 156, 0.42);
+          border: 1px solid var(--light-border, rgba(62, 121, 156, 0.42));
           background:
             linear-gradient(
               145deg,
-              rgba(11, 38, 55, 0.98),
-              rgba(4, 22, 34, 0.98)
+              var(--light-panel, rgba(11, 38, 55, 0.98)),
+              var(--light-panel, rgba(4, 22, 34, 0.98))
             );
           box-shadow:
-            0 20px 50px rgba(0, 0, 0, 0.16),
+            0 20px 50px var(--light-shadow, rgba(0, 0, 0, 0.16)),
             inset 0 1px rgba(255, 255, 255, 0.03);
         }
 
@@ -956,12 +956,12 @@ export default function AdminPage() {
 
         .hero p {
           margin-top: 10px;
-          color: #86abc1;
+          color: var(--light-muted, #86abc1);
           font-size: 1rem;
         }
 
         .eyebrow {
-          color: #6da5ff;
+          color: var(--light-accent, #6da5ff);
           font-size: 0.72rem;
           font-weight: 900;
           letter-spacing: 0.16em;
@@ -989,10 +989,10 @@ export default function AdminPage() {
         .inviteCard button {
           min-height: 44px;
           padding: 0 16px;
-          border: 1px solid rgba(78, 147, 194, 0.55);
+          border: 1px solid var(--light-border, rgba(78, 147, 194, 0.55));
           border-radius: 12px;
-          color: #edf8ff;
-          background: rgba(13, 48, 71, 0.95);
+          color: var(--light-text, #edf8ff);
+          background: var(--light-raised, rgba(13, 48, 71, 0.95));
           font-weight: 800;
         }
 
@@ -1000,8 +1000,8 @@ export default function AdminPage() {
         .primary:hover,
         .search button:hover,
         .createdCode button:hover {
-          border-color: #659cff;
-          background: rgba(39, 94, 145, 0.88);
+          border-color: var(--light-border, #659cff);
+          background: var(--light-raised, rgba(39, 94, 145, 0.88));
         }
 
         .tabs {
@@ -1021,19 +1021,19 @@ export default function AdminPage() {
           align-items: center;
           justify-content: center;
           gap: 9px;
-          color: #8eacbf;
+          color: var(--light-muted, #8eacbf);
           background: transparent;
           font-weight: 850;
         }
 
         .tabs button.active {
-          border-color: #5086ef;
-          color: #fff;
+          border-color: var(--light-border, #5086ef);
+          color: var(--light-text, #fff);
           background:
             linear-gradient(
               145deg,
-              rgba(51, 101, 184, 0.42),
-              rgba(17, 55, 85, 0.66)
+              var(--light-raised, rgba(51, 101, 184, 0.42)),
+              var(--light-raised, rgba(17, 55, 85, 0.66))
             );
         }
 
@@ -1044,8 +1044,8 @@ export default function AdminPage() {
           border-radius: 999px;
           display: inline-grid;
           place-items: center;
-          color: #b9d6e8;
-          background: rgba(4, 24, 37, 0.72);
+          color: var(--light-muted, #b9d6e8);
+          background: var(--light-panel, rgba(4, 24, 37, 0.72));
           font-size: 0.72rem;
         }
 
@@ -1056,19 +1056,19 @@ export default function AdminPage() {
         }
 
         .error {
-          border-color: rgba(255, 98, 115, 0.45);
+          border-color: var(--light-border, rgba(255, 98, 115, 0.45));
           display: grid;
           gap: 5px;
-          color: #ffb5bd;
+          color: var(--light-negative, #ffb5bd);
         }
 
         .error span,
         .error small {
-          color: #d68d98;
+          color: var(--light-negative, #d68d98);
         }
 
         .loading {
-          color: #8baec2;
+          color: var(--light-muted, #8baec2);
         }
 
         .metrics {
@@ -1088,7 +1088,7 @@ export default function AdminPage() {
 
         .metrics span,
         .metrics small {
-          color: #7e9eb3;
+          color: var(--light-muted, #7e9eb3);
         }
 
         .metrics strong {
@@ -1122,25 +1122,25 @@ export default function AdminPage() {
 
         .health {
           padding: 7px 10px;
-          border: 1px solid rgba(83, 216, 170, 0.42);
+          border: 1px solid var(--light-border, rgba(83, 216, 170, 0.42));
           border-radius: 999px;
-          color: #71e3ba;
-          background: rgba(28, 125, 91, 0.17);
+          color: var(--light-positive, #71e3ba);
+          background: var(--light-positive-surface, rgba(28, 125, 91, 0.17));
           font-size: 0.75rem;
           font-style: normal;
           font-weight: 850;
         }
 
         .health.degraded {
-          border-color: rgba(247, 184, 78, 0.48);
-          color: #f5c469;
-          background: rgba(143, 92, 16, 0.18);
+          border-color: var(--light-border, rgba(247, 184, 78, 0.48));
+          color: var(--light-muted, #f5c469);
+          background: var(--light-warning-surface, rgba(143, 92, 16, 0.18));
         }
 
         .health.critical {
-          border-color: rgba(255, 92, 110, 0.48);
-          color: #ff8997;
-          background: rgba(145, 29, 49, 0.18);
+          border-color: var(--light-border, rgba(255, 92, 110, 0.48));
+          color: var(--light-negative, #ff8997);
+          background: var(--light-negative-surface, rgba(145, 29, 49, 0.18));
         }
 
         dl {
@@ -1156,19 +1156,19 @@ export default function AdminPage() {
         .panel > dl div,
         .userCard dl div {
           padding: 14px;
-          border: 1px solid rgba(52, 105, 137, 0.34);
+          border: 1px solid var(--light-border, rgba(52, 105, 137, 0.34));
           border-radius: 13px;
-          background: rgba(3, 19, 29, 0.42);
+          background: var(--light-panel, rgba(3, 19, 29, 0.42));
         }
 
         dt {
-          color: #7191a5;
+          color: var(--light-muted, #7191a5);
           font-size: 0.78rem;
         }
 
         dd {
           margin: 5px 0 0;
-          color: #f2f8fc;
+          color: var(--light-text, #f2f8fc);
           font-weight: 850;
         }
 
@@ -1181,16 +1181,16 @@ export default function AdminPage() {
         select {
           min-height: 44px;
           box-sizing: border-box;
-          border: 1px solid rgba(65, 123, 158, 0.45);
+          border: 1px solid var(--light-border, rgba(65, 123, 158, 0.45));
           border-radius: 11px;
           padding: 0 13px;
-          color: #f2f8fc;
-          background: rgba(2, 17, 27, 0.88);
+          color: var(--light-text, #f2f8fc);
+          background: var(--light-panel, rgba(2, 17, 27, 0.88));
         }
 
         input:focus,
         select:focus {
-          border-color: #6198ef;
+          border-color: var(--light-accent, #6198ef);
           outline: none;
         }
 
@@ -1207,13 +1207,13 @@ export default function AdminPage() {
 
         .userCard {
           padding: 17px;
-          border: 1px solid rgba(52, 105, 137, 0.34);
+          border: 1px solid var(--light-border, rgba(52, 105, 137, 0.34));
           border-radius: 17px;
           display: grid;
           grid-template-columns: 48px minmax(180px, 0.9fr) minmax(0, 2fr);
           align-items: center;
           gap: 14px;
-          background: rgba(4, 22, 34, 0.7);
+          background: var(--light-panel, rgba(4, 22, 34, 0.7));
         }
 
         .avatar {
@@ -1222,9 +1222,9 @@ export default function AdminPage() {
           border-radius: 14px;
           display: grid;
           place-items: center;
-          color: #fff;
+          color: var(--light-text, #fff);
           background:
-            linear-gradient(145deg, #4b85e9, #1b9fce);
+            linear-gradient(145deg, var(--light-raised, #4b85e9), var(--light-raised, #1b9fce));
           font-size: 1.2rem;
           font-weight: 900;
         }
@@ -1244,15 +1244,15 @@ export default function AdminPage() {
         .identity em {
           padding: 3px 6px;
           border-radius: 6px;
-          color: #80b6ff;
-          background: rgba(43, 93, 177, 0.22);
+          color: var(--light-accent, #80b6ff);
+          background: var(--light-raised, rgba(43, 93, 177, 0.22));
           font-size: 0.58rem;
           font-style: normal;
         }
 
         .identity span {
           overflow: hidden;
-          color: #7698ad;
+          color: var(--light-muted, #7698ad);
           text-overflow: ellipsis;
         }
 
@@ -1266,7 +1266,7 @@ export default function AdminPage() {
           display: grid;
           gap: 7px;
           margin-top: 14px;
-          color: #b7cedd;
+          color: var(--light-muted, #b7cedd);
           font-size: 0.86rem;
           font-weight: 800;
         }
@@ -1289,23 +1289,23 @@ export default function AdminPage() {
         .createdCode {
           margin-top: 16px;
           padding: 15px;
-          border: 1px solid rgba(77, 221, 170, 0.38);
+          border: 1px solid var(--light-border, rgba(77, 221, 170, 0.38));
           border-radius: 14px;
           display: grid;
           gap: 10px;
-          background: rgba(31, 125, 91, 0.14);
+          background: var(--light-positive-surface, rgba(31, 125, 91, 0.14));
         }
 
         .createdCode span {
-          color: #8ed5bc;
+          color: var(--light-positive, #8ed5bc);
           font-size: 0.82rem;
         }
 
         .createdCode strong {
           padding: 12px;
           border-radius: 10px;
-          color: #fff;
-          background: rgba(2, 18, 28, 0.72);
+          color: var(--light-text, #fff);
+          background: var(--light-panel, rgba(2, 18, 28, 0.72));
           font-family: ui-monospace, monospace;
           letter-spacing: 0.07em;
           word-break: break-all;
@@ -1314,9 +1314,9 @@ export default function AdminPage() {
         .inviteCard,
         .reportCard {
           padding: 15px;
-          border: 1px solid rgba(52, 105, 137, 0.34);
+          border: 1px solid var(--light-border, rgba(52, 105, 137, 0.34));
           border-radius: 15px;
-          background: rgba(4, 22, 34, 0.7);
+          background: var(--light-panel, rgba(4, 22, 34, 0.7));
         }
 
         .inviteCard {
@@ -1336,13 +1336,13 @@ export default function AdminPage() {
         .inviteCard small,
         .reportCard span,
         .reportCard small {
-          color: #7898ac;
+          color: var(--light-muted, #7898ac);
         }
 
         .inviteCard button {
           flex: 0 0 auto;
-          border-color: rgba(255, 99, 115, 0.38);
-          color: #ff9ba6;
+          border-color: var(--light-border, rgba(255, 99, 115, 0.38));
+          color: var(--light-negative, #ff9ba6);
         }
 
         .reportHead {
@@ -1360,7 +1360,7 @@ export default function AdminPage() {
 
         .reportCard p {
           margin: 14px 0 11px;
-          color: #c8d9e4;
+          color: var(--light-muted, #c8d9e4);
           line-height: 1.55;
           white-space: pre-wrap;
         }
@@ -1368,7 +1368,7 @@ export default function AdminPage() {
         .empty {
           padding: 24px;
           text-align: center;
-          color: #7898ac;
+          color: var(--light-muted, #7898ac);
         }
 
         @media (max-width: 1050px) {

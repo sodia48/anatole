@@ -25,21 +25,21 @@
 .searchDialog {
   width: min(680px, 100%);
   overflow: hidden;
-  border: 1px solid rgba(64, 111, 140, .72);
+  border: 1px solid var(--light-border, rgba(64, 111, 140, .72));
   border-radius: 22px;
   background:
     radial-gradient(
       circle at 95% 0%,
-      rgba(34, 111, 166, .21),
+      var(--light-raised, rgba(34, 111, 166, .21)),
       transparent 42%
     ),
     linear-gradient(
       150deg,
-      rgba(9, 27, 40, .995),
-      rgba(4, 15, 24, .995)
+      var(--light-panel, rgba(9, 27, 40, .995)),
+      var(--light-panel, rgba(4, 15, 24, .995))
     );
   box-shadow:
-    0 34px 100px rgba(0, 0, 0, .58),
+    0 34px 100px var(--light-shadow, rgba(0, 0, 0, .58)),
     inset 0 1px 0 rgba(255, 255, 255, .04);
 }
 
@@ -56,7 +56,7 @@
 }
 
 .searchHeader span {
-  color: #5f91ae;
+  color: var(--light-muted, #5f91ae);
   font-size: 9px;
   font-weight: 900;
   letter-spacing: .16em;
@@ -77,10 +77,10 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(62, 108, 135, .72);
+  border: 1px solid var(--light-border, rgba(62, 108, 135, .72));
   border-radius: 12px;
   background: var(--panel);
-  color: #dfeef7;
+  color: var(--light-text, #dfeef7);
   cursor: pointer;
 }
 
@@ -92,16 +92,16 @@
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(61, 111, 140, .82);
+  border: 1px solid var(--light-border, rgba(61, 111, 140, .82));
   border-radius: 15px;
   background: var(--panel);
-  color: #7da2b8;
-  box-shadow: 0 0 0 3px rgba(45, 118, 255, .06);
+  color: var(--light-muted, #7da2b8);
+  box-shadow: 0 0 0 3px var(--light-shadow, rgba(45, 118, 255, .06));
 }
 
 .searchField:focus-within {
-  border-color: rgba(69, 151, 255, .94);
-  box-shadow: 0 0 0 3px rgba(45, 118, 255, .14);
+  border-color: var(--light-accent, rgba(69, 151, 255, .94));
+  box-shadow: 0 0 0 3px var(--light-shadow, rgba(45, 118, 255, .14));
 }
 
 .searchField input {
@@ -112,13 +112,13 @@
   border: 0;
   outline: 0;
   background: transparent;
-  color: #eef8ff;
+  color: var(--light-text, #eef8ff);
   font: inherit;
   font-size: 15px;
 }
 
 .searchField input::placeholder {
-  color: #577b91;
+  color: var(--light-muted, #577b91);
 }
 
 .searchField input::-webkit-search-cancel-button {
@@ -127,7 +127,7 @@
 
 .searchField kbd {
   padding: 4px 7px;
-  border: 1px solid rgba(67, 110, 135, .58);
+  border: 1px solid var(--light-border, rgba(67, 110, 135, .58));
   border-radius: 7px;
   color: var(--muted);
   font-size: 9px;
@@ -155,19 +155,19 @@
   border: 1px solid transparent;
   border-radius: 13px;
   background: transparent;
-  color: #dcebf4;
+  color: var(--light-text, #dcebf4);
   cursor: pointer;
   text-align: left;
 }
 
 .searchResult:hover,
 .searchResultActive {
-  border-color: rgba(62, 125, 163, .54);
+  border-color: var(--light-accent, rgba(62, 125, 163, .54));
   background:
     linear-gradient(
       90deg,
-      rgba(31, 103, 149, .28),
-      rgba(11, 42, 61, .86)
+      var(--light-raised, rgba(31, 103, 149, .28)),
+      var(--light-raised, rgba(11, 42, 61, .86))
     );
 }
 
@@ -176,10 +176,10 @@
   height: 38px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(61, 112, 141, .55);
+  border: 1px solid var(--light-border, rgba(61, 112, 141, .55));
   border-radius: 11px;
   background: var(--panel);
-  color: #8cc5ef;
+  color: var(--light-accent, #8cc5ef);
 }
 
 .searchResult > span:nth-child(2) {
@@ -199,7 +199,7 @@
 
 .searchResult small {
   overflow: hidden;
-  color: #6e94aa;
+  color: var(--light-muted, #6e94aa);
   font-size: 9px;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -207,20 +207,20 @@
 }
 
 .searchResultArrow {
-  color: #4b758d;
+  color: var(--light-accent, #4b758d);
   font-size: 18px;
 }
 
 .searchResultActive .searchResultArrow {
-  color: #49a7ff;
+  color: var(--light-accent, #49a7ff);
 }
 
 .searchEmpty {
   margin: 10px 0;
   padding: 24px 16px;
-  border: 1px dashed rgba(61, 108, 135, .48);
+  border: 1px dashed var(--light-border, rgba(61, 108, 135, .48));
   border-radius: 14px;
-  color: #7898aa;
+  color: var(--light-muted, #7898aa);
   font-size: 12px;
   line-height: 1.5;
   text-align: center;
@@ -229,8 +229,8 @@
 .searchHelp {
   margin: 12px 20px 0;
   padding: 12px 0 16px;
-  border-top: 1px solid rgba(48, 88, 112, .44);
-  color: #53788d;
+  border-top: 1px solid var(--light-border, rgba(48, 88, 112, .44));
+  color: var(--light-muted, #53788d);
   font-size: 9px;
   text-align: center;
 }

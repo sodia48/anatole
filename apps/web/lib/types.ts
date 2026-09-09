@@ -382,6 +382,7 @@ export type CalendarSnapshot = {
 };
 
 export type EarningsCalendarEvent = {
+  exchange?: string | null;
   ticker: string;
   symbol: string;
   company: string;
@@ -401,6 +402,9 @@ export type EarningsCalendarEvent = {
 };
 
 export type EarningsCalendarSnapshot = {
+  status?: "available" | "partial" | "loading" | "unavailable";
+  refresh_in_progress?: boolean;
+  stale?: boolean;
   universe: string;
   universe_as_of: string | null;
   constituent_count: number;

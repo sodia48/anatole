@@ -222,7 +222,7 @@ export function getCalendarSnapshot(
 }
 
 export function getEarningsCalendarSnapshot(
-  universe: "composite" | "tsx60" = "composite",
+  universe: "canada" | "composite" | "tsx60" = "canada",
   signal?: AbortSignal,
 ): Promise<EarningsCalendarSnapshot> {
   return apiRequest<EarningsCalendarSnapshot>(

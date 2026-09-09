@@ -10,7 +10,7 @@
 }
 
 .heading span {
-  color: #55b9ff;
+  color: var(--light-accent, #55b9ff);
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.12em;
@@ -18,7 +18,7 @@
 
 .heading h1 {
   margin: 0;
-  color: #eaf6fc;
+  color: var(--light-text, #eaf6fc);
   font-size: 16px;
 }
 
@@ -35,9 +35,9 @@
   align-items: center;
   gap: 5px;
   padding: 4px;
-  border: 1px solid rgba(39, 78, 102, 0.8);
+  border: 1px solid var(--light-border, rgba(39, 78, 102, 0.8));
   border-radius: 11px;
-  background: rgba(4, 18, 29, 0.82);
+  background: var(--light-panel, rgba(4, 18, 29, 0.82));
 }
 
 .periodButton {
@@ -51,7 +51,7 @@
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #88a6ba;
+  color: var(--light-muted, #88a6ba);
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
@@ -63,12 +63,12 @@
 }
 
 .periodButton:hover {
-  color: #e7f5ff;
-  background: rgba(26, 65, 91, 0.56);
+  color: var(--light-text, #e7f5ff);
+  background: var(--light-raised, rgba(26, 65, 91, 0.56));
 }
 
 .periodButton:focus-visible {
-  outline: 2px solid rgba(57, 161, 255, 0.9);
+  outline: 2px solid var(--light-accent, rgba(57, 161, 255, 0.9));
   outline-offset: 2px;
 }
 
@@ -77,12 +77,12 @@
 }
 
 .activePeriod {
-  border-color: rgba(52, 154, 232, 0.62);
-  background: rgba(29, 104, 157, 0.72);
-  color: white;
+  border-color: var(--light-border, rgba(52, 154, 232, 0.62));
+  background: var(--light-raised, rgba(29, 104, 157, 0.72));
+  color: var(--light-text, white);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 5px 14px rgba(0, 0, 0, 0.16);
+    0 5px 14px var(--light-shadow, rgba(0, 0, 0, 0.16));
 }
 
 .livePeriod {
@@ -104,7 +104,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  color: #8ba7ba;
+  color: var(--light-muted, #8ba7ba);
   font-size: 10px;
 }
 
@@ -141,15 +141,15 @@
   gap: 11px;
   flex-wrap: wrap;
   padding: 7px 10px;
-  border: 1px solid rgba(39, 78, 102, 0.7);
+  border: 1px solid var(--light-border, rgba(39, 78, 102, 0.7));
   border-radius: 9px;
-  background: rgba(5, 22, 34, 0.68);
-  color: #7f9db1;
+  background: var(--light-panel, rgba(5, 22, 34, 0.68));
+  color: var(--light-muted, #7f9db1);
   font-size: 10px;
 }
 
 .periodName {
-  color: #dcecf6;
+  color: var(--light-text, #dcecf6);
   font-weight: 750;
 }
 
@@ -158,15 +158,15 @@
 }
 
 .positive {
-  color: #00d7ad;
+  color: var(--light-positive, #00d7ad);
 }
 
 .negative {
-  color: #ff4d70;
+  color: var(--light-negative, #ff4d70);
 }
 
 .neutral {
-  color: #dcecf6;
+  color: var(--light-text, #dcecf6);
 }
 
 .liveStatus,
@@ -179,16 +179,16 @@
 }
 
 .liveStatus {
-  color: #00d7ad;
+  color: var(--light-positive, #00d7ad);
 }
 
 .refreshing {
-  color: #65b8f5;
+  color: var(--light-accent, #65b8f5);
 }
 
 .delayed {
   margin-left: 0;
-  color: #d2a45e;
+  color: var(--light-warning, #d2a45e);
 }
 
 .chartLayout {
@@ -219,21 +219,21 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px 14px;
-  border: 1px solid rgba(35, 73, 96, 0.88);
+  border: 1px solid var(--light-border, rgba(35, 73, 96, 0.88));
   border-radius: 9px;
   background:
-    linear-gradient(180deg, rgba(8, 32, 48, 0.96), rgba(5, 20, 31, 0.96));
+    linear-gradient(180deg, var(--light-panel, rgba(8, 32, 48, 0.96)), var(--light-panel, rgba(5, 20, 31, 0.96)));
 }
 
 .volumeHeading {
   display: grid;
   gap: 4px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(55, 96, 122, 0.54);
+  border-bottom: 1px solid var(--light-border, rgba(55, 96, 122, 0.54));
 }
 
 .volumeHeading span {
-  color: #7f9db1;
+  color: var(--light-muted, #7f9db1);
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.1em;
@@ -241,7 +241,7 @@
 }
 
 .volumeHeading strong {
-  color: #f1f8fc;
+  color: var(--light-text, #f1f8fc);
   font-size: 22px;
   letter-spacing: -0.03em;
 }
@@ -252,7 +252,7 @@
   display: flex;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(80, 108, 126, 0.28);
+  background: var(--light-raised, rgba(80, 108, 126, 0.28));
 }
 
 .buyerBar { background: #00cba1; }
@@ -271,7 +271,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #91aabd;
+  color: var(--light-muted, #91aabd);
   font-size: 10px;
   font-weight: 700;
 }
@@ -284,13 +284,13 @@
 }
 
 .volumeMetric strong {
-  color: #e8f5fc;
+  color: var(--light-text, #e8f5fc);
   font-size: 14px;
 }
 
 .volumeMetric small {
   grid-column: 2;
-  color: #6f8da1;
+  color: var(--light-muted, #6f8da1);
   font-size: 9px;
   text-align: right;
 }
@@ -301,12 +301,12 @@
 
 .neutralMetric {
   padding-top: 10px;
-  border-top: 1px solid rgba(55, 96, 122, 0.36);
+  border-top: 1px solid var(--light-border, rgba(55, 96, 122, 0.36));
 }
 
 .volumeMethod {
   margin: auto 0 0;
-  color: #607f93;
+  color: var(--light-muted, #607f93);
   font-size: 9px;
   line-height: 1.5;
 }
@@ -338,7 +338,7 @@
 
 .note {
   margin: 0;
-  color: #69879b;
+  color: var(--light-muted, #69879b);
   font-size: 9px;
   line-height: 1.45;
 }

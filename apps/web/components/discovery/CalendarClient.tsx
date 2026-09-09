@@ -365,7 +365,7 @@ export function CalendarClient() {
       </button>
       <button type="button" aria-pressed={calendarSection === "earnings"} onClick={() => setCalendarSection("earnings")}>
         <TrendingUp size={15} />
-        {pick(language, "Résultats TSX", "TSX earnings")}
+        {pick(language, "Résultats Canada", "Canadian earnings")}
       </button>
     </nav>
   );
