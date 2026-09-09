@@ -77,7 +77,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     border: 0 !important;
     border-right: 1px solid var(--border) !important;
     border-radius: 0 22px 22px 0 !important;
-    background: rgba(4, 13, 21, 0.99) !important;
+    background: var(--sidebar-bg) !important;
     box-shadow: 24px 0 72px rgba(0, 0, 0, 0.52) !important;
     transform: translate3d(-106%, 0, 0);
     transition: transform 180ms ease;
@@ -111,7 +111,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     background:
       linear-gradient(
         180deg,
-        rgba(4, 13, 21, 1) 72%,
+        var(--sidebar-bg) 72%,
         rgba(4, 13, 21, 0)
       );
   }
@@ -177,7 +177,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     place-items: center;
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: rgba(9, 29, 43, 0.94);
+    background: var(--panel-2);
     color: var(--text);
     cursor: pointer;
   }
@@ -303,7 +303,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     place-items: center;
     border: 1px solid var(--border);
     border-radius: 13px;
-    background: rgba(7, 22, 34, 0.97);
+    background: var(--panel);
     color: var(--text);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
     backdrop-filter: blur(18px);
@@ -325,7 +325,7 @@ const MOBILE_DESKTOP_PARITY_CSS = String.raw`
     margin: 0;
     padding: 0;
     border: 0;
-    background: rgba(0, 6, 11, 0.7);
+    background: var(--overlay);
     backdrop-filter: blur(3px);
     cursor: pointer;
   }

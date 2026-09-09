@@ -271,7 +271,7 @@ export function AlertsClient() {
         <div className={styles.alertFormGrid}>
           <div className={styles.searchField}>
             <label htmlFor="alert-symbol">{pick(language, "Symbole", "Symbol")}</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "#7393aa" }} /><input id="alert-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="alert-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
             {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
           </div>
           <div className={styles.field}><label htmlFor="alert-metric">{pick(language, "Indicateur", "Metric")}</label><select id="alert-metric" value={metric} onChange={(event) => setMetric(event.target.value as AlertMetric)}>{METRICS.map((item) => <option value={item.key} key={item.key}>{pick(language, item.label[0], item.label[1])}</option>)}</select></div>
@@ -325,7 +325,7 @@ export function AlertsClient() {
       </section>
 
       <div className={styles.notice}><strong>{pick(language, "Portée actuelle :", "Current scope:")}</strong> {pick(language, "les règles sont évaluées lorsque cette page est ouverte. Une surveillance continue côté serveur nécessiterait un compte utilisateur et une base persistante; Anatole ne prétend pas l’activer sans cette infrastructure.", "rules are evaluated while this page is open. Continuous server-side monitoring would require an account and persistent database; Anatole does not claim to enable it without that infrastructure.")}</div>
-      <div style={{ textAlign: "right", color: "#5f7c91", fontSize: 10 }}>{snapshot ? `${pick(language, "Dernière vérification", "Last checked")} ${new Date(snapshot.generated_at).toLocaleString(localeFor(language))}` : null}</div>
+      <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}>{snapshot ? `${pick(language, "Dernière vérification", "Last checked")} ${new Date(snapshot.generated_at).toLocaleString(localeFor(language))}` : null}</div>
     </main>
   );
 }

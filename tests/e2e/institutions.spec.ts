@@ -178,7 +178,7 @@ test("la section Institutions suit la préférence anglaise", async ({ page }) =
   await expect(page.getByText(/Changes are inferred by comparing quarterly 13F filings/)).toBeVisible();
 });
 
-test("la page Institutions conserve un contraste lisible avec Anatole Ciel", async ({ page }) => {
+test("la page Institutions conserve un contraste lisible avec Anatole Blanc", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
       theme: "blue",

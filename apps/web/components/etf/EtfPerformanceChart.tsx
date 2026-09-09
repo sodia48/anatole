@@ -449,7 +449,7 @@ export function EtfPerformanceChart({
                 <text
                   x={WIDTH - MARGIN.right + 9}
                   y={tick.y + 4}
-                  fill="#769db4"
+                  fill="var(--light-muted, #769db4)"
                   fontSize="10"
                 >
                   {tick.value.toFixed(2)}
@@ -462,7 +462,7 @@ export function EtfPerformanceChart({
                 key={index}
                 x={geometry.x(index)}
                 y={HEIGHT - 15}
-                fill="#769db4"
+                fill="var(--light-muted, #769db4)"
                 fontSize="10"
                 textAnchor={
                   index === 0

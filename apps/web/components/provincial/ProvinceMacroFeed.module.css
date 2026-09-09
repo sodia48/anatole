@@ -10,7 +10,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 13px 16px;
-  border: 1px solid rgba(61, 178, 255, .25);
+  border: 1px solid var(--light-border, rgba(61, 178, 255, .25));
   border-radius: 16px;
   background: var(--panel);
   color: var(--text);
@@ -23,7 +23,7 @@
 }
 
 .provinceBar small {
-  color: #86adc3;
+  color: var(--light-muted, #86adc3);
   text-align: right;
 }
 
@@ -31,8 +31,8 @@
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #35e6b3;
-  box-shadow: 0 0 12px rgba(53, 230, 179, .55);
+  background: var(--light-positive-surface, #35e6b3);
+  box-shadow: 0 0 12px var(--light-shadow, rgba(53, 230, 179, .55));
 }
 
 .newsGrid {
@@ -46,7 +46,7 @@
 .state,
 .error,
 .empty {
-  border: 1px solid rgba(64, 153, 204, .25);
+  border: 1px solid var(--light-border, rgba(64, 153, 204, .25));
   border-radius: 18px;
   background: var(--panel);
 }
@@ -67,8 +67,8 @@
 .badges span {
   padding: 5px 9px;
   border-radius: 999px;
-  background: rgba(24, 94, 150, .22);
-  color: #7abaff;
+  background: var(--light-raised, rgba(24, 94, 150, .22));
+  color: var(--light-accent, #7abaff);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: .04em;
@@ -76,8 +76,8 @@
 }
 
 .badges span:last-child {
-  background: rgba(21, 167, 128, .15);
-  color: #3fe1b4;
+  background: var(--light-positive-surface, rgba(21, 167, 128, .15));
+  color: var(--light-positive, #3fe1b4);
 }
 
 .meta {
@@ -85,14 +85,14 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 13px;
-  color: #82a9c0;
+  color: var(--light-muted, #82a9c0);
   font-size: 11px;
 }
 
 .newsCard h3,
 .eventCard h3 {
   margin: 14px 0 9px;
-  color: #f4f8fb;
+  color: var(--light-text, #f4f8fb);
   font-size: 18px;
   line-height: 1.3;
 }
@@ -100,7 +100,7 @@
 .newsCard p,
 .eventCard p {
   margin: 0;
-  color: #83bad8;
+  color: var(--light-muted, #83bad8);
   line-height: 1.55;
 }
 
@@ -110,7 +110,7 @@
   gap: 14px;
   margin-top: auto;
   padding-top: 17px;
-  color: #7899ac;
+  color: var(--light-muted, #7899ac);
   font-size: 11px;
 }
 
@@ -136,7 +136,7 @@
 .eventWhen {
   display: grid;
   gap: 8px;
-  color: #80b9ff;
+  color: var(--light-accent, #80b9ff);
   font-size: 12px;
 }
 
@@ -144,8 +144,8 @@
   width: max-content;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(208, 151, 53, .16);
-  color: #f0b95d;
+  background: var(--light-warning-surface, rgba(208, 151, 53, .16));
+  color: var(--light-warning, #f0b95d);
   font-size: 10px;
   font-weight: 700;
 }
@@ -157,7 +157,7 @@
 .eventBody small {
   display: block;
   margin-top: 8px;
-  color: #7699ae;
+  color: var(--light-muted, #7699ae);
 }
 
 .open {
@@ -165,7 +165,7 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(75, 159, 211, .32);
+  border: 1px solid var(--light-border, rgba(75, 159, 211, .32));
   border-radius: 10px;
 }
 
@@ -173,18 +173,18 @@
 .error,
 .empty {
   padding: 24px;
-  color: #8bb0c5;
+  color: var(--light-muted, #8bb0c5);
 }
 
 .error {
   display: grid;
   gap: 6px;
-  color: #ffb4b4;
+  color: var(--light-negative, #ffb4b4);
 }
 
 .message {
   margin: 0;
-  color: #829fb0;
+  color: var(--light-muted, #829fb0);
   font-size: 12px;
 }
 

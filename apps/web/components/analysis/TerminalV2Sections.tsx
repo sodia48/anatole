@@ -93,7 +93,7 @@ function RotationMatrix({ snapshot, language }: { snapshot: TerminalSnapshot; la
     <line stroke="#34566c" x1="250" x2="250" y1="0" y2="500" /><line stroke="#34566c" x1="0" x2="500" y1="250" y2="250" />
     {drawable.map((item) => {
       const cx = scale(item.x!); const cy = 500 - scale(item.y!); const hasPrevious = item.previous_x != null && item.previous_y != null;
-      return <g data-testid={`terminal-rotation-bubble-${item.sector}`} key={item.sector}>{hasPrevious ? <line data-testid={`terminal-rotation-path-${item.sector}`} stroke="#7894a8" strokeWidth="2" x1={scale(item.previous_x!)} x2={cx} y1={500 - scale(item.previous_y!)} y2={cy} /> : null}<circle cx={cx} cy={cy} fill="#2c9cff" opacity=".85" r={Math.max(9, Math.min(25, 7 + item.member_count * 1.5))} /><text fill="#fff" fontSize="11" textAnchor="middle" x={cx} y={cy - 16}>{item.sector}</text></g>;
+      return <g data-testid={`terminal-rotation-bubble-${item.sector}`} key={item.sector}>{hasPrevious ? <line data-testid={`terminal-rotation-path-${item.sector}`} stroke="#7894a8" strokeWidth="2" x1={scale(item.previous_x!)} x2={cx} y1={500 - scale(item.previous_y!)} y2={cy} /> : null}<circle cx={cx} cy={cy} fill="#2c9cff" opacity=".85" r={Math.max(9, Math.min(25, 7 + item.member_count * 1.5))} /><text fill="var(--text)" fontSize="11" textAnchor="middle" x={cx} y={cy - 16}>{item.sector}</text></g>;
     })}
   </svg>{unavailable.length ? <div className={styles.rotationUnavailable}>{unavailable.map((item) => <span data-testid={`terminal-rotation-unavailable-${item.sector}`} key={item.sector}>{item.sector} — {pick(language, "données insuffisantes", "insufficient data")} · N/D</span>)}</div> : null}</>;
 }

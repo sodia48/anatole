@@ -70,9 +70,9 @@
 }
 
 .universeButtons button[aria-pressed="true"] {
-  border-color: rgba(50, 157, 236, 0.68);
-  background: rgba(30, 102, 153, 0.6);
-  color: #fff;
+  border-color: var(--light-border, rgba(50, 157, 236, 0.68));
+  background: var(--light-raised, rgba(30, 102, 153, 0.6));
+  color: var(--light-text, #fff);
 }
 
 .control {
@@ -135,7 +135,7 @@
 
 .day h2 {
   margin: 0;
-  color: #bcd0df;
+  color: var(--light-muted, #bcd0df);
   font-size: 14px;
   text-transform: capitalize;
 }
@@ -159,7 +159,7 @@
   min-height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(45, 118, 255, 0.52);
+  border: 1px solid var(--light-border, rgba(45, 118, 255, 0.52));
   border-radius: 8px;
   background: var(--primary-surface);
   color: var(--blue);
@@ -188,7 +188,7 @@
 }
 
 .estimate {
-  color: #d4aa59;
+  color: var(--light-muted, #d4aa59);
 }
 
 .consensus {

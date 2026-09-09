@@ -94,8 +94,8 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #1dd5a7;
-  box-shadow: 0 0 12px rgba(29, 213, 167, 0.72);
+  background: var(--light-positive-surface, #1dd5a7);
+  box-shadow: 0 0 12px var(--light-shadow, rgba(29, 213, 167, 0.72));
 }
 
 .filters {
@@ -118,7 +118,7 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--panel);
-  color: #7fa9c2;
+  color: var(--light-muted, #7fa9c2);
 }
 
 .search > span {
@@ -165,9 +165,9 @@
 
 .errorBanner {
   padding: 11px 14px;
-  border: 1px solid rgba(255, 196, 92, 0.38);
+  border: 1px solid var(--light-border, rgba(255, 196, 92, 0.38));
   border-radius: 12px;
-  background: rgba(255, 180, 67, 0.08);
+  background: var(--light-warning-surface, rgba(255, 180, 67, 0.08));
   color: var(--warning);
   font-size: 12px;
 }

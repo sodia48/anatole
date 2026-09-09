@@ -26,7 +26,7 @@ export function applyPreferences(preferences: AnatolePreferences): void {
   root.lang = preferences.language === "en" ? "en-CA" : "fr-CA";
   root.style.colorScheme = preferences.theme === "blue" ? "light" : "dark";
   document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-    ?.setAttribute("content", preferences.theme === "blue" ? "#DDF3FF" : "#050D15");
+    ?.setAttribute("content", preferences.theme === "blue" ? "#FFFFFF" : "#050D15");
 }
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
