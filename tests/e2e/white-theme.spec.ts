@@ -1,6 +1,31 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
+for (const theme of ["blue", "dark"] as const) {
+  test(`IPO source status badges remain readable (${theme})`, async ({ page }) => {
+    await page.addInitScript((theme) => {
+      localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
+        theme, language: "fr", density: "comfortable", decimals: 2,
+        defaultRange: "1y", defaultUniverse: "tsx60",
+      }));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, theme);
+    await page.route("**/api/anatole/api/v1/discovery/ipo**", (route) => route.fulfill({ json: {
+      items: [], summary: { total: 0, canada: 0, united_states: 0, companies: 0,
+        newly_listed: 0, regulatory_filings: 0 },
+      sources: ["available", "partial", "unavailable"].map((status) => ({
+        source: `Test source ${status}`, status, count: 0, detail: null,
+        url: "https://www.tsx.com/en/news/new-company-listings",
+      })), generated_at: new Date().toISOString(), refresh_after_seconds: 300, message: null,
+    } }));
+    await page.goto("/ipo-insiders");
+    await expect(page.getByText("DISPONIBLE", { exact: true })).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const results = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();
+    expect(results.violations).toEqual([]);
+  });
+}
+
 // A populated table is essential: a loading screen cannot detect the pale
 // company names that made the Screener unreadable in the former Sky theme.
 for (const theme of ["blue", "dark"] as const) {

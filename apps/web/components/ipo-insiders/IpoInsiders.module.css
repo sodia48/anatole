@@ -499,7 +499,7 @@
 }
 
 .sourceAvailable {
-  color: var(--teal);
+  color: var(--positive-text);
 }
 
 .sourcePartial {
