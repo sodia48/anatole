@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, Field
 
 
@@ -91,6 +92,7 @@ class EarningsCalendarEvent(BaseModel):
     company: str
     sector: str | None = None
     weight: float | None = None
+    exchange: str | None = None
     starts_at: datetime
     window_start: datetime
     window_end: datetime
@@ -113,6 +115,9 @@ class EarningsCalendarSnapshot(BaseModel):
     source_statuses: list[FeedStatus]
     generated_at: datetime
     refresh_after_seconds: int = 10_800
+    status: Literal["available", "partial", "loading", "unavailable"] = "available"
+    refresh_in_progress: bool = False
+    stale: bool = False
 
 
 class EtfDirectoryItem(BaseModel):

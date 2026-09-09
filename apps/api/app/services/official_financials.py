@@ -703,6 +703,11 @@ class OfficialFinancialsService:
         )
 
         data = snapshot.model_dump()
+        if constituent is not None:
+            if snapshot.name in {snapshot.symbol, snapshot.ticker}:
+                data["name"] = constituent.name
+            if not snapshot.sector:
+                data["sector"] = constituent.sector
         data["annual_financials"] = annual
         data["quarterly_financials"] = quarterly
         data["financial_currency"] = reporting_currency

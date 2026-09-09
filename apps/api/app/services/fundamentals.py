@@ -6,8 +6,6 @@ from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Literal
 
-import httpx
-
 from app.core.config import settings
 from app.schemas.fundamentals import (
     AnalystConsensus,
@@ -21,6 +19,7 @@ from app.schemas.fundamentals import (
     TTMSummary,
 )
 from app.services.market_data import market_data_service
+from app.services.yahoo_public import yahoo_public_service
 from app.services.official_financials import (
     official_financials_service,
 )
@@ -165,92 +164,44 @@ class FundamentalsService:
             self._locks[symbol] = lock
         return lock
 
-    async def _credentials(
-        self,
-        client: httpx.AsyncClient,
-    ) -> str | None:
-        try:
-            await client.get("https://fc.yahoo.com", timeout=6.0)
-        except httpx.HTTPError:
-            pass
+    async def _request_summary(self, symbol: str) -> dict[str, Any]:
+        body = await yahoo_public_service.request_json(
+            f"/v10/finance/quoteSummary/{symbol}",
+            params={"modules": ",".join(MODULES)},
+        )
+        rows = body.get("quoteSummary", {}).get("result") or []
+        if not rows or not isinstance(rows[0], dict) or not rows[0]:
+            raise RuntimeError("Yahoo fundamentals unavailable")
+        return rows[0]
 
-        try:
-            response = await client.get(
-                "https://query1.finance.yahoo.com/v1/test/getcrumb",
-                timeout=8.0,
-            )
-            response.raise_for_status()
-            crumb = response.text.strip()
-            return crumb or None
-        except httpx.HTTPError:
-            return None
-
-    async def _request_summary(
-        self,
-        symbol: str,
-    ) -> dict[str, Any]:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Anatole/0.9"
-            ),
-            "Accept": "application/json,text/plain,*/*",
-            "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.8",
-            "Referer": f"https://finance.yahoo.com/quote/{symbol}",
+    async def _quote_fallback(self, symbol: str) -> dict[str, Any]:
+        if settings.market_data_provider.strip().lower() == "demo":
+            return {}
+        body = await yahoo_public_service.request_json(
+            "/v7/finance/quote", params={"symbols": symbol},
+        )
+        quote = next((row for row in body.get("quoteResponse", {}).get("result", [])
+                      if row.get("symbol") == symbol), {})
+        if not quote:
+            return {}
+        return {
+            "price": {**quote, "exchangeName": quote.get("fullExchangeName")},
+            "assetProfile": {"sector": quote.get("sector"), "industry": quote.get("industry")},
+            "summaryDetail": {
+                "trailingPE": quote.get("trailingPE"), "forwardPE": quote.get("forwardPE"),
+                "fiftyTwoWeekHigh": quote.get("fiftyTwoWeekHigh"),
+                "fiftyTwoWeekLow": quote.get("fiftyTwoWeekLow"),
+                "averageVolume10days": quote.get("averageDailyVolume10Day"),
+                "averageVolume": quote.get("averageDailyVolume3Month"),
+            },
+            "defaultKeyStatistics": {
+                "sharesOutstanding": quote.get("sharesOutstanding"),
+                "trailingEps": quote.get("epsTrailingTwelveMonths"),
+                "forwardEps": quote.get("epsForward"), "priceToBook": quote.get("priceToBook"),
+            },
+            "financialData": {"financialCurrency": quote.get("financialCurrency"),
+                              "currentPrice": quote.get("regularMarketPrice")},
         }
-        timeout_seconds = max(
-            8.0,
-            float(settings.yahoo_timeout_seconds),
-        )
-        timeout = httpx.Timeout(
-            connect=min(timeout_seconds, 8.0),
-            read=timeout_seconds,
-            write=8.0,
-            pool=8.0,
-        )
-
-        async with httpx.AsyncClient(
-            headers=headers,
-            timeout=timeout,
-            follow_redirects=True,
-        ) as client:
-            crumb = await self._credentials(client)
-            params: dict[str, str] = {
-                "modules": ",".join(MODULES),
-                "corsDomain": "finance.yahoo.com",
-                "formatted": "false",
-                "lang": "en-CA",
-                "region": "CA",
-            }
-            if crumb:
-                params["crumb"] = crumb
-
-            errors: list[str] = []
-            for host in (
-                "https://query2.finance.yahoo.com",
-                "https://query1.finance.yahoo.com",
-            ):
-                try:
-                    response = await client.get(
-                        f"{host}/v10/finance/quoteSummary/{symbol}",
-                        params=params,
-                    )
-                    response.raise_for_status()
-                    body = response.json()
-                    result = (
-                        body.get("quoteSummary", {}).get("result")
-                        or []
-                    )
-                    if result and isinstance(result[0], dict):
-                        return result[0]
-                    error = body.get("quoteSummary", {}).get("error")
-                    errors.append(str(error or "empty result"))
-                except (httpx.HTTPError, ValueError) as exc:
-                    errors.append(f"{host}: {type(exc).__name__}: {exc}")
-
-        raise RuntimeError(
-            "; ".join(errors) or "Yahoo fundamentals unavailable"
-        )
 
     def _financial_periods(
         self,
@@ -531,17 +482,20 @@ class FundamentalsService:
         quarterly: list[FinancialPeriod],
         currency: str | None,
     ) -> TTMSummary:
-        recent = quarterly[:4]
+        recent = sorted(quarterly, key=lambda row: row.period_end, reverse=True)[:4]
         if not recent:
             return TTMSummary(currency=currency)
 
         def total(field: str) -> float | None:
-            values = [
-                getattr(period, field)
-                for period in recent
-                if getattr(period, field) is not None
-            ]
-            return sum(values) if values else None
+            # A TTM figure requires four distinct, consecutive quarters in
+            # the same reporting currency. Partial sums are not annual totals.
+            if not currency or len(recent) != 4 or any(period.currency != currency for period in recent):
+                return None
+            if any(not 65 <= (a.period_end - b.period_end).days <= 115
+                   for a, b in zip(recent, recent[1:])):
+                return None
+            values = [getattr(period, field) for period in recent]
+            return sum(values) if all(value is not None for value in values) else None
 
         revenue = total("total_revenue")
         gross_profit = total("gross_profit")
@@ -998,6 +952,47 @@ class FundamentalsService:
             refresh_after_seconds=self.unavailable_ttl_seconds,
         )
 
+    @staticmethod
+    def _complete_metrics(snapshot: FundamentalSnapshot) -> None:
+        """Fill missing cards from verified statements, never from partial sums."""
+        metrics = snapshot.metrics
+        ttm = snapshot.ttm
+        reporting_currency = snapshot.financial_currency
+
+        def fill(field: str, value: float | None) -> None:
+            if getattr(metrics, field) is None and value is not None and math.isfinite(value):
+                setattr(metrics, field, value)
+
+        if ttm.period_end and 0 <= (datetime.now(UTC) - ttm.period_end).days <= 550:
+            for target, source in {
+                "total_revenue": "total_revenue", "gross_profit": "gross_profit",
+                "ebitda": "ebitda", "net_income_to_common": "net_income",
+                "operating_cash_flow": "operating_cash_flow", "free_cash_flow": "free_cash_flow",
+                "trailing_eps": "diluted_eps", "gross_margin": "gross_margin",
+                "operating_margin": "operating_margin", "profit_margin": "net_margin",
+            }.items():
+                fill(target, getattr(ttm, source))
+
+        balance = sorted(snapshot.quarterly_financials + snapshot.annual_financials,
+                         key=lambda row: row.period_end, reverse=True)
+        latest = next((row for row in balance if row.currency == reporting_currency
+                       and any(getattr(row, field) is not None for field in
+                               ("total_cash", "total_debt", "current_assets", "stockholder_equity"))), None)
+        if latest and 0 <= (datetime.now(UTC) - latest.period_end).days <= 550:
+            fill("total_cash", latest.total_cash)
+            fill("total_debt", latest.total_debt)
+            if latest.current_liabilities is not None and latest.current_liabilities > 0:
+                fill("current_ratio", safe_div(latest.current_assets, latest.current_liabilities))
+            if latest.stockholder_equity is not None and latest.stockholder_equity > 0:
+                fill("debt_to_equity", safe_div(latest.total_debt, latest.stockholder_equity, scale=100))
+
+        # Valuation crosses market and statement currencies: no implicit FX conversion.
+        if reporting_currency and reporting_currency == snapshot.currency:
+            if metrics.total_revenue is not None and metrics.total_revenue > 0:
+                fill("price_to_sales", safe_div(metrics.market_cap, metrics.total_revenue))
+            if metrics.trailing_eps is not None and metrics.trailing_eps > 0:
+                fill("trailing_pe", safe_div(snapshot.analysts.current_price, metrics.trailing_eps))
+
     async def get_snapshot(
         self,
         ticker: str,
@@ -1019,6 +1014,9 @@ class FundamentalsService:
             try:
                 payload = await self._request_summary(symbol)
                 snapshot = self._snapshot(ticker, symbol, payload)
+                quote_summary_failed = not any(
+                    value is not None for value in snapshot.metrics.model_dump().values()
+                )
             except Exception:  # noqa: BLE001
                 quote_summary_failed = True
                 snapshot = self._unavailable(
@@ -1029,6 +1027,26 @@ class FundamentalsService:
                         "indisponibles."
                     ),
                 )
+
+            if quote_summary_failed:
+                try:
+                    quote_payload = await self._quote_fallback(symbol)
+                    if quote_payload:
+                        fallback = self._snapshot(ticker, symbol, quote_payload)
+                        for field, value in fallback.metrics.model_dump().items():
+                            if getattr(snapshot.metrics, field) is None:
+                                setattr(snapshot.metrics, field, value)
+                        for field in ("currency", "financial_currency", "sector", "industry", "exchange"):
+                            if getattr(snapshot, field) is None:
+                                setattr(snapshot, field, getattr(fallback, field))
+                        if snapshot.name in {ticker, snapshot.symbol, snapshot.ticker}:
+                            snapshot.name = fallback.name
+                        if snapshot.analysts.current_price is None:
+                            snapshot.analysts.current_price = fallback.analysts.current_price
+                        if any(value is not None for value in snapshot.metrics.model_dump().values()):
+                            snapshot.status = "partial"
+                except Exception:  # noqa: BLE001
+                    pass
 
             snapshot = await official_financials_service.enrich(
                 snapshot,
@@ -1044,12 +1062,19 @@ class FundamentalsService:
                 snapshot.quarterly_financials,
                 snapshot.ttm,
             )
+            self._complete_metrics(snapshot)
+            if quote_summary_failed:
+                snapshot.refresh_after_seconds = self.unavailable_ttl_seconds
 
             stale = self._cache.get(symbol)
             if (
-                snapshot.status == "unavailable"
-                and stale is not None
+                stale is not None
                 and stale[1].status != "unavailable"
+                and (snapshot.status == "unavailable" or (
+                    quote_summary_failed
+                    and sum(value is not None for value in snapshot.metrics.model_dump().values())
+                    < sum(value is not None for value in stale[1].metrics.model_dump().values())
+                ))
             ):
                 snapshot = stale[1].model_copy(
                     update={

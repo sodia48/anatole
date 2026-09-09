@@ -12,32 +12,48 @@ import type {
 
 import styles from "./EarningsCalendarPanel.module.css";
 
-type Universe = "composite" | "tsx60";
+type Universe = "canada" | "composite" | "tsx60";
+const snapshots = new Map<Universe, EarningsCalendarSnapshot>();
 
 export function EarningsCalendarPanel({
   language,
 }: {
   language: "fr" | "en";
 }) {
-  const [universe, setUniverse] = useState<Universe>("composite");
+  const [universe, setUniverse] = useState<Universe>("canada");
+  const [revision, setRevision] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [data, setData] = useState<EarningsCalendarSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sector, setSector] = useState("ALL");
   const [horizon, setHorizon] = useState("90");
+  const [visibleLimit, setVisibleLimit] = useState(60);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     queueMicrotask(() => {
       if (!active) return;
-      setData(null);
+      setData(snapshots.get(universe) ?? null);
       setError(null);
+      setVisibleLimit(60);
     });
 
-    void getEarningsCalendarSnapshot(universe, controller.signal)
+    const load = () => void getEarningsCalendarSnapshot(universe, controller.signal)
       .then((snapshot) => {
-        if (active) setData(snapshot);
+        if (!active) return;
+        const unavailable = snapshot.status === "unavailable";
+        if (!unavailable && snapshot.status !== "loading") snapshots.set(universe, snapshot);
+        setData(snapshots.get(universe) ?? snapshot);
+        setError(unavailable ? pick(language, "Le calendrier est temporairement indisponible.", "The calendar is temporarily unavailable.") : null);
+        if (snapshot.refresh_in_progress || unavailable) timer = setTimeout(load, unavailable ? 60_000 : 5_000);
       })
       .catch((reason: unknown) => {
         if (
@@ -47,18 +63,21 @@ export function EarningsCalendarPanel({
           setError(
             pick(
               language,
-              "Le calendrier des résultats TSX est temporairement indisponible.",
-              "The TSX earnings calendar is temporarily unavailable.",
+              "Le calendrier des résultats est temporairement indisponible.",
+              "The earnings calendar is temporarily unavailable.",
             ),
           );
+          timer = setTimeout(load, 30_000);
         }
       });
+    load();
 
     return () => {
       active = false;
       controller.abort();
+      clearTimeout(timer);
     };
-  }, [language, universe]);
+  }, [language, universe, revision]);
 
   const sectors = useMemo(
     () =>
@@ -74,17 +93,18 @@ export function EarningsCalendarPanel({
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    const generatedAt = data ? Date.parse(data.generated_at) : 0;
-    const limit = generatedAt + Number(horizon) * 86_400_000;
+    const today = new Date(now).toLocaleDateString("en-CA", { timeZone: "America/Toronto" });
+    const limit = now + Number(horizon) * 86_400_000;
     return (data?.events ?? []).filter((item) => {
       const text = `${item.ticker} ${item.company}`.toLowerCase();
       return (
         (!normalized || text.includes(normalized)) &&
         (sector === "ALL" || item.sector === sector) &&
-        Date.parse(item.starts_at) <= limit
+        Date.parse(item.starts_at) <= limit &&
+        new Date(item.starts_at).toLocaleDateString("en-CA", { timeZone: "America/Toronto" }) >= today
       );
     });
-  }, [data, horizon, query, sector]);
+  }, [data, horizon, query, sector, now]);
 
   const dayFormatter = useMemo(
     () =>
@@ -125,43 +145,45 @@ export function EarningsCalendarPanel({
 
   const grouped = useMemo(() => {
     const output = new Map<string, EarningsCalendarEvent[]>();
-    for (const item of filtered) {
+    for (const item of filtered.slice(0, visibleLimit)) {
       const key = dayFormatter.format(new Date(item.starts_at));
       output.set(key, [...(output.get(key) ?? []), item]);
     }
     return Array.from(output.entries());
-  }, [dayFormatter, filtered]);
+  }, [dayFormatter, filtered, visibleLimit]);
 
   return (
-    <section className={styles.root} aria-label={pick(language, "Résultats TSX à venir", "Upcoming TSX earnings")}>
+    <section className={styles.root} aria-label={pick(language, "Résultats Canada à venir", "Upcoming Canadian earnings")}>
       <header className={`panel ${styles.hero}`}>
         <div>
           <span className="eyebrow">
             {pick(language, "CALENDRIER DES SOCIÉTÉS", "COMPANY CALENDAR")}
           </span>
-          <h1>{pick(language, "Résultats TSX à venir", "Upcoming TSX earnings")}</h1>
+          <h1>{pick(language, "Résultats Canada à venir", "Upcoming Canadian earnings")}</h1>
           <p>
             {pick(
               language,
-              "Fenêtres de publication disponibles pour les composantes du S&P/TSX Composite ou du TSX 60. Les dates restent indicatives jusqu’à confirmation par l’émetteur.",
-              "Available reporting windows for S&P/TSX Composite or TSX 60 constituents. Dates remain indicative until confirmed by the issuer.",
+              "Sociétés cotées au Canada : TSX, TSX Venture, CSE et Cboe Canada, au-delà des indices. Les dates disponibles restent indicatives jusqu’à confirmation par l’émetteur.",
+              "Canadian-listed companies: TSX, TSX Venture, CSE and Cboe Canada, beyond the indices. Available dates remain indicative until confirmed by the issuer.",
             )}
           </p>
         </div>
         <div className={styles.score}>
           <TrendingUp size={20} />
-          <strong>{filtered.length}</strong>
+          <strong>{data && data.status !== "loading" && data.status !== "unavailable" ? filtered.length : "—"}</strong>
           <span>{pick(language, "publications à venir", "upcoming reports")}</span>
           <small>
-            {data
+            {data && data.status !== "loading" && data.status !== "unavailable"
               ? `${data.companies_with_dates}/${data.constituent_count} ${pick(language, "sociétés datées", "companies dated")}`
-              : pick(language, "Chargement…", "Loading…")}
+              : error ? pick(language, "Indisponible", "Unavailable") : pick(language, "Chargement…", "Loading…")}
           </small>
+          {data?.status === "partial" && !data.refresh_in_progress ? <small>{pick(language, "Couverture partielle", "Partial coverage")}</small> : null}
         </div>
       </header>
 
       <section className={`panel ${styles.controls}`} aria-label={pick(language, "Filtres des résultats", "Earnings filters")}>
-        <div className={styles.universeButtons} role="group" aria-label={pick(language, "Univers TSX", "TSX universe")}>
+        <div className={styles.universeButtons} role="group" aria-label={pick(language, "Univers canadien", "Canadian universe")}>
+          <button type="button" aria-pressed={universe === "canada"} onClick={() => setUniverse("canada")}>Canada</button>
           <button type="button" aria-pressed={universe === "composite"} onClick={() => setUniverse("composite")}>TSX Composite</button>
           <button type="button" aria-pressed={universe === "tsx60"} onClick={() => setUniverse("tsx60")}>TSX 60</button>
         </div>
@@ -170,13 +192,13 @@ export function EarningsCalendarPanel({
           <span>{pick(language, "Rechercher", "Search")}</span>
           <span>
             <Search size={14} aria-hidden="true" />
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pick(language, "Ticker ou entreprise", "Ticker or company")} />
+            <input value={query} onChange={(event) => { setQuery(event.target.value); setVisibleLimit(60); }} placeholder={pick(language, "Ticker ou entreprise", "Ticker or company")} />
           </span>
         </label>
 
         <label className={styles.control}>
           <span>{pick(language, "Secteur", "Sector")}</span>
-          <select value={sector} onChange={(event) => setSector(event.target.value)}>
+          <select value={sector} onChange={(event) => { setSector(event.target.value); setVisibleLimit(60); }}>
             <option value="ALL">{pick(language, "Tous", "All")}</option>
             {sectors.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
@@ -184,7 +206,7 @@ export function EarningsCalendarPanel({
 
         <label className={styles.control}>
           <span>{pick(language, "Horizon", "Horizon")}</span>
-          <select value={horizon} onChange={(event) => setHorizon(event.target.value)}>
+          <select value={horizon} onChange={(event) => { setHorizon(event.target.value); setVisibleLimit(60); }}>
             <option value="30">30 {pick(language, "jours", "days")}</option>
             <option value="90">90 {pick(language, "jours", "days")}</option>
             <option value="180">180 {pick(language, "jours", "days")}</option>
@@ -192,9 +214,12 @@ export function EarningsCalendarPanel({
         </label>
       </section>
 
-      {error ? <div className="cockpit-warning">{error}</div> : null}
+      <button type="button" className="button-secondary" onClick={() => setRevision((value) => value + 1)}>{pick(language, "Actualiser", "Refresh")}</button>
+      {error ? <div className="cockpit-warning" role="status">{error} {data?.events.length ? pick(language, "Dernières données disponibles.", "Last available data.") : ""}</div> : null}
+      {data?.stale ? <p role="status">{pick(language, "Dernières données disponibles.", "Last available data.")}</p> : null}
+      {data?.refresh_in_progress ? <p role="status">{pick(language, "Synchronisation des dates et estimations…", "Synchronizing dates and estimates…")}</p> : null}
 
-      {!data && !error ? <div className={`panel ${styles.loading}`}>{pick(language, "Synchronisation des résultats TSX…", "Synchronizing TSX earnings…")}</div> : null}
+      {!data && !error ? <div className={`panel ${styles.loading}`}>{pick(language, "Synchronisation des résultats…", "Synchronizing earnings…")}</div> : null}
 
       {data ? (
         <section className={styles.groups}>
@@ -207,7 +232,7 @@ export function EarningsCalendarPanel({
                     <a className={styles.ticker} href={`/focus/${encodeURIComponent(event.ticker)}`}>{event.ticker}</a>
                     <div className={styles.eventBody}>
                       <strong>{event.company}</strong>
-                      <span className={styles.meta}>{event.sector ?? pick(language, "Secteur non publié", "Sector not published")} · {timeFormatter.format(new Date(event.starts_at))}</span>
+                      <span className={styles.meta}>{event.exchange ? `${event.exchange} · ` : ""}{event.sector ?? pick(language, "Secteur non publié", "Sector not published")} · {timeFormatter.format(new Date(event.starts_at))}</span>
                       <span className={styles.estimate}>{pick(language, "Date et heure indicatives", "Indicative date and time")}</span>
                       <div className={styles.consensus}>
                         <div>
@@ -244,7 +269,8 @@ export function EarningsCalendarPanel({
             </div>
           ))}
 
-          {!grouped.length ? <div className={`panel ${styles.empty}`}>{pick(language, "Aucune date future publiée pour ces filtres.", "No published future date matches these filters.")}</div> : null}
+          {!grouped.length && !error && !data.refresh_in_progress && data.status !== "unavailable" ? <div className={`panel ${styles.empty}`}>{pick(language, "Aucune date future publiée pour ces filtres.", "No published future date matches these filters.")}</div> : null}
+          {filtered.length > visibleLimit ? <button type="button" className="button-secondary" onClick={() => setVisibleLimit((value) => value + 60)}>{pick(language, "Afficher plus", "Show more")} ({visibleLimit}/{filtered.length})</button> : null}
         </section>
       ) : null}
     </section>
