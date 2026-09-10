@@ -29,6 +29,7 @@ export function EarningsCalendarPanel({
   const [sector, setSector] = useState("ALL");
   const [horizon, setHorizon] = useState("90");
   const [visibleLimit, setVisibleLimit] = useState(60);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60_000);
@@ -46,10 +47,16 @@ export function EarningsCalendarPanel({
       setVisibleLimit(60);
     });
 
-    const load = () => void getEarningsCalendarSnapshot(universe, controller.signal)
+    const load = () => {
+      if (!active) return;
+      setRefreshing(true);
+      return void getEarningsCalendarSnapshot(universe, controller.signal)
       .then((snapshot) => {
         if (!active) return;
-        const unavailable = snapshot.status === "unavailable";
+        if (snapshot.status === "unavailable" && snapshot.refresh_in_progress) {
+          snapshot = { ...snapshot, status: snapshot.events.length ? "partial" : "loading" };
+        }
+        const unavailable = snapshot.status === "unavailable" && !snapshot.refresh_in_progress;
         if (!unavailable && snapshot.status !== "loading") snapshots.set(universe, snapshot);
         setData(snapshots.get(universe) ?? snapshot);
         setError(unavailable ? pick(language, "Le calendrier est temporairement indisponible.", "The calendar is temporarily unavailable.") : null);
@@ -69,7 +76,8 @@ export function EarningsCalendarPanel({
           );
           timer = setTimeout(load, 30_000);
         }
-      });
+      }).finally(() => { if (active) setRefreshing(false); });
+    };
     load();
 
     return () => {
@@ -214,7 +222,7 @@ export function EarningsCalendarPanel({
         </label>
       </section>
 
-      <button type="button" className="button-secondary" onClick={() => setRevision((value) => value + 1)}>{pick(language, "Actualiser", "Refresh")}</button>
+      <button type="button" className="button-secondary" disabled={refreshing} onClick={() => setRevision((value) => value + 1)}>{pick(language, "Actualiser", "Refresh")}</button>
       {error ? <div className="cockpit-warning" role="status">{error} {data?.events.length ? pick(language, "Dernières données disponibles.", "Last available data.") : ""}</div> : null}
       {data?.stale ? <p role="status">{pick(language, "Dernières données disponibles.", "Last available data.")}</p> : null}
       {data?.refresh_in_progress ? <p role="status">{pick(language, "Synchronisation des dates et estimations…", "Synchronizing dates and estimates…")}</p> : null}
@@ -245,7 +253,7 @@ export function EarningsCalendarPanel({
                           <small>
                             {event.eps_analyst_count
                               ? `${event.eps_analyst_count} ${pick(language, "analystes", "analysts")}`
-                              : pick(language, "Consensus indisponible", "Consensus unavailable")}
+                              : data.refresh_in_progress ? pick(language, "Consensus en synchronisation", "Consensus synchronizing") : pick(language, "Consensus indisponible", "Consensus unavailable")}
                           </small>
                         </div>
                         <div>
@@ -258,7 +266,7 @@ export function EarningsCalendarPanel({
                           <small>
                             {event.revenue_analyst_count
                               ? `${event.revenue_analyst_count} ${pick(language, "analystes", "analysts")}`
-                              : pick(language, "Consensus indisponible", "Consensus unavailable")}
+                              : data.refresh_in_progress ? pick(language, "Consensus en synchronisation", "Consensus synchronizing") : pick(language, "Consensus indisponible", "Consensus unavailable")}
                           </small>
                         </div>
                       </div>

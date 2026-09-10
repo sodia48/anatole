@@ -33,15 +33,7 @@ MODULES = (
     "financialData",
     "calendarEvents",
     "recommendationTrend",
-    "earnings",
-    "earningsHistory",
     "earningsTrend",
-    "incomeStatementHistory",
-    "incomeStatementHistoryQuarterly",
-    "cashflowStatementHistory",
-    "cashflowStatementHistoryQuarterly",
-    "balanceSheetHistory",
-    "balanceSheetHistoryQuarterly",
 )
 
 
@@ -152,17 +144,14 @@ def normalized_capex(value: float | None) -> float | None:
 class FundamentalsService:
     cache_ttl_seconds = 1800
     unavailable_ttl_seconds = 300
+    fast_budget_seconds = 2.5
+    deep_budget_seconds = 20
+    stale_seconds = 86_400
 
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, FundamentalSnapshot]] = {}
-        self._locks: dict[str, asyncio.Lock] = {}
-
-    def _lock_for(self, symbol: str) -> asyncio.Lock:
-        lock = self._locks.get(symbol)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._locks[symbol] = lock
-        return lock
+        self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
+        self._fast_tasks: dict[str, asyncio.Task[FundamentalSnapshot]] = {}
 
     async def _request_summary(self, symbol: str) -> dict[str, Any]:
         body = await yahoo_public_service.request_json(
@@ -993,104 +982,151 @@ class FundamentalsService:
             if metrics.trailing_eps is not None and metrics.trailing_eps > 0:
                 fill("trailing_pe", safe_div(snapshot.analysts.current_price, metrics.trailing_eps))
 
-    async def get_snapshot(
-        self,
-        ticker: str,
-    ) -> FundamentalSnapshot:
+    @staticmethod
+    def _retain_components(new: FundamentalSnapshot, old: FundamentalSnapshot | None) -> FundamentalSnapshot:
+        if old is None:
+            return new
+        new = new.model_copy(deep=True)
+        retained = False
+        for section in ("metrics", "analysts", "events"):
+            if section != "events" and any(getattr(new, field) and getattr(old, field)
+                    and getattr(new, field) != getattr(old, field) for field in ("currency", "financial_currency")):
+                continue  # No implicit currency conversion between snapshots.
+            target, previous = getattr(new, section), getattr(old, section)
+            for field, value in previous.model_dump().items():
+                current = getattr(target, field)
+                if (current is None or current == []) and value is not None and value != []:
+                    setattr(target, field, getattr(previous, field))
+                    retained = True
+        for section in ("annual_financials", "quarterly_financials", "earnings_estimates", "earnings_history"):
+            target, previous = getattr(new, section), getattr(old, section)
+            if previous:
+                # Preserve missing periods, not just a whole-snapshot metric count.
+                key = lambda row: (getattr(row, "period_end", None), getattr(row, "period", None),
+                                   getattr(row, "end_date", None))
+                merged = {key(row): row for row in previous}
+                for row in target:
+                    prior = merged.get(key(row))
+                    if prior and getattr(prior, "currency", None) == getattr(row, "currency", None):
+                        missing = {field: getattr(prior, field) for field, value in prior.model_dump().items()
+                            if getattr(row, field) is None and value is not None}
+                        row = row.model_copy(update=missing)
+                        retained = retained or bool(missing)
+                    merged[key(row)] = row
+                setattr(new, section, list(merged.values()))
+                retained = retained or len(merged) > len(target)
+        for field in ("currency", "financial_currency", "sector", "industry", "exchange", "website"):
+            if getattr(new, field) is None and getattr(old, field) is not None:
+                setattr(new, field, getattr(old, field))
+                retained = True
+        if new.name in {new.ticker, new.symbol} and old.name not in {old.ticker, old.symbol}:
+            new.name = old.name
+        if retained:
+            new.stale = True
+            new.status = "partial"
+            new.message = "Dernières données disponibles pour les sections en cours d'actualisation."
+        return new
+
+    async def _analyst_payload(self, symbol: str) -> dict[str, Any]:
+        if settings.market_data_provider.strip().lower() == "demo":
+            return {}
+        body = await yahoo_public_service.request_json(
+            f"/v10/finance/quoteSummary/{symbol}",
+            params={"modules": "financialData,recommendationTrend"},
+        )
+        rows = body.get("quoteSummary", {}).get("result") or []
+        return rows[0] if rows and isinstance(rows[0], dict) else {}
+
+    async def _fast_load(self, ticker: str, symbol: str) -> FundamentalSnapshot:
+        snapshot = self._unavailable(ticker, symbol, "Synchronisation des données fondamentales…")
+        summary_failed = True
+        try:
+            # Leave room for independent light fallbacks within the total fast budget.
+            async with asyncio.timeout(self.fast_budget_seconds):
+                try:
+                    async with asyncio.timeout(self.fast_budget_seconds * 0.6):
+                        payload = await self._request_summary(symbol)
+                    snapshot = self._snapshot(ticker, symbol, payload)
+                    summary_failed = not any(v is not None for v in snapshot.metrics.model_dump().values())
+                except Exception:
+                    pass
+                if not any(v is not None for k, v in snapshot.analysts.model_dump().items()
+                           if k != "current_price") or snapshot.status == "unavailable":
+                    async def fallback(loader):
+                        nonlocal snapshot
+                        try:
+                            payload = await loader(symbol)
+                            if payload:
+                                snapshot = self._retain_components(self._snapshot(ticker, symbol, payload), snapshot)
+                        except Exception:
+                            pass
+                    await asyncio.gather(
+                        fallback(self._quote_fallback), fallback(self._analyst_payload))
+        except TimeoutError:
+            pass
+        cached = self._cache.get(symbol)
+        old = cached[1] if cached and monotonic() - cached[0] < self.stale_seconds else None
+        snapshot = self._retain_components(snapshot, old)
+        snapshot.refresh_in_progress = True
+        if summary_failed:
+            snapshot.refresh_after_seconds = self.unavailable_ttl_seconds
+        if snapshot.status == "unavailable":
+            snapshot.message = "Synchronisation des données fondamentales en cours."
+        self._cache[symbol] = (monotonic(), snapshot)
+        self._schedule_deep(ticker, symbol, snapshot, summary_failed)
+        return snapshot
+
+    def _schedule_deep(self, ticker: str, symbol: str, snapshot: FundamentalSnapshot, upstream_failed: bool = False) -> None:
+        task = self._refresh_tasks.get(symbol)
+        if task is None or task.done():
+            self._refresh_tasks[symbol] = asyncio.create_task(self._deep_refresh(ticker, symbol, snapshot, upstream_failed))
+
+    async def _deep_refresh(self, ticker: str, symbol: str, fast: FundamentalSnapshot, upstream_failed: bool) -> None:
+        snapshot = fast.model_copy(deep=True)
+        try:
+            async with asyncio.timeout(self.deep_budget_seconds):
+                snapshot = await official_financials_service.enrich(
+                    snapshot, upstream_failed=upstream_failed)
+                # EPS history remains available, but is no longer on the interactive path.
+                if settings.market_data_provider.strip().lower() != "demo":
+                    try:
+                        async with asyncio.timeout(3):
+                            body = await yahoo_public_service.request_json(
+                                f"/v10/finance/quoteSummary/{symbol}",
+                                params={"modules": "earnings,earningsHistory"})
+                        rows = body.get("quoteSummary", {}).get("result") or []
+                        if rows:
+                            history = self._snapshot(ticker, symbol, rows[0]).earnings_history
+                            if history:
+                                snapshot.earnings_history = history
+                    except Exception:
+                        pass
+        except Exception:
+            snapshot.stale = True
+        finally:
+            current = self._cache.get(symbol)
+            snapshot = self._retain_components(snapshot, current[1] if current else fast)
+            snapshot.ttm = self._ttm(snapshot.quarterly_financials,
+                                     snapshot.financial_currency or snapshot.currency)
+            snapshot.highlights = self._highlights(snapshot.annual_financials,
+                                                     snapshot.quarterly_financials, snapshot.ttm)
+            self._complete_metrics(snapshot)
+            snapshot.refresh_in_progress = False
+            snapshot.refresh_after_seconds = self.unavailable_ttl_seconds if upstream_failed or snapshot.stale or snapshot.status == "unavailable" else self.cache_ttl_seconds
+            self._cache[symbol] = (monotonic(), snapshot)
+            self._refresh_tasks.pop(symbol, None)
+
+    async def get_snapshot(self, ticker: str) -> FundamentalSnapshot:
         symbol = market_data_service.normalize_ticker(ticker)
         cached = self._cache.get(symbol)
-        now = monotonic()
-
-        if cached and now - cached[0] < cached[1].refresh_after_seconds:
+        if cached and monotonic() - cached[0] < cached[1].refresh_after_seconds:
             return cached[1]
-
-        async with self._lock_for(symbol):
-            cached = self._cache.get(symbol)
-            now = monotonic()
-            if cached and now - cached[0] < cached[1].refresh_after_seconds:
-                return cached[1]
-
-            quote_summary_failed = False
-            try:
-                payload = await self._request_summary(symbol)
-                snapshot = self._snapshot(ticker, symbol, payload)
-                quote_summary_failed = not any(
-                    value is not None for value in snapshot.metrics.model_dump().values()
-                )
-            except Exception:  # noqa: BLE001
-                quote_summary_failed = True
-                snapshot = self._unavailable(
-                    ticker,
-                    symbol,
-                    (
-                        "Les données fondamentales sont temporairement "
-                        "indisponibles."
-                    ),
-                )
-
-            if quote_summary_failed:
-                try:
-                    quote_payload = await self._quote_fallback(symbol)
-                    if quote_payload:
-                        fallback = self._snapshot(ticker, symbol, quote_payload)
-                        for field, value in fallback.metrics.model_dump().items():
-                            if getattr(snapshot.metrics, field) is None:
-                                setattr(snapshot.metrics, field, value)
-                        for field in ("currency", "financial_currency", "sector", "industry", "exchange"):
-                            if getattr(snapshot, field) is None:
-                                setattr(snapshot, field, getattr(fallback, field))
-                        if snapshot.name in {ticker, snapshot.symbol, snapshot.ticker}:
-                            snapshot.name = fallback.name
-                        if snapshot.analysts.current_price is None:
-                            snapshot.analysts.current_price = fallback.analysts.current_price
-                        if any(value is not None for value in snapshot.metrics.model_dump().values()):
-                            snapshot.status = "partial"
-                except Exception:  # noqa: BLE001
-                    pass
-
-            snapshot = await official_financials_service.enrich(
-                snapshot,
-                upstream_failed=quote_summary_failed,
-            )
-            snapshot.ttm = self._ttm(
-                snapshot.quarterly_financials,
-                snapshot.financial_currency
-                or snapshot.currency,
-            )
-            snapshot.highlights = self._highlights(
-                snapshot.annual_financials,
-                snapshot.quarterly_financials,
-                snapshot.ttm,
-            )
-            self._complete_metrics(snapshot)
-            if quote_summary_failed:
-                snapshot.refresh_after_seconds = self.unavailable_ttl_seconds
-
-            stale = self._cache.get(symbol)
-            if (
-                stale is not None
-                and stale[1].status != "unavailable"
-                and (snapshot.status == "unavailable" or (
-                    quote_summary_failed
-                    and sum(value is not None for value in snapshot.metrics.model_dump().values())
-                    < sum(value is not None for value in stale[1].metrics.model_dump().values())
-                ))
-            ):
-                snapshot = stale[1].model_copy(
-                    update={
-                        "status": "partial",
-                        "message": (
-                            "Dernières données disponibles; "
-                            "l'actualisation a temporairement échoué."
-                        ),
-                        "refresh_after_seconds": (
-                            self.unavailable_ttl_seconds
-                        ),
-                    }
-                )
-
-            self._cache[symbol] = (monotonic(), snapshot)
-            return snapshot
-
+        task = self._fast_tasks.get(symbol)
+        if task is None or task.done():
+            task = asyncio.create_task(self._fast_load(ticker, symbol))
+            self._fast_tasks[symbol] = task
+        if cached and monotonic() - cached[0] < self.stale_seconds:
+            return cached[1].model_copy(update={"stale": True, "refresh_in_progress": True})
+        return await asyncio.shield(task)
 
 fundamentals_service = FundamentalsService()

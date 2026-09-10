@@ -264,6 +264,8 @@ export type OfficialCoverage = {
   yahoo_statements_error: string | null; discovery_url: string | null; message: string | null;
 };
 export type FundamentalSnapshot = {
+  refresh_in_progress?: boolean;
+  stale?: boolean;
   ticker: string; symbol: string; name: string; exchange: string | null; currency: string | null;
   financial_currency: string | null; website: string | null; sector: string | null; industry: string | null;
   status: "available" | "partial" | "unavailable"; message: string | null; metrics: FundamentalMetrics;

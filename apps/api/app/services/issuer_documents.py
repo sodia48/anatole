@@ -619,7 +619,7 @@ class IssuerFinancialDocumentsService:
             ),
         ]
 
-        async with httpx.AsyncClient(
+        async with await asyncio.to_thread(httpx.AsyncClient,
             headers=self.headers,
             timeout=httpx.Timeout(
                 connect=7.0,
@@ -785,7 +785,7 @@ class IssuerFinancialDocumentsService:
         document: IssuerDocumentCandidate,
     ) -> bytes | None:
         """Download one already-vetted issuer document with existing limits."""
-        async with httpx.AsyncClient(
+        async with await asyncio.to_thread(httpx.AsyncClient,
             timeout=18.0,
             follow_redirects=True,
             headers=self.headers,
@@ -886,7 +886,7 @@ class IssuerFinancialDocumentsService:
         all_periods: list[FinancialPeriod] = []
         parsed_documents = 0
 
-        async with httpx.AsyncClient(
+        async with await asyncio.to_thread(httpx.AsyncClient,
             headers=self.headers,
             timeout=httpx.Timeout(
                 connect=7.0,
@@ -907,13 +907,8 @@ class IssuerFinancialDocumentsService:
                     continue
 
                 try:
-                    periods = (
-                        financial_document_parser
-                        .parse_bytes(
-                            content,
-                            document,
-                        )
-                    )
+                    periods = await asyncio.to_thread(
+                        financial_document_parser.parse_bytes, content, document)
                 except Exception:  # noqa: BLE001
                     periods = []
 

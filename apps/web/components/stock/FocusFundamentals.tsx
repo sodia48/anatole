@@ -7,6 +7,7 @@ import {
 } from "react";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick } from "@/lib/i18n";
+import { getFocusFundamentalOverlay } from "@/lib/api";
 
 export type FundamentalView =
   | "fundamentals"
@@ -225,6 +226,8 @@ type Events = {
 };
 
 type Snapshot = {
+  refresh_in_progress?: boolean;
+  stale?: boolean;
   ticker: string;
   symbol: string;
   name: string;
@@ -250,12 +253,6 @@ type Snapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
-
-function bridgeUrl(ticker: string): string {
-  return `/api/anatole/api/v1/stocks/${encodeURIComponent(
-    ticker,
-  )}/fundamentals`;
-}
 
 function n(
   value: number | null,
@@ -1314,6 +1311,12 @@ function AnalystsView({
     0,
   );
 
+  if (!Object.entries(a).some(([key, value]) => key !== "current_price" && value !== null)) {
+    return <section style={panelStyle} role="status">{pick(language,
+      "Consensus analystes temporairement indisponible.",
+      "Analyst consensus temporarily unavailable.")}</section>;
+  }
+
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section
@@ -1433,29 +1436,24 @@ export function FocusFundamentals({
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
+  const identity = (value: string) => value.toUpperCase().replace(/\.TO$/, "").replaceAll("-", ".");
+  const currentSnapshot = snapshot && identity(snapshot.ticker) === identity(ticker) ? snapshot : null;
 
   useEffect(() => {
     const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function load(): Promise<void> {
       setLoading(true);
       try {
-        const response = await fetch(bridgeUrl(ticker), {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        setSnapshot((await response.json()) as Snapshot);
+        const value = await getFocusFundamentalOverlay(ticker, controller.signal) as Snapshot;
+        if (controller.signal.aborted) return;
+        setSnapshot((old) => old?.ticker === value.ticker && old.status !== "unavailable" && value.status === "unavailable" ? old : value);
         setError(null);
-      } catch (reason) {
-        if (
-          !(
-            reason instanceof DOMException &&
-            reason.name === "AbortError"
-          )
-        ) {
+        if (value.refresh_in_progress) timer = setTimeout(() => void load(), 3_000);
+      } catch {
+        if (!controller.signal.aborted) {
           setError(
             pick(
               language,
@@ -1465,13 +1463,13 @@ export function FocusFundamentals({
           );
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     void load();
-    return () => controller.abort();
-  }, [language, ticker]);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [language, ticker, revision]);
 
   const generated = useMemo(
     () =>
@@ -1483,7 +1481,7 @@ export function FocusFundamentals({
     [language, snapshot],
   );
 
-  if (loading && !snapshot) {
+  if (!currentSnapshot && !error) {
     return (
       <section
         className="panel"
@@ -1499,7 +1497,7 @@ export function FocusFundamentals({
     );
   }
 
-  if (error && !snapshot) {
+  if (error && !currentSnapshot) {
     return (
       <section className="panel" style={{ ...panelStyle, color: "var(--negative-text)" }}>
         {pick(language, "Données fondamentales indisponibles", "Fundamental data unavailable")}: {language === "fr" ? error : "The data provider did not return a usable response."}
@@ -1507,12 +1505,25 @@ export function FocusFundamentals({
     );
   }
 
-  if (!snapshot) {
+  if (!currentSnapshot || !snapshot) {
     return null;
+  }
+
+  if (snapshot.status === "unavailable" && snapshot.refresh_in_progress) {
+    return <section className="panel" style={panelStyle} role="status">
+      {pick(language, "Synchronisation des données fondamentales…", "Synchronizing fundamental data…")}
+    </section>;
   }
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <div role="status">
+        {loading || snapshot.refresh_in_progress ? pick(language, "Synchronisation en cours…", "Synchronization in progress…") : null}
+        {error || snapshot.stale ? pick(language, "Dernières données disponibles", "Latest available data") : null}
+        <button type="button" className="button-secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}>
+          {pick(language, "Actualiser", "Refresh")}
+        </button>
+      </div>
       <header
         className="panel"
         style={{

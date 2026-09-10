@@ -198,6 +198,10 @@ async def test_quote_summary_failure_still_uses_structured_financials(
 
     snapshot = await service.get_snapshot("CNQ")
 
+    if task := service._refresh_tasks.get("CNQ.TO"):
+        await task
+    snapshot = await service.get_snapshot("CNQ")
+
     assert snapshot.status == "partial"
     assert snapshot.annual_financials[0].total_revenue == 42_000_000_000
     assert "RuntimeError" not in (snapshot.message or "")

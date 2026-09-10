@@ -301,6 +301,8 @@ class CorporateEvents(BaseModel):
 
 
 class FundamentalSnapshot(BaseModel):
+    refresh_in_progress: bool = False
+    stale: bool = False
     ticker: str
     symbol: str
     name: str
