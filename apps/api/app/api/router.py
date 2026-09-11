@@ -5,6 +5,7 @@ from app.api.routes import (
     admin,
     analysis,
     backtest,
+    canada_360,
     company_network,
     discovery,
     etf_holdings,
@@ -17,6 +18,7 @@ from app.api.routes import (
     notifications,
     paper_trading,
     provincial_macro,
+    provincial_statistics,
     reliability,
     search,
     stocks,
@@ -51,6 +53,13 @@ api_router.include_router(
     tags=["market"],
 )
 
+# Canada 360 — vue intégrée économie, taux, devise, marché et provinces
+api_router.include_router(
+    canada_360.router,
+    prefix="/api/v1/canada",
+    tags=["canada-360"],
+)
+
 # Recherche de symboles
 api_router.include_router(
     search.router,
@@ -71,6 +80,13 @@ api_router.include_router(
     provincial_macro.router,
     prefix="/api/v1/discovery",
     tags=["provincial-macro"],
+)
+
+# Statistiques comparables des 10 provinces
+api_router.include_router(
+    provincial_statistics.router,
+    prefix="/api/v1/discovery",
+    tags=["provincial-statistics"],
 )
 
 # Participations et historique détaillé des ETF
