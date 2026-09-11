@@ -69,7 +69,7 @@ test("les réglages présentent les deux identités localisées", async ({ page 
   await expect(page.getByText("White · clear and readable", { exact: true })).toBeVisible();
 });
 
-test("les cartes fondamentales utilisent la palette blanche", async ({ page }) => {
+test("les cartes de valorisation dans Cours utilisent la palette blanche", async ({ page }) => {
   await page.addInitScript((value) => {
     localStorage.setItem("anatole.preferences.v0.4", JSON.stringify(value));
     localStorage.setItem("anatole.appearance-choice.v1", "1");
@@ -104,7 +104,7 @@ test("les cartes fondamentales utilisent la palette blanche", async ({ page }) =
 
   await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
-  await page.getByRole("button", { name: "Fondamentaux", exact: true }).click();
+  await page.getByRole("button", { name: "Cours", exact: true }).click();
   const metric = page.getByText("Capitalisation", { exact: true }).locator("..");
   await expect(metric).toBeVisible();
   const colors = await metric.evaluate((node) => {
