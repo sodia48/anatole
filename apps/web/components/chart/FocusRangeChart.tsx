@@ -17,6 +17,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import {
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -426,10 +427,12 @@ export function FocusRangeChart({
   ticker,
   initialSnapshot,
   language,
+  beforeNews,
 }: {
   ticker: string;
   initialSnapshot?: FocusSnapshot;
   language: "fr" | "en";
+  beforeNews?: ReactNode;
 }) {
   const chartContainerRef = useRef<HTMLDivElement | null>(null);
   const chartRefs = useRef<ChartRefs | null>(null);
@@ -842,6 +845,8 @@ export function FocusRangeChart({
           </p>
         </aside>
       </div>
+
+      {beforeNews}
 
       <FocusStockNews
         ticker={ticker}
