@@ -77,6 +77,12 @@ const groups: Array<{
         available: true,
       },
       {
+        href: "/canada",
+        label: "Canada 360",
+        icon: Gauge,
+        available: true,
+      },
+      {
         href: "/cockpit",
         label: "Cockpit",
         icon: LayoutDashboard,

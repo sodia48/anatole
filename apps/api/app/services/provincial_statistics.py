@@ -821,6 +821,28 @@ class ProvincialStatisticsService:
             refresh_after_seconds=1800 if available else 180,
         )
 
+    def peek_snapshot(
+        self,
+        region: str | None = None,
+        lang: str | None = "fr",
+    ) -> tuple[ProvincialStatisticsSnapshot | None, bool]:
+        """Retourne immédiatement le cache/last-good sans déclencher de réseau.
+
+        Le booléen indique que le portrait doit être considéré stale et rafraîchi
+        en arrière-plan.
+        """
+        normalized_region = normalize_region(region)
+        normalized_lang = _language(lang)
+        cache_key = (normalized_region, normalized_lang)
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return (
+                cached[1],
+                monotonic() - cached[0] >= CACHE_SECONDS,
+            )
+        previous = self._last_good.get(cache_key)
+        return previous, previous is not None
+
     async def get_snapshot(
         self,
         region: str | None = None,
