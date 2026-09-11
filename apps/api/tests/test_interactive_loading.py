@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 
@@ -154,11 +154,15 @@ async def test_independent_analyst_fallback_does_not_wait_for_deep(monkeypatch):
         raise RuntimeError("summary down")
     async def analysts(_):
         return {"financialData": {"targetMeanPrice": 42}}
+    async def quote(_):
+        # Unit tests must never depend on live Yahoo/network availability.
+        return {}
     async def deep(snapshot, **kwargs):
         await gate.wait()
         return snapshot
     monkeypatch.setattr(service, "_request_summary", fail)
     monkeypatch.setattr(service, "_analyst_payload", analysts)
+    monkeypatch.setattr(service, "_quote_fallback", quote)
     monkeypatch.setattr("app.services.fundamentals.official_financials_service.enrich", deep)
     fast = await asyncio.wait_for(service.get_snapshot("RY"), .2)
     assert fast.analysts.target_mean == 42

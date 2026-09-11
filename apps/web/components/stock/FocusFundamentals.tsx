@@ -511,7 +511,7 @@ function Valuation({
         value={compact(m.market_cap, currency)}
       />
       <Metric
-        label={pick(language, "Valeur dâ€™entreprise", "Enterprise value")}
+        label={pick(language, "Valeur d’entreprise", "Enterprise value")}
         value={compact(m.enterprise_value, currency)}
       />
       <Metric
@@ -519,7 +519,7 @@ function Valuation({
         value={n(m.trailing_pe)}
       />
       <Metric
-        label={pick(language, "C/B anticipÃ©", "Forward P/E")}
+        label={pick(language, "C/B anticipé", "Forward P/E")}
         value={n(m.forward_pe)}
       />
       <Metric
@@ -1570,7 +1570,9 @@ export function FocusFundamentals({
           color: "var(--text-secondary)",
         }}
       >
-        {pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
+        {view === "valuation"
+          ? pick(language, "Synchronisation de la valorisation…", "Synchronizing valuation…")
+          : pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
       </section>
     );
   }
@@ -1589,8 +1591,28 @@ export function FocusFundamentals({
 
   if (snapshot.status === "unavailable" && snapshot.refresh_in_progress) {
     return <section className="panel" style={panelStyle} role="status">
-      {pick(language, "Synchronisation des données fondamentales…", "Synchronizing fundamental data…")}
+      {view === "valuation"
+        ? pick(language, "Synchronisation de la valorisation…", "Synchronizing valuation…")
+        : pick(language, "Synchronisation des données fondamentales…", "Synchronizing fundamental data…")}
     </section>;
+  }
+
+  if (view === "valuation") {
+    return (
+      <div style={{ display: "grid", gap: 8 }} data-focus-valuation="true">
+        {(loading || snapshot.refresh_in_progress || error || snapshot.stale) ? (
+          <div role="status" style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+            {error || snapshot.stale
+              ? pick(language, "Dernières données disponibles", "Latest available data")
+              : pick(language, "Actualisation en cours…", "Refreshing…")}
+          </div>
+        ) : null}
+        <Valuation snapshot={snapshot} />
+        <footer className="status-footer">
+          {pick(language, "Source", "Source")}: {snapshot.source} · {pick(language, "Mise à jour", "Updated")}: {generated ?? "N/D"}
+        </footer>
+      </div>
+    );
   }
 
   return (

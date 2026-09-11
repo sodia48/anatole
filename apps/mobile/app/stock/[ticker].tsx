@@ -45,12 +45,12 @@ export default function StockDetailScreen() {
     return () => task.cancel();
   }, [focus.data, ticker]);
   const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: ({ signal }) => marketApi.stockNews(ticker, company, language, signal), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
-  const needsFundamentals = ["fundamentals", "financials", "analysts"].includes(section);
-  const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: needsFundamentals, staleTime: 10 * 60_000 });
+  const needsFundamentals = ["overview", "fundamentals", "financials", "analysts"].includes(section);
+  const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: Boolean(focus.data) && needsFundamentals, staleTime: 10 * 60_000 });
   const live = useLiveQuote(ticker, focus.data?.quote);
   const followed = workspace.data.watchlist.includes(ticker);
   async function toggleWatchlist() { await saveWorkspace({ ...workspace.data, watchlist: followed ? workspace.data.watchlist.filter((item) => item !== ticker) : [...workspace.data.watchlist, ticker] }); }
-  const refresh = () => { if (section === "overview") void Promise.all([focus.refetch(), news.refetch()]); else if (needsFundamentals) void fundamentals.refetch(); };
+  const refresh = () => { if (section === "overview") void Promise.all([focus.refetch(), news.refetch(), fundamentals.refetch()]); else if (needsFundamentals) void fundamentals.refetch(); };
   const changeSection = (next: MobileFocusSection) => { if (next === "pro") setPreloadedProTicker(ticker); setSection(next); };
   return <Screen onRefresh={refresh} refreshing={focus.isRefetching || fundamentals.isRefetching || news.isRefetching} testID="stock-detail-screen">
     <QueryState error={!focus.data ? focus.error : null} loading={focus.isLoading} onRetry={() => void focus.refetch()} />
@@ -59,7 +59,19 @@ export default function StockDetailScreen() {
       <MobileFocusNavigation onChange={changeSection} section={section} />
       <View style={{ alignItems: "flex-end" }}><IntelligenceActions symbol={ticker} /></View>
       <Pressable accessibilityRole="link" onPress={() => router.push("/terminal")} style={styles.terminalLink} testID="focus-open-terminal"><Text style={styles.terminalLinkText}>← Terminal Pro</Text></Pressable>
-      {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview liveState={live.state} news={news.data} newsError={!news.data ? news.error : null} newsLoading={news.isLoading} period={period} snapshot={{ ...focus.data, quote: live.quote }} ticker={ticker} /></> : null}
+      {section === "overview" ? <><View style={styles.periods}>{focusPeriods.map((item) => <Pressable key={item.label} onPress={() => setPeriod(item)} style={[styles.period, period.label === item.label && styles.periodActive]}><Text style={[styles.periodText, period.label === item.label && styles.periodTextActive]}>{item.label}</Text></Pressable>)}</View><MobileFocusOverview
+        fundamentals={fundamentals.data}
+        fundamentalsError={!fundamentals.data ? fundamentals.error : null}
+        fundamentalsLoading={fundamentals.isLoading}
+        liveState={live.state}
+        news={news.data}
+        newsError={!news.data ? news.error : null}
+        newsLoading={news.isLoading}
+        onRetryFundamentals={() => void fundamentals.refetch()}
+        period={period}
+        snapshot={{ ...focus.data, quote: live.quote }}
+        ticker={ticker}
+      /></> : null}
       {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
       {section === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       {section === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
