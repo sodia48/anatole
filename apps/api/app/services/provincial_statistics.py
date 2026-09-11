@@ -202,20 +202,15 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="1810000401",
         unit_kind="percent",
         change_kind="points",
-        latest_n=2,
+        latest_n=14,
         selectors=(
             _selector(
                 ("product", "produit"),
-                ("all items", "ensemble"),
-            ),
-            _selector(
-                ("statistics", "statistique"),
                 (
-                    "12 month percentage change",
-                    "12-month percentage change",
-                    "percentage change from same month previous year",
-                    "variation en pourcentage sur 12 mois",
-                    "variation en pourcentage d une annee a l autre",
+                    "all items",
+                    "all-items",
+                    "ensemble",
+                    "indice d ensemble",
                 ),
             ),
         ),
@@ -228,7 +223,7 @@ METRICS: tuple[MetricSpec, ...] = (
         category_en="Labour",
         product_id=14100287,
         table_id="14-10-0287-01",
-        simple_view_pid="1410028701",
+        simple_view_pid="1410028703",
         unit_kind="percent",
         change_kind="points",
         latest_n=2,
@@ -237,15 +232,35 @@ METRICS: tuple[MetricSpec, ...] = (
                 ("labour force characteristics", "caracteristiques de la population active"),
                 ("unemployment rate", "taux de chomage"),
             ),
-            _selector(("sex", "sexe"), ("both sexes", "les deux sexes")),
             _selector(
-                ("age", "groupe d age"),
+                ("sex", "gender", "sexe", "genre"),
+                (
+                    "both sexes",
+                    "both genders",
+                    "les deux sexes",
+                    "tous les genres",
+                ),
+            ),
+            _selector(
+                ("age", "age group", "groupe d age"),
                 ("15 years and over", "15 ans et plus"),
             ),
             _selector(
-                ("statistics", "statistique"),
-                ("seasonally adjusted", "desaisonnalise"),
-                required=False,
+                (
+                    "data type",
+                    "type de donnees",
+                    "seasonal adjustment",
+                    "desaisonnalisation",
+                    "statistics",
+                    "statistique",
+                ),
+                (
+                    "seasonally adjusted",
+                    "seasonally adjusted estimates",
+                    "desaisonnalise",
+                    "donnees desaisonnalisees",
+                    "estimations desaisonnalisees",
+                ),
             ),
         ),
     ),
@@ -257,7 +272,7 @@ METRICS: tuple[MetricSpec, ...] = (
         category_en="Labour",
         product_id=14100287,
         table_id="14-10-0287-01",
-        simple_view_pid="1410028701",
+        simple_view_pid="1410028703",
         unit_kind="persons",
         change_kind="percent",
         latest_n=2,
@@ -266,15 +281,35 @@ METRICS: tuple[MetricSpec, ...] = (
                 ("labour force characteristics", "caracteristiques de la population active"),
                 ("employment", "emploi"),
             ),
-            _selector(("sex", "sexe"), ("both sexes", "les deux sexes")),
             _selector(
-                ("age", "groupe d age"),
+                ("sex", "gender", "sexe", "genre"),
+                (
+                    "both sexes",
+                    "both genders",
+                    "les deux sexes",
+                    "tous les genres",
+                ),
+            ),
+            _selector(
+                ("age", "age group", "groupe d age"),
                 ("15 years and over", "15 ans et plus"),
             ),
             _selector(
-                ("statistics", "statistique"),
-                ("seasonally adjusted", "desaisonnalise"),
-                required=False,
+                (
+                    "data type",
+                    "type de donnees",
+                    "seasonal adjustment",
+                    "desaisonnalisation",
+                    "statistics",
+                    "statistique",
+                ),
+                (
+                    "seasonally adjusted",
+                    "seasonally adjusted estimates",
+                    "desaisonnalise",
+                    "donnees desaisonnalisees",
+                    "estimations desaisonnalisees",
+                ),
             ),
         ),
     ),
@@ -605,6 +640,30 @@ def _change(
     return current - previous
 
 
+def _inflation_yoy_pair(
+    points: list[dict[str, Any]],
+) -> tuple[float | None, float | None]:
+    ordered = _sort_points(points)
+    if len(ordered) < 13:
+        return None, None
+
+    current_index = _scaled_value(ordered[-1])
+    year_ago_index = _scaled_value(ordered[-13])
+    if current_index is None or year_ago_index in (None, 0):
+        return None, None
+
+    current = (current_index / year_ago_index - 1.0) * 100.0
+
+    previous = None
+    if len(ordered) >= 14:
+        previous_index = _scaled_value(ordered[-2])
+        previous_year_index = _scaled_value(ordered[-14])
+        if previous_index is not None and previous_year_index not in (None, 0):
+            previous = (previous_index / previous_year_index - 1.0) * 100.0
+
+    return current, previous
+
+
 def _response_coordinate(response: Any) -> str | None:
     value = _unwrap(response)
     if not isinstance(value, dict):
@@ -726,8 +785,17 @@ class ProvincialStatisticsService:
                 continue
             current_point = points[-1]
             previous_point = points[-2] if len(points) >= 2 else {}
-            current = _scaled_value(current_point)
-            previous = _scaled_value(previous_point) if previous_point else None
+
+            if spec.key == "inflation_yoy":
+                current, previous = _inflation_yoy_pair(points)
+            else:
+                current = _scaled_value(current_point)
+                previous = (
+                    _scaled_value(previous_point)
+                    if previous_point
+                    else None
+                )
+
             if current is None:
                 continue
 
