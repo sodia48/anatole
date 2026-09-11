@@ -10,6 +10,7 @@ import { localeFor, pick } from "@/lib/i18n";
 import { getFocusFundamentalOverlay } from "@/lib/api";
 
 export type FundamentalView =
+  | "valuation"
   | "fundamentals"
   | "financials"
   | "analysts";
@@ -458,6 +459,93 @@ function Group({
   );
 }
 
+
+function Valuation({
+  snapshot,
+}: {
+  snapshot: Snapshot;
+}) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
+  const m = snapshot.metrics;
+  const currency =
+    snapshot.financial_currency ??
+    snapshot.currency ??
+    "CAD";
+  const values = [
+    m.market_cap,
+    m.enterprise_value,
+    m.trailing_pe,
+    m.forward_pe,
+    m.price_to_book,
+    m.price_to_sales,
+    m.enterprise_to_revenue,
+    m.enterprise_to_ebitda,
+    m.trailing_eps,
+  ];
+  const hasValuation = values.some(
+    (value) => value !== null && Number.isFinite(value),
+  );
+
+  if (!hasValuation) {
+    return (
+      <section style={panelStyle} role="status">
+        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
+          {pick(language, "Valorisation", "Valuation")}
+        </h2>
+        <span style={{ color: "var(--text-secondary)" }}>
+          {pick(
+            language,
+            "Valorisation temporairement indisponible.",
+            "Valuation data is temporarily unavailable.",
+          )}
+        </span>
+      </section>
+    );
+  }
+
+  return (
+    <Group title={pick(language, "Valorisation", "Valuation")}>
+      <Metric
+        label={pick(language, "Capitalisation", "Market capitalization")}
+        value={compact(m.market_cap, currency)}
+      />
+      <Metric
+        label={pick(language, "Valeur dâ€™entreprise", "Enterprise value")}
+        value={compact(m.enterprise_value, currency)}
+      />
+      <Metric
+        label={pick(language, "C/B historique", "Trailing P/E")}
+        value={n(m.trailing_pe)}
+      />
+      <Metric
+        label={pick(language, "C/B anticipÃ©", "Forward P/E")}
+        value={n(m.forward_pe)}
+      />
+      <Metric
+        label={pick(language, "Cours / valeur comptable", "Price / book value")}
+        value={n(m.price_to_book)}
+      />
+      <Metric
+        label={pick(language, "Cours / ventes", "Price / sales")}
+        value={n(m.price_to_sales)}
+      />
+      <Metric
+        label={pick(language, "VE / Revenus", "EV / Revenue")}
+        value={n(m.enterprise_to_revenue)}
+      />
+      <Metric
+        label={pick(language, "VE / BAIIA", "EV / EBITDA")}
+        value={n(m.enterprise_to_ebitda)}
+      />
+      <Metric
+        label={pick(language, "BPA historique", "Trailing EPS")}
+        value={money(m.trailing_eps, currency)}
+      />
+    </Group>
+  );
+}
+
 function Fundamentals({
   snapshot,
 }: {
@@ -480,16 +568,6 @@ function Fundamentals({
         gap: 14,
       }}
     >
-      <Group title={pick(language, "Valorisation", "Valuation")}>
-        <Metric label={pick(language, "Capitalisation", "Market capitalization")} value={compact(m.market_cap, currency)} />
-        <Metric label={pick(language, "Valeur d’entreprise", "Enterprise value")} value={compact(m.enterprise_value, currency)} />
-        <Metric label={pick(language, "C/B historique", "Trailing P/E")} value={n(m.trailing_pe)} />
-        <Metric label={pick(language, "C/B anticipé", "Forward P/E")} value={n(m.forward_pe)} />
-        <Metric label={pick(language, "Cours / valeur comptable", "Price / book value")} value={n(m.price_to_book)} />
-        <Metric label={pick(language, "Cours / ventes", "Price / sales")} value={n(m.price_to_sales)} />
-        <Metric label={pick(language, "VE / BAIIA", "EV / EBITDA")} value={n(m.enterprise_to_ebitda)} />
-        <Metric label={pick(language, "BPA historique", "Trailing EPS")} value={money(m.trailing_eps, currency)} />
-      </Group>
 
       <Group title={pick(language, "Croissance et rentabilité", "Growth and profitability")}>
         <Metric label={pick(language, "Chiffre d’affaires", "Revenue")} value={compact(m.total_revenue, currency)} />
@@ -1486,7 +1564,7 @@ export function FocusFundamentals({
       <section
         className="panel"
         style={{
-          minHeight: 360,
+          minHeight: view === "valuation" ? 140 : 360,
           display: "grid",
           placeItems: "center",
           color: "var(--text-secondary)",
