@@ -2,10 +2,13 @@
 
 import {
   Activity,
+  ChevronRight,
   Database,
+  Info,
   Landmark,
   RefreshCw,
   TrendingUp,
+  X,
 } from "lucide-react";
 import {
   useCallback,
@@ -116,7 +119,7 @@ function metricValue(
   }
 
   if (metric.unit === "currency") {
-    return `${compactNumber(value, language)} $`;
+    return `${compactNumber(value, language)} CAD`;
   }
 
   if (metric.unit === "units") {
@@ -188,6 +191,103 @@ function sourceStatusLabel(
     return pick(language, "Partiel", "Partial");
   }
   return pick(language, "Indisponible", "Unavailable");
+}
+
+
+const PROVINCE_SUMMARY_KEYS = [
+  "real_gdp",
+  "unemployment_rate",
+  "inflation_yoy",
+  "population",
+] as const;
+
+const PROVINCE_DETAIL_KEYS = [
+  "real_gdp",
+  "unemployment_rate",
+  "inflation_yoy",
+  "employment",
+  "retail_sales",
+  "housing_starts",
+  "population",
+] as const;
+
+function provinceMetric(
+  province: Province,
+  key: string,
+): Metric | null {
+  return (
+    province.metrics.find((metric) => metric.key === key) ??
+    null
+  );
+}
+
+function metricRole(
+  key: string,
+  language: "fr" | "en",
+): {
+  title: string;
+  body: string;
+} {
+  const entries: Record<
+    string,
+    { fr: string; en: string }
+  > = {
+    real_gdp: {
+      fr: "Mesure la production réelle de la province, corrigée de l’inflation. C’est la lecture centrale de son rythme d’activité.",
+      en: "Measures the province’s inflation-adjusted output. It is the core reading of its real economic activity.",
+    },
+    unemployment_rate: {
+      fr: "Mesure la part de la population active qui cherche un emploi. Une hausse persistante signale généralement un marché du travail qui ralentit.",
+      en: "Measures the share of the labour force looking for work. A persistent rise usually signals a cooling labour market.",
+    },
+    inflation_yoy: {
+      fr: "Mesure la progression des prix sur 12 mois. Elle influence le pouvoir d’achat et la sensibilité de l’économie aux taux d’intérêt.",
+      en: "Measures 12-month price growth. It affects purchasing power and the economy’s sensitivity to interest rates.",
+    },
+    employment: {
+      fr: "Mesure le nombre de personnes en emploi. À lire avec le chômage pour distinguer création d’emplois et simple croissance de la population active.",
+      en: "Measures the number of people employed. Read it with unemployment to distinguish job creation from labour-force growth.",
+    },
+    retail_sales: {
+      fr: "Donne le pouls de la consommation des ménages, un moteur important de l’activité intérieure.",
+      en: "Tracks household consumption, an important driver of domestic activity.",
+    },
+    housing_starts: {
+      fr: "Mesure le rythme de construction résidentielle. Sensible aux taux, à la démographie et aux contraintes d’offre de logements.",
+      en: "Measures residential construction activity. It is sensitive to rates, demographics and housing-supply constraints.",
+    },
+    population: {
+      fr: "Mesure la taille du marché intérieur et du bassin de main-d’œuvre. Elle prend son sens avec le PIB réel : si la population croît plus vite que le PIB, la production réelle par habitant peut s’affaiblir.",
+      en: "Measures the size of the domestic market and labour pool. It is most useful alongside real GDP: if population grows faster than output, real output per person can weaken.",
+    },
+  };
+
+  const fallback = {
+    fr: "Indicateur économique provincial à lire avec les autres composantes du portrait.",
+    en: "Provincial economic indicator to read alongside the rest of the dashboard.",
+  };
+  const entry = entries[key] ?? fallback;
+  return {
+    title: pick(language, "Pourquoi ça compte", "Why it matters"),
+    body: language === "en" ? entry.en : entry.fr,
+  };
+}
+
+function fallbackMetricLabel(
+  key: string,
+  language: "fr" | "en",
+): string {
+  const labels: Record<string, [string, string]> = {
+    real_gdp: ["PIB réel", "Real GDP"],
+    unemployment_rate: ["Taux de chômage", "Unemployment rate"],
+    inflation_yoy: ["Inflation sur 12 mois", "12-month inflation"],
+    employment: ["Emploi", "Employment"],
+    retail_sales: ["Ventes au détail", "Retail sales"],
+    housing_starts: ["Mises en chantier", "Housing starts"],
+    population: ["Population", "Population"],
+  };
+  const label = labels[key] ?? [key, key];
+  return pick(language, label[0], label[1]);
 }
 
 function MetricCard({
@@ -298,6 +398,8 @@ export function Canada360Client() {
     useState<string | null>(null);
   const [clientStale, setClientStale] =
     useState(false);
+  const [selectedProvinceCode, setSelectedProvinceCode] =
+    useState<string | null>(null);
 
   const load = useCallback(
     async (
@@ -399,6 +501,14 @@ export function Canada360Client() {
         (item) => item.key !== "usd_cad",
       ) ?? [],
     [snapshot],
+  );
+  const selectedProvince = useMemo(
+    () =>
+      snapshot?.provinces.find(
+        (province) =>
+          province.code === selectedProvinceCode,
+      ) ?? null,
+    [selectedProvinceCode, snapshot],
   );
 
   if (loading && !snapshot) {
@@ -675,65 +785,248 @@ export function Canada360Client() {
           </span>
         </div>
 
+        <p className={styles.provinceIntro}>
+          {pick(
+            language,
+            "Cliquez sur une province pour ouvrir son portrait 360°. Les cartes mettent d’abord en avant le PIB réel, le chômage, l’inflation et la population.",
+            "Select a province to open its 360° profile. Cards prioritize real GDP, unemployment, inflation and population.",
+          )}
+        </p>
+
         <div className={styles.provinceGrid}>
           {snapshot.provinces.map((province) => (
-            <article
-              className={styles.provinceCard}
+            <button
+              type="button"
+              className={`${styles.provinceCard} ${
+                selectedProvinceCode === province.code
+                  ? styles.provinceCardSelected
+                  : ""
+              }`}
               key={province.code}
+              onClick={() =>
+                setSelectedProvinceCode((current) =>
+                  current === province.code
+                    ? null
+                    : province.code,
+                )
+              }
+              aria-expanded={
+                selectedProvinceCode === province.code
+              }
             >
               <div className={styles.provinceTitle}>
                 <div>
                   <small>{province.code}</small>
                   <h3>{province.name}</h3>
                 </div>
-                <span
-                  className={`${styles.dot} ${styles[province.status]}`}
-                  aria-label={sourceStatusLabel(
-                    province.status,
-                    language,
-                  )}
-                />
+                <div className={styles.provinceActions}>
+                  <span
+                    className={`${styles.dot} ${styles[province.status]}`}
+                    aria-label={sourceStatusLabel(
+                      province.status,
+                      language,
+                    )}
+                  />
+                  <ChevronRight size={15} />
+                </div>
               </div>
 
-              {province.metrics.length ? (
-                <dl>
-                  {province.metrics
-                    .slice(0, 4)
-                    .map((item) => (
-                      <div key={item.key}>
-                        <dt>{item.label}</dt>
-                        <dd>
-                          {metricValue(
-                            item,
+              <dl>
+                {PROVINCE_SUMMARY_KEYS.map((key) => {
+                  const metric = provinceMetric(
+                    province,
+                    key,
+                  );
+                  return (
+                    <div key={key}>
+                      <dt>
+                        {metric?.label ??
+                          fallbackMetricLabel(
+                            key,
                             language,
                           )}
-                        </dd>
-                      </div>
-                    ))}
-                </dl>
-              ) : (
-                <p className={styles.provinceEmpty}>
-                  {pick(
-                    language,
-                    "Chargement en arrière-plan",
-                    "Loading in background",
-                  )}
-                </p>
-              )}
+                      </dt>
+                      <dd>
+                        <span>
+                          {metric
+                            ? metricValue(
+                                metric,
+                                language,
+                              )
+                            : "N/D"}
+                        </span>
+                        {metric ? (
+                          <small>
+                            {metricChange(
+                              metric,
+                              language,
+                            ) ?? ""}
+                          </small>
+                        ) : null}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
 
-              {province.source_url ? (
-                <a
-                  href={province.source_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={styles.sourceLink}
-                >
-                  {province.source_name}
-                </a>
-              ) : null}
-            </article>
+              <span className={styles.provinceOpenLabel}>
+                {pick(
+                  language,
+                  "Ouvrir Province 360",
+                  "Open Province 360",
+                )}
+              </span>
+            </button>
           ))}
         </div>
+
+        {selectedProvince ? (
+          <section
+            className={`panel ${styles.provinceDetail}`}
+            aria-live="polite"
+          >
+            <div className={styles.provinceDetailHeader}>
+              <div>
+                <div className="eyebrow">
+                  {selectedProvince.code} · PROVINCE 360
+                </div>
+                <h3>{selectedProvince.name}</h3>
+                <p>
+                  {pick(
+                    language,
+                    "Lecture intégrée de l’activité, du travail, des prix, de la consommation, du logement et de la démographie.",
+                    "Integrated view of activity, labour, prices, consumption, housing and demographics.",
+                  )}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.closeProvince}
+                onClick={() =>
+                  setSelectedProvinceCode(null)
+                }
+                aria-label={pick(
+                  language,
+                  "Fermer",
+                  "Close",
+                )}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className={styles.provinceReading}>
+              <Info size={16} />
+              <p>
+                {pick(
+                  language,
+                  "Clé de lecture : comparez toujours la croissance du PIB réel à celle de la population. Une économie peut grossir au total tout en ralentissant par habitant si la population augmente plus vite que la production.",
+                  "Reading key: always compare real GDP growth with population growth. Total output can rise while per-person activity weakens if population grows faster than production.",
+                )}
+              </p>
+            </div>
+
+            <div className={styles.provinceDetailGrid}>
+              {PROVINCE_DETAIL_KEYS.map((key) => {
+                const metric = provinceMetric(
+                  selectedProvince,
+                  key,
+                );
+                const role = metricRole(
+                  key,
+                  language,
+                );
+
+                return (
+                  <article
+                    className={styles.provinceMetricDetail}
+                    key={key}
+                  >
+                    <div className={styles.detailMetricHeader}>
+                      <div>
+                        <small>
+                          {metric?.category ??
+                            pick(
+                              language,
+                              "Économie",
+                              "Economy",
+                            )}
+                        </small>
+                        <h4>
+                          {metric?.label ??
+                            fallbackMetricLabel(
+                              key,
+                              language,
+                            )}
+                        </h4>
+                      </div>
+                      <strong>
+                        {metric
+                          ? metricValue(
+                              metric,
+                              language,
+                            )
+                          : "N/D"}
+                      </strong>
+                    </div>
+
+                    <div className={styles.detailMeta}>
+                      <span>
+                        {metric?.reference_period ??
+                          pick(
+                            language,
+                            "Période N/D",
+                            "Period N/A",
+                          )}
+                      </span>
+                      <span>
+                        {metric
+                          ? metricChange(
+                              metric,
+                              language,
+                            ) ??
+                            pick(
+                              language,
+                              "Variation N/D",
+                              "Change N/A",
+                            )
+                          : pick(
+                              language,
+                              "Donnée non disponible",
+                              "Data unavailable",
+                            )}
+                      </span>
+                    </div>
+
+                    <div className={styles.metricRole}>
+                      <strong>{role.title}</strong>
+                      <p>{role.body}</p>
+                    </div>
+
+                    {metric?.source_url ? (
+                      <a
+                        className={styles.sourceLink}
+                        href={metric.source_url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {metric.source_name}
+                      </a>
+                    ) : (
+                      <span className={styles.sourceLink}>
+                        {pick(
+                          language,
+                          "Source indisponible",
+                          "Source unavailable",
+                        )}
+                      </span>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
       </section>
 
       <section className={`panel ${styles.quality}`}>

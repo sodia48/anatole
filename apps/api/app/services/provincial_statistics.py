@@ -307,11 +307,22 @@ METRICS: tuple[MetricSpec, ...] = (
         selectors=(
             _selector(
                 ("estimates", "estimations"),
-                ("gross domestic product at market prices", "produit interieur brut aux prix du marche"),
+                (
+                    "gross domestic product at market prices",
+                    "gross domestic product",
+                    "produit interieur brut aux prix du marche",
+                    "produit interieur brut",
+                ),
             ),
             _selector(
                 ("prices", "prix"),
-                ("chained 2017 dollars", "dollars enchaines de 2017"),
+                (
+                    "chained 2017 dollars",
+                    "2017 chained dollars",
+                    "chained (2017) dollars",
+                    "dollars enchaines de 2017",
+                    "dollars de 2017 enchaines",
+                ),
             ),
         ),
     ),
@@ -594,6 +605,32 @@ def _change(
     return current - previous
 
 
+def _response_coordinate(response: Any) -> str | None:
+    value = _unwrap(response)
+    if not isinstance(value, dict):
+        return None
+    coordinate = str(value.get("coordinate") or "").strip()
+    return coordinate or None
+
+
+def _responses_by_code(
+    responses: list[Any],
+    coordinate_to_code: dict[str, str],
+) -> dict[str, Any]:
+    # L'ordre des réponses groupées WDS n'est pas utilisé : chaque réponse
+    # est reliée à la province grâce à sa coordonnée explicite.
+    matched: dict[str, Any] = {}
+    for response in responses:
+        coordinate = _response_coordinate(response)
+        if coordinate is None:
+            continue
+        code = coordinate_to_code.get(coordinate)
+        if code is None:
+            continue
+        matched[code] = response
+    return matched
+
+
 class ProvincialStatisticsService:
     def __init__(self) -> None:
         self._metadata_cache: dict[int, _CachedMetadata] = {}
@@ -649,7 +686,7 @@ class ProvincialStatisticsService:
             return {}, f"{spec.table_id}: métadonnées indisponibles ({type(exc).__name__})"
 
         requests: list[dict[str, Any]] = []
-        order: list[tuple[str, str]] = []
+        coordinate_to_code: dict[str, str] = {}
         for province in provinces:
             coordinate = _resolve_coordinate(metadata, spec, province)
             if not coordinate:
@@ -661,7 +698,7 @@ class ProvincialStatisticsService:
                     "latestN": spec.latest_n,
                 }
             )
-            order.append((province["code"], coordinate))
+            coordinate_to_code[coordinate] = province["code"]
 
         if not requests:
             return {}, f"{spec.table_id}: aucune série provinciale résolue sans ambiguïté"
@@ -676,16 +713,14 @@ class ProvincialStatisticsService:
             return {}, f"{spec.table_id}: données indisponibles ({type(exc).__name__})"
 
         responses = payload if isinstance(payload, list) else [payload]
+        responses_by_code = _responses_by_code(responses, coordinate_to_code)
         by_code: dict[str, ProvincialMetric] = {}
         table_url = (
             f"https://www150.statcan.gc.ca/t1/tbl1/"
             f"{'fr' if lang == 'fr' else 'en'}/tv.action?pid={spec.simple_view_pid}"
         )
 
-        for index, response in enumerate(responses):
-            if index >= len(order):
-                break
-            code, _coordinate = order[index]
+        for code, response in responses_by_code.items():
             points = _sort_points(_point_list(response))
             if not points:
                 continue
@@ -733,6 +768,13 @@ class ProvincialStatisticsService:
 
         if not by_code:
             return {}, f"{spec.table_id}: aucune donnée provinciale exploitable"
+
+        if len(by_code) < len(requests):
+            return (
+                by_code,
+                f"{spec.table_id}: {len(by_code)}/{len(requests)} séries "
+                "appariées par coordonnée",
+            )
         return by_code, None
 
     async def _build(
