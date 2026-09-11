@@ -465,3 +465,201 @@ a.sourceLink:hover {
     font-size: 24px;
   }
 }
+
+.provinceIntro {
+  margin: -4px 2px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.provinceCard {
+  width: 100%;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.provinceCard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--blue) 48%, var(--border));
+}
+
+.provinceCardSelected {
+  border-color: var(--blue);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--blue) 38%, transparent),
+    0 14px 34px var(--light-shadow, rgba(0, 0, 0, 0.13));
+}
+
+.provinceActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.provinceCard dl dd {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
+.provinceCard dl dd small {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.provinceOpenLabel {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.provinceDetail {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.provinceDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.provinceDetailHeader h3 {
+  margin: 5px 0 6px;
+  font-size: clamp(24px, 3vw, 34px);
+}
+
+.provinceDetailHeader p {
+  max-width: 860px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.closeProvince {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.provinceReading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--muted);
+}
+
+.provinceReading svg {
+  flex: 0 0 auto;
+  color: var(--blue);
+}
+
+.provinceReading p {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.provinceDetailGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.provinceMetricDetail {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-2);
+}
+
+.detailMetricHeader {
+  display: grid;
+  gap: 12px;
+}
+
+.detailMetricHeader small {
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detailMetricHeader h4 {
+  margin: 3px 0 0;
+  font-size: 12px;
+}
+
+.detailMetricHeader > strong {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.detailMeta {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.metricRole {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.metricRole strong {
+  font-size: 9px;
+}
+
+.metricRole p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 1280px) {
+  .provinceDetailGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .provinceDetailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .provinceDetailGrid {
+    grid-template-columns: 1fr;
+  }
+}
