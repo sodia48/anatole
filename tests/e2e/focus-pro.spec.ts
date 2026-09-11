@@ -159,7 +159,7 @@ test.describe("Focus Pro workstation", () => {
   });
 
   test("authenticated PAPER order remains simulated and account-linked", async ({ page }, testInfo) => {
-    const email = `focus-paper-${testInfo.project.name.replace(/[^a-z0-9]/gi, "-")}-${testInfo.retry}@example.com`;
+    const email = `focus-paper-${testInfo.project.name.replace(/[^a-z0-9]/gi, "-")}-${crypto.randomUUID()}@example.com`;
     const registration = await page.request.post("/api/account/register", {
       data: {
         email,

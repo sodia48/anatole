@@ -1,4 +1,5 @@
 "use client";
+import { LocalRequestLane } from "@/lib/local-request-lane";
 
 import Link from "next/link";
 import {
@@ -300,6 +301,14 @@ export default function TodayPage() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const mounted = useRef(true);
   const loadingRef = useRef(false);
+  const marketLane = useRef(new LocalRequestLane());
+  const personalLane = useRef(new LocalRequestLane());
+  const contextLane = useRef(new LocalRequestLane());
+
+  useEffect(() => {
+    const lanes = [marketLane.current, personalLane.current, contextLane.current];
+    return () => lanes.forEach(lane => lane.cancel());
+  }, []);
 
   const [universe, setUniverse] =
     useState<CockpitUniverse>(
@@ -381,7 +390,7 @@ export default function TodayPage() {
     setLastUpdated(new Date().toISOString());
   }, []);
 
-  const loadMarket = useCallback(async () => {
+  const loadMarket = useCallback(() => marketLane.current.run(`${universe}:${language}`, async (controller) => {
     if (
       document.visibilityState ===
       "hidden"
@@ -389,8 +398,6 @@ export default function TodayPage() {
       return;
     }
 
-    const controller =
-      new AbortController();
     const nextIssues: SourceIssue[] = [];
 
     try {
@@ -400,7 +407,7 @@ export default function TodayPage() {
           controller.signal,
         );
 
-      if (mounted.current) {
+      if (mounted.current && !controller.signal.aborted) {
         setCockpit(value);
       }
     } catch (reason) {
@@ -412,14 +419,14 @@ export default function TodayPage() {
             : pick(language, "Données indisponibles", "Data unavailable"),
       });
     } finally {
-      if (mounted.current) {
+      if (mounted.current && !controller.signal.aborted) {
         setMarketSwitching(false);
       }
     }
 
     if (
       nextIssues.length &&
-      mounted.current
+      mounted.current && !controller.signal.aborted
     ) {
       setIssues((current) => [
         ...current.filter(
@@ -430,18 +437,17 @@ export default function TodayPage() {
       ]);
       setState("partial");
     }
-  }, [language, universe]);
+  }), [language, universe]);
 
-  const loadPersonal = useCallback(async () => {
+  const loadPersonal = useCallback(() => personalLane.current.run(JSON.stringify([language, workspace]), async (controller) => {
     if (document.visibilityState === "hidden") return;
-    const controller = new AbortController();
     const tasks: Array<Promise<void>> = [];
     const nextIssues: SourceIssue[] = [];
 
     if (workspace.watchlist.length) {
       tasks.push(
         getWatchlistSnapshot(workspace.watchlist, controller.signal)
-          .then((value) => { if (mounted.current) setWatchlist(value); })
+          .then((value) => { if (mounted.current && !controller.signal.aborted) setWatchlist(value); })
           .catch((reason) => {
             nextIssues.push({
               source: "Watchlist",
@@ -449,14 +455,14 @@ export default function TodayPage() {
             });
           }),
       );
-    } else if (mounted.current) {
+    } else if (mounted.current && !controller.signal.aborted) {
       setWatchlist(null);
     }
 
     if (workspace.portfolio.length) {
       tasks.push(
         analyzePortfolio(workspace.portfolio, controller.signal)
-          .then((value) => { if (mounted.current) setPortfolio(value); })
+          .then((value) => { if (mounted.current && !controller.signal.aborted) setPortfolio(value); })
           .catch((reason) => {
             nextIssues.push({
               source: pick(language, "Portefeuille", "Portfolio"),
@@ -464,14 +470,14 @@ export default function TodayPage() {
             });
           }),
       );
-    } else if (mounted.current) {
+    } else if (mounted.current && !controller.signal.aborted) {
       setPortfolio(null);
     }
 
     if (workspace.alerts.length) {
       tasks.push(
         evaluateAlerts(workspace.alerts, controller.signal)
-          .then((value) => { if (mounted.current) setAlerts(value); })
+          .then((value) => { if (mounted.current && !controller.signal.aborted) setAlerts(value); })
           .catch((reason) => {
             nextIssues.push({
               source: pick(language, "Alertes", "Alerts"),
@@ -479,23 +485,22 @@ export default function TodayPage() {
             });
           }),
       );
-    } else if (mounted.current) {
+    } else if (mounted.current && !controller.signal.aborted) {
       setAlerts(null);
     }
 
     await Promise.all(tasks);
-    if (mounted.current) {
+    if (mounted.current && !controller.signal.aborted) {
       setIssues((current) => [
         ...current.filter((item) => !["Watchlist", pick(language, "Portefeuille", "Portfolio"), pick(language, "Alertes", "Alerts")].includes(item.source)),
         ...nextIssues,
       ]);
       if (nextIssues.length) setState("partial");
     }
-  }, [language, workspace.alerts, workspace.portfolio, workspace.watchlist]);
+  }), [language, workspace]);
 
-  const loadContext = useCallback(async () => {
+  const loadContext = useCallback(() => contextLane.current.run(language, async (controller) => {
     if (document.visibilityState === "hidden") return;
-    const controller = new AbortController();
     const nextIssues: SourceIssue[] = [];
     const results = await Promise.allSettled([
       getTerminalSnapshot(controller.signal),
@@ -516,7 +521,7 @@ export default function TodayPage() {
 
     results.forEach((result, index) => {
       if (result.status === "fulfilled") {
-        if (mounted.current) setters[index](result.value as never);
+        if (mounted.current && !controller.signal.aborted) setters[index](result.value as never);
       } else {
         nextIssues.push({
           source: names[index],
@@ -525,8 +530,8 @@ export default function TodayPage() {
       }
     });
 
-    recordIssues(nextIssues);
-  }, [language, recordIssues]);
+    if (!controller.signal.aborted) recordIssues(nextIssues);
+  }), [language, recordIssues]);
 
   const loadAll = useCallback(async () => {
     if (loadingRef.current) return;
@@ -535,16 +540,30 @@ export default function TodayPage() {
     setState((current) => current === "idle" ? "loading" : current);
     try {
       await Promise.all([loadMarket(), loadPersonal(), loadContext()]);
-      if (mounted.current && !lastUpdated) setLastUpdated(new Date().toISOString());
+      if (mounted.current) setLastUpdated(new Date().toISOString());
     } finally {
       loadingRef.current = false;
       if (mounted.current) setRefreshing(false);
     }
-  }, [lastUpdated, loadContext, loadMarket, loadPersonal]);
+  }, [loadContext, loadMarket, loadPersonal]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void loadAll(), 0);
     return () => window.clearTimeout(timer);
+  }, [loadAll]);
+
+  useEffect(() => {
+    // Key changes supersede only this lane's locally owned request.
+    void loadMarket();
+  }, [loadMarket]);
+
+  useEffect(() => { void loadPersonal(); }, [loadPersonal]);
+  useEffect(() => { void loadContext(); }, [loadContext]);
+
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) void loadAll(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [loadAll]);
 
   useEffect(() => {

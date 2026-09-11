@@ -463,6 +463,8 @@ class LocalOfficialFinancialsProvider:
 
 
 class OfficialFinancialsService:
+    source_budget_seconds = 6
+
     def __init__(self) -> None:
         self.local = LocalOfficialFinancialsProvider()
 
@@ -473,11 +475,13 @@ class OfficialFinancialsService:
         upstream_failed: bool = False,
     ) -> FundamentalSnapshot:
         ticker = snapshot.symbol
-        constituent = await (
-            tsx_composite_universe_service.find(ticker)
-        )
+        try:
+            async with asyncio.timeout(2):
+                constituent = await tsx_composite_universe_service.find(ticker)
+        except Exception:
+            constituent = None
         is_composite = constituent is not None
-        local_annual, local_quarterly = self.local.get(ticker)
+        local_annual, local_quarterly = await asyncio.to_thread(self.local.get, ticker)
 
         sec_result: SECEdgarResult | None = None
         issuer_result: IssuerFinancialsResult | None = None
@@ -487,8 +491,9 @@ class OfficialFinancialsService:
         async def sec_task() -> None:
             nonlocal sec_result
             try:
-                sec_result = await (
-                    sec_edgar_financials_provider.get_financials(ticker)
+                sec_result = await asyncio.wait_for(
+                    sec_edgar_financials_provider.get_financials(ticker),
+                    self.source_budget_seconds,
                 )
             except Exception:  # noqa: BLE001
                 errors.append("SEC EDGAR indisponible")
@@ -496,10 +501,10 @@ class OfficialFinancialsService:
         async def issuer_task() -> None:
             nonlocal issuer_result
             try:
-                issuer_result = await (
+                issuer_result = await asyncio.wait_for(
                     issuer_financial_documents_service.get_financials(
                         ticker, snapshot.website
-                    )
+                    ), self.source_budget_seconds
                 )
             except Exception:  # noqa: BLE001
                 errors.append("Site investisseurs indisponible")
@@ -507,12 +512,12 @@ class OfficialFinancialsService:
         async def yahoo_task() -> None:
             nonlocal yahoo_result
             try:
-                yahoo_result = await (
+                yahoo_result = await asyncio.wait_for(
                     yahoo_statements_service.get_financials(
                         ticker,
                         snapshot.financial_currency
                         or snapshot.currency,
-                    )
+                    ), self.source_budget_seconds
                 )
             except Exception:  # noqa: BLE001
                 errors.append("Yahoo structuré indisponible")

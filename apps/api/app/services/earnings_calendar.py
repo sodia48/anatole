@@ -17,6 +17,7 @@ from app.schemas.discovery import (
 )
 from app.services.session_quotes import session_quote_service
 from app.services.yahoo_public import yahoo_public_service
+from app.services.canadian_equity_directory import canadian_equity_directory_service
 from app.services.tsx60 import TSX60, TSX60_AS_OF, TSX60_SOURCE
 from app.services.tsx_composite_universe import (
     XIC_UNIVERSE_SOURCE,
@@ -57,12 +58,14 @@ class EarningsCalendarService:
     """
 
     batch_size = 50
-    refresh_after_seconds = 10_800
+    refresh_after_seconds = 900
     stale_seconds = 86_400
 
     def __init__(self) -> None:
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
         self._retry_after: dict[str, float] = {}
+        self.directory = canadian_equity_directory_service
+        self._consensus_tasks: dict[str, asyncio.Task[None]] = {}
         self.response_wait_seconds = 2.0
         self._cache: AsyncStaleCache[
             str,
@@ -168,51 +171,6 @@ class EarningsCalendarService:
             raise RuntimeError("Empty Yahoo quotes response")
         return [row for row in rows if isinstance(row, dict)]
 
-    async def _canadian_page(self, offset: int) -> dict[str, Any]:
-        payload = await yahoo_public_service.request_json(
-            "/v1/finance/screener", method="POST", body={
-                "size": 250, "offset": offset, "sortField": "ticker", "sortType": "ASC",
-                "quoteType": "EQUITY", "userId": "", "userIdType": "guid",
-                "query": {"operator": "EQ", "operands": ["region", "ca"]},
-            },
-        )
-        rows = payload.get("finance", {}).get("result") or []
-        if not rows or not isinstance(rows[0], dict):
-            raise RuntimeError("Canadian equity directory unavailable")
-        return rows[0]
-
-    async def _canadian_quotes(self) -> tuple[list[dict[str, Any]], int]:
-        first = await self._canadian_page(0)
-        total = int(first.get("total") or 0)
-        if total <= 0 or not first.get("quotes"):
-            raise RuntimeError("Empty Canadian equity directory")
-        # Stable alphabetical pagination; never restrict the market to an index.
-        # Bound both the page count and upstream concurrency.
-        semaphore = asyncio.Semaphore(3)
-
-        async def page(offset: int) -> dict[str, Any]:
-            async with semaphore:
-                return await self._canadian_page(offset)
-
-        pages = await asyncio.gather(
-            *(page(offset) for offset in range(250, min(total, 25_000), 250)),
-            return_exceptions=True,
-        )
-        quotes = list(first["quotes"])
-        failures = int(total > 25_000)
-        for result in pages:
-            if isinstance(result, Exception) or not result.get("quotes"):
-                failures += 1
-            else:
-                quotes.extend(result["quotes"])
-        by_symbol = {}
-        for row in quotes:
-            symbol = str(row.get("symbol") or "").upper()
-            if row.get("quoteType") == "EQUITY" and symbol.endswith((".TO", ".V", ".CN", ".NE")):
-                by_symbol[symbol] = row
-        if not by_symbol:
-            raise RuntimeError("No Canadian listings in directory")
-        return list(by_symbol.values()), failures
 
     async def _fetch_quotes(
         self,
@@ -479,7 +437,10 @@ class EarningsCalendarService:
     async def _load(self, universe: Universe) -> EarningsCalendarSnapshot:
         demo_mode = settings.market_data_provider.strip().lower() == "demo"
         if universe == "canada":
-            rows, failed_batches = ([], 0) if demo_mode else await self._canadian_quotes()
+            directory = None if demo_mode else self.directory.peek()
+            if not demo_mode:
+                self.directory.ensure_refresh()
+            rows, failed_batches = (directory.rows, directory.failures) if directory else ([], 0)
             constituents = [EarningsConstituent(
                 ticker=str(row["symbol"]).removesuffix(".TO").replace("-", ".")
                 if str(row["symbol"]).endswith(".TO") else str(row["symbol"]),
@@ -492,6 +453,18 @@ class EarningsCalendarService:
             universe_status = FeedStatus(source="Yahoo Finance Canadian equity directory",
                                          status="partial" if failed_batches else "ok",
                                          detail=f"{len(constituents)} listed equities; {failed_batches} failed pages")
+            if not directory and not demo_mode:
+                # Existing Composite coverage is usable without fetching its universe.
+                composite = self._cache.peek("composite", max_age_seconds=self.stale_seconds)
+                if composite and composite.events:
+                    constituents = [EarningsConstituent(e.ticker, e.company, e.sector, e.weight, e.exchange)
+                                    for e in composite.events]
+                    universe_label = "Canada — couverture Composite temporaire"
+                else:
+                    constituents = self._tsx60_constituents()
+                    universe_label = "Canada — couverture TSX 60 temporaire"
+                universe_status = FeedStatus(source="Yahoo Finance Canadian equity directory", status="partial",
+                    detail="Synchronisation du marché canadien élargi en cours.")
         elif demo_mode and universe == "composite":
             constituents = self._tsx60_constituents()
             universe_label = "S&P/TSX Composite — TSX 60 fallback"
@@ -539,10 +512,13 @@ class EarningsCalendarService:
             session_quote_service.normalize_ticker(item.ticker)
             for item in constituents
         ]
-        if universe == "canada":
-            crumb = ""
+        if universe == "canada" and directory and monotonic() - directory.fetched_at < 60:
+            # The just-finished scan already contains published upstream quote fields.
+            # Reuse them once; a long-lived identity cache never makes quotes fresh.
+            rows, quote_failures, crumb = directory.rows, 0, ""
         else:
-            rows, failed_batches, crumb = await self._fetch_quotes(symbols)
+            rows, quote_failures, crumb = await self._fetch_quotes(symbols)
+        failed_batches = (failed_batches if universe == "canada" else 0) + quote_failures
         now = datetime.now(UTC)
         events = self._events(rows, constituents, now=now)
         preliminary = EarningsCalendarSnapshot(
@@ -552,39 +528,58 @@ class EarningsCalendarService:
             status="partial", refresh_in_progress=True, refresh_after_seconds=5,
         )
         previous = self._cache.peek(universe, max_age_seconds=self.stale_seconds)
-        if previous is None or not previous.events:
-            self._cache.store(universe, preliminary)
-        consensus, failed_consensus = await self._fetch_consensus(
-            [event.symbol for event in events],
-            crumb,
-        )
-        events = self._with_consensus(events, consensus)
-        quote_status = (
-            "partial" if failed_batches or failed_consensus else "ok"
-        )
+        if previous:
+            # Keep estimates only for the same published event, never a new quarter.
+            old_events = {(e.symbol, e.starts_at): e for e in previous.events}
+            retained_events = []
+            for event in preliminary.events:
+                old_event = old_events.get((event.symbol, event.starts_at))
+                updates = {} if old_event is None else {
+                    field: getattr(old_event, field)
+                    for field in ("eps_estimate", "revenue_estimate", "estimate_currency",
+                                  "eps_analyst_count", "revenue_analyst_count")
+                    if getattr(event, field) is None and getattr(old_event, field) is not None
+                }
+                retained_events.append(event.model_copy(update=updates))
+                if updates:
+                    preliminary.stale = True
+            preliminary.events = retained_events
+        if failed_batches and previous and previous.events:
+            previous_by_symbol = {event.symbol: event for event in previous.events
+                                  if event.starts_at >= now}
+            previous_by_symbol.update({event.symbol: event for event in events})
+            preliminary = preliminary.model_copy(update={
+                "events": sorted(previous_by_symbol.values(), key=lambda event: (event.starts_at, event.ticker)),
+                "companies_with_dates": len(previous_by_symbol), "stale": True,
+            })
+        self._cache.store(universe, preliminary)
+        old_task = self._consensus_tasks.get(universe)
+        if old_task and not old_task.done():
+            old_task.cancel()  # Superseded enrichment owned solely by this service.
+        self._consensus_tasks[universe] = asyncio.create_task(
+            self._enrich_consensus(universe, preliminary, crumb, failed_batches))
+        return preliminary
 
-        return EarningsCalendarSnapshot(
-            status="partial" if quote_status == "partial" or universe_status.status == "partial" else "available",
-            universe=universe_label,
-            universe_as_of=universe_as_of,
-            constituent_count=len(constituents),
-            companies_with_dates=len({item.ticker for item in events}),
-            events=events,
-            source_statuses=[
-                universe_status,
-                FeedStatus(
-                    source="Yahoo Finance public quote calendar",
-                    status=quote_status,
-                    detail=(
-                        f"{len(events)} upcoming earnings dates; "
-                        f"{failed_batches} failed batches; "
-                        f"{failed_consensus} failed consensus requests"
-                    ),
-                ),
-            ],
-            generated_at=now,
-            refresh_after_seconds=self.refresh_after_seconds,
-        )
+    async def _enrich_consensus(self, universe: Universe, snapshot: EarningsCalendarSnapshot,
+                               crumb: str, failed_batches: int) -> None:
+        try:
+            consensus, failed = await self._fetch_consensus([e.symbol for e in snapshot.events], crumb)
+            current = self._cache.peek(universe)
+            if current is None or current.generated_at != snapshot.generated_at:
+                return
+            directory_pending = universe == "canada" and self.directory.peek() is None
+            self._cache.store(universe, snapshot.model_copy(update={
+                "events": self._with_consensus(snapshot.events, consensus),
+                "status": "partial" if failed or failed_batches or any(s.status != "ok" for s in snapshot.source_statuses) else "available",
+                "refresh_in_progress": directory_pending,
+                "refresh_after_seconds": 5 if directory_pending else self.refresh_after_seconds,
+                "source_statuses": [*snapshot.source_statuses, FeedStatus(
+                    source="Yahoo Finance earnings consensus", status="partial" if failed else "ok",
+                    detail=f"{failed} unavailable consensus requests")],
+            }))
+        except Exception:
+            if self._cache.peek(universe) is snapshot:
+                self._cache.store(universe, snapshot.model_copy(update={"refresh_in_progress": False, "stale": True}))
 
     def _empty(self, universe: str, *, loading: bool) -> EarningsCalendarSnapshot:
         return EarningsCalendarSnapshot(
@@ -599,6 +594,19 @@ class EarningsCalendarService:
             async with asyncio.timeout(150):
                 snapshot = await self._load(universe)
             self._cache.store(universe, snapshot)
+            # Expand the cold warm-up independently of consensus; never block dates.
+            if universe == "canada" and "temporaire" in snapshot.universe:
+                directory_task = self.directory.ensure_refresh()
+                directory = await asyncio.shield(directory_task) if directory_task else self.directory.peek()
+                if directory:
+                    snapshot = await self._load(universe)
+                    self._cache.store(universe, snapshot)
+                else:
+                    current = self._cache.peek(universe)
+                    if current:
+                        self._cache.store(universe, current.model_copy(update={
+                            "stale": True, "refresh_in_progress": False, "refresh_after_seconds": 60}))
+                    self._retry_after[universe] = monotonic() + 60
         except asyncio.CancelledError:
             previous = self._cache.peek(universe)
             if previous and previous.refresh_in_progress:
@@ -624,11 +632,18 @@ class EarningsCalendarService:
         normalized = self.normalize_universe(universe)
         cached = self._cache.peek(normalized, max_age_seconds=self.refresh_after_seconds)
         task = self._refresh_tasks.get(normalized)
-        if cached and not cached.stale and cached.status != "unavailable" and (not cached.refresh_in_progress or task is not None):
-            return cached
+        consensus_task = self._consensus_tasks.get(normalized)
+        if cached and cached.status != "unavailable":
+            refreshing = task is not None or (consensus_task is not None and not consensus_task.done())
+            fresh = self._cache.peek(normalized, max_age_seconds=cached.refresh_after_seconds) is not None
+            if refreshing or (fresh and not cached.refresh_in_progress):
+                return cached  # Retained fields do not trigger overlapping refresh loops.
         if task is None and monotonic() >= self._retry_after.get(normalized, 0):
             task = asyncio.create_task(self._refresh(normalized))
             self._refresh_tasks[normalized] = task
+        stale = self._cache.peek(normalized, max_age_seconds=self.stale_seconds)
+        if stale and stale.events:
+            return stale.model_copy(update={"stale": True, "refresh_in_progress": task is not None})
         if task is not None:
             try:
                 await asyncio.wait_for(asyncio.shield(task), self.response_wait_seconds)

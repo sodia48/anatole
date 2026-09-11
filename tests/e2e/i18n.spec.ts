@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["/aujourdhui", /Today in the markets/],
   ["/cockpit", /Market universe/],
-  ["/screener", /Preparing the Screener|Focused view of 60 Canadian large caps/],
+  ["/screener", /Preparing the Screener|Focused view of 60 Canadian large caps|Broader ranking of Canadian companies/],
   ["/actualites", /Synchronizing news|Canadian macro feed/],
   ["/calendrier", /Preparing calendar|Economic events/],
   ["/etf", /Canadian ETF map/],

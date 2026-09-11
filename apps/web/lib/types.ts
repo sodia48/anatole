@@ -225,6 +225,8 @@ export type StockHistoryResponse = {
 };
 
 export type FocusFundamentalOverlaySnapshot = {
+  refresh_in_progress?: boolean;
+  stale?: boolean;
   ticker: string;
   source: string;
   quarterly_financials: Array<{

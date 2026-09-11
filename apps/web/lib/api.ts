@@ -90,7 +90,6 @@ async function apiRequest<T>(
       ...init.headers,
     },
     signal,
-    retries: 2,
     timeoutMs,
   });
 
@@ -98,7 +97,11 @@ async function apiRequest<T>(
     throw await apiError(response);
   }
 
-  return (await response.json()) as T;
+  const payload = await response.json();
+  if (response.headers.get("X-Anatole-Stale") === "true" && payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return { ...payload, stale: true } as T;
+  }
+  return payload as T;
 }
 
 export function getHealthStatus(

@@ -13,6 +13,7 @@ const MAX_CACHE_BODY_LENGTH = 1_500_000;
 type ResilientFetchOptions = RequestInit & {
   timeoutMs?: number;
   retries?: number;
+  idempotent?: boolean;
   allowStale?: boolean;
   staleTtlMs?: number;
 };
@@ -43,15 +44,15 @@ function wait(ms: number, signal?: AbortSignal | null): Promise<void> {
       return;
     }
 
-    const timer = globalThis.setTimeout(resolve, ms);
-    signal?.addEventListener(
-      "abort",
-      () => {
-        globalThis.clearTimeout(timer);
-        reject(abortError());
-      },
-      { once: true },
-    );
+    const onAbort = () => {
+      globalThis.clearTimeout(timer);
+      reject(abortError());
+    };
+    const timer = globalThis.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -142,7 +143,8 @@ export async function resilientFetch(
 ): Promise<Response> {
   const {
     timeoutMs = 12_000,
-    retries = 2,
+    retries: requestedRetries,
+    idempotent = false,
     allowStale,
     staleTtlMs = DEFAULT_STALE_TTL_MS,
     signal: callerSignal,
@@ -150,20 +152,25 @@ export async function resilientFetch(
   } = options;
 
   const url = urlString(input);
-  const method = (init.method ?? "GET").toUpperCase();
+  const method = (init.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+  const retries = method === "GET" || idempotent ? Math.max(0, requestedRetries ?? 1) : 0;
   const mayServeStale =
-    allowStale ??
-    (method === "GET" && !url.endsWith("/health") && !url.includes("/reliability/status"));
+    method === "GET" && (allowStale ??
+    (!url.endsWith("/health") && !url.includes("/reliability/status")));
   const id = requestId();
   const startedAt = performance.now?.() ?? Date.now();
+  const remaining = () => timeoutMs - ((performance.now?.() ?? Date.now()) - startedAt);
+  let attempts = 0;
   let lastError: unknown;
   let lastStatus: number | null = null;
 
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     if (callerSignal?.aborted) throw abortError();
+    if (remaining() <= 0) break;
+    attempts += 1;
 
     const controller = new AbortController();
-    const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+    const timer = globalThis.setTimeout(() => controller.abort(), remaining());
     const abortFromCaller = () => controller.abort();
     callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
 
@@ -172,17 +179,22 @@ export async function resilientFetch(
       if (!headers.has("X-Request-ID")) headers.set("X-Request-ID", id);
       headers.set("X-Anatole-Client-Version", ANATOLE_VERSION);
 
-      const response = await fetch(input, {
+      let response = await fetch(input, {
         ...init,
         headers,
         signal: controller.signal,
       });
       lastStatus = response.status;
+      if (response.ok && response.body) {
+        // The same abort timer also bounds body download, not just headers.
+        const body = await response.arrayBuffer();
+        response = new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+      }
 
       if (!RETRYABLE_STATUSES.has(response.status) || attempt === retries) {
         const durationMs = Math.round((performance.now?.() ?? Date.now()) - startedAt);
         if (response.ok) {
-          await storeLastGood(response, url, id);
+          if (method === "GET") void storeLastGood(response, url, id);
           saveTrace({
             requestId: response.headers.get("X-Request-ID") ?? id,
             url,
@@ -232,12 +244,13 @@ export async function resilientFetch(
       const delay = Number.isFinite(retryAfter) && retryAfter > 0
         ? Math.min(retryAfter * 1_000, 8_000)
         : 450 * 2 ** attempt + Math.random() * 180;
-      await wait(delay, callerSignal);
+      await response.body?.cancel();
+      await wait(Math.max(0, Math.min(delay, remaining())), callerSignal);
     } catch (error) {
       lastError = error;
       if (callerSignal?.aborted) throw abortError();
-      if (attempt === retries) break;
-      await wait(450 * 2 ** attempt + Math.random() * 180, callerSignal);
+      if (attempt === retries || remaining() <= 0) break;
+      await wait(Math.min(450 * 2 ** attempt + Math.random() * 180, remaining()), callerSignal);
     } finally {
       globalThis.clearTimeout(timer);
       callerSignal?.removeEventListener("abort", abortFromCaller);
@@ -253,7 +266,7 @@ export async function resilientFetch(
         url,
         status: lastStatus,
         durationMs,
-        attempts: retries + 1,
+        attempts,
         stale: true,
         recordedAt: new Date().toISOString(),
       });
@@ -271,7 +284,7 @@ export async function resilientFetch(
     url,
     status: lastStatus,
     durationMs,
-    attempts: retries + 1,
+    attempts,
     stale: false,
     recordedAt: new Date().toISOString(),
   });

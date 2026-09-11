@@ -250,14 +250,14 @@ class SECEdgarFinancialsProvider:
         headers = dict(self.headers)
         headers["Host"] = "www.sec.gov"
 
-        async with httpx.AsyncClient(
+        async with await asyncio.to_thread(httpx.AsyncClient,
             headers=headers,
             timeout=20.0,
             follow_redirects=True,
         ) as client:
             response = await client.get(SEC_TICKERS_URL)
             response.raise_for_status()
-            payload = response.json()
+            payload = await asyncio.to_thread(response.json)
 
         fields = payload.get("fields") or []
         rows = payload.get("data") or []
@@ -312,7 +312,7 @@ class SECEdgarFinancialsProvider:
             ):
                 return cached[1]
 
-            async with httpx.AsyncClient(
+            async with await asyncio.to_thread(httpx.AsyncClient,
                 headers=self.headers,
                 timeout=25.0,
                 follow_redirects=True,
@@ -321,7 +321,7 @@ class SECEdgarFinancialsProvider:
                     SEC_FACTS_URL.format(cik=cik)
                 )
                 response.raise_for_status()
-                payload = response.json()
+                payload = await asyncio.to_thread(response.json)
 
             self._facts_cache[cik] = (monotonic(), payload)
             return payload
@@ -650,12 +650,12 @@ class SECEdgarFinancialsProvider:
         cik, entity_name = resolved
         payload = await self._company_facts(cik)
 
-        annual = self._periods(
+        annual = await asyncio.to_thread(self._periods,
             payload,
             cik,
             "annual",
         )
-        quarterly = self._periods(
+        quarterly = await asyncio.to_thread(self._periods,
             payload,
             cik,
             "quarterly",

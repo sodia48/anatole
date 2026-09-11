@@ -7,8 +7,10 @@ import {
 } from "react";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick } from "@/lib/i18n";
+import { getFocusFundamentalOverlay } from "@/lib/api";
 
 export type FundamentalView =
+  | "valuation"
   | "fundamentals"
   | "financials"
   | "analysts";
@@ -225,6 +227,8 @@ type Events = {
 };
 
 type Snapshot = {
+  refresh_in_progress?: boolean;
+  stale?: boolean;
   ticker: string;
   symbol: string;
   name: string;
@@ -250,12 +254,6 @@ type Snapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
-
-function bridgeUrl(ticker: string): string {
-  return `/api/anatole/api/v1/stocks/${encodeURIComponent(
-    ticker,
-  )}/fundamentals`;
-}
 
 function n(
   value: number | null,
@@ -461,6 +459,93 @@ function Group({
   );
 }
 
+
+function Valuation({
+  snapshot,
+}: {
+  snapshot: Snapshot;
+}) {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
+  const m = snapshot.metrics;
+  const currency =
+    snapshot.financial_currency ??
+    snapshot.currency ??
+    "CAD";
+  const values = [
+    m.market_cap,
+    m.enterprise_value,
+    m.trailing_pe,
+    m.forward_pe,
+    m.price_to_book,
+    m.price_to_sales,
+    m.enterprise_to_revenue,
+    m.enterprise_to_ebitda,
+    m.trailing_eps,
+  ];
+  const hasValuation = values.some(
+    (value) => value !== null && Number.isFinite(value),
+  );
+
+  if (!hasValuation) {
+    return (
+      <section style={panelStyle} role="status">
+        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>
+          {pick(language, "Valorisation", "Valuation")}
+        </h2>
+        <span style={{ color: "var(--text-secondary)" }}>
+          {pick(
+            language,
+            "Valorisation temporairement indisponible.",
+            "Valuation data is temporarily unavailable.",
+          )}
+        </span>
+      </section>
+    );
+  }
+
+  return (
+    <Group title={pick(language, "Valorisation", "Valuation")}>
+      <Metric
+        label={pick(language, "Capitalisation", "Market capitalization")}
+        value={compact(m.market_cap, currency)}
+      />
+      <Metric
+        label={pick(language, "Valeur d’entreprise", "Enterprise value")}
+        value={compact(m.enterprise_value, currency)}
+      />
+      <Metric
+        label={pick(language, "C/B historique", "Trailing P/E")}
+        value={n(m.trailing_pe)}
+      />
+      <Metric
+        label={pick(language, "C/B anticipé", "Forward P/E")}
+        value={n(m.forward_pe)}
+      />
+      <Metric
+        label={pick(language, "Cours / valeur comptable", "Price / book value")}
+        value={n(m.price_to_book)}
+      />
+      <Metric
+        label={pick(language, "Cours / ventes", "Price / sales")}
+        value={n(m.price_to_sales)}
+      />
+      <Metric
+        label={pick(language, "VE / Revenus", "EV / Revenue")}
+        value={n(m.enterprise_to_revenue)}
+      />
+      <Metric
+        label={pick(language, "VE / BAIIA", "EV / EBITDA")}
+        value={n(m.enterprise_to_ebitda)}
+      />
+      <Metric
+        label={pick(language, "BPA historique", "Trailing EPS")}
+        value={money(m.trailing_eps, currency)}
+      />
+    </Group>
+  );
+}
+
 function Fundamentals({
   snapshot,
 }: {
@@ -483,16 +568,6 @@ function Fundamentals({
         gap: 14,
       }}
     >
-      <Group title={pick(language, "Valorisation", "Valuation")}>
-        <Metric label={pick(language, "Capitalisation", "Market capitalization")} value={compact(m.market_cap, currency)} />
-        <Metric label={pick(language, "Valeur d’entreprise", "Enterprise value")} value={compact(m.enterprise_value, currency)} />
-        <Metric label={pick(language, "C/B historique", "Trailing P/E")} value={n(m.trailing_pe)} />
-        <Metric label={pick(language, "C/B anticipé", "Forward P/E")} value={n(m.forward_pe)} />
-        <Metric label={pick(language, "Cours / valeur comptable", "Price / book value")} value={n(m.price_to_book)} />
-        <Metric label={pick(language, "Cours / ventes", "Price / sales")} value={n(m.price_to_sales)} />
-        <Metric label={pick(language, "VE / BAIIA", "EV / EBITDA")} value={n(m.enterprise_to_ebitda)} />
-        <Metric label={pick(language, "BPA historique", "Trailing EPS")} value={money(m.trailing_eps, currency)} />
-      </Group>
 
       <Group title={pick(language, "Croissance et rentabilité", "Growth and profitability")}>
         <Metric label={pick(language, "Chiffre d’affaires", "Revenue")} value={compact(m.total_revenue, currency)} />
@@ -1314,6 +1389,12 @@ function AnalystsView({
     0,
   );
 
+  if (!Object.entries(a).some(([key, value]) => key !== "current_price" && value !== null)) {
+    return <section style={panelStyle} role="status">{pick(language,
+      "Consensus analystes temporairement indisponible.",
+      "Analyst consensus temporarily unavailable.")}</section>;
+  }
+
   return (
     <div style={{ display: "grid", gap: 14 }}>
       <section
@@ -1433,29 +1514,24 @@ export function FocusFundamentals({
   );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [revision, setRevision] = useState(0);
+  const identity = (value: string) => value.toUpperCase().replace(/\.TO$/, "").replaceAll("-", ".");
+  const currentSnapshot = snapshot && identity(snapshot.ticker) === identity(ticker) ? snapshot : null;
 
   useEffect(() => {
     const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     async function load(): Promise<void> {
       setLoading(true);
       try {
-        const response = await fetch(bridgeUrl(ticker), {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        setSnapshot((await response.json()) as Snapshot);
+        const value = await getFocusFundamentalOverlay(ticker, controller.signal) as Snapshot;
+        if (controller.signal.aborted) return;
+        setSnapshot((old) => old?.ticker === value.ticker && old.status !== "unavailable" && value.status === "unavailable" ? old : value);
         setError(null);
-      } catch (reason) {
-        if (
-          !(
-            reason instanceof DOMException &&
-            reason.name === "AbortError"
-          )
-        ) {
+        if (value.refresh_in_progress) timer = setTimeout(() => void load(), 3_000);
+      } catch {
+        if (!controller.signal.aborted) {
           setError(
             pick(
               language,
@@ -1465,13 +1541,13 @@ export function FocusFundamentals({
           );
         }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     void load();
-    return () => controller.abort();
-  }, [language, ticker]);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [language, ticker, revision]);
 
   const generated = useMemo(
     () =>
@@ -1483,23 +1559,25 @@ export function FocusFundamentals({
     [language, snapshot],
   );
 
-  if (loading && !snapshot) {
+  if (!currentSnapshot && !error) {
     return (
       <section
         className="panel"
         style={{
-          minHeight: 360,
+          minHeight: view === "valuation" ? 140 : 360,
           display: "grid",
           placeItems: "center",
           color: "var(--text-secondary)",
         }}
       >
-        {pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
+        {view === "valuation"
+          ? pick(language, "Synchronisation de la valorisation…", "Synchronizing valuation…")
+          : pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
       </section>
     );
   }
 
-  if (error && !snapshot) {
+  if (error && !currentSnapshot) {
     return (
       <section className="panel" style={{ ...panelStyle, color: "var(--negative-text)" }}>
         {pick(language, "Données fondamentales indisponibles", "Fundamental data unavailable")}: {language === "fr" ? error : "The data provider did not return a usable response."}
@@ -1507,12 +1585,45 @@ export function FocusFundamentals({
     );
   }
 
-  if (!snapshot) {
+  if (!currentSnapshot || !snapshot) {
     return null;
+  }
+
+  if (snapshot.status === "unavailable" && snapshot.refresh_in_progress) {
+    return <section className="panel" style={panelStyle} role="status">
+      {view === "valuation"
+        ? pick(language, "Synchronisation de la valorisation…", "Synchronizing valuation…")
+        : pick(language, "Synchronisation des données fondamentales…", "Synchronizing fundamental data…")}
+    </section>;
+  }
+
+  if (view === "valuation") {
+    return (
+      <div style={{ display: "grid", gap: 8 }} data-focus-valuation="true">
+        {(loading || snapshot.refresh_in_progress || error || snapshot.stale) ? (
+          <div role="status" style={{ color: "var(--text-secondary)", fontSize: 11 }}>
+            {error || snapshot.stale
+              ? pick(language, "Dernières données disponibles", "Latest available data")
+              : pick(language, "Actualisation en cours…", "Refreshing…")}
+          </div>
+        ) : null}
+        <Valuation snapshot={snapshot} />
+        <footer className="status-footer">
+          {pick(language, "Source", "Source")}: {snapshot.source} · {pick(language, "Mise à jour", "Updated")}: {generated ?? "N/D"}
+        </footer>
+      </div>
+    );
   }
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
+      <div role="status">
+        {loading || snapshot.refresh_in_progress ? pick(language, "Synchronisation en cours…", "Synchronization in progress…") : null}
+        {error || snapshot.stale ? pick(language, "Dernières données disponibles", "Latest available data") : null}
+        <button type="button" className="button-secondary" disabled={loading} onClick={() => setRevision(value => value + 1)}>
+          {pick(language, "Actualiser", "Refresh")}
+        </button>
+      </div>
       <header
         className="panel"
         style={{

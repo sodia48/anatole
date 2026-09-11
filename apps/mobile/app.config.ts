@@ -9,6 +9,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: label,
   slug: "anatole-mobile",
+  owner: "sodia48s-team",
   scheme: "anatole",
   version: "1.0.0",
   icon: "./assets/anatole-icon.png",
@@ -68,7 +69,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     apiUrl: process.env.EXPO_PUBLIC_ANATOLE_API_URL ?? process.env.EXPO_PUBLIC_API_URL ?? "https://anatole-api.onrender.com",
     webUrl: process.env.EXPO_PUBLIC_WEB_URL ?? "https://anatole.ca",
     eas: {
-      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "00000000-0000-0000-0000-000000000000",
+      projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ?? "b7d50f14-ad4b-4ef6-8c5e-b0492e7697bf",
     },
   },
 });

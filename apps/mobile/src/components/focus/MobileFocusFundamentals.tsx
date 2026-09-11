@@ -9,10 +9,10 @@ import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type Metric = { key: keyof FundamentalMetrics; fr: string; en: string; format?: "money" | "percent" | "number" };
 const groups: { fr: string; en: string; items: Metric[] }[] = [
-  { fr: "Aperçu", en: "Overview", items: [
-    { key: "market_cap", fr: "Capitalisation", en: "Market cap", format: "money" }, { key: "enterprise_value", fr: "Valeur d’entreprise", en: "Enterprise value", format: "money" },
-    { key: "trailing_pe", fr: "C/B historique", en: "Trailing P/E" }, { key: "forward_pe", fr: "C/B prévisionnel", en: "Forward P/E" }, { key: "price_to_book", fr: "Cours/valeur comptable", en: "P/B" }, { key: "price_to_sales", fr: "Cours/ventes", en: "P/S" },
-    { key: "enterprise_to_revenue", fr: "VE/Revenus", en: "EV/Revenue" }, { key: "enterprise_to_ebitda", fr: "VE/BAIIA", en: "EV/EBITDA" }, { key: "beta", fr: "Bêta", en: "Beta" }, { key: "fifty_two_week_high", fr: "Haut 52 sem.", en: "52w high", format: "money" }, { key: "fifty_two_week_low", fr: "Bas 52 sem.", en: "52w low", format: "money" },
+  { fr: "Marché", en: "Market", items: [
+    { key: "beta", fr: "Bêta", en: "Beta" },
+    { key: "fifty_two_week_high", fr: "Haut 52 sem.", en: "52w high", format: "money" },
+    { key: "fifty_two_week_low", fr: "Bas 52 sem.", en: "52w low", format: "money" },
   ] },
   { fr: "Dividendes", en: "Dividends", items: [{ key: "dividend_rate", fr: "Taux annuel", en: "Annual rate", format: "money" }, { key: "dividend_yield", fr: "Rendement", en: "Yield", format: "percent" }, { key: "payout_ratio", fr: "Ratio de distribution", en: "Payout ratio", format: "percent" }] },
   { fr: "Croissance", en: "Growth", items: [{ key: "revenue_growth", fr: "Croissance revenus", en: "Revenue growth", format: "percent" }, { key: "earnings_growth", fr: "Croissance bénéfices", en: "Earnings growth", format: "percent" }] },

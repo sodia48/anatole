@@ -42,7 +42,7 @@
       ),
       linear-gradient(
         180deg,
-        #050d15 0%,
+        var(--bg) 0%,
         #06111b 100%
       );
     background-attachment: fixed;
@@ -166,7 +166,7 @@
     background:
       linear-gradient(
         135deg,
-        #2d76ff,
+        var(--blue),
         #21c8ff
       );
     color: white;
@@ -492,7 +492,7 @@
     border:
       1px solid transparent;
     border-radius: 12px !important;
-    color: #8ca8ba !important;
+    color: var(--muted) !important;
     text-align: left !important;
   }
 
@@ -1651,7 +1651,7 @@
       rgba(38, 91, 120, .72);
     border-radius: 13px;
     background:
-      rgba(5, 25, 38, .72);
+      var(--panel);
   }
 
   body[data-anatole-section="etf"]
@@ -1802,7 +1802,7 @@
       rgba(38, 91, 120, .72);
     border-radius: 13px;
     background:
-      rgba(5, 25, 38, .72);
+      var(--panel);
   }
 
   body[data-anatole-section="ipo-insiders"]

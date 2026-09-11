@@ -3,6 +3,7 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 import { MobileFocusAnalysts } from "./MobileFocusAnalysts";
 import { MobileFocusFinancials } from "./MobileFocusFinancials";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
+import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
 import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
@@ -53,6 +54,13 @@ describe("mobile Focus parity", () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
     expect(view.getAllByText("N/D").length).toBeGreaterThan(5); expect(view.getByText(/MIXED/)).toBeTruthy();
     expect(view.getByText("20,67 %")).toBeTruthy(); expect(view.getByText("5,23 %")).toBeTruthy(); expect(view.getByText("0,16 %")).toBeTruthy();
+    expect(view.queryByText("Capitalisation")).toBeNull();
+    expect(view.getByText("Marché")).toBeTruthy();
+  });
+  it("renders valuation separately for the Price view", async () => {
+    const view = await render(<MobileFocusValuation error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
+    expect(view.getByText("Valorisation")).toBeTruthy();
+    expect(view.getByText("Capitalisation")).toBeTruthy();
   });
   it("renders financial and analyst snapshots without inventing periods", async () => {
     const financials = await render(<MobileFocusFinancials error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);

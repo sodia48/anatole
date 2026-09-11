@@ -7,6 +7,7 @@ import pytest
 from app.schemas.fundamentals import FinancialPeriod
 from app.services.earnings_calendar import EarningsCalendarService, EarningsConstituent
 from app.services.fundamentals import FundamentalsService
+from app.services.canadian_equity_directory import CanadianEquityDirectoryService
 from app.services.yahoo_public import YahooPublicService
 
 
@@ -26,7 +27,7 @@ def test_only_earnings_default_changes_to_canada():
 
 @pytest.mark.asyncio
 async def test_canadian_directory_paginates_all_exchanges_and_reports_failed_pages(monkeypatch):
-    service = EarningsCalendarService()
+    service = CanadianEquityDirectoryService()
     calls = []
 
     async def page(offset):
@@ -36,8 +37,8 @@ async def test_canadian_directory_paginates_all_exchanges_and_reports_failed_pag
         symbols = ["RY.TO", "AAG.V"] if offset == 0 else ["AAG.V", "AA.CN", "AAG.NE", "MSFT"]
         return {"total": 600, "quotes": [{"symbol": symbol, "quoteType": "EQUITY"} for symbol in symbols]}
 
-    monkeypatch.setattr(service, "_canadian_page", page)
-    rows, failed = await service._canadian_quotes()
+    monkeypatch.setattr(service, "_page", page)
+    rows, failed = await service._scan()
     assert set(calls) == {0, 250, 500}
     assert {row["symbol"] for row in rows} == {"RY.TO", "AAG.V", "AA.CN", "AAG.NE"}
     assert failed == 1
@@ -197,6 +198,9 @@ async def test_primary_failure_or_empty_response_fills_cards_from_other_sources(
     assert snapshot.ticker == "XYZ.V"
     assert snapshot.name == "Example Canadian issuer"
     assert snapshot.metrics.market_cap == 1000
+    if task := service._refresh_tasks.get("XYZ.V"):
+        await task
+    snapshot = await service.get_snapshot("XYZ.V")
     assert snapshot.metrics.total_revenue == 400
     assert snapshot.metrics.price_to_sales == 2.5
     assert snapshot.refresh_after_seconds == service.unavailable_ttl_seconds
