@@ -14,6 +14,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -400,6 +401,7 @@ export function Canada360Client() {
     useState(false);
   const [selectedProvinceCode, setSelectedProvinceCode] =
     useState<string | null>(null);
+  const provinceHydrationAttempts = useRef(0);
 
   const load = useCallback(
     async (
@@ -487,6 +489,44 @@ export function Canada360Client() {
       controller.abort();
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!snapshot) {
+      return;
+    }
+
+    const provinceSource = snapshot.sources.find(
+      (source) => source.key === "provinces",
+    );
+
+    if (provinceSource?.status !== "unavailable") {
+      provinceHydrationAttempts.current = 0;
+      return;
+    }
+
+    if (provinceHydrationAttempts.current >= 12) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const delayMs = Math.max(
+      1_500,
+      Math.min(
+        snapshot.refresh_after_seconds * 1_000,
+        4_000,
+      ),
+    );
+
+    const timer = window.setTimeout(() => {
+      provinceHydrationAttempts.current += 1;
+      void load(controller.signal, true);
+    }, delayMs);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [load, snapshot]);
 
   const usdCad = useMemo(
     () =>
@@ -853,7 +893,9 @@ export function Canada360Client() {
                                 metric,
                                 language,
                               )
-                            : "N/D"}
+                            : province.metrics.length === 0
+                              ? "…"
+                              : "N/D"}
                         </span>
                         {metric ? (
                           <small>
