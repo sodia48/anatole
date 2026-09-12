@@ -198,8 +198,8 @@ METRICS: tuple[MetricSpec, ...] = (
         category_fr="Prix",
         category_en="Prices",
         product_id=18100004,
-        table_id="18-10-0004-01",
-        simple_view_pid="1810000401",
+        table_id="18-10-0004-02",
+        simple_view_pid="1810000402",
         unit_kind="percent",
         change_kind="points",
         latest_n=14,
@@ -222,7 +222,7 @@ METRICS: tuple[MetricSpec, ...] = (
         category_fr="Travail",
         category_en="Labour",
         product_id=14100287,
-        table_id="14-10-0287-01",
+        table_id="14-10-0287-03",
         simple_view_pid="1410028703",
         unit_kind="percent",
         change_kind="points",
@@ -233,26 +233,11 @@ METRICS: tuple[MetricSpec, ...] = (
                 ("unemployment rate", "taux de chomage"),
             ),
             _selector(
-                ("sex", "gender", "sexe", "genre"),
-                (
-                    "both sexes",
-                    "both genders",
-                    "les deux sexes",
-                    "tous les genres",
-                ),
-            ),
-            _selector(
-                ("age", "age group", "groupe d age"),
-                ("15 years and over", "15 ans et plus"),
-            ),
-            _selector(
                 (
                     "data type",
                     "type de donnees",
                     "seasonal adjustment",
                     "desaisonnalisation",
-                    "statistics",
-                    "statistique",
                 ),
                 (
                     "seasonally adjusted",
@@ -271,7 +256,7 @@ METRICS: tuple[MetricSpec, ...] = (
         category_fr="Travail",
         category_en="Labour",
         product_id=14100287,
-        table_id="14-10-0287-01",
+        table_id="14-10-0287-03",
         simple_view_pid="1410028703",
         unit_kind="persons",
         change_kind="percent",
@@ -282,26 +267,11 @@ METRICS: tuple[MetricSpec, ...] = (
                 ("employment", "emploi"),
             ),
             _selector(
-                ("sex", "gender", "sexe", "genre"),
-                (
-                    "both sexes",
-                    "both genders",
-                    "les deux sexes",
-                    "tous les genres",
-                ),
-            ),
-            _selector(
-                ("age", "age group", "groupe d age"),
-                ("15 years and over", "15 ans et plus"),
-            ),
-            _selector(
                 (
                     "data type",
                     "type de donnees",
                     "seasonal adjustment",
                     "desaisonnalisation",
-                    "statistics",
-                    "statistique",
                 ),
                 (
                     "seasonally adjusted",
@@ -375,13 +345,32 @@ METRICS: tuple[MetricSpec, ...] = (
         latest_n=2,
         selectors=(
             _selector(
-                ("industry", "industrie", "retail trade", "commerce de detail"),
-                ("retail trade", "commerce de detail", "total retail"),
+                (
+                    "north american industry classification system",
+                    "naics",
+                    "systeme de classification des industries de l amerique du nord",
+                    "scian",
+                    "industry",
+                    "industrie",
+                ),
+                (
+                    "retail trade",
+                    "commerce de detail",
+                    "total retail",
+                    "retail trade 44 45",
+                ),
             ),
             _selector(
-                ("adjustment", "ajustement", "statistics", "statistique"),
-                ("seasonally adjusted", "desaisonnalise"),
-                required=False,
+                ("sales", "ventes"),
+                ("retail sales", "ventes au detail", "sales", "ventes"),
+            ),
+            _selector(
+                ("adjustments", "adjustment", "ajustements", "ajustement"),
+                (
+                    "seasonally adjusted",
+                    "desaisonnalise",
+                    "donnees desaisonnalisees",
+                ),
             ),
         ),
     ),
@@ -703,12 +692,29 @@ class ProvincialStatisticsService:
         method: str,
         body: list[dict[str, Any]],
     ) -> Any:
-        response = await client.post(
-            f"{WDS_BASE}/{method}",
-            json=body,
-        )
-        response.raise_for_status()
-        return response.json()
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                response = await client.post(
+                    f"{WDS_BASE}/{method}",
+                    json=body,
+                )
+                response.raise_for_status()
+                return response.json()
+            except (
+                httpx.ConnectError,
+                httpx.ConnectTimeout,
+                httpx.ReadError,
+                httpx.ReadTimeout,
+                httpx.RemoteProtocolError,
+            ) as exc:
+                last_error = exc
+                if attempt == 0:
+                    await asyncio.sleep(0.25)
+                    continue
+                raise
+        assert last_error is not None
+        raise last_error
 
     async def _metadata(
         self,
@@ -855,7 +861,7 @@ class ProvincialStatisticsService:
             if region == "ALL"
             else [PROVINCE_BY_CODE[region]]
         )
-        timeout = httpx.Timeout(connect=8.0, read=18.0, write=8.0, pool=8.0)
+        timeout = httpx.Timeout(connect=4.0, read=10.0, write=4.0, pool=4.0)
         headers = {
             "Accept": "application/json",
             "User-Agent": "Anatole/1.4 provincial-statistics",
@@ -928,7 +934,13 @@ class ProvincialStatisticsService:
                 )
             ],
             generated_at=datetime.now(UTC),
-            refresh_after_seconds=1800 if available else 180,
+            refresh_after_seconds=(
+                1800
+                if available == expected
+                else 15
+                if available > 0
+                else 30
+            ),
         )
 
     def peek_snapshot(
@@ -948,7 +960,8 @@ class ProvincialStatisticsService:
         if cached is not None:
             return (
                 cached[1],
-                monotonic() - cached[0] >= CACHE_SECONDS,
+                monotonic() - cached[0]
+                >= cached[1].refresh_after_seconds,
             )
         previous = self._last_good.get(cache_key)
         return previous, previous is not None
@@ -966,13 +979,21 @@ class ProvincialStatisticsService:
         now = monotonic()
 
         cached = self._cache.get(cache_key)
-        if not force and cached and now - cached[0] < CACHE_SECONDS:
+        if (
+            not force
+            and cached
+            and now - cached[0] < cached[1].refresh_after_seconds
+        ):
             return cached[1]
 
         async with self._lock:
             now = monotonic()
             cached = self._cache.get(cache_key)
-            if not force and cached and now - cached[0] < CACHE_SECONDS:
+            if (
+                not force
+                and cached
+                and now - cached[0] < cached[1].refresh_after_seconds
+            ):
                 return cached[1]
 
             try:
@@ -983,12 +1004,76 @@ class ProvincialStatisticsService:
                     return previous
                 raise
 
+            previous = self._last_good.get(cache_key)
+            fallback_used = False
+
+            if previous is not None:
+                previous_by_code = {
+                    profile.code: profile
+                    for profile in previous.provinces
+                }
+                merged_profiles = []
+                for profile in snapshot.provinces:
+                    prior = previous_by_code.get(profile.code)
+                    current_keys = {
+                        metric.key for metric in profile.metrics
+                    }
+                    fallback_metrics = []
+                    if prior is not None:
+                        fallback_metrics = [
+                            metric.model_copy(
+                                update={"note": "last_good"}
+                            )
+                            for metric in prior.metrics
+                            if metric.key not in current_keys
+                        ]
+                    if fallback_metrics:
+                        fallback_used = True
+                    merged_profiles.append(
+                        profile.model_copy(
+                            update={
+                                "metrics": [
+                                    *profile.metrics,
+                                    *fallback_metrics,
+                                ]
+                            }
+                        )
+                    )
+
+                if fallback_used:
+                    available = sum(
+                        len(profile.metrics)
+                        for profile in merged_profiles
+                    )
+                    expected = len(merged_profiles) * len(METRICS)
+                    detail = (
+                        f"{available}/{expected} séries provinciales résolues"
+                        if normalized_lang == "fr"
+                        else f"{available}/{expected} provincial series resolved"
+                    )
+                    detail += (
+                        " · certaines séries reprises du dernier portrait disponible"
+                        if normalized_lang == "fr"
+                        else " · some series carried forward from the latest available snapshot"
+                    )
+                    snapshot = snapshot.model_copy(
+                        update={
+                            "provinces": merged_profiles,
+                            "source_statuses": [
+                                ProvincialStatisticsSourceStatus(
+                                    source="Statistique Canada — WDS",
+                                    status="partial",
+                                    detail=detail,
+                                )
+                            ],
+                            "refresh_after_seconds": 15,
+                        }
+                    )
+
             if any(profile.metrics for profile in snapshot.provinces):
                 self._last_good[cache_key] = snapshot
-            else:
-                previous = self._last_good.get(cache_key)
-                if previous is not None:
-                    return previous
+            elif previous is not None:
+                return previous
 
             self._cache[cache_key] = (monotonic(), snapshot)
             return snapshot
