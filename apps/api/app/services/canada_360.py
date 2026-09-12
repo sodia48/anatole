@@ -245,6 +245,11 @@ class Canada360Service:
                     region="all",
                     lang=lang,
                 )
+                # Le premier snapshot Canada 360 peut contenir les 10 cartes
+                # vides pendant le cold start. Dès que le cache provincial est
+                # prêt, invalider ce placeholder afin que le prochain fetch
+                # récupère les vraies métriques.
+                self._cache.pop(lang, None)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:  # noqa: BLE001
