@@ -69,7 +69,13 @@ def _from_statcan(
         source_url=metric.table_url,
         reference_period=metric.reference_period,
         observed_at=metric.released_at,
-        freshness=freshness if metric.value is not None else "unavailable",
+        freshness=(
+            "stale"
+            if metric.note == "last_good"
+            else freshness
+        )
+        if metric.value is not None
+        else "unavailable",
         official=True,
         derived=False,
         delayed=False,
@@ -77,7 +83,9 @@ def _from_statcan(
 
 
 class Canada360Service:
-    macro_deadline_seconds = 4.5
+    macro_deadline_seconds = 3.0
+    macro_metric_deadline_seconds = 2.25
+    macro_warm_metric_deadline_seconds = 8.0
     rates_deadline_seconds = 2.5
     market_deadline_seconds = 2.8
     fresh_seconds = 60.0
@@ -86,33 +94,53 @@ class Canada360Service:
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, Canada360Snapshot]] = {}
         self._last_good: dict[str, Canada360Snapshot] = {}
+        self._macro_last_good: dict[
+            str,
+            dict[str, Canada360Metric],
+        ] = {}
         self._lock = asyncio.Lock()
         self._province_warm_tasks: dict[str, asyncio.Task[None]] = {}
+        self._macro_warm_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def _load_macro(
         self,
         lang: str,
+        *,
+        metric_deadline_seconds: float | None = None,
     ) -> tuple[list[Canada360Metric], list[str]]:
-        timeout = httpx.Timeout(connect=4.0, read=8.0, write=4.0, pool=4.0)
+        per_metric_deadline = (
+            self.macro_metric_deadline_seconds
+            if metric_deadline_seconds is None
+            else metric_deadline_seconds
+        )
+        timeout = httpx.Timeout(connect=4.0, read=10.0, write=4.0, pool=4.0)
         headers = {
             "Accept": "application/json",
             "User-Agent": "Anatole/Canada360",
         }
+
         async with httpx.AsyncClient(
             timeout=timeout,
             headers=headers,
             follow_redirects=True,
         ) as client:
-            results = await asyncio.gather(
-                *(
-                    provincial_statistics_service._metric_for_provinces(
-                        client,
-                        spec,
-                        [CANADA_GEOGRAPHY],
-                        lang,
+
+            async def load_one(spec):
+                try:
+                    return await asyncio.wait_for(
+                        provincial_statistics_service._metric_for_provinces(
+                            client,
+                            spec,
+                            [CANADA_GEOGRAPHY],
+                            lang,
+                        ),
+                        timeout=per_metric_deadline,
                     )
-                    for spec in METRICS
-                )
+                except TimeoutError:
+                    return {}, f"{spec.table_id}: délai interactif dépassé"
+
+            results = await asyncio.gather(
+                *(load_one(spec) for spec in METRICS)
             )
 
         metrics: list[Canada360Metric] = []
@@ -124,8 +152,64 @@ class Canada360Service:
                 issues.append(issue)
             metric = by_code.get("CA")
             if metric is not None:
-                metrics.append(_from_statcan(metric, source_name=source_name))
+                metrics.append(
+                    _from_statcan(
+                        metric,
+                        source_name=source_name,
+                    )
+                )
         return metrics, issues
+
+    def _merge_macro_last_good(
+        self,
+        lang: str,
+        metrics: list[Canada360Metric],
+    ) -> list[Canada360Metric]:
+        stored = self._macro_last_good.setdefault(lang, {})
+        for metric in metrics:
+            stored[metric.key] = metric
+
+        current = {metric.key: metric for metric in metrics}
+        merged: list[Canada360Metric] = []
+        for spec in METRICS:
+            metric = current.get(spec.key)
+            if metric is not None:
+                merged.append(metric)
+                continue
+            previous = stored.get(spec.key)
+            if previous is not None:
+                merged.append(
+                    previous.model_copy(
+                        update={"freshness": "stale"}
+                    )
+                )
+        return merged
+
+    def _schedule_macro_warm(self, lang: str) -> None:
+        current = self._macro_warm_tasks.get(lang)
+        if current is not None and not current.done():
+            return
+
+        async def warm() -> None:
+            try:
+                metrics, _issues = await self._load_macro(
+                    lang,
+                    metric_deadline_seconds=(
+                        self.macro_warm_metric_deadline_seconds
+                    ),
+                )
+                self._merge_macro_last_good(lang, metrics)
+                self._cache.pop(lang, None)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "canada360_macro_warm_failed lang=%s error=%s",
+                    lang,
+                    type(exc).__name__,
+                )
+
+        self._macro_warm_tasks[lang] = asyncio.create_task(warm())
 
     async def _load_rates(self, lang: str) -> list[Canada360Metric]:
         payload = await bank_of_canada_valet_service.yields()
@@ -244,6 +328,7 @@ class Canada360Service:
                 await provincial_statistics_service.get_snapshot(
                     region="all",
                     lang=lang,
+                    force=True,
                 )
                 # Le premier snapshot Canada 360 peut contenir les 10 cartes
                 # vides pendant le cold start. Dès que le cache provincial est
@@ -379,6 +464,9 @@ class Canada360Service:
         macro_issues: list[str] = []
         if isinstance(macro_payload, tuple):
             macro, macro_issues = macro_payload
+        macro = self._merge_macro_last_good(lang, macro)
+        if len(macro) < len(METRICS):
+            self._schedule_macro_warm(lang)
 
         rates = rates_payload if isinstance(rates_payload, list) else []
         markets = market_payload if isinstance(market_payload, list) else []
@@ -392,6 +480,14 @@ class Canada360Service:
         issues.extend(macro_issues[:4])
 
         provinces_with_data = sum(bool(item.metrics) for item in provinces)
+        province_series_count = sum(
+            len(item.metrics) for item in provinces
+        )
+        province_series_expected = len(PROVINCES) * len(METRICS)
+        provinces_complete = sum(
+            len(item.metrics) >= len(METRICS)
+            for item in provinces
+        )
         if provinces_with_data == 0:
             issues.append(
                 "Provincial indicators are warming in background"
@@ -408,7 +504,11 @@ class Canada360Service:
         source_statuses = [
             Canada360SourceStatus(
                 key="statcan",
-                label="Statistics Canada" if lang == "en" else "Statistique Canada",
+                label=(
+                    "Statistics Canada — Macro"
+                    if lang == "en"
+                    else "Statistique Canada — Macro"
+                ),
                 status=_status(len(macro), len(METRICS)),
                 detail=f"{len(macro)}/{len(METRICS)}",
             ),
@@ -426,9 +526,24 @@ class Canada360Service:
             ),
             Canada360SourceStatus(
                 key="provinces",
-                label="Provincial indicators" if lang == "en" else "Indicateurs provinciaux",
-                status=_status(provinces_with_data, len(PROVINCES)),
-                detail=f"{provinces_with_data}/{len(PROVINCES)}",
+                label=(
+                    "Province 360 — Statistics Canada"
+                    if lang == "en"
+                    else "Province 360 — Statistique Canada"
+                ),
+                status=_status(
+                    province_series_count,
+                    province_series_expected,
+                ),
+                detail=(
+                    f"{province_series_count}/{province_series_expected}"
+                    f" · {provinces_complete}/{len(PROVINCES)} "
+                    + (
+                        "complete provinces"
+                        if lang == "en"
+                        else "provinces complètes"
+                    )
+                ),
             ),
         ]
 

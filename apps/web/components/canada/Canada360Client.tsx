@@ -495,16 +495,22 @@ export function Canada360Client() {
       return;
     }
 
+    const statCanSource = snapshot.sources.find(
+      (source) => source.key === "statcan",
+    );
     const provinceSource = snapshot.sources.find(
       (source) => source.key === "provinces",
     );
+    const needsHydration =
+      statCanSource?.status !== "ok" ||
+      provinceSource?.status !== "ok";
 
-    if (provinceSource?.status !== "unavailable") {
+    if (!needsHydration) {
       provinceHydrationAttempts.current = 0;
       return;
     }
 
-    if (provinceHydrationAttempts.current >= 12) {
+    if (provinceHydrationAttempts.current >= 6) {
       return;
     }
 

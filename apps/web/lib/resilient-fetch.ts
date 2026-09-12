@@ -245,12 +245,17 @@ export async function resilientFetch(
         ? Math.min(retryAfter * 1_000, 8_000)
         : 450 * 2 ** attempt + Math.random() * 180;
       await response.body?.cancel();
-      await wait(Math.max(0, Math.min(delay, remaining())), callerSignal);
+      const retryBudget = remaining();
+      if (retryBudget <= 0 || delay >= retryBudget) break;
+      await wait(delay, callerSignal);
     } catch (error) {
       lastError = error;
       if (callerSignal?.aborted) throw abortError();
       if (attempt === retries || remaining() <= 0) break;
-      await wait(Math.min(450 * 2 ** attempt + Math.random() * 180, remaining()), callerSignal);
+      const delay = 450 * 2 ** attempt + Math.random() * 180;
+      const retryBudget = remaining();
+      if (retryBudget <= 0 || delay >= retryBudget) break;
+      await wait(delay, callerSignal);
     } finally {
       globalThis.clearTimeout(timer);
       callerSignal?.removeEventListener("abort", abortFromCaller);
