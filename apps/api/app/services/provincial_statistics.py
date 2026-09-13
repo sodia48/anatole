@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import re
 import unicodedata
+import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
@@ -19,6 +22,9 @@ from app.schemas.provincial_statistics import (
 
 
 WDS_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
+RETAIL_SALES_CSV_URL = "https://www150.statcan.gc.ca/n1/tbl/csv/20100056-eng.zip"
+RETAIL_SALES_CSV_NAME = "20100056.csv"
+RETAIL_SALES_CACHE_SECONDS = 1800.0
 CACHE_SECONDS = 1800.0
 METADATA_CACHE_SECONDS = 86_400.0
 
@@ -378,7 +384,12 @@ METRICS: tuple[MetricSpec, ...] = (
             ),
             _selector(
                 ("sales", "ventes"),
-                ("retail sales", "ventes au detail", "sales", "ventes"),
+                (
+                    "total retail sales",
+                    "retail sales",
+                    "ventes au detail totales",
+                    "ventes au detail",
+                ),
             ),
             _selector(
                 ("adjustments", "adjustment", "ajustements", "ajustement"),
@@ -695,11 +706,94 @@ def _responses_by_code(
     return matched
 
 
+def _retail_scalar_multiplier(row: dict[str, str]) -> float:
+    scalar = _norm(row.get("SCALAR_FACTOR"))
+    if "billion" in scalar or "milliard" in scalar:
+        return 1_000_000_000.0
+    if "million" in scalar:
+        return 1_000_000.0
+    if "thousand" in scalar or "millier" in scalar:
+        return 1_000.0
+
+    raw_id = str(row.get("SCALAR_ID") or "").strip()
+    try:
+        scalar_id = int(raw_id)
+    except ValueError:
+        scalar_id = 0
+    if scalar_id in {0, 3, 6, 9}:
+        return float(10**scalar_id)
+    return 1.0
+
+
+def _parse_retail_sales_zip(
+    content: bytes,
+) -> dict[str, list[tuple[str, float]]]:
+    # Official selection:
+    # Retail trade [44-45] / Total retail sales / Seasonally adjusted.
+    by_geo: dict[str, list[tuple[str, float]]] = {}
+
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        csv_name = next(
+            (
+                name
+                for name in archive.namelist()
+                if name.endswith(RETAIL_SALES_CSV_NAME)
+            ),
+            None,
+        )
+        if csv_name is None:
+            raise ValueError("20100056.csv absent de l'archive StatCan")
+
+        with archive.open(csv_name) as raw:
+            text = io.TextIOWrapper(
+                raw,
+                encoding="utf-8-sig",
+                newline="",
+            )
+            reader = csv.DictReader(text)
+            naics_key = (
+                "North American Industry Classification System (NAICS)"
+            )
+
+            for row in reader:
+                if row.get(naics_key) != "Retail trade [44-45]":
+                    continue
+                if row.get("Sales") != "Total retail sales":
+                    continue
+                if row.get("Adjustments") != "Seasonally adjusted":
+                    continue
+
+                geo = str(row.get("GEO") or "").strip()
+                ref = str(row.get("REF_DATE") or "").strip()
+                raw_value = row.get("VALUE")
+                if not geo or not ref or raw_value in (None, ""):
+                    continue
+
+                try:
+                    value = float(str(raw_value))
+                except ValueError:
+                    continue
+
+                value *= _retail_scalar_multiplier(row)
+                by_geo.setdefault(geo, []).append((ref, value))
+
+    for geo, rows in list(by_geo.items()):
+        rows.sort(key=lambda item: item[0])
+        by_geo[geo] = rows[-2:]
+
+    return by_geo
+
+
+
 class ProvincialStatisticsService:
     def __init__(self) -> None:
         self._metadata_cache: dict[int, _CachedMetadata] = {}
         self._cache: dict[tuple[str, str], tuple[float, ProvincialStatisticsSnapshot]] = {}
         self._last_good: dict[tuple[str, str], ProvincialStatisticsSnapshot] = {}
+        self._retail_sales_cache: tuple[
+            float,
+            dict[str, list[tuple[str, float]]],
+        ] | None = None
         self._lock = asyncio.Lock()
 
     async def _post(
@@ -754,6 +848,116 @@ class ProvincialStatisticsService:
         self._metadata_cache[product_id] = _CachedMetadata(value=value, stored_at=now)
         return value
 
+
+    async def _retail_sales_rows(
+        self,
+        client: httpx.AsyncClient,
+    ) -> dict[str, list[tuple[str, float]]]:
+        now = monotonic()
+        cached = self._retail_sales_cache
+        if (
+            cached is not None
+            and now - cached[0] < RETAIL_SALES_CACHE_SECONDS
+        ):
+            return cached[1]
+
+        response = await client.get(
+            RETAIL_SALES_CSV_URL,
+            timeout=httpx.Timeout(
+                connect=5.0,
+                read=20.0,
+                write=5.0,
+                pool=5.0,
+            ),
+        )
+        response.raise_for_status()
+
+        rows = await asyncio.to_thread(
+            _parse_retail_sales_zip,
+            response.content,
+        )
+        self._retail_sales_cache = (now, rows)
+        return rows
+
+    async def _retail_sales_for_provinces(
+        self,
+        client: httpx.AsyncClient,
+        spec: MetricSpec,
+        provinces: list[dict[str, str]],
+        lang: str,
+    ) -> tuple[dict[str, ProvincialMetric], str | None]:
+        try:
+            rows_by_geo = await self._retail_sales_rows(client)
+        except Exception as exc:  # noqa: BLE001
+            return (
+                {},
+                f"{spec.table_id}: données retail indisponibles "
+                f"({type(exc).__name__})",
+            )
+
+        by_code: dict[str, ProvincialMetric] = {}
+        table_url = (
+            f"https://www150.statcan.gc.ca/t1/tbl1/"
+            f"{'fr' if lang == 'fr' else 'en'}/"
+            f"tv.action?pid={spec.simple_view_pid}"
+        )
+
+        for province in provinces:
+            geo = str(province.get("en") or "").strip()
+            rows = rows_by_geo.get(geo, [])
+            if not rows:
+                continue
+
+            current_ref, current = rows[-1]
+            previous_ref = None
+            previous = None
+            if len(rows) >= 2:
+                previous_ref, previous = rows[-2]
+
+            by_code[province["code"]] = ProvincialMetric(
+                key=spec.key,
+                label=spec.label_en if lang == "en" else spec.label_fr,
+                category=(
+                    spec.category_en
+                    if lang == "en"
+                    else spec.category_fr
+                ),
+                value=current,
+                previous_value=previous,
+                change=_change(
+                    current,
+                    previous,
+                    spec.change_kind,
+                ),
+                change_kind=spec.change_kind,
+                unit_kind=spec.unit_kind,
+                reference_period=current_ref,
+                previous_reference_period=previous_ref,
+                released_at=None,
+                table_id=spec.table_id,
+                table_url=table_url,
+                status="available",
+                note=(
+                    "Official Statistics Canada CSV table "
+                    "20-10-0056-01"
+                ),
+            )
+
+        if not by_code:
+            return (
+                {},
+                f"{spec.table_id}: aucune vente au détail exploitable",
+            )
+
+        if len(by_code) < len(provinces):
+            return (
+                by_code,
+                f"{spec.table_id}: {len(by_code)}/{len(provinces)} "
+                "géographies retail disponibles",
+            )
+
+        return by_code, None
+
     async def _metric_for_provinces(
         self,
         client: httpx.AsyncClient,
@@ -761,6 +965,14 @@ class ProvincialStatisticsService:
         provinces: list[dict[str, str]],
         lang: str,
     ) -> tuple[dict[str, ProvincialMetric], str | None]:
+        if spec.key == "retail_sales":
+            return await self._retail_sales_for_provinces(
+                client,
+                spec,
+                provinces,
+                lang,
+            )
+
         try:
             metadata = await self._metadata(client, spec.product_id)
         except Exception as exc:
