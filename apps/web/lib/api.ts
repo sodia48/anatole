@@ -243,7 +243,7 @@ export function getPsychologySnapshot(
     "/api/v1/discovery/psychology",
     {},
     signal,
-    45_000,
+    10_000,
   );
 }
 

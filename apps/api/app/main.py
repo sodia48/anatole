@@ -18,6 +18,7 @@ from app.services.accounts import account_service
 from app.services.company_network import company_network_service
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
+from app.services.psychology import psychology_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +36,7 @@ async def lifespan(_: FastAPI):
     await notification_service.start()
     paper_trading_service.account_service = account_service
     await paper_trading_service.start()
+    psychology_service.ensure_refresh()
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
