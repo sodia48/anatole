@@ -428,6 +428,7 @@ class MarketDataService:
         interval: str = "1d",
         concurrency: int = 6,
         deadline_seconds: float | None = None,
+        attempts: int = 1,
     ) -> dict[str, list[Candle]]:
         """Load real Yahoo histories without silently substituting demo data.
 
@@ -440,6 +441,7 @@ class MarketDataService:
             return {}
         semaphore = asyncio.Semaphore(max(1, min(concurrency, 16)))
         deadline = self.bulk_history_deadline_seconds if deadline_seconds is None else max(0.01, deadline_seconds)
+        request_attempts = max(1, min(attempts, 3))
         started_at = monotonic()
 
         async def load(ticker: str) -> tuple[str, list[Candle] | None]:
@@ -448,7 +450,12 @@ class MarketDataService:
                     history_call = (
                         self.demo.history(ticker, range_, interval)
                         if self.demo_mode
-                        else self.yahoo.history(ticker, range_, interval, attempts=1)
+                        else self.yahoo.history(
+                            ticker,
+                            range_,
+                            interval,
+                            attempts=request_attempts,
+                        )
                     )
                     candles = await asyncio.wait_for(
                         history_call,

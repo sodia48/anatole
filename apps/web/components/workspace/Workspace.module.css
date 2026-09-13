@@ -707,6 +707,28 @@
   color: var(--light-warning, #ffc2a4);
 }
 
+.chartState {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  padding: 24px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.chartState .skeleton {
+  width: 100%;
+  min-height: 280px;
+}
+
+.chartNotice {
+  margin-top: 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .errorNotice .secondaryButton {
   flex: 0 0 auto;
 }

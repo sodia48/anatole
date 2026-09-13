@@ -80,6 +80,29 @@ function snapshot(items = [
   };
 }
 
+function historicalSnapshot() {
+  const data = snapshot();
+  return {
+    ...data,
+    portfolio_score: 68.4,
+    performance: [
+      { time: 1_746_057_600, portfolio: 100, benchmark: 100 },
+      { time: 1_754_006_400, portfolio: 106.4, benchmark: 104.2 },
+      { time: 1_762_128_000, portfolio: 111.8, benchmark: 108.1 },
+    ],
+    risk: {
+      ...data.risk,
+      volatility_percent: 14.2,
+      beta: 0.84,
+      max_drawdown_percent: -7.3,
+      sharpe_ratio: 1.26,
+      risk_level: "Modéré",
+      history_coverage_percent: 100,
+      history_observations: 251,
+    },
+  };
+}
+
 test.describe("Portfolio progressive degradation", () => {
   test("keeps valuation visible when history fails and marks a missing quote unavailable", async ({ page }) => {
     let fastCalls = 0;
@@ -108,20 +131,73 @@ test.describe("Portfolio progressive degradation", () => {
 
     await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
     const portfolioAlert = page.getByRole("alert").filter({
-      hasText: "Certaines données du portefeuille sont temporairement indisponibles.",
+      hasText: "Certaines données historiques du portefeuille sont temporairement indisponibles.",
     });
     await expect(portfolioAlert).toBeVisible();
     await expect(page.getByText("5 200,00 $", { exact: false })).toBeVisible();
     await expect(page.getByText("N/D", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Historique du portefeuille temporairement indisponible.")).toBeVisible();
     await expect(portfolioAlert).not.toContainText("technical-reference");
 
     partial = true;
-    await page.getByRole("button", { name: "Réessayer" }).click();
+    await portfolioAlert.getByRole("button", { name: "Réessayer" }).click();
     await expect.poll(() => fastCalls).toBeGreaterThanOrEqual(2);
     const tdRow = page.getByRole("row").filter({ hasText: "TD" });
     await expect(tdRow.getByText("Données temporairement indisponibles")).toBeVisible();
     await expect(tdRow.getByText("N/D", { exact: true }).first()).toBeVisible();
     const ryRow = page.getByRole("row").filter({ hasText: "RY" });
     await expect(ryRow.getByText("200,00 $", { exact: false })).toBeVisible();
+  });
+
+  test("renders portfolio and benchmark curves and clears historical errors", async ({ page }) => {
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const data = requestUrl.searchParams.get("fast") === "true"
+        ? snapshot()
+        : historicalSnapshot();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+    const chart = page.getByRole("img", { name: "Performance du portefeuille et du TSX Composite" });
+    await expect(chart).toBeVisible();
+    await expect(chart.locator("path")).toHaveCount(2);
+    await expect(chart.locator("path").first()).toHaveAttribute("d", /L/);
+    await expect(chart.locator("path").nth(1)).toHaveAttribute("d", /L/);
+    await expect(page.getByText("14.2 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.84", { exact: true })).toBeVisible();
+    await expect(page.getByText("-7.3 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("1.26", { exact: true })).toBeVisible();
+    await expect(page.getByText("Certaines données historiques du portefeuille sont temporairement indisponibles.")).toHaveCount(0);
+  });
+
+  test("keeps the portfolio curve when the benchmark history is unavailable", async ({ page }) => {
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      const data = requestUrl.searchParams.get("fast") === "true"
+        ? snapshot()
+        : {
+            ...historicalSnapshot(),
+            performance: historicalSnapshot().performance.map((point) => ({
+              ...point,
+              benchmark: null,
+            })),
+          };
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+    const chart = page.getByRole("img", { name: "Performance du portefeuille et du TSX Composite" });
+    await expect(chart.locator("path").first()).toHaveAttribute("d", /L/);
+    await expect(chart.locator("path").nth(1)).toHaveAttribute("d", "");
+    await expect(page.getByText("La courbe du portefeuille reste disponible; l’historique du TSX Composite est temporairement indisponible.")).toBeVisible();
   });
 });

@@ -124,7 +124,19 @@ function linePath(
     .join(" ");
 }
 
-function PerformanceChart({ points, language }: { points: PortfolioPerformancePoint[]; language: AnatoleLanguage }) {
+function PerformanceChart({
+  points,
+  language,
+  loading,
+  error,
+  onRetry,
+}: {
+  points: PortfolioPerformancePoint[];
+  language: AnatoleLanguage;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
   const width = 980;
   const height = 330;
   const portfolio = points.map((point) => ({ time: point.time, value: point.portfolio }));
@@ -139,8 +151,20 @@ function PerformanceChart({ points, language }: { points: PortfolioPerformancePo
   const high = maxValue + padding;
   const ticks = Array.from({ length: 5 }, (_, index) => high - ((high - low) / 4) * index);
 
+  if (loading && !points.length) {
+    return <div aria-busy="true" aria-label={pick(language, "Chargement de l’historique", "Loading history")} className={`${styles.chartWrap} ${styles.chartState}`}><div className={styles.skeleton} /></div>;
+  }
+
+  if (!points.length) {
+    return <div className={`${styles.chartWrap} ${styles.chartState}`} role={error ? "alert" : "status"}>
+      <strong>{pick(language, "Historique du portefeuille temporairement indisponible.", "Portfolio history is temporarily unavailable.")}</strong>
+      <button className={styles.secondaryButton} onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button>
+    </div>;
+  }
+
   return (
-    <div className={styles.chartWrap}>
+    <div>
+      <div className={styles.chartWrap}>
       <svg className={styles.chart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={pick(language, "Performance du portefeuille et du TSX Composite", "Portfolio and TSX Composite performance")}>
         {ticks.map((tick, index) => {
           const y = 18 + (index / 4) * (height - 48);
@@ -154,6 +178,8 @@ function PerformanceChart({ points, language }: { points: PortfolioPerformancePo
         <path d={linePath(portfolio, low, high, width, height)} fill="none" stroke="#2d76ff" strokeWidth="3" strokeLinejoin="round" />
         <path d={linePath(benchmark, low, high, width, height)} fill="none" stroke="#16c79a" strokeWidth="2" strokeDasharray="7 6" strokeLinejoin="round" />
       </svg>
+      </div>
+      {benchmark.length === 0 ? <div className={styles.chartNotice}>{pick(language, "La courbe du portefeuille reste disponible; l’historique du TSX Composite est temporairement indisponible.", "The portfolio curve remains available; TSX Composite history is temporarily unavailable.")}</div> : error ? <div className={styles.chartNotice}>{error}</div> : null}
     </div>
   );
 }
@@ -202,6 +228,7 @@ export function PortfolioClient() {
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -251,6 +278,7 @@ export function PortfolioClient() {
       setSnapshot(null);
       setLoading(false);
       setError(null);
+      setHistoryError(null);
       return;
     }
     refreshControllerRef.current?.abort();
@@ -258,19 +286,32 @@ export function PortfolioClient() {
     refreshControllerRef.current = controller;
     setLoading(true);
     setError(null);
+    setHistoryError(null);
     try {
       const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
       setSnapshot(currentSnapshot);
       try {
-        setSnapshot(await analyzePortfolio(current, controller.signal));
+        const fullSnapshot = await analyzePortfolio(current, controller.signal);
+        setSnapshot(fullSnapshot);
+        if ((fullSnapshot.risk?.history_coverage_percent ?? 0) < 70) {
+          const message = pick(
+            language,
+            "Certaines données historiques du portefeuille sont temporairement indisponibles.",
+            "Some historical portfolio data is temporarily unavailable.",
+          );
+          setError(message);
+          setHistoryError(message);
+        }
       } catch (reason) {
         if (controller.signal.aborted) return;
         console.error("portfolio_full_analysis_failed", reason);
-        setError(pick(
+        const message = pick(
           language,
-          "Certaines données du portefeuille sont temporairement indisponibles.",
-          "Some portfolio data is temporarily unavailable.",
-        ));
+          "Certaines données historiques du portefeuille sont temporairement indisponibles.",
+          "Some historical portfolio data is temporarily unavailable.",
+        );
+        setError(message);
+        setHistoryError(message);
       }
     } catch (reason) {
       if (controller.signal.aborted) return;
@@ -457,7 +498,7 @@ export function PortfolioClient() {
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.sectionHeading}><div><span className="eyebrow">PERFORMANCE</span><h2>{pick(language, "Portefeuille vs TSX Composite", "Portfolio vs TSX Composite")}</h2><p>{pick(language, "Indice base 100 fondé sur les poids actuels, et non sur les flux historiques réels.", "Base-100 index using current weights rather than actual historical cash flows.")}</p></div></div>
                   <div className={styles.legend}><span style={{ color: "var(--accent-text)" }}><i /> {pick(language, "Portefeuille", "Portfolio")}</span><span style={{ color: "var(--positive-text)" }}><i /> TSX Composite</span></div>
-                  <PerformanceChart points={snapshot.performance} language={language} />
+                  <PerformanceChart error={historyError} language={language} loading={loading} onRetry={() => void refresh()} points={snapshot.performance} />
                 </section>
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk?.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk?.risk_level === "Modéré" ? styles.statusMonitoring : snapshot.risk?.risk_level ? styles.statusDegraded : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
