@@ -58,6 +58,8 @@ describe("Anatole article reader", () => {
   it("loads a NewsItem publisher URL inside the isolated WebView", async () => {
     const view = await render(<ArticleReaderScreen />);
     expect(view.getByText("L’emploi progresse au Canada")).toBeTruthy();
+    expect(view.getByText("Résumé")).toBeTruthy();
+    expect(view.getByText("Source originale")).toBeTruthy();
     expect(view.getByTestId("article-hero-image")).toBeTruthy();
     expect(view.getByTestId("article-webview").props.source).toEqual({ uri: economic.url });
     await view.unmount();
@@ -97,6 +99,16 @@ describe("Anatole article reader", () => {
     await user.press(view.getByTestId("article-share"));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(economic.url) }));
+    await view.unmount();
+  });
+
+  it("keeps the original source as an explicit secondary action", async () => {
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const view = await render(<ArticleReaderScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("article-view-original"));
+    expect(open).toHaveBeenCalledWith(economic.url);
+    expect(view.getByTestId("article-webview")).toBeTruthy();
     await view.unmount();
   });
 

@@ -193,6 +193,7 @@ describe("mobile news and calendar intelligence", () => {
     const user = userEvent.setup();
     expect(view.getByText(/Tonalité lexicale/)).toBeTruthy();
     expect(view.getByText(/ne mesure pas l’impact de marché/)).toBeTruthy();
+    expect(view.getByText("Lire dans Anatole →")).toBeTruthy();
     await user.press(view.getByText("Emploi au Québec"));
     expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ pathname: "/article", params: expect.objectContaining({ url: "https://example.com/qc", imageUrl: "https://images.example.com/qc.jpg" }) }));
     expect(open).not.toHaveBeenCalled();
