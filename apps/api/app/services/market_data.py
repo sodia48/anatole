@@ -224,6 +224,7 @@ class YahooProvider:
         interval: str,
         attempts: int | None = None,
     ) -> list[Candle]:
+        symbol = self.normalize_ticker(ticker)
         result = await self.chart(ticker, range_, interval, attempts)
         timestamps = result.get("timestamp") or []
         raw_quote = (
