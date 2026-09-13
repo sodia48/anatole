@@ -1123,13 +1123,6 @@ export function Canada360Client() {
           ))}
         </div>
 
-        {snapshot.issues.length ? (
-          <div className={styles.issues}>
-            {snapshot.issues.map((issue) => (
-              <span key={issue}>{issue}</span>
-            ))}
-          </div>
-        ) : null}
       </section>
     </main>
   );
