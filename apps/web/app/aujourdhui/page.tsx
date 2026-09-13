@@ -663,7 +663,19 @@ export default function TodayPage() {
   const marketChange = cockpit?.weighted_change_percent ?? 0;
   const advanceRatio = normalizeAdvanceRatio(cockpit?.breadth);
   const marketState = cockpit ? marketLabel(marketChange, advanceRatio, language) : pick(language, "Synchronisation du marché", "Synchronizing market");
-  const sourceCount = [cockpit, watchlist, portfolio, alerts, terminal, psychology, news, calendar].filter(Boolean).length;
+  const expectedSourceCount = 5
+    + (workspace.watchlist.length ? 1 : 0)
+    + (workspace.portfolio.length ? 1 : 0)
+    + (workspace.alerts.length ? 1 : 0);
+  const sourceCount =
+    Number(Boolean(cockpit))
+    + Number(Boolean(terminal))
+    + Number(Boolean(psychology))
+    + Number(Boolean(news))
+    + Number(Boolean(calendar))
+    + (workspace.watchlist.length ? Number(Boolean(watchlist)) : 0)
+    + (workspace.portfolio.length ? Number(Boolean(portfolio)) : 0)
+    + (workspace.alerts.length ? Number(Boolean(alerts)) : 0);
 
   return (
     <main className={styles.page}>
@@ -677,7 +689,7 @@ export default function TodayPage() {
           <span className={`${styles.liveDot} ${issues.length ? styles.warningDot : ""}`} />
           <div>
             <strong>{state === "loading" ? pick(language, "Chargement…", "Loading…") : issues.length ? pick(language, "Mode résilient", "Resilient mode") : pick(language, "Données actives", "Live data")}</strong>
-            <small>{sourceCount}/8 sources · {pick(language, "mis à jour", "updated")} {formatTime(lastUpdated, language)}</small>
+            <small>{sourceCount}/{expectedSourceCount} sources · {pick(language, "mis à jour", "updated")} {formatTime(lastUpdated, language)}</small>
           </div>
           <button type="button" onClick={() => void loadAll()} disabled={refreshing}>
             {pick(language, "Actualiser", "Refresh")}
