@@ -15,6 +15,7 @@ from app.schemas.fundamentals import (
 )
 from app.schemas.stocks import Candle, Quote
 from app.services.currency_conversion import CurrencyConversionService
+from app.services.market_data import YahooProvider
 
 
 def usd_quote(ticker: str = "GC=F") -> Quote:
@@ -103,6 +104,48 @@ async def test_history_ohlc_is_normalized_with_date_fx(monkeypatch) -> None:
     assert result[0].low == 12.6
     assert result[0].close == 15.4
     assert result[0].volume == 50
+
+
+@pytest.mark.asyncio
+async def test_yahoo_history_passes_normalized_symbol_to_cad_converter(
+    monkeypatch,
+) -> None:
+    provider = YahooProvider()
+    timestamps = [1_700_000_000, 1_700_086_400]
+
+    async def chart(_ticker, _range, _interval, _attempts=None):
+        return {
+            "meta": {"currency": "CAD"},
+            "timestamp": timestamps,
+            "indicators": {
+                "quote": [
+                    {
+                        "open": [10.0, 11.0],
+                        "high": [12.0, 13.0],
+                        "low": [9.0, 10.0],
+                        "close": [11.0, 12.0],
+                        "volume": [100, 120],
+                    }
+                ]
+            },
+        }
+
+    calls = []
+
+    async def candles_to_cad(symbol, currency, candles):
+        calls.append((symbol, currency, candles))
+        return candles
+
+    monkeypatch.setattr(provider, "chart", chart)
+    monkeypatch.setattr(
+        "app.services.market_data.currency_conversion_service.candles_to_cad",
+        candles_to_cad,
+    )
+
+    candles = await provider.history("AEM", "1y", "1d")
+
+    assert len(candles) == 2
+    assert calls == [("AEM.TO", "CAD", candles)]
 
 
 @pytest.mark.asyncio
