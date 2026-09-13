@@ -87,9 +87,13 @@ describe("critical native screens", () => {
 
   it("renders the native Focus shell with its specialized chart", async () => {
     const view = await render(<StockDetailScreen />);
-    expect(view.getByTestId("focus-overview-section")).toBeTruthy();
+    const overview = view.getByTestId("focus-overview-section");
+    const valuation = view.getByTestId("focus-valuation-section");
+    const news = view.getByTestId("focus-news-section");
+    expect(overview).toBeTruthy();
     expect(view.getByTestId("focus-chart-webview")).toBeTruthy();
     expect(view.getByText("RY · LIVE")).toBeTruthy();
+    expect(overview.children.indexOf(valuation)).toBeLessThan(overview.children.indexOf(news));
     await view.unmount();
   }, 30_000);
 

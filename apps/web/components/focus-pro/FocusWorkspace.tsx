@@ -15,6 +15,7 @@ import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem"
 import { FocusRangeChart } from "@/components/chart/FocusRangeChart";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { FocusFundamentals, type FundamentalView } from "@/components/stock/FocusFundamentals";
+import { FocusStockNews } from "@/components/stock/FocusStockNews";
 import { KeyLevels } from "@/components/stock/KeyLevels";
 import { QuoteHeader } from "@/components/stock/QuoteHeader";
 import { TechnicalSummary } from "@/components/stock/TechnicalSummary";
@@ -399,6 +400,13 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
             ticker={ticker}
             view={section === "overview" ? "valuation" : section}
           />
+          {section === "overview" ? (
+            <FocusStockNews
+              ticker={ticker}
+              company={initialSnapshot.profile.name ?? ticker}
+              language={language}
+            />
+          ) : null}
         </>
       ) : section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : (
         <div className={styles.workspace}>

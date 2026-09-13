@@ -64,6 +64,21 @@ function tone(value: number): string {
   return value > 0.001 ? styles.positive : value < -0.001 ? styles.negative : "";
 }
 
+function riskLabel(value: NonNullable<PortfolioSnapshot["risk"]>["risk_level"], language: AnatoleLanguage): string {
+  if (!value) return pick(language, "N/D", "N/A");
+  if (language === "fr") return value;
+  return ({
+    Faible: "Low",
+    Modéré: "Moderate",
+    Élevé: "High",
+    "Très élevé": "Very high",
+  } as Record<string, string>)[value] ?? value;
+}
+
+function optionalFixed(value: number | null, digits: number, language: AnatoleLanguage, suffix = ""): string {
+  return value === null ? pick(language, "N/D", "N/A") : `${value.toFixed(digits)}${suffix}`;
+}
+
 function loadPositions(): PortfolioPositionInput[] {
   if (typeof window === "undefined") return [];
   try {
@@ -178,6 +193,7 @@ export function PortfolioClient() {
   const language = preferences.language;
   const searchParams = useSearchParams();
   const importedRef = useRef<HTMLInputElement>(null);
+  const refreshControllerRef = useRef<AbortController | null>(null);
   const [positions, setPositions] = useState<PortfolioPositionInput[]>([]);
   const [symbol, setSymbol] = useState("");
   const [quantity, setQuantity] = useState("10");
@@ -231,20 +247,45 @@ export function PortfolioClient() {
 
   const refresh = async (current = positions) => {
     if (!current.length) {
+      refreshControllerRef.current?.abort();
       setSnapshot(null);
+      setLoading(false);
+      setError(null);
       return;
     }
+    refreshControllerRef.current?.abort();
     const controller = new AbortController();
+    refreshControllerRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      setSnapshot(await analyzePortfolio(current, controller.signal));
+      const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
+      setSnapshot(currentSnapshot);
+      try {
+        setSnapshot(await analyzePortfolio(current, controller.signal));
+      } catch (reason) {
+        if (controller.signal.aborted) return;
+        console.error("portfolio_full_analysis_failed", reason);
+        setError(pick(
+          language,
+          "Certaines données du portefeuille sont temporairement indisponibles.",
+          "Some portfolio data is temporarily unavailable.",
+        ));
+      }
     } catch (reason) {
-      setError(language === "fr" && reason instanceof Error ? reason.message : pick(language, "Analyse du portefeuille indisponible.", "Portfolio analysis is unavailable."));
+      if (controller.signal.aborted) return;
+      console.error("portfolio_valuation_failed", reason);
+      setError(pick(
+        language,
+        "Certaines données du portefeuille sont temporairement indisponibles.",
+        "Some portfolio data is temporarily unavailable.",
+      ));
     } finally {
-      setLoading(false);
+      if (refreshControllerRef.current === controller) setLoading(false);
     }
   };
+
+  useEffect(() => () => refreshControllerRef.current?.abort(), []);
 
   useEffect(() => {
     if (!hydrated || !positions.length) return;
@@ -318,12 +359,15 @@ export function PortfolioClient() {
 
   const performanceReturn = snapshot?.performance.length
     ? snapshot.performance[snapshot.performance.length - 1].portfolio - 100
-    : 0;
+    : null;
 
   const liveCount = useMemo(
     () => snapshot?.positions.filter((item) => !item.source.startsWith("demo")).length ?? 0,
     [snapshot],
   );
+  const pendingValue = loading && !snapshot
+    ? pick(language, "Chargement…", "Loading…")
+    : pick(language, "N/D", "N/A");
 
   return (
     <main className={styles.page}>
@@ -334,7 +378,7 @@ export function PortfolioClient() {
           <p>{pick(language, "Positions locales, performance, P&L, allocation sectorielle, concentration et risque. Aucun ordre n’est exécuté et les positions restent dans ce navigateur.", "Local positions, performance, P&L, sector allocation, concentration, and risk. No order is executed and positions remain in this browser.")}</p>
         </div>
         <div className={styles.heroMetric}>
-          <strong>{snapshot ? snapshot.portfolio_score.toFixed(0) : "—"}</strong>
+          <strong>{snapshot?.portfolio_score?.toFixed(0) ?? pick(language, "N/D", "N/A")}</strong>
           <span>{pick(language, "score portefeuille", "portfolio score")}</span>
           <small>{positions.length} {pick(language, `position${positions.length > 1 ? "s" : ""}`, `position${positions.length === 1 ? "" : "s"}`)} · {liveCount} {pick(language, `cotation${liveCount > 1 ? "s" : ""} publique${liveCount > 1 ? "s" : ""}`, `public quote${liveCount === 1 ? "" : "s"}`)}</small>
         </div>
@@ -362,7 +406,7 @@ export function PortfolioClient() {
         </div>
       </section>
 
-      {error ? <div className={styles.errorNotice}>{error}</div> : null}
+      {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button className={styles.secondaryButton} disabled={loading} onClick={() => void refresh()} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
 
       {!positions.length ? (
         <section className={`panel ${styles.emptyState}`}>
@@ -374,11 +418,11 @@ export function PortfolioClient() {
       ) : (
         <>
           <section className={styles.kpiGrid}>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Valeur actuelle", "Current value")}</span><strong>{snapshot ? money(snapshot.total_market_value, snapshot.base_currency, language) : "…"}</strong><small>CAD</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : "…"}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pick(language, "Calcul", "Calculating")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : "…"}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pick(language, "Calcul", "Calculating")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={tone(performanceReturn)}>{snapshot ? percent(performanceReturn) : "…"}</strong><small>{pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? (language === "en" ? ({ Faible: "Low", Modéré: "Moderate", Élevé: "High", "Très élevé": "Very high" } as Record<string, string>)[snapshot.risk.risk_level] ?? snapshot.risk.risk_level : snapshot.risk.risk_level) : "…"}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk.diversification_score.toFixed(0)}/100` : pick(language, "Calcul", "Calculating")}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Valeur actuelle", "Current value")}</span><strong>{snapshot ? money(snapshot.total_market_value, snapshot.base_currency, language) : pendingValue}</strong><small>CAD</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pendingValue}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pendingValue}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? percent(performanceReturn) : pendingValue}</strong><small>{pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? riskLabel(snapshot.risk?.risk_level ?? null, language) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(0)}/100`}` : pendingValue}</small></article>
           </section>
 
           <section className={`panel ${styles.panel}`}>
@@ -390,15 +434,15 @@ export function PortfolioClient() {
                   {positions.map((position, index) => {
                     const result = snapshot?.positions.find((item) => item.symbol === position.symbol);
                     return <tr key={position.symbol}>
-                      <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? pick(language, "En attente", "Pending")}</small></span></div></td>
+                      <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
                       <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
                       <td data-label={pick(language, "Coût moyen", "Average cost")}><input aria-label={pick(language, `Coût moyen de ${position.symbol}`, `${position.symbol} average cost`)} style={{ width: 96, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
-                      <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.price, result.currency, language) : "…"}</td>
-                      <td data-label={pick(language, "Valeur", "Value")}>{result ? money(result.market_value, snapshot?.base_currency, language) : "…"}</td>
-                      <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : "…"}</td>
-                      <td data-label={pick(language, "P&L latent", "Unrealized P&L")} className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency, language)} · ${percent(result.unrealized_pnl_percent)}` : "…"}</td>
-                      <td data-label={pick(language, "Séance", "Session")} className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency, language)} · ${percent(result.day_change_percent)}` : "…"}</td>
-                      <td data-label="Score">{result ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : "…"}</td>
+                      <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.price, result.currency, language) : pendingValue}</td>
+                      <td data-label={pick(language, "Valeur", "Value")}>{result ? money(result.market_value, snapshot?.base_currency, language) : pendingValue}</td>
+                      <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : pendingValue}</td>
+                      <td data-label={pick(language, "P&L latent", "Unrealized P&L")} className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency, language)} · ${percent(result.unrealized_pnl_percent)}` : pendingValue}</td>
+                      <td data-label={pick(language, "Séance", "Session")} className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency, language)} · ${percent(result.day_change_percent)}` : pendingValue}</td>
+                      <td data-label="Score">{result?.score !== null && result?.score !== undefined ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : pendingValue}</td>
                       <td data-label="Action"><button className={styles.iconButton} type="button" aria-label={pick(language, `Supprimer ${position.symbol}`, `Delete ${position.symbol}`)} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
                     </tr>;
                   })}
@@ -416,15 +460,15 @@ export function PortfolioClient() {
                   <PerformanceChart points={snapshot.performance} language={language} />
                 </section>
                 <section className={`panel ${styles.panel}`}>
-                  <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk.risk_level === "Modéré" ? styles.statusMonitoring : styles.statusDegraded}`}>{language === "en" ? ({ Faible: "Low", Modéré: "Moderate", Élevé: "High", "Très élevé": "Very high" } as Record<string, string>)[snapshot.risk.risk_level] ?? snapshot.risk.risk_level : snapshot.risk.risk_level}</span></div>
-                  <div className={styles.riskGrid}>
-                    <div className={styles.riskMetric}><span>{pick(language, "Volatilité", "Volatility")}</span><strong>{snapshot.risk.volatility_percent === null ? pick(language, "N/D", "N/A") : `${snapshot.risk.volatility_percent.toFixed(1)} %`}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Bêta TSX", "TSX beta")}</span><strong>{snapshot.risk.beta?.toFixed(2) ?? pick(language, "N/D", "N/A")}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Drawdown max", "Max drawdown")}</span><strong className={styles.negative}>{snapshot.risk.max_drawdown_percent === null ? pick(language, "N/D", "N/A") : `${snapshot.risk.max_drawdown_percent.toFixed(1)} %`}</strong></div>
-                    <div className={styles.riskMetric}><span>Sharpe</span><strong>{snapshot.risk.sharpe_ratio?.toFixed(2) ?? pick(language, "N/D", "N/A")}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Plus grande position", "Largest position")}</span><strong>{snapshot.risk.top_position_percent.toFixed(1)} %</strong></div>
-                    <div className={styles.riskMetric}><span>Top 3</span><strong>{snapshot.risk.top_three_percent.toFixed(1)} %</strong></div>
-                  </div>
+                  <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk?.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk?.risk_level === "Modéré" ? styles.statusMonitoring : snapshot.risk?.risk_level ? styles.statusDegraded : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
+                  {snapshot.risk ? <div className={styles.riskGrid}>
+                    <div className={styles.riskMetric}><span>{pick(language, "Volatilité", "Volatility")}</span><strong>{optionalFixed(snapshot.risk.volatility_percent, 1, language, " %")}</strong></div>
+                    <div className={styles.riskMetric}><span>{pick(language, "Bêta TSX", "TSX beta")}</span><strong>{optionalFixed(snapshot.risk.beta, 2, language)}</strong></div>
+                    <div className={styles.riskMetric}><span>{pick(language, "Drawdown max", "Max drawdown")}</span><strong className={snapshot.risk.max_drawdown_percent === null ? "" : styles.negative}>{optionalFixed(snapshot.risk.max_drawdown_percent, 1, language, " %")}</strong></div>
+                    <div className={styles.riskMetric}><span>Sharpe</span><strong>{optionalFixed(snapshot.risk.sharpe_ratio, 2, language)}</strong></div>
+                    <div className={styles.riskMetric}><span>{pick(language, "Plus grande position", "Largest position")}</span><strong>{optionalFixed(snapshot.risk.top_position_percent, 1, language, " %")}</strong></div>
+                    <div className={styles.riskMetric}><span>Top 3</span><strong>{optionalFixed(snapshot.risk.top_three_percent, 1, language, " %")}</strong></div>
+                  </div> : <div className={styles.notice}>{pick(language, "Diagnostic de risque indisponible pour les données actuelles.", "Risk assessment is unavailable for the current data.")}</div>}
                   {snapshot.notes.map((note, index) => <div className={styles.notice} style={{ marginTop: 10 }} key={note}>{language === "fr" ? note : pick(language, "", [
                     "This portfolio risk note is based on the current positions and available market history.",
                     "Concentration and volatility should be reviewed alongside the underlying data coverage.",

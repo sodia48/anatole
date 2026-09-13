@@ -70,6 +70,7 @@ export function NewsCard({
       </View>
       {showCategory && category ? <Text style={styles.newsCategory}>{category}{showRegion && regions.length ? ` · ${regions.join(" · ")}` : ""}</Text> : showRegion && regions.length ? <Text style={styles.newsCategory}>{regions.join(" · ")}</Text> : null}
       {showTone && economic ? <View style={styles.tone}><Text style={styles.toneLabel}>{pick("Tonalité lexicale", "Lexical tone")} · {tone}</Text><Text style={styles.toneHelp}>{pick("Analyse automatique du vocabulaire du titre et du résumé; elle ne mesure pas l’impact de marché.", "Automated analysis of title and summary wording; it does not measure market impact.")}</Text></View> : null}
+      {href ? <Text style={styles.readInAnatole}>{pick("Lire dans Anatole", "Read in Anatole")} →</Text> : null}
       {onExplore && exploreLabel ? <Pressable accessibilityRole="button" onPress={(event) => { event.stopPropagation(); onExplore(); }} style={styles.explore}><Text style={styles.exploreText}>{exploreLabel}</Text></Pressable> : null}
     </Pressable>
   );
@@ -108,6 +109,7 @@ const styles = createThemedStyles((colors) => ({
   tone: { gap: 3, padding: spacing.sm, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
   toneLabel: { ...typography.caption, color: colors.text, fontWeight: "800" },
   toneHelp: { ...typography.caption, color: colors.textMuted },
+  readInAnatole: { ...typography.caption, color: colors.primary, fontWeight: "800" },
   explore: { minHeight: 44, alignSelf: "flex-start", justifyContent: "center", paddingHorizontal: spacing.md, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.borderStrong },
   exploreText: { ...typography.caption, color: colors.primary, fontWeight: "800" },
   pressed: { opacity: 0.7 },

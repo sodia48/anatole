@@ -489,9 +489,10 @@ export function getTerminalSnapshot(
 export function analyzePortfolio(
   positions: PortfolioPositionInput[],
   signal?: AbortSignal,
+  fast = false,
 ): Promise<PortfolioSnapshot> {
   return apiRequest<PortfolioSnapshot>(
-    "/api/v1/workspace/portfolio",
+    `/api/v1/workspace/portfolio${fast ? "?fast=true" : ""}`,
     { method: "POST", body: JSON.stringify({ positions, base_currency: "CAD" }) },
     signal,
     60_000,

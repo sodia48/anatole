@@ -1,9 +1,10 @@
 import { act, cleanup, render, userEvent } from "@testing-library/react-native";
-import { Linking, Share } from "react-native";
+import { Linking, Share, StyleSheet } from "react-native";
 
 import { ArticleReaderScreen } from "@/src/components/news/ArticleReaderScreen";
 import type { NewsItem, StockNewsItem } from "@/src/lib/api/types";
 import { articleHref } from "@/src/lib/article";
+import { originalPalette, setActiveMobileTheme, skyPalette } from "@/src/theme/palettes";
 
 const mockBack = jest.fn();
 let mockParams: Record<string, string> = {};
@@ -51,6 +52,7 @@ describe("Anatole article reader", () => {
   });
 
   afterEach(() => {
+    setActiveMobileTheme("dark");
     cleanup();
     jest.restoreAllMocks();
   });
@@ -58,6 +60,8 @@ describe("Anatole article reader", () => {
   it("loads a NewsItem publisher URL inside the isolated WebView", async () => {
     const view = await render(<ArticleReaderScreen />);
     expect(view.getByText("L’emploi progresse au Canada")).toBeTruthy();
+    expect(view.getByText("Résumé")).toBeTruthy();
+    expect(view.getByText("Source originale")).toBeTruthy();
     expect(view.getByTestId("article-hero-image")).toBeTruthy();
     expect(view.getByTestId("article-webview").props.source).toEqual({ uri: economic.url });
     await view.unmount();
@@ -97,6 +101,30 @@ describe("Anatole article reader", () => {
     await user.press(view.getByTestId("article-share"));
     expect(mockBack).toHaveBeenCalledTimes(1);
     expect(share).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining(economic.url) }));
+    await view.unmount();
+  });
+
+  it("uses opaque, high-contrast reader surfaces in both themes", async () => {
+    setActiveMobileTheme("dark");
+    const dark = await render(<ArticleReaderScreen />);
+    expect(StyleSheet.flatten(dark.getByTestId("article-story").props.style).backgroundColor).toBe(originalPalette.background);
+    expect(StyleSheet.flatten(dark.getByTestId("article-summary").props.style).backgroundColor).toBe(originalPalette.surfaceRaised);
+    await dark.unmount();
+
+    setActiveMobileTheme("blue");
+    const light = await render(<ArticleReaderScreen />);
+    expect(StyleSheet.flatten(light.getByTestId("article-story").props.style).backgroundColor).toBe(skyPalette.background);
+    expect(StyleSheet.flatten(light.getByTestId("article-summary").props.style).backgroundColor).toBe(skyPalette.surfaceRaised);
+    await light.unmount();
+  });
+
+  it("keeps the original source as an explicit secondary action", async () => {
+    const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    const view = await render(<ArticleReaderScreen />);
+    const user = userEvent.setup();
+    await user.press(view.getByTestId("article-view-original"));
+    expect(open).toHaveBeenCalledWith(economic.url);
+    expect(view.getByTestId("article-webview")).toBeTruthy();
     await view.unmount();
   });
 

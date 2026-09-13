@@ -22,6 +22,7 @@ test.describe("Focus Pro workstation", () => {
           publisher: "Canadian Business Wire",
           published_at: recentNewsDate,
           related_tickers: ["RY.TO", "RY"],
+          image_url: index === 0 ? "https://images.example.com/royal-bank.jpg" : null,
         })),
         status: "ok",
         detail: null,
@@ -36,13 +37,54 @@ test.describe("Focus Pro workstation", () => {
     const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
-    await expect(stockNews.getByRole("link")).toHaveCount(10);
+    await expect(stockNews.getByRole("button")).toHaveCount(10);
     await expect(stockNews.getByText("10 articles")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
     await expect(stockNews.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(stockNews.getByText("Canadian Business Wire").first()).toBeVisible();
-    const [performanceBox, stockNewsBox] = await Promise.all([performance.boundingBox(), stockNews.boundingBox()]);
+    const valuation = page.locator('[data-focus-valuation="true"]');
+    await expect(valuation).toBeVisible();
+    const [performanceBox, valuationBox, stockNewsBox] = await Promise.all([performance.boundingBox(), valuation.boundingBox(), stockNews.boundingBox()]);
+    expect(valuationBox?.y).toBeGreaterThan(performanceBox?.y ?? Number.POSITIVE_INFINITY);
     expect(stockNewsBox?.y).toBeGreaterThan(performanceBox?.y ?? Number.POSITIVE_INFINITY);
+    expect(stockNewsBox?.y).toBeGreaterThan(valuationBox?.y ?? Number.POSITIVE_INFINITY);
+
+    await stockNews.getByRole("button").first().click();
+    const reader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
+    await expect(reader).toBeVisible();
+    await expect(reader.getByRole("heading", { name: "Résumé" })).toBeVisible();
+    await expect(reader.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
+    await expect(reader.locator("img")).toHaveCount(1);
+    expect(await reader.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { background: style.backgroundColor, color: style.color, opacity: style.opacity };
+    })).toEqual({ background: "rgb(7, 21, 33)", color: "rgb(244, 249, 253)", opacity: "1" });
+    await expect(reader.getByText("Cette source ne fournit pas le texte intégral à Anatole.", { exact: false })).toBeVisible();
+    await expect(reader.getByRole("link", { name: "Voir la source originale" })).toHaveAttribute("href", "https://example.com/royal-bank-news-0");
+    await page.keyboard.press("Escape");
+    await expect(reader).toHaveCount(0);
+
+    await stockNews.getByRole("button").nth(1).click();
+    const noImageReader = page.getByRole("dialog", { name: "Royal Bank of Canada update 2" });
+    await expect(noImageReader).toBeVisible();
+    await expect(noImageReader.locator("img")).toHaveCount(0);
+    await noImageReader.getByRole("button", { name: "Fermer" }).click();
+
+    await page.evaluate(() => {
+      const preferences = JSON.parse(localStorage.getItem("anatole.preferences.v0.4") ?? "{}");
+      localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({ ...preferences, language: "en", theme: "blue" }));
+    });
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    const englishNews = page.getByRole("region", { name: "Latest news for RY" });
+    await expect(englishNews.getByText("Read in Anatole").first()).toBeVisible();
+    await englishNews.getByRole("button").first().click();
+    const englishReader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
+    await expect(englishReader.getByRole("link", { name: "View original source" })).toBeVisible();
+    expect(await englishReader.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { background: style.backgroundColor, color: style.color, opacity: style.opacity };
+    })).toEqual({ background: "rgb(255, 255, 255)", color: "rgb(7, 27, 44)", opacity: "1" });
   });
 
   test("chart, indicators, drawings, layout, comparison, markers, alerts and backtest", async ({ page }) => {

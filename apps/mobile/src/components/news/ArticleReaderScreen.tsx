@@ -45,18 +45,21 @@ export function ArticleReaderScreen() {
       <Text style={styles.invalidTitle}>{pick("Lien d’article invalide", "Invalid article link")}</Text>
       <Text style={styles.invalidCopy}>{pick("Anatole a refusé d’ouvrir cette adresse.", "Anatole refused to open this address.")}</Text>
     </View> : <>
-      <View style={styles.storyHeader}>
+      <View style={styles.storyHeader} testID="article-story">
+        <Text style={styles.sectionLabel}>{pick("ARTICLE", "ARTICLE")}</Text>
         <Text style={styles.source}>{article.source || pick("Actualité", "News")} · {date}</Text>
         <Text style={styles.title}>{article.title || pick("Article", "Article")}</Text>
         {article.imageUrl ? <NewsThumbnail imageUrl={article.imageUrl} size="hero" source={article.source || "Anatole"} testID="article-hero" /> : null}
-        {article.summary ? <Text numberOfLines={5} style={styles.summary}>{article.summary}</Text> : null}
+        {article.summary ? <View style={styles.summaryBlock} testID="article-summary"><Text style={styles.summaryLabel}>{pick("Résumé", "Summary")}</Text><Text style={styles.summary}>{article.summary}</Text></View> : null}
+        <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-view-original"><Text style={styles.externalText}>{pick("Voir la source originale", "View original source")}</Text></Pressable>
       </View>
 
       <View style={styles.browser}>
+        <View style={styles.sourceBar}><Text style={styles.sourceBarText}>{pick("Source originale", "Original source")}</Text></View>
         {webFailed ? <View accessibilityRole="alert" style={styles.webFallback} testID="article-webview-error">
           <Text style={styles.invalidTitle}>{pick("La page de l’éditeur ne peut pas être affichée ici.", "The publisher page cannot be displayed here.")}</Text>
-          <Text style={styles.invalidCopy}>{pick("Le titre et le résumé restent disponibles dans Anatole.", "The title and summary remain available in Anatole.")}</Text>
-          <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-open-browser"><Text style={styles.externalText}>{pick("Ouvrir dans le navigateur", "Open in browser")}</Text></Pressable>
+          <Text style={styles.invalidCopy}>{pick("Cette source ne fournit pas le texte intégral à Anatole. Vous pouvez consulter le résumé ci-dessus ou poursuivre la lecture sur le site de la source.", "This publisher does not provide the full article to Anatole. You can read the summary above or continue on the publisher’s website.")}</Text>
+          <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-open-browser"><Text style={styles.externalText}>{pick("Lire la suite sur le site de la source", "Continue reading on the publisher’s website")}</Text></Pressable>
         </View> : <>
           <WebView
             allowsBackForwardNavigationGestures
@@ -91,11 +94,16 @@ const styles = createThemedStyles((colors) => ({
   publisher: { ...typography.label, flex: 1, color: colors.text, textAlign: "center" },
   actionButton: { minWidth: 72, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   actionText: { ...typography.label, color: colors.primary },
-  storyHeader: { gap: spacing.sm, padding: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+  storyHeader: { gap: spacing.sm, padding: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.background },
+  sectionLabel: { ...typography.caption, color: colors.primary, fontWeight: "800", letterSpacing: 1.2 },
   source: { ...typography.caption, color: colors.textMuted },
   title: { ...typography.title, color: colors.text },
+  summaryBlock: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
+  summaryLabel: { ...typography.label, color: colors.text },
   summary: { ...typography.body, color: colors.textMuted },
   browser: { flex: 1, minHeight: 180, overflow: "hidden", backgroundColor: "#ffffff" },
+  sourceBar: { minHeight: 36, justifyContent: "center", paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
+  sourceBarText: { ...typography.caption, color: colors.textMuted, fontWeight: "800" },
   webview: { flex: 1, backgroundColor: "#ffffff" },
   loading: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, alignItems: "center", justifyContent: "center", gap: spacing.sm, backgroundColor: colors.surface },
   loadingText: { ...typography.caption, color: colors.textMuted },
@@ -103,6 +111,6 @@ const styles = createThemedStyles((colors) => ({
   invalidTitle: { ...typography.section, color: colors.text, textAlign: "center" },
   invalidCopy: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   webFallback: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md, padding: spacing.xl, backgroundColor: colors.background },
-  externalButton: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderStrong },
-  externalText: { ...typography.label, color: colors.primary },
+  externalButton: { minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, backgroundColor: colors.primary },
+  externalText: { ...typography.label, color: colors.onPrimary },
 }));
