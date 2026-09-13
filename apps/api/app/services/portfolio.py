@@ -105,7 +105,7 @@ def _position_score(
 
 def _risk_statistics(
     returns: list[float],
-    benchmark_returns: list[float],
+    benchmark_returns: list[float | None],
 ) -> tuple[float | None, float | None, float | None, float | None]:
     if len(returns) < 5:
         return None, None, None, None
@@ -121,19 +121,30 @@ def _risk_statistics(
         )
 
     beta = None
-    if len(benchmark_returns) == len(returns) and len(returns) >= 20:
-        variance = statistics.variance(benchmark_returns)
+    aligned = [
+        (portfolio_return, benchmark_return)
+        for portfolio_return, benchmark_return in zip(
+            returns,
+            benchmark_returns,
+            strict=False,
+        )
+        if benchmark_return is not None
+    ]
+    if len(aligned) >= 20:
+        aligned_portfolio = [item[0] for item in aligned]
+        aligned_benchmark = [item[1] for item in aligned]
+        variance = statistics.variance(aligned_benchmark)
         if variance > 1e-12:
-            left_mean = statistics.mean(returns)
-            right_mean = statistics.mean(benchmark_returns)
+            left_mean = statistics.mean(aligned_portfolio)
+            right_mean = statistics.mean(aligned_benchmark)
             covariance = sum(
                 (left - left_mean) * (right - right_mean)
                 for left, right in zip(
-                    returns,
-                    benchmark_returns,
+                    aligned_portfolio,
+                    aligned_benchmark,
                     strict=False,
                 )
-            ) / (len(returns) - 1)
+            ) / (len(aligned) - 1)
             beta = covariance / variance
 
     level = 100.0
@@ -178,10 +189,10 @@ def _covered_performance(
     return_maps: dict[str, dict[int, float]],
     weights: dict[str, float],
     benchmark_map: dict[int, float],
-) -> tuple[list[float], list[float], list[PortfolioPerformancePoint], float]:
+) -> tuple[list[float], list[float | None], list[PortfolioPerformancePoint], float]:
     all_days = sorted(set().union(*(values.keys() for values in return_maps.values())) if return_maps else set())
     portfolio_returns: list[float] = []
-    benchmark_returns: list[float] = []
+    benchmark_returns: list[float | None] = []
     performance: list[PortfolioPerformancePoint] = []
     portfolio_level = 100.0
     benchmark_level = 100.0
@@ -192,13 +203,19 @@ def _covered_performance(
         daily_coverages.append(available_weight)
         if not available or available_weight < 0.70:
             continue
+        if not performance:
+            performance.append(PortfolioPerformancePoint(
+                time=max(0, (day - 1) * 86_400),
+                portfolio=100.0,
+                benchmark=100.0 if benchmark_map else None,
+            ))
         daily_return = sum(weights[symbol] * return_maps[symbol][day] for symbol in available)
         portfolio_level *= 1 + daily_return
         portfolio_returns.append(daily_return)
         benchmark_value = benchmark_map.get(day)
         if benchmark_value is not None:
             benchmark_level *= 1 + benchmark_value
-            benchmark_returns.append(benchmark_value)
+        benchmark_returns.append(benchmark_value)
         performance.append(PortfolioPerformancePoint(
             time=day * 86_400,
             portfolio=round(portfolio_level, 4),
@@ -232,7 +249,8 @@ def _allocation(
 
 
 class PortfolioService:
-    history_deadline_seconds = 4.0
+    core_history_deadline_seconds = 12.0
+    optional_history_deadline_seconds = 4.0
     driver_deadline_seconds = 1.5
 
     async def _fx_rates(
@@ -273,20 +291,62 @@ class PortfolioService:
     ) -> PortfolioSnapshot:
         started_at = monotonic()
         symbols = [item.symbol for item in request.positions]
-        history_symbols = list(dict.fromkeys(symbols + [request.benchmark, "CL=F", "CAD=X"]))
+        history_tickers = {
+            symbol: market_data_service.normalize_ticker(symbol)
+            for symbol in symbols
+        }
+        benchmark_ticker = market_data_service.normalize_ticker(request.benchmark)
+        core_history_tickers = list(dict.fromkeys([
+            *history_tickers.values(),
+            benchmark_ticker,
+        ]))
+        optional_history_tickers = ["CL=F", "CAD=X"]
         if fast:
             quotes = await market_data_service.get_quotes(symbols)
             histories = {}
         else:
-            quotes, histories = await asyncio.gather(
+            quotes, core_histories, optional_histories = await asyncio.gather(
                 market_data_service.get_quotes(symbols),
                 market_data_service.get_history_many_strict(
-                    history_symbols,
+                    core_history_tickers,
                     range_="1y",
                     interval="1d",
                     concurrency=6,
-                    deadline_seconds=self.history_deadline_seconds,
+                    deadline_seconds=self.core_history_deadline_seconds,
+                    attempts=2,
                 ),
+                market_data_service.get_history_many_strict(
+                    optional_history_tickers,
+                    range_="1y",
+                    interval="1d",
+                    concurrency=2,
+                    deadline_seconds=self.optional_history_deadline_seconds,
+                    attempts=1,
+                ),
+            )
+            histories = {
+                symbol: core_histories.get(ticker, core_histories.get(symbol, []))
+                for symbol, ticker in history_tickers.items()
+            }
+            histories[request.benchmark] = core_histories.get(
+                benchmark_ticker,
+                core_histories.get(request.benchmark, []),
+            )
+            histories.update(optional_histories)
+            for symbol, ticker in history_tickers.items():
+                points = len(histories.get(symbol, []))
+                logger.info(
+                    "portfolio_history ticker=%s points=%s status=%s",
+                    ticker,
+                    points,
+                    "ok" if points >= 2 else "unavailable",
+                )
+            benchmark_points = len(histories.get(request.benchmark, []))
+            logger.info(
+                "portfolio_history benchmark=%s points=%s status=%s",
+                benchmark_ticker,
+                benchmark_points,
+                "ok" if benchmark_points >= 2 else "unavailable",
             )
         quote_by_symbol = {_key(item.symbol): item for item in quotes}
         quote_by_symbol.update({_key(item.ticker): item for item in quotes})
@@ -424,16 +484,23 @@ class PortfolioService:
         portfolio_returns, benchmark_returns, performance, history_coverage = _covered_performance(return_maps, weights, benchmark_map)
         portfolio_level = performance[-1].portfolio if performance else 100.0
         history_observations = len(portfolio_returns)
-        if history_coverage >= 70:
+        if not fast and history_coverage >= 70:
             volatility, beta, max_drawdown, sharpe = _risk_statistics(
                 portfolio_returns,
                 benchmark_returns,
             )
         else:
             volatility, beta, max_drawdown, sharpe = None, None, None, None
-            notes.append(
-                "Couverture historique inférieure à 70 %; les statistiques "
-                "de risque restent indisponibles."
+            if not fast:
+                notes.append(
+                    "Couverture historique inférieure à 70 %; les statistiques "
+                    "de risque restent indisponibles."
+                )
+        if not fast:
+            logger.info(
+                "portfolio_history_coverage weighted_coverage=%.2f%% observations=%s",
+                history_coverage,
+                history_observations,
             )
         top_position = positions[0].weight_percent if positions else 0.0
         top_three = sum(item.weight_percent for item in positions[:3])

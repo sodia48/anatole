@@ -80,6 +80,7 @@ async function apiRequest<T>(
   init: RequestInit = {},
   signal?: AbortSignal,
   timeoutMs = 20_000,
+  idempotent = false,
 ): Promise<T> {
   const response = await resilientFetch(`${apiBaseUrl()}${path}`, {
     ...init,
@@ -91,6 +92,7 @@ async function apiRequest<T>(
     },
     signal,
     timeoutMs,
+    idempotent,
   });
 
   if (!response.ok) {
@@ -496,6 +498,7 @@ export function analyzePortfolio(
     { method: "POST", body: JSON.stringify({ positions, base_currency: "CAD" }) },
     signal,
     60_000,
+    true,
   );
 }
 
