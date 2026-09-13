@@ -389,17 +389,25 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
     <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
       {!embedded ? <QuoteHeader quote={quote} liveState={liveState} /> : null}
       {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button><Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
-      {section === "overview" || section === "fundamentals" || section === "financials" || section === "analysts" ? (
-        <>
-          {section === "overview" ? (
-            <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} />
-          ) : null}
-          <FocusFundamentals
-            key={ticker}
-            ticker={ticker}
-            view={section === "overview" ? "valuation" : section}
-          />
-        </>
+      {section === "overview" ? (
+        <FocusRangeChart
+          ticker={ticker}
+          initialSnapshot={initialSnapshot}
+          language={language}
+          beforeNews={
+            <FocusFundamentals
+              key={ticker}
+              ticker={ticker}
+              view="valuation"
+            />
+          }
+        />
+      ) : section === "fundamentals" || section === "financials" || section === "analysts" ? (
+        <FocusFundamentals
+          key={ticker}
+          ticker={ticker}
+          view={section}
+        />
       ) : section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : (
         <div className={styles.workspace}>
           <FocusToolbar ticker={ticker} timeframe={layout.timeframe} chartType={layout.chart_type} language={language} onTimeframe={(value) => setLayout({ ...layout, timeframe: value })} onChartType={(value) => setLayout({ ...layout, chart_type: value })} onToggleIndicators={() => togglePanel("indicators")} onToggleCompare={() => togglePanel("compare")} onCreateAlert={() => togglePanel("alerts")} onToggleLayouts={() => togglePanel("layouts")} onToggleStrategy={() => togglePanel("strategy")} onTogglePaper={() => togglePanel("paper")} onSaveLayout={() => saveLayout()} />
