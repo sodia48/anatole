@@ -6,6 +6,8 @@ export type Quote = {
   name: string;
   exchange: string;
   currency: string;
+  native_currency?: string | null;
+  fx_rate_to_cad?: number | null;
   price: number;
   previous_close: number;
   change: number;

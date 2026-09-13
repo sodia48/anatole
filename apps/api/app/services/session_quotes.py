@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.core.resilience import AsyncStaleCache, shared_http_client
 from app.schemas.stocks import Quote
+from app.services.currency_conversion import currency_conversion_service
 
 logger = logging.getLogger(__name__)
 
@@ -244,7 +245,8 @@ class SessionQuoteService:
         results = payload.get("chart", {}).get("result") or []
         if not results:
             raise RuntimeError("Yahoo chart result is empty")
-        return self._quote_from_result(ticker, results[0])
+        native = self._quote_from_result(ticker, results[0])
+        return await currency_conversion_service.quote_to_cad(native)
 
     async def get_quote(self, ticker: str) -> Quote:
         normalized = self.normalize_ticker(ticker)

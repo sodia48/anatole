@@ -34,8 +34,8 @@ CANADA_GEOGRAPHY = {
 MARKET_SERIES = (
     ("tsx_composite", "S&P/TSX Composite", "S&P/TSX Composite", "^GSPTSE", "index"),
     ("usd_cad", "USD/CAD", "USD/CAD", "CAD=X", "cad_per_usd"),
-    ("wti", "Pétrole WTI", "WTI crude oil", "CL=F", "usd_per_barrel"),
-    ("gold", "Or", "Gold", "GC=F", "usd_per_ounce"),
+    ("wti", "Pétrole WTI", "WTI crude oil", "CL=F", "cad_per_barrel"),
+    ("gold", "Or", "Gold", "GC=F", "cad_per_ounce"),
 )
 
 

@@ -134,16 +134,16 @@ function metricValue(
     })} CAD`;
   }
 
-  if (metric.unit === "usd_per_barrel") {
+  if (metric.unit === "cad_per_barrel") {
     return `${value.toLocaleString(locale, {
       maximumFractionDigits: 2,
-    })} $ US/b`;
+    })} CAD/b`;
   }
 
-  if (metric.unit === "usd_per_ounce") {
+  if (metric.unit === "cad_per_ounce") {
     return `${value.toLocaleString(locale, {
       maximumFractionDigits: 2,
-    })} $ US/oz`;
+    })} CAD/oz`;
   }
 
   return value.toLocaleString(locale, {

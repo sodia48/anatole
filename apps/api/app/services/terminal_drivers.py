@@ -10,12 +10,12 @@ from app.schemas.stocks import Candle
 
 
 YAHOO_DRIVERS = (
-    ("wti", "WTI", "Énergie", "CL=F", "USD", "$"),
-    ("brent", "Brent", "Énergie", "BZ=F", "USD", "$"),
-    ("gold", "Or", "Métaux", "GC=F", "USD", "$"),
-    ("copper", "Cuivre", "Métaux", "HG=F", "USD", "$"),
-    ("natural_gas", "Gaz naturel", "Énergie", "NG=F", "USD", "$"),
-    ("cadusd", "CAD/USD", "Devises", "CADUSD=X", "USD", "taux"),
+    ("wti", "WTI", "Énergie", "CL=F", "CAD", "CAD"),
+    ("brent", "Brent", "Énergie", "BZ=F", "CAD", "CAD"),
+    ("gold", "Or", "Métaux", "GC=F", "CAD", "CAD"),
+    ("copper", "Cuivre", "Métaux", "HG=F", "CAD", "CAD"),
+    ("natural_gas", "Gaz naturel", "Énergie", "NG=F", "CAD", "CAD"),
+    ("cadusd", "CAD/USD", "Devises", "CADUSD=X", "taux", "taux"),
     ("sp500", "S&P 500", "Actions", "^GSPC", "points", "points"),
     ("nasdaq", "Nasdaq", "Actions", "^IXIC", "points", "points"),
     ("vix", "VIX", "Volatilité", "^VIX", "points", "points"),
