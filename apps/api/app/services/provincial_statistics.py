@@ -25,6 +25,21 @@ WDS_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
 RETAIL_SALES_CSV_URL = "https://www150.statcan.gc.ca/n1/tbl/csv/20100056-eng.zip"
 RETAIL_SALES_CSV_NAME = "20100056.csv"
 RETAIL_SALES_CACHE_SECONDS = 1800.0
+
+CPI_ALL_ITEMS_VECTOR_BY_CODE: dict[str, int] = {
+    "CA": 41690973,
+    "NL": 41691244,
+    "PE": 41691379,
+    "NS": 41691513,
+    "NB": 41691648,
+    "QC": 41691783,
+    "ON": 41691919,
+    "MB": 41692055,
+    "SK": 41692191,
+    "AB": 41692327,
+    "BC": 41692462,
+}
+
 CACHE_SECONDS = 1800.0
 METADATA_CACHE_SECONDS = 86_400.0
 
@@ -260,8 +275,8 @@ METRICS: tuple[MetricSpec, ...] = (
         category_fr="Prix",
         category_en="Prices",
         product_id=18100004,
-        table_id="18-10-0004-02",
-        simple_view_pid="1810000402",
+        table_id="18-10-0004-01",
+        simple_view_pid="1810000401",
         unit_kind="percent",
         change_kind="points",
         latest_n=14,
@@ -680,6 +695,18 @@ def _inflation_yoy_pair(
     return current, previous
 
 
+
+def _response_vector_id(response: Any) -> int | None:
+    value = _unwrap(response)
+    if not isinstance(value, dict):
+        return None
+    raw = value.get("vectorId")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _response_coordinate(response: Any) -> str | None:
     value = _unwrap(response)
     if not isinstance(value, dict):
@@ -849,6 +876,137 @@ class ProvincialStatisticsService:
         return value
 
 
+
+    async def _inflation_for_provinces(
+        self,
+        client: httpx.AsyncClient,
+        spec: MetricSpec,
+        provinces: list[dict[str, str]],
+        lang: str,
+    ) -> tuple[dict[str, ProvincialMetric], str | None]:
+        requests: list[dict[str, int]] = []
+        vector_to_code: dict[int, str] = {}
+
+        for province in provinces:
+            code = province["code"]
+            vector_id = CPI_ALL_ITEMS_VECTOR_BY_CODE.get(code)
+            if vector_id is None:
+                continue
+            requests.append(
+                {
+                    "vectorId": vector_id,
+                    "latestN": 14,
+                }
+            )
+            vector_to_code[vector_id] = code
+
+        if not requests:
+            return (
+                {},
+                f"{spec.table_id}: aucun vecteur IPC provincial configuré",
+            )
+
+        try:
+            payload = await self._post(
+                client,
+                "getDataFromVectorsAndLatestNPeriods",
+                requests,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return (
+                {},
+                f"{spec.table_id}: IPC indisponible "
+                f"({type(exc).__name__})",
+            )
+
+        responses = payload if isinstance(payload, list) else [payload]
+        table_url = (
+            f"https://www150.statcan.gc.ca/t1/tbl1/"
+            f"{'fr' if lang == 'fr' else 'en'}/"
+            f"tv.action?pid={spec.simple_view_pid}"
+        )
+        by_code: dict[str, ProvincialMetric] = {}
+
+        for response in responses:
+            vector_id = _response_vector_id(response)
+            if vector_id is None:
+                continue
+            code = vector_to_code.get(vector_id)
+            if code is None:
+                continue
+
+            points = _sort_points(_point_list(response))
+            if len(points) < 13:
+                continue
+
+            current, previous = _inflation_yoy_pair(points)
+            if current is None:
+                continue
+
+            current_point = points[-1]
+            previous_point = points[-2] if len(points) >= 2 else {}
+
+            released_at = None
+            release_value = current_point.get("releaseTime")
+            if release_value:
+                try:
+                    released_at = datetime.fromisoformat(
+                        str(release_value).replace("Z", "+00:00")
+                    )
+                except ValueError:
+                    released_at = None
+
+            by_code[code] = ProvincialMetric(
+                key=spec.key,
+                label=spec.label_en if lang == "en" else spec.label_fr,
+                category=(
+                    spec.category_en
+                    if lang == "en"
+                    else spec.category_fr
+                ),
+                value=current,
+                previous_value=previous,
+                change=(
+                    current - previous
+                    if previous is not None
+                    else None
+                ),
+                change_kind="points",
+                unit_kind="percent",
+                reference_period=str(
+                    current_point.get("refPerRaw")
+                    or current_point.get("refPer")
+                    or ""
+                )
+                or None,
+                previous_reference_period=str(
+                    previous_point.get("refPerRaw")
+                    or previous_point.get("refPer")
+                    or ""
+                )
+                or None,
+                released_at=released_at,
+                table_id=spec.table_id,
+                table_url=table_url,
+                status="available",
+                note="derived_from_official_cpi_index",
+            )
+
+        if not by_code:
+            return (
+                {},
+                f"{spec.table_id}: aucune inflation provinciale exploitable",
+            )
+
+        if len(by_code) < len(requests):
+            return (
+                by_code,
+                f"{spec.table_id}: {len(by_code)}/{len(requests)} "
+                "vecteurs IPC provinciaux disponibles",
+            )
+
+        return by_code, None
+
     async def _retail_sales_rows(
         self,
         client: httpx.AsyncClient,
@@ -965,6 +1123,14 @@ class ProvincialStatisticsService:
         provinces: list[dict[str, str]],
         lang: str,
     ) -> tuple[dict[str, ProvincialMetric], str | None]:
+        if spec.key == "inflation_yoy":
+            return await self._inflation_for_provinces(
+                client,
+                spec,
+                provinces,
+                lang,
+            )
+
         if spec.key == "retail_sales":
             return await self._retail_sales_for_provinces(
                 client,
