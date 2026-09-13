@@ -144,8 +144,8 @@ function ArticleReader({
               <span>
                 {pick(
                   language,
-                  "Anatole affiche tout le contenu légalement fourni par la source.",
-                  "Anatole displays all content legally provided by the source.",
+                  "Cette source ne fournit pas le texte intégral à Anatole. Vous pouvez consulter le résumé ci-dessus ou poursuivre la lecture sur le site de la source.",
+                  "This publisher does not provide the full article to Anatole. You can read the summary above or continue on the publisher’s website.",
                 )}
               </span>
             </div>
@@ -158,13 +158,6 @@ function ArticleReader({
               {pick(language, "Voir la source originale", "View original source")}
               <ArrowUpRight aria-hidden="true" size={15} />
             </a>
-            <p className={styles.continueText}>
-              {pick(
-                language,
-                "Lire la suite sur le site de la source",
-                "Continue reading on the publisher’s website",
-              )}
-            </p>
           </article>
         </div>
       </div>

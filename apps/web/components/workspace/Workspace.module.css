@@ -698,9 +698,17 @@
 }
 
 .errorNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   border: 1px solid var(--light-border, rgba(255, 117, 77, 0.45));
   background: var(--light-warning-surface, rgba(114, 46, 27, 0.22));
   color: var(--light-warning, #ffc2a4);
+}
+
+.errorNotice .secondaryButton {
+  flex: 0 0 auto;
 }
 
 .successNotice {

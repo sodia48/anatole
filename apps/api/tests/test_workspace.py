@@ -50,6 +50,37 @@ def test_portfolio_analysis_demo() -> None:
         _reset()
 
 
+def test_portfolio_fast_snapshot_keeps_quotes_when_history_metrics_are_unavailable() -> None:
+    original = settings.market_data_provider
+    settings.market_data_provider = "demo"
+    _reset()
+    try:
+        response = client.post(
+            "/api/v1/workspace/portfolio?fast=true",
+            json={
+                "positions": [
+                    {"symbol": "RY", "quantity": 12, "average_cost": 122},
+                    {"symbol": "TD", "quantity": 18, "average_cost": 78},
+                    {"symbol": "XIC", "quantity": 25, "average_cost": 33},
+                ],
+                "base_currency": "CAD",
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert {item["symbol"] for item in payload["positions"]} == {"RY", "TD", "XIC"}
+        assert all(item["price"] > 0 for item in payload["positions"])
+        assert all(item["market_value"] > 0 for item in payload["positions"])
+        assert all(item["score"] is None for item in payload["positions"])
+        assert payload["portfolio_score"] is None
+        assert payload["risk"]["risk_level"] is None
+        assert payload["performance"] == []
+    finally:
+        settings.market_data_provider = original
+        _reset()
+
+
 def test_alert_evaluation_demo() -> None:
     original = settings.market_data_provider
     settings.market_data_provider = "demo"

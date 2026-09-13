@@ -152,26 +152,49 @@
 }
 
 .reader {
+  --reader-bg: #071521;
+  --reader-surface: #0e2434;
+  --reader-border: #28536d;
+  --reader-text: #f4f9fd;
+  --reader-muted: #b9cbd8;
+  --reader-accent: #9fc8ff;
+  --reader-action: #2d76ff;
   width: min(780px, 100%);
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
+  isolation: isolate;
+  border: 1px solid var(--reader-border);
   border-radius: 14px;
-  background: var(--background);
+  background: var(--reader-bg);
+  color: var(--reader-text);
   box-shadow: -18px 0 50px rgba(0, 0, 0, 0.28);
 }
 
+:global(html[data-theme="blue"]) .reader {
+  --reader-bg: #ffffff;
+  --reader-surface: #f2f5f8;
+  --reader-border: #bdc8d2;
+  --reader-text: #071b2c;
+  --reader-muted: #405263;
+  --reader-accent: #075f99;
+  --reader-action: #1268b3;
+}
+
 .readerTopbar {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 auto;
   min-height: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   padding: 7px 12px 7px 20px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-secondary);
+  border-bottom: 1px solid var(--reader-border);
+  background: var(--reader-bg);
+  color: var(--reader-muted);
   font-size: 12px;
   font-weight: 750;
 }
@@ -181,10 +204,10 @@
   height: 44px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border);
+  border: 1px solid var(--reader-border);
   border-radius: 999px;
-  background: var(--panel);
-  color: var(--text);
+  background: var(--reader-surface);
+  color: var(--reader-text);
   cursor: pointer;
 }
 
@@ -198,6 +221,23 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: var(--reader-bg);
+  scrollbar-color: var(--reader-border) var(--reader-bg);
+  scrollbar-width: thin;
+}
+
+.readerScroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.readerScroll::-webkit-scrollbar-track {
+  background: var(--reader-bg);
+}
+
+.readerScroll::-webkit-scrollbar-thumb {
+  border: 2px solid var(--reader-bg);
+  border-radius: 999px;
+  background: var(--reader-border);
 }
 
 .readerImage {
@@ -205,7 +245,7 @@
   width: 100%;
   aspect-ratio: 16 / 8;
   overflow: hidden;
-  background: var(--panel);
+  background: var(--reader-surface);
 }
 
 .readerImage img {
@@ -219,7 +259,7 @@
 }
 
 .articleLabel {
-  color: var(--accent-text);
+  color: var(--reader-accent);
   font-size: 10px;
   font-weight: 850;
   letter-spacing: 0.14em;
@@ -230,15 +270,16 @@
   flex-wrap: wrap;
   justify-content: space-between;
   gap: 8px 18px;
-  color: var(--text-secondary);
+  color: var(--reader-muted);
   font-size: 11px;
 }
 
 .article h2 {
   margin: 0;
-  color: var(--text);
-  font-size: clamp(25px, 4vw, 40px);
-  line-height: 1.12;
+  max-width: 21ch;
+  color: var(--reader-text);
+  font-size: clamp(24px, 3.1vw, 34px);
+  line-height: 1.16;
 }
 
 .tickers {
@@ -249,9 +290,9 @@
 
 .tickers span {
   padding: 5px 9px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--reader-border);
   border-radius: 999px;
-  color: var(--accent-text);
+  color: var(--reader-accent);
   font-size: 10px;
   font-weight: 800;
 }
@@ -263,29 +304,32 @@
 
 .readerSummary h3 {
   margin: 0;
-  color: var(--text);
+  color: var(--reader-text);
   font-size: 15px;
 }
 
 .readerSummary p {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.75;
+  color: var(--reader-muted);
+  font-size: 16px;
+  line-height: 1.72;
 }
 
 .unavailable {
   display: grid;
-  gap: 4px;
-  padding: 14px;
-  border: 1px solid var(--border);
+  gap: 7px;
+  padding: 17px;
+  border: 1px solid var(--reader-border);
   border-radius: 9px;
-  color: var(--text-secondary);
-  font-size: 11px;
+  background: var(--reader-surface);
+  color: var(--reader-muted);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .unavailable strong {
-  color: var(--text);
+  color: var(--reader-text);
+  font-size: 14px;
 }
 
 .originalLink {
@@ -295,17 +339,12 @@
   align-items: center;
   gap: 7px;
   padding: 0 16px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--reader-action);
   border-radius: 8px;
-  color: var(--accent-text);
-  font-size: 11px;
+  background: var(--reader-action);
+  color: #ffffff;
+  font-size: 12px;
   font-weight: 800;
-}
-
-.continueText {
-  margin: -8px 0 0;
-  color: var(--text-secondary);
-  font-size: 10px;
 }
 
 @media (max-width: 560px) {
@@ -329,6 +368,15 @@
   .reader {
     border: 0;
     border-radius: 0;
+  }
+
+  .article {
+    padding: 22px 18px 34px;
+  }
+
+  .article h2 {
+    max-width: none;
+    font-size: clamp(22px, 7vw, 29px);
   }
 }
 
