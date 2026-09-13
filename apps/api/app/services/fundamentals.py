@@ -18,6 +18,7 @@ from app.schemas.fundamentals import (
     FundamentalSnapshot,
     TTMSummary,
 )
+from app.services.currency_conversion import currency_conversion_service
 from app.services.market_data import market_data_service
 from app.services.yahoo_public import yahoo_public_service
 from app.services.official_financials import (
@@ -777,6 +778,11 @@ class FundamentalsService:
             or financial.get("financialCurrency")
             or ""
         ) or None
+        financial_currency = str(
+            financial.get("financialCurrency")
+            or currency
+            or ""
+        ) or None
 
         metrics = FundamentalMetrics(
             market_cap=number(price.get("marketCap")),
@@ -847,15 +853,15 @@ class FundamentalsService:
 
         annual = self._financial_periods(
             payload,
-            currency,
+            financial_currency,
             "annual",
         )
         quarterly = self._financial_periods(
             payload,
-            currency,
+            financial_currency,
             "quarterly",
         )
-        ttm = self._ttm(quarterly, currency)
+        ttm = self._ttm(quarterly, financial_currency)
         highlights = self._highlights(
             annual,
             quarterly,
@@ -887,12 +893,9 @@ class FundamentalsService:
             ),
             exchange=str(price.get("exchangeName") or "") or None,
             currency=currency,
-            financial_currency=str(
-                financial.get("financialCurrency")
-                or currency
-                or ""
-            )
-            or None,
+            financial_currency=financial_currency,
+            native_currency=currency,
+            native_financial_currency=financial_currency,
             website=str(profile.get("website") or "") or None,
             sector=str(profile.get("sector") or "") or None,
             industry=str(profile.get("industry") or "") or None,
@@ -1120,13 +1123,21 @@ class FundamentalsService:
         symbol = market_data_service.normalize_ticker(ticker)
         cached = self._cache.get(symbol)
         if cached and monotonic() - cached[0] < cached[1].refresh_after_seconds:
-            return cached[1]
+            return await currency_conversion_service.fundamental_to_cad(
+                cached[1]
+            )
         task = self._fast_tasks.get(symbol)
         if task is None or task.done():
             task = asyncio.create_task(self._fast_load(ticker, symbol))
             self._fast_tasks[symbol] = task
         if cached and monotonic() - cached[0] < self.stale_seconds:
-            return cached[1].model_copy(update={"stale": True, "refresh_in_progress": True})
-        return await asyncio.shield(task)
+            stale = cached[1].model_copy(
+                update={"stale": True, "refresh_in_progress": True}
+            )
+            return await currency_conversion_service.fundamental_to_cad(
+                stale
+            )
+        native = await asyncio.shield(task)
+        return await currency_conversion_service.fundamental_to_cad(native)
 
 fundamentals_service = FundamentalsService()

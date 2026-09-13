@@ -18,6 +18,7 @@ from app.schemas.stocks import (
     StockProfile,
     Technicals,
 )
+from app.services.currency_conversion import currency_conversion_service
 from app.services.indicators import calculate_technicals
 from app.services.session_quotes import session_quote_service
 
@@ -255,7 +256,14 @@ class YahooProvider:
 
         if len(output) < 2:
             raise RuntimeError("Yahoo history contains insufficient candles")
-        return output
+        native_currency = str(
+            (result.get("meta") or {}).get("currency") or "CAD"
+        )
+        return await currency_conversion_service.candles_to_cad(
+            symbol,
+            native_currency,
+            output,
+        )
 
     @staticmethod
     def profile_from_quote(quote: Quote) -> StockProfile:

@@ -9,6 +9,8 @@ class Quote(BaseModel):
     name: str
     exchange: str
     currency: str
+    native_currency: str | None = None
+    fx_rate_to_cad: float | None = None
     price: float
     previous_close: float
     change: float

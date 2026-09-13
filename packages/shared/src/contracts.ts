@@ -267,7 +267,9 @@ export type FundamentalSnapshot = {
   refresh_in_progress?: boolean;
   stale?: boolean;
   ticker: string; symbol: string; name: string; exchange: string | null; currency: string | null;
-  financial_currency: string | null; website: string | null; sector: string | null; industry: string | null;
+  financial_currency: string | null; native_currency?: string | null; native_financial_currency?: string | null;
+  fx_rate_to_cad?: number | null; financial_fx_rate_to_cad?: number | null;
+  website: string | null; sector: string | null; industry: string | null;
   status: "available" | "partial" | "unavailable"; message: string | null; metrics: FundamentalMetrics;
   annual_financials: FinancialPeriod[]; quarterly_financials: FinancialPeriod[]; ttm: TTMSummary;
   highlights: FinancialHighlights; earnings_history: EarningsQuarter[]; earnings_estimates: EarningsEstimate[];

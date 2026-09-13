@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 from datetime import UTC, datetime, timedelta
 from time import monotonic
 
@@ -212,6 +212,7 @@ def test_component_retention_keeps_estimates_events_real_zero_and_currency_bound
 
 @pytest.mark.asyncio
 async def test_fast_budget_preserves_completed_quote_when_analysts_are_slow(monkeypatch):
+    monkeypatch.setattr(settings, "market_data_provider", "demo")
     service = FundamentalsService()
     service.fast_budget_seconds = .03
     async def fail(_):

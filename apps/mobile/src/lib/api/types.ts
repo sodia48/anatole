@@ -125,6 +125,8 @@ export type Quote = {
   day_high: number;
   day_low: number;
   currency: string;
+  native_currency?: string | null;
+  fx_rate_to_cad?: number | null;
   source: string;
   delayed: boolean;
   timestamp: string;

@@ -309,6 +309,10 @@ class FundamentalSnapshot(BaseModel):
     exchange: str | None = None
     currency: str | None = None
     financial_currency: str | None = None
+    native_currency: str | None = None
+    native_financial_currency: str | None = None
+    fx_rate_to_cad: float | None = None
+    financial_fx_rate_to_cad: float | None = None
     website: str | None = None
     sector: str | None = None
     industry: str | None = None

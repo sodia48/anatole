@@ -296,6 +296,11 @@ class PortfolioService:
             for item in request.positions
             if item.symbol in quote_by_symbol
         }
+        currencies.update(
+            quote.native_currency
+            for quote in quote_by_symbol.values()
+            if quote.native_currency
+        )
         fx_rates, notes = await self._fx_rates(
             currencies,
             request.base_currency,
@@ -316,11 +321,13 @@ class PortfolioService:
             relative_volume = quote.volume / average_volume if average_volume else None
             momentum = _momentum(candles)
             name, sector = _metadata(item.symbol, quote)
-            fx_rate = fx_rates.get(quote.currency)
-            if fx_rate is None:
+            market_fx_rate = fx_rates.get(quote.currency)
+            cost_currency = quote.native_currency or quote.currency
+            cost_fx_rate = fx_rates.get(cost_currency)
+            if market_fx_rate is None or cost_fx_rate is None:
                 continue
-            cost_basis = item.quantity * item.average_cost * fx_rate
-            market_value = item.quantity * quote.price * fx_rate
+            cost_basis = item.quantity * item.average_cost * cost_fx_rate
+            market_value = item.quantity * quote.price * market_fx_rate
             pnl = market_value - cost_basis
             raw_positions.append(
                 {
@@ -328,7 +335,8 @@ class PortfolioService:
                     "quote": quote,
                     "name": name,
                     "sector": sector,
-                    "fx_rate": fx_rate,
+                    "fx_rate": market_fx_rate,
+                    "cost_fx_rate": cost_fx_rate,
                     "cost_basis": cost_basis,
                     "market_value": market_value,
                     "pnl": pnl,

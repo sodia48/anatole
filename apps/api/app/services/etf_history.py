@@ -14,6 +14,7 @@ from app.schemas.etf_history import (
     EtfHistoryRange,
     EtfHistorySnapshot,
 )
+from app.services.currency_conversion import currency_conversion_service
 
 
 REQUEST_TIMEOUT_SECONDS = 35
@@ -367,6 +368,28 @@ class EtfHistoryService:
                         spec,
                     )
                 points = normalize_history_frame(frame)
+                if points and currency.upper() != "CAD":
+                    timestamps = [
+                        int(point.timestamp.timestamp())
+                        for point in points
+                    ]
+                    rates = await currency_conversion_service.rates_to_cad(
+                        currency,
+                        timestamps,
+                    )
+                    if rates is not None:
+                        points = [
+                            point.model_copy(
+                                update={
+                                    "open": point.open * rates[int(point.timestamp.timestamp())],
+                                    "high": point.high * rates[int(point.timestamp.timestamp())],
+                                    "low": point.low * rates[int(point.timestamp.timestamp())],
+                                    "close": point.close * rates[int(point.timestamp.timestamp())],
+                                }
+                            )
+                            for point in points
+                        ]
+                        currency = "CAD"
                 snapshot = build_history_snapshot(
                     ticker=ticker,
                     normalized_symbol=normalized_symbol,
