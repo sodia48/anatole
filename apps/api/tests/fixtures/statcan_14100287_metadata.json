@@ -1,0 +1,78 @@
+{
+  "productId": 14100287,
+  "capturedAt": "2026-09-12",
+  "source": "Statistics Canada WDS getCubeMetadata",
+  "dimension": [
+    {
+      "dimensionPositionId": 1,
+      "dimensionNameEn": "Geography",
+      "dimensionNameFr": "Géographie",
+      "member": [
+        {"memberId": 1, "memberNameEn": "Canada", "memberNameFr": "Canada", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "Newfoundland and Labrador", "memberNameFr": "Terre-Neuve-et-Labrador", "terminated": 0},
+        {"memberId": 3, "memberNameEn": "Prince Edward Island", "memberNameFr": "Île-du-Prince-Édouard", "terminated": 0},
+        {"memberId": 4, "memberNameEn": "Nova Scotia", "memberNameFr": "Nouvelle-Écosse", "terminated": 0},
+        {"memberId": 5, "memberNameEn": "New Brunswick", "memberNameFr": "Nouveau-Brunswick", "terminated": 0},
+        {"memberId": 6, "memberNameEn": "Quebec", "memberNameFr": "Québec", "terminated": 0},
+        {"memberId": 7, "memberNameEn": "Ontario", "memberNameFr": "Ontario", "terminated": 0},
+        {"memberId": 8, "memberNameEn": "Manitoba", "memberNameFr": "Manitoba", "terminated": 0},
+        {"memberId": 9, "memberNameEn": "Saskatchewan", "memberNameFr": "Saskatchewan", "terminated": 0},
+        {"memberId": 10, "memberNameEn": "Alberta", "memberNameFr": "Alberta", "terminated": 0},
+        {"memberId": 11, "memberNameEn": "British Columbia", "memberNameFr": "Colombie-Britannique", "terminated": 0}
+      ]
+    },
+    {
+      "dimensionPositionId": 2,
+      "dimensionNameEn": "Labour force characteristics",
+      "dimensionNameFr": "Caractéristiques de la population active",
+      "member": [
+        {"memberId": 1, "memberNameEn": "Population", "memberNameFr": "Population", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "Labour force", "memberNameFr": "Population active", "terminated": 0},
+        {"memberId": 3, "memberNameEn": "Employment", "memberNameFr": "Emploi", "terminated": 0},
+        {"memberId": 6, "memberNameEn": "Unemployment", "memberNameFr": "Chômage", "terminated": 0},
+        {"memberId": 7, "memberNameEn": "Unemployment rate", "memberNameFr": "Taux de chômage", "terminated": 0}
+      ]
+    },
+    {
+      "dimensionPositionId": 3,
+      "dimensionNameEn": "Gender",
+      "dimensionNameFr": "Genre",
+      "member": [
+        {"memberId": 1, "memberNameEn": "Total - Gender", "memberNameFr": "Total - Genre", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "Men+", "memberNameFr": "Hommes+", "terminated": 0},
+        {"memberId": 3, "memberNameEn": "Women+", "memberNameFr": "Femmes+", "terminated": 0}
+      ]
+    },
+    {
+      "dimensionPositionId": 4,
+      "dimensionNameEn": "Age group",
+      "dimensionNameFr": "Groupe d'âge",
+      "member": [
+        {"memberId": 1, "memberNameEn": "15 years and over", "memberNameFr": "15 ans et plus", "terminated": 0},
+        {"memberId": 8, "memberNameEn": "15 to 64 years", "memberNameFr": "15 à 64 ans", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "15 to 24 years", "memberNameFr": "15 à 24 ans", "terminated": 0}
+      ]
+    },
+    {
+      "dimensionPositionId": 5,
+      "dimensionNameEn": "Statistics",
+      "dimensionNameFr": "Statistiques",
+      "member": [
+        {"memberId": 1, "memberNameEn": "Estimate", "memberNameFr": "Estimation", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "Standard error of estimate", "memberNameFr": "Erreur-type de l'estimation", "terminated": 0},
+        {"memberId": 3, "memberNameEn": "Standard error of month-to-month change", "memberNameFr": "Erreur-type du changement mensuel", "terminated": 0},
+        {"memberId": 4, "memberNameEn": "Standard error of year-over-year change", "memberNameFr": "Erreur-type du changement annuel", "terminated": 0}
+      ]
+    },
+    {
+      "dimensionPositionId": 6,
+      "dimensionNameEn": "Data type",
+      "dimensionNameFr": "Type de données",
+      "member": [
+        {"memberId": 1, "memberNameEn": "Seasonally adjusted", "memberNameFr": "Désaisonnalisées", "terminated": 0},
+        {"memberId": 3, "memberNameEn": "Trend-cycle", "memberNameFr": "Tendance-cycle", "terminated": 0},
+        {"memberId": 2, "memberNameEn": "Unadjusted", "memberNameFr": "Non désaisonnalisées", "terminated": 0}
+      ]
+    }
+  ]
+}

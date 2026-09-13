@@ -190,6 +190,62 @@ def _selector(
     return Selector(tuple(dimensions), tuple(members), required)
 
 
+def _labour_selectors(
+    characteristic_members: Iterable[str],
+) -> tuple[Selector, ...]:
+    """Resolve the LFS view by dimension name, never by position.
+
+    Table 14-10-0287-03 currently exposes six dimensions.  Statistics and
+    data type remain optional so that an official metadata view which omits
+    either dimension can still be resolved without inventing a coordinate.
+    """
+    return (
+        _selector(
+            (
+                "labour force characteristics",
+                "caracteristiques de la population active",
+            ),
+            characteristic_members,
+        ),
+        _selector(
+            ("gender", "sex", "genre", "sexe"),
+            (
+                "total - gender",
+                "total - genre",
+                "both genders",
+                "both sexes",
+                "les deux sexes",
+                "tous les genres",
+            ),
+        ),
+        _selector(
+            ("age group", "age", "groupe d age"),
+            ("15 years and over", "15 ans et plus"),
+        ),
+        _selector(
+            ("statistics", "statistic", "statistiques", "statistique"),
+            ("estimate", "estimation"),
+            required=False,
+        ),
+        _selector(
+            (
+                "data type",
+                "type de donnees",
+                "seasonal adjustment",
+                "desaisonnalisation",
+            ),
+            (
+                "seasonally adjusted",
+                "seasonally adjusted estimates",
+                "desaisonnalise",
+                "donnees desaisonnalisees",
+                "estimations desaisonnalisees",
+            ),
+            required=False,
+        ),
+    )
+
+
 METRICS: tuple[MetricSpec, ...] = (
     MetricSpec(
         key="inflation_yoy",
@@ -227,26 +283,8 @@ METRICS: tuple[MetricSpec, ...] = (
         unit_kind="percent",
         change_kind="points",
         latest_n=2,
-        selectors=(
-            _selector(
-                ("labour force characteristics", "caracteristiques de la population active"),
-                ("unemployment rate", "taux de chomage"),
-            ),
-            _selector(
-                (
-                    "data type",
-                    "type de donnees",
-                    "seasonal adjustment",
-                    "desaisonnalisation",
-                ),
-                (
-                    "seasonally adjusted",
-                    "seasonally adjusted estimates",
-                    "desaisonnalise",
-                    "donnees desaisonnalisees",
-                    "estimations desaisonnalisees",
-                ),
-            ),
+        selectors=_labour_selectors(
+            ("unemployment rate", "taux de chomage"),
         ),
     ),
     MetricSpec(
@@ -261,27 +299,7 @@ METRICS: tuple[MetricSpec, ...] = (
         unit_kind="persons",
         change_kind="percent",
         latest_n=2,
-        selectors=(
-            _selector(
-                ("labour force characteristics", "caracteristiques de la population active"),
-                ("employment", "emploi"),
-            ),
-            _selector(
-                (
-                    "data type",
-                    "type de donnees",
-                    "seasonal adjustment",
-                    "desaisonnalisation",
-                ),
-                (
-                    "seasonally adjusted",
-                    "seasonally adjusted estimates",
-                    "desaisonnalise",
-                    "donnees desaisonnalisees",
-                    "estimations desaisonnalisees",
-                ),
-            ),
-        ),
+        selectors=_labour_selectors(("employment", "emploi")),
     ),
     MetricSpec(
         key="population",
@@ -314,9 +332,7 @@ METRICS: tuple[MetricSpec, ...] = (
                 ("estimates", "estimations"),
                 (
                     "gross domestic product at market prices",
-                    "gross domestic product",
                     "produit interieur brut aux prix du marche",
-                    "produit interieur brut",
                 ),
             ),
             _selector(
@@ -877,11 +893,20 @@ class ProvincialStatisticsService:
             headers=headers,
             follow_redirects=True,
         ) as client:
-            tasks = [
-                self._metric_for_provinces(client, spec, selected, lang)
-                for spec in METRICS
-            ]
-            results = await asyncio.gather(*tasks)
+            # WDS is reliable for these small grouped coordinate requests, but
+            # intermittently times out when all tables perform metadata and
+            # data POSTs at once.  Province 360 warms in the background, so
+            # favour a complete official snapshot over an unnecessary fan-out.
+            results = []
+            for spec in METRICS:
+                results.append(
+                    await self._metric_for_provinces(
+                        client,
+                        spec,
+                        selected,
+                        lang,
+                    )
+                )
 
         for metrics, issue in results:
             if issue:

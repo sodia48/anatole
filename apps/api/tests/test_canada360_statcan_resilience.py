@@ -134,7 +134,7 @@ async def test_province_source_counts_series_not_just_provinces(
     assert "0/10 provinces complètes" in source.detail
 
 
-def test_labour_coordinate_resolves_without_age_or_gender_dimensions() -> None:
+def test_labour_coordinate_resolves_without_optional_statistics_dimension() -> None:
     metadata = {
         "dimension": [
             {
@@ -163,6 +163,42 @@ def test_labour_coordinate_resolves_without_age_or_gender_dimensions() -> None:
             },
             {
                 "dimensionPositionId": 3,
+                "dimensionNameEn": "Gender",
+                "member": [
+                    {
+                        "memberId": 1,
+                        "memberNameEn": "Total - Gender",
+                        "memberNameFr": "Total - Genre",
+                        "terminated": 0,
+                    },
+                    {
+                        "memberId": 2,
+                        "memberNameEn": "Men+",
+                        "memberNameFr": "Hommes+",
+                        "terminated": 0,
+                    },
+                ],
+            },
+            {
+                "dimensionPositionId": 4,
+                "dimensionNameEn": "Age group",
+                "member": [
+                    {
+                        "memberId": 1,
+                        "memberNameEn": "15 years and over",
+                        "memberNameFr": "15 ans et plus",
+                        "terminated": 0,
+                    },
+                    {
+                        "memberId": 2,
+                        "memberNameEn": "15 to 24 years",
+                        "memberNameFr": "15 à 24 ans",
+                        "terminated": 0,
+                    },
+                ],
+            },
+            {
+                "dimensionPositionId": 5,
                 "dimensionNameEn": "Data type",
                 "member": [
                     {
@@ -189,4 +225,4 @@ def test_labour_coordinate_resolves_without_age_or_gender_dimensions() -> None:
         PROVINCE_BY_CODE["QC"],
     )
 
-    assert coordinate == "6.7.1.0.0.0.0.0.0.0"
+    assert coordinate == "6.7.1.1.1.0.0.0.0.0"
