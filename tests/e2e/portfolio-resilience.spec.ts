@@ -65,9 +65,9 @@ function snapshot(items = [
       max_drawdown_percent: null,
       sharpe_ratio: null,
       concentration_hhi: 3333,
-      top_position_percent: 33.33,
-      top_three_percent: 100,
-      diversification_score: 49.4,
+      top_position_percent: 38.28,
+      top_three_percent: 88.03,
+      diversification_score: 55.4,
       risk_level: null,
       history_coverage_percent: 0,
       history_observations: 0,
@@ -82,21 +82,22 @@ function snapshot(items = [
 
 function historicalSnapshot() {
   const data = snapshot();
+  const performance = Array.from({ length: 252 }, (_, index) => ({
+    time: 1_746_057_600 + index * 86_400,
+    portfolio: 100 + index * 0.05,
+    benchmark: 100 + index * 0.04,
+  }));
   return {
     ...data,
-    portfolio_score: 68.4,
-    performance: [
-      { time: 1_746_057_600, portfolio: 100, benchmark: 100 },
-      { time: 1_754_006_400, portfolio: 106.4, benchmark: 104.2 },
-      { time: 1_762_128_000, portfolio: 111.8, benchmark: 108.1 },
-    ],
+    portfolio_score: 61.7,
+    performance,
     risk: {
       ...data.risk,
-      volatility_percent: 14.2,
-      beta: 0.84,
-      max_drawdown_percent: -7.3,
-      sharpe_ratio: 1.26,
-      risk_level: "Modéré",
+      volatility_percent: 15.8,
+      beta: 0.89,
+      max_drawdown_percent: -8.75,
+      sharpe_ratio: 1.94,
+      risk_level: "Faible",
       history_coverage_percent: 100,
       history_observations: 251,
     },
@@ -168,10 +169,13 @@ test.describe("Portfolio progressive degradation", () => {
     await expect(chart.locator("path")).toHaveCount(2);
     await expect(chart.locator("path").first()).toHaveAttribute("d", /L/);
     await expect(chart.locator("path").nth(1)).toHaveAttribute("d", /L/);
-    await expect(page.getByText("14.2 %", { exact: true })).toBeVisible();
-    await expect(page.getByText("0.84", { exact: true })).toBeVisible();
-    await expect(page.getByText("-7.3 %", { exact: true })).toBeVisible();
-    await expect(page.getByText("1.26", { exact: true })).toBeVisible();
+    await expect(page.getByText("15.8 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("0.89", { exact: true })).toBeVisible();
+    await expect(page.getByText("-8.8 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("1.94", { exact: true })).toBeVisible();
+    await expect(page.getByText("61.7", { exact: true })).toBeVisible();
+    await expect(page.getByText("+12.5 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("Diversification 55.4/100", { exact: true })).toBeVisible();
     await expect(page.getByText("Certaines données historiques du portefeuille sont temporairement indisponibles.")).toHaveCount(0);
   });
 

@@ -79,6 +79,25 @@ function optionalFixed(value: number | null, digits: number, language: AnatoleLa
   return value === null ? pick(language, "N/D", "N/A") : `${value.toFixed(digits)}${suffix}`;
 }
 
+function hasUsableHistory(snapshot: PortfolioSnapshot | null): boolean {
+  if (!snapshot) return false;
+  return snapshot.performance.length > 0 || (snapshot.risk?.history_coverage_percent ?? 0) >= 70;
+}
+
+function logPortfolioSnapshot(kind: "fast" | "full", snapshot: PortfolioSnapshot): void {
+  if (process.env.NODE_ENV !== "production") {
+    console.debug(`portfolio-${kind}`, {
+      performance: snapshot.performance.length,
+      risk: snapshot.risk,
+    });
+  }
+}
+
+function visiblePortfolioNotes(snapshot: PortfolioSnapshot): string[] {
+  const historyIsUsable = (snapshot.risk?.history_coverage_percent ?? 0) >= 70 && snapshot.performance.length > 0;
+  return snapshot.notes.filter((note) => !historyIsUsable || !/couverture historique/i.test(note));
+}
+
 function loadPositions(): PortfolioPositionInput[] {
   if (typeof window === "undefined") return [];
   try {
@@ -230,6 +249,12 @@ export function PortfolioClient() {
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const refreshSequenceRef = useRef(0);
+  const snapshotRef = useRef<PortfolioSnapshot | null>(null);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
 
   useEffect(() => {
     const saved = loadPositions();
@@ -283,17 +308,25 @@ export function PortfolioClient() {
     }
     refreshControllerRef.current?.abort();
     const controller = new AbortController();
+    const sequence = refreshSequenceRef.current + 1;
+    refreshSequenceRef.current = sequence;
     refreshControllerRef.current = controller;
+    const isCurrentRequest = () => refreshControllerRef.current === controller && refreshSequenceRef.current === sequence && !controller.signal.aborted;
     setLoading(true);
     setError(null);
     setHistoryError(null);
     try {
       const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
-      setSnapshot(currentSnapshot);
+      if (!isCurrentRequest()) return;
+      logPortfolioSnapshot("fast", currentSnapshot);
+      setSnapshot((previous) => hasUsableHistory(previous) ? previous : currentSnapshot);
       try {
         const fullSnapshot = await analyzePortfolio(current, controller.signal);
+        if (!isCurrentRequest()) return;
+        logPortfolioSnapshot("full", fullSnapshot);
         setSnapshot(fullSnapshot);
-        if ((fullSnapshot.risk?.history_coverage_percent ?? 0) < 70) {
+        const historyIsUsable = hasUsableHistory(fullSnapshot) && (fullSnapshot.risk?.history_coverage_percent ?? 0) >= 70;
+        if (!historyIsUsable) {
           const message = pick(
             language,
             "Certaines données historiques du portefeuille sont temporairement indisponibles.",
@@ -301,10 +334,14 @@ export function PortfolioClient() {
           );
           setError(message);
           setHistoryError(message);
+        } else {
+          setError(null);
+          setHistoryError(null);
         }
       } catch (reason) {
-        if (controller.signal.aborted) return;
+        if (!isCurrentRequest()) return;
         console.error("portfolio_full_analysis_failed", reason);
+        if (hasUsableHistory(snapshotRef.current)) return;
         const message = pick(
           language,
           "Certaines données historiques du portefeuille sont temporairement indisponibles.",
@@ -399,7 +436,7 @@ export function PortfolioClient() {
   };
 
   const performanceReturn = snapshot?.performance.length
-    ? snapshot.performance[snapshot.performance.length - 1].portfolio - 100
+    ? ((snapshot.performance[snapshot.performance.length - 1].portfolio / snapshot.performance[0].portfolio) - 1) * 100
     : null;
 
   const liveCount = useMemo(
@@ -419,7 +456,7 @@ export function PortfolioClient() {
           <p>{pick(language, "Positions locales, performance, P&L, allocation sectorielle, concentration et risque. Aucun ordre n’est exécuté et les positions restent dans ce navigateur.", "Local positions, performance, P&L, sector allocation, concentration, and risk. No order is executed and positions remain in this browser.")}</p>
         </div>
         <div className={styles.heroMetric}>
-          <strong>{snapshot?.portfolio_score?.toFixed(0) ?? pick(language, "N/D", "N/A")}</strong>
+          <strong>{snapshot?.portfolio_score?.toFixed(1) ?? pick(language, "N/D", "N/A")}</strong>
           <span>{pick(language, "score portefeuille", "portfolio score")}</span>
           <small>{positions.length} {pick(language, `position${positions.length > 1 ? "s" : ""}`, `position${positions.length === 1 ? "" : "s"}`)} · {liveCount} {pick(language, `cotation${liveCount > 1 ? "s" : ""} publique${liveCount > 1 ? "s" : ""}`, `public quote${liveCount === 1 ? "" : "s"}`)}</small>
         </div>
@@ -463,7 +500,7 @@ export function PortfolioClient() {
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pendingValue}</small></article>
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pendingValue}</small></article>
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? percent(performanceReturn) : pendingValue}</strong><small>{pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? riskLabel(snapshot.risk?.risk_level ?? null, language) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(0)}/100`}` : pendingValue}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? riskLabel(snapshot.risk?.risk_level ?? null, language) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(1)}/100`}` : pendingValue}</small></article>
           </section>
 
           <section className={`panel ${styles.panel}`}>
@@ -510,7 +547,7 @@ export function PortfolioClient() {
                     <div className={styles.riskMetric}><span>{pick(language, "Plus grande position", "Largest position")}</span><strong>{optionalFixed(snapshot.risk.top_position_percent, 1, language, " %")}</strong></div>
                     <div className={styles.riskMetric}><span>Top 3</span><strong>{optionalFixed(snapshot.risk.top_three_percent, 1, language, " %")}</strong></div>
                   </div> : <div className={styles.notice}>{pick(language, "Diagnostic de risque indisponible pour les données actuelles.", "Risk assessment is unavailable for the current data.")}</div>}
-                  {snapshot.notes.map((note, index) => <div className={styles.notice} style={{ marginTop: 10 }} key={note}>{language === "fr" ? note : pick(language, "", [
+                  {visiblePortfolioNotes(snapshot).map((note, index) => <div className={styles.notice} style={{ marginTop: 10 }} key={note}>{language === "fr" ? note : pick(language, "", [
                     "This portfolio risk note is based on the current positions and available market history.",
                     "Concentration and volatility should be reviewed alongside the underlying data coverage.",
                     "Risk indicators are informational and do not constitute financial advice.",
