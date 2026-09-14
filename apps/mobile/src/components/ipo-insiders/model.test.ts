@@ -1,5 +1,5 @@
 import type { InsiderSnapshot, InsiderTrade, IpoItem } from "@/src/lib/api/types";
-import { dedupeInsiderTradesForRender, filterIpoItems, formatIpoPrice, insiderCoverageUnavailable, insiderPreviewScanLimit } from "./model";
+import { dedupeInsiderTradesForRender, filterIpoItems, formatInsiderMoney, formatIpoPrice, insiderCoverageUnavailable, insiderPriceLabel, insiderPreviewScanLimit } from "./model";
 
 function ipo(overrides: Partial<IpoItem>): IpoItem {
   return {
@@ -43,5 +43,13 @@ describe("IPO and insider mobile model", () => {
     const result = dedupeInsiderTradesForRender([trade("same", 100), trade("same", 250), trade("distinct", 500)]);
     expect(result.map((item) => item.id)).toEqual(["same", "distinct"]);
     expect(result[0]?.shares).toBe(100);
+  });
+
+  it("renders insider values with explicit currency and never an ambiguous dollar sign", () => {
+    expect(formatInsiderMoney(129, "USD", "fr", false)).toMatch(/129,00\s*USD/);
+    expect(formatInsiderMoney(1_935_000, "USD", "fr")).toMatch(/1,94\s*M\s*USD/);
+    expect(formatInsiderMoney(129, null, "fr", false)).toBe("129,00 — devise non fournie");
+    expect(formatInsiderMoney(129, null, "en", false)).toBe("129.00 — currency unavailable");
+    expect(insiderPriceLabel("exercise", "fr")).toBe("Prix d’exercice");
   });
 });

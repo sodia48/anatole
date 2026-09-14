@@ -72,6 +72,10 @@ export type InsiderTransactionType =
   | "exercise"
   | "tax"
   | "other";
+export type InsiderCurrencySource = "source" | "verified" | "inferred" | "unknown";
+export type InsiderPriceType = "market" | "exercise" | "grant" | "conversion" | "private" | "unknown";
+export type InsiderClassificationSource = "regulatory_code" | "provider_code" | "inferred_change" | "unknown";
+export type InsiderPriceValidation = "verified" | "plausible" | "outside_market_range" | "not_applicable" | "unavailable";
 
 export type InsiderTrade = {
   id: string;
@@ -87,6 +91,14 @@ export type InsiderTrade = {
   filing_date: string | null;
   shares: number | null;
   price: number | null;
+  price_currency?: string | null;
+  value_currency?: string | null;
+  currency_source?: InsiderCurrencySource;
+  price_type?: InsiderPriceType;
+  classification_source?: InsiderClassificationSource;
+  price_validation?: InsiderPriceValidation;
+  price_validation_detail?: string | null;
+  market_price_ranges?: Array<{ listing: string; currency: string; low: number; high: number }>;
   value: number | null;
   holdings_after: number | null;
   ownership: string;
@@ -95,6 +107,7 @@ export type InsiderTrade = {
   source_url: string;
   official_verification_url: string;
   official_source: boolean;
+  regulatory_source_name?: string | null;
 };
 
 export type InsiderSnapshot = {
@@ -108,6 +121,9 @@ export type InsiderSnapshot = {
     buy_value: number;
     sell_value: number;
     net_value: number;
+    buy_value_currency?: string | null;
+    sell_value_currency?: string | null;
+    net_value_currency?: string | null;
     buy_ratio_percent: number;
     unusual_transactions: number;
   };

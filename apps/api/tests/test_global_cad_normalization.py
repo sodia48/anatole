@@ -149,6 +149,56 @@ async def test_yahoo_history_passes_normalized_symbol_to_cad_converter(
 
 
 @pytest.mark.asyncio
+async def test_yahoo_exact_symbol_history_preserves_native_listing_currency(
+    monkeypatch,
+) -> None:
+    provider = YahooProvider()
+    timestamps = [1_700_000_000, 1_700_086_400]
+    chart_calls = []
+
+    async def chart(
+        ticker,
+        _range,
+        _interval,
+        _attempts=None,
+        *,
+        normalize_symbol=True,
+    ):
+        chart_calls.append((ticker, normalize_symbol))
+        return {
+            "meta": {"currency": "USD"},
+            "timestamp": timestamps,
+            "indicators": {"quote": [{
+                "open": [128.0, 129.0],
+                "high": [131.0, 132.0],
+                "low": [126.0, 127.0],
+                "close": [130.0, 131.0],
+                "volume": [100, 120],
+            }]},
+        }
+
+    async def unexpected_conversion(*_args):
+        raise AssertionError("exact listing history must remain source-native")
+
+    monkeypatch.setattr(provider, "chart", chart)
+    monkeypatch.setattr(
+        "app.services.market_data.currency_conversion_service.candles_to_cad",
+        unexpected_conversion,
+    )
+
+    candles = await provider.history(
+        "SHOP",
+        "1y",
+        "1d",
+        normalize_symbol=False,
+    )
+
+    assert chart_calls == [("SHOP", False)]
+    assert candles[0].low == 126.0
+    assert candles[0].high == 131.0
+
+
+@pytest.mark.asyncio
 async def test_fundamentals_money_is_cad_ratios_are_unchanged(
     monkeypatch,
 ) -> None:

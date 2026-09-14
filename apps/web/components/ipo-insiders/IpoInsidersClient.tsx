@@ -97,7 +97,9 @@ function formatDate(
     day: "numeric",
     month: "short",
     year: "numeric",
-    timeZone: "America/Toronto",
+    // API transaction dates are calendar dates, not UTC instants. Formatting
+    // them in Toronto would shift YYYY-MM-DD values to the preceding day.
+    timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : "America/Toronto",
   }).format(date);
 }
 
@@ -120,6 +122,8 @@ function formatNumber(
 function formatMoney(
   value: number | null,
   language: AnatoleLanguage,
+  currency: string | null | undefined,
+  compact = true,
 ): string {
   if (
     value === null ||
@@ -128,18 +132,54 @@ function formatMoney(
     return "N/D";
   }
 
-  return new Intl.NumberFormat(localeFor(language), {
-    style: "currency",
-    currency: "CAD",
-    notation:
-      Math.abs(value) >= 1_000_000
-        ? "compact"
-        : "standard",
-    maximumFractionDigits:
-      Math.abs(value) >= 1_000_000
-        ? 2
-        : 0,
+  const notation = compact && Math.abs(value) >= 1_000_000
+    ? "compact"
+    : "standard";
+  if (!currency) {
+    const formatted = new Intl.NumberFormat(localeFor(language), {
+      notation,
+      minimumFractionDigits: compact ? 0 : 2,
+      maximumFractionDigits: compact && Math.abs(value) >= 1_000_000 ? 2 : 2,
+    }).format(value);
+    return `${formatted} — ${pick(language, "devise non fournie", "currency unavailable")}`;
+  }
+
+  const formatted = new Intl.NumberFormat(localeFor(language), {
+    notation,
+    minimumFractionDigits: compact ? 0 : 2,
+    maximumFractionDigits: compact && Math.abs(value) >= 1_000_000 ? 2 : 2,
   }).format(value);
+  return `${formatted} ${currency}`;
+}
+
+function insiderPriceLabel(
+  priceType: string | undefined,
+  language: AnatoleLanguage,
+): string {
+  if (priceType === "exercise") return pick(language, "Prix d’exercice", "Exercise price");
+  if (priceType === "grant") return pick(language, "Prix d’attribution", "Grant price");
+  if (priceType === "conversion") return pick(language, "Prix de conversion", "Conversion price");
+  if (priceType === "market") return pick(language, "Prix de marché", "Market price");
+  return pick(language, "Prix déclaré", "Reported price");
+}
+
+function classificationSourceLabel(value: string | undefined, language: AnatoleLanguage): string {
+  return ({
+    regulatory_code: pick(language, "Code réglementaire", "Regulatory code"),
+    provider_code: pick(language, "Code fournisseur", "Provider code"),
+    inferred_change: pick(language, "Inféré du changement de détention", "Inferred from holding change"),
+    unknown: pick(language, "Non déterminée", "Undetermined"),
+  } as Record<string, string>)[value ?? "unknown"];
+}
+
+function validationLabel(value: string | undefined, language: AnatoleLanguage): string {
+  return ({
+    verified: pick(language, "Prix vérifié", "Price verified"),
+    plausible: pick(language, "Prix plausible", "Plausible price"),
+    outside_market_range: pick(language, "Prix déclaré hors de la fourchette du marché — vérifier la source", "Reported price outside the market range — verify the source"),
+    not_applicable: pick(language, "Validation marché non applicable", "Market validation not applicable"),
+    unavailable: pick(language, "Validation marché indisponible", "Market validation unavailable"),
+  } as Record<string, string>)[value ?? "unavailable"];
 }
 
 function formatIpoPrice(
@@ -1380,6 +1420,7 @@ export function IpoInsidersClient({
                         insiders.summary
                           .net_value,
                         language,
+                        insiders.summary.net_value_currency,
                       )}
               </strong>
             </article>
@@ -1448,7 +1489,7 @@ export function IpoInsidersClient({
                 }}
               >
                 <option value="canada">
-                  Canada — SEDI via Finnhub
+                  {pick(language, "Canada — Initiés (fournisseurs · vérification SEDI)", "Canada — Insiders (providers · SEDI verification)")}
                 </option>
                 <option value="us">
                   {pick(language, "États-Unis — SEC", "United States — SEC")}
@@ -1624,12 +1665,8 @@ export function IpoInsidersClient({
 
                 {filteredTrades.map(
                   (trade) => (
-                    <div
-                      className={
-                        styles.tradeRow
-                      }
-                      key={trade.id}
-                    >
+                    <div className={styles.tradeEntry} key={trade.id}>
+                      <div className={styles.tradeRow}>
                       <button
                         type="button"
                         className={
@@ -1690,10 +1727,22 @@ export function IpoInsidersClient({
                         )}
                       </span>
                       <span>
-                        {formatMoney(
+                        <strong>{formatMoney(
                           trade.price,
                           language,
-                        )}
+                          trade.price_currency,
+                          false,
+                        )}</strong>
+                        <small>
+                          {insiderPriceLabel(trade.price_type, language)}
+                          {trade.currency_source === "source"
+                            ? ` · ${pick(language, "déclaration source", "source filing")}`
+                            : trade.currency_source === "verified"
+                              ? ` · ${pick(language, "devise vérifiée", "verified currency")}`
+                              : !trade.price_currency
+                                ? ` · ${pick(language, "devise à confirmer", "currency to confirm")}`
+                                : ""}
+                        </small>
                       </span>
                       <span
                         className={tradeClass(
@@ -1703,6 +1752,7 @@ export function IpoInsidersClient({
                         {formatMoney(
                           trade.value,
                           language,
+                          trade.value_currency,
                         )}
                         {trade.unusual ? (
                           <small
@@ -1744,6 +1794,22 @@ export function IpoInsidersClient({
                           {pick(language, "Officiel ↗", "Official ↗")}
                         </a>
                       </span>
+                      </div>
+                      <details className={styles.tradeDetails}>
+                        <summary>{pick(language, "Détails de la transaction", "Transaction details")}</summary>
+                        <dl>
+                          <div><dt>{pick(language, "Donnée", "Data")}</dt><dd>{trade.source_name}</dd></div>
+                          <div><dt>{pick(language, "Vérification officielle", "Official verification")}</dt><dd>{trade.regulatory_source_name ?? (trade.market === "Canada" ? "SEDI" : "SEC EDGAR")}</dd></div>
+                          <div><dt>{pick(language, "Code transaction", "Transaction code")}</dt><dd>{trade.transaction_code || "N/D"}</dd></div>
+                          <div><dt>{pick(language, "Classification", "Classification")}</dt><dd>{classificationSourceLabel(trade.classification_source, language)}</dd></div>
+                          <div><dt>{pick(language, "Type", "Type")}</dt><dd>{insiderPriceLabel(trade.price_type, language)}</dd></div>
+                          <div><dt>{pick(language, "Prix déclaré", "Reported price")}</dt><dd>{formatMoney(trade.price, language, trade.price_currency, false)}</dd></div>
+                          <div><dt>{pick(language, "Cours ce jour-là", "Market range that day")}</dt><dd>{trade.market_price_ranges?.length
+                            ? trade.market_price_ranges.map((item) => `${item.listing}: ${item.low.toFixed(2)}–${item.high.toFixed(2)} ${item.currency}`).join(" · ")
+                            : pick(language, "Indisponible", "Unavailable")}</dd></div>
+                          <div><dt>{pick(language, "Statut", "Status")}</dt><dd>{trade.price_validation_detail ?? validationLabel(trade.price_validation, language)}</dd></div>
+                        </dl>
+                      </details>
                     </div>
                   ),
                 )}
@@ -1834,6 +1900,7 @@ export function IpoInsidersClient({
                   insiders.summary
                     .buy_value,
                   language,
+                  insiders.summary.buy_value_currency,
                 )}
               </strong>
             </article>
@@ -1850,6 +1917,7 @@ export function IpoInsidersClient({
                   insiders.summary
                     .sell_value,
                   language,
+                  insiders.summary.sell_value_currency,
                 )}
               </strong>
             </article>

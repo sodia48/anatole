@@ -17,11 +17,14 @@ import pandas as pd
 
 from app.core.config import settings
 from app.schemas.ipo_insiders import (
+    InsiderMarketPriceRange,
     InsiderSnapshot,
     InsiderSourceStatus,
     InsiderSummary,
     InsiderTrade,
 )
+from app.schemas.stocks import Candle
+from app.services.market_data import market_data_service
 
 
 SEDI_URL = (
@@ -70,6 +73,20 @@ FALLBACK_TSX60: tuple[tuple[str, str], ...] = (
 )
 
 SEC_CODES = {
+    "P": ("buy", "Achat au marché"),
+    "S": ("sell", "Vente au marché"),
+    "A": ("grant", "Attribution"),
+    "M": ("exercise", "Exercice d’options"),
+    "F": ("tax", "Retenue fiscale"),
+    "C": ("exercise", "Conversion"),
+    "G": ("other", "Don"),
+    "J": ("other", "Autre opération"),
+}
+
+# Finnhub exposes provider transaction codes in the insider-transactions feed.
+# Keep this mapping separate from SEC Form 4 codes: identical characters from
+# different sources must never be treated as the same evidence implicitly.
+FINNHUB_CODES = {
     "P": ("buy", "Achat au marché"),
     "S": ("sell", "Vente au marché"),
     "A": ("grant", "Attribution"),
@@ -149,6 +166,44 @@ def trade_id(*parts: Any) -> str:
     ).hexdigest()[:20]
 
 
+def classify_transaction(
+    transaction: str = "",
+    text: str = "",
+    *,
+    acquired_disposed: str = "",
+    code: str = "",
+    code_mapping: dict[str, tuple[str, str]] | None = None,
+    code_source: str = "provider_code",
+    change: float | None = None,
+) -> tuple[str, str, str]:
+    code = code.strip().upper()
+    if code_mapping is not None and code in code_mapping:
+        transaction_type, label = code_mapping[code]
+        return transaction_type, label, code_source
+    value = f"{transaction} {text}".lower()
+    # Disposition descriptions can contain words such as "purchase plan".
+    # The economic action must win over the name of the plan.
+    if any(token in value for token in ("sale", "sell", "disposition", "disposed")):
+        return "sell", "Vente", "provider_code"
+    if any(token in value for token in ("purchase", "buy", "acquisition", "acquired")):
+        return "buy", "Achat", "provider_code"
+    if any(token in value for token in ("grant", "award", "restricted stock")):
+        return "grant", "Attribution", "provider_code"
+    if any(token in value for token in ("exercise", "conversion", "option")):
+        return "exercise", "Exercice d’options", "provider_code"
+    if any(token in value for token in ("tax", "withhold")):
+        return "tax", "Retenue fiscale", "provider_code"
+    if acquired_disposed.upper() == "A":
+        return "buy", "Acquisition", code_source
+    if acquired_disposed.upper() == "D":
+        return "sell", "Disposition", code_source
+    if change is not None and change > 0:
+        return "buy", "Achat", "inferred_change"
+    if change is not None and change < 0:
+        return "sell", "Vente", "inferred_change"
+    return "other", "Autre", "unknown"
+
+
 def infer_transaction_type(
     transaction: str = "",
     text: str = "",
@@ -156,25 +211,50 @@ def infer_transaction_type(
     acquired_disposed: str = "",
     code: str = "",
 ) -> tuple[str, str]:
-    code = code.strip().upper()
-    if code in SEC_CODES:
-        return SEC_CODES[code]
-    value = f"{transaction} {text}".lower()
-    if any(token in value for token in ("purchase", "buy", "acquisition", "acquired")):
-        return "buy", "Achat"
-    if any(token in value for token in ("sale", "sell", "disposition", "disposed")):
-        return "sell", "Vente"
-    if any(token in value for token in ("grant", "award", "restricted stock")):
-        return "grant", "Attribution"
-    if any(token in value for token in ("exercise", "conversion", "option")):
-        return "exercise", "Exercice d’options"
-    if any(token in value for token in ("tax", "withhold")):
-        return "tax", "Retenue fiscale"
-    if acquired_disposed.upper() == "A":
-        return "buy", "Acquisition"
-    if acquired_disposed.upper() == "D":
-        return "sell", "Disposition"
-    return "other", "Autre"
+    transaction_type, label, _ = classify_transaction(
+        transaction,
+        text,
+        acquired_disposed=acquired_disposed,
+        code=code,
+        code_mapping=SEC_CODES,
+        code_source="regulatory_code",
+    )
+    return transaction_type, label
+
+
+def price_type_for_transaction(
+    transaction_type: str,
+    *,
+    code: str = "",
+    label: str = "",
+    context: str = "",
+) -> str:
+    normalized_code = code.strip().upper()
+    normalized_context = f"{label} {context}".casefold()
+    if "private" in normalized_context:
+        return "private"
+    if normalized_code == "C" or "conversion" in normalized_context:
+        return "conversion"
+    if transaction_type == "exercise":
+        return "exercise"
+    if transaction_type == "grant":
+        return "grant"
+    if transaction_type in {"buy", "sell"}:
+        return "market"
+    return "unknown"
+
+
+def source_currency(row: dict[str, Any]) -> str | None:
+    for key in (
+        "priceCurrency",
+        "transactionPriceCurrency",
+        "transactionCurrency",
+        "currency",
+    ):
+        value = str(row.get(key) or "").strip().upper()
+        if re.fullmatch(r"[A-Z]{3}", value):
+            return value
+    return None
 
 
 def parse_yahoo_insider_frame(
@@ -260,8 +340,18 @@ def parse_yahoo_insider_frame(
             row_value(row, "Ownership", "Ownership Type")
             or ""
         ).strip()
-        transaction_type, label = infer_transaction_type(
+        transaction_type, label, classification_source = classify_transaction(
             transaction, text
+        )
+        raw_currency = str(
+            row_value(row, "Currency", "Price Currency", "Transaction Currency")
+            or ""
+        ).strip().upper()
+        currency = raw_currency if re.fullmatch(r"[A-Z]{3}", raw_currency) else None
+        price_type = price_type_for_transaction(
+            transaction_type,
+            label=label,
+            context=f"{transaction} {text}",
         )
         output.append(
             InsiderTrade(
@@ -279,6 +369,14 @@ def parse_yahoo_insider_frame(
                 trade_date=trade_date,
                 shares=shares,
                 price=price,
+                price_currency=currency,
+                value_currency=currency,
+                currency_source="source" if currency else "unknown",
+                price_type=price_type,
+                classification_source=classification_source,
+                price_validation=(
+                    "unavailable" if price_type == "market" else "not_applicable"
+                ),
                 value=abs(value) if value is not None else None,
                 ownership=ownership,
                 unusual=(
@@ -289,6 +387,7 @@ def parse_yahoo_insider_frame(
                 source_url=source_url,
                 official_verification_url=SEDI_URL,
                 official_source=False,
+                regulatory_source_name="SEDI",
             )
         )
     return output
@@ -307,6 +406,7 @@ def parse_finnhub_insider_payload(
         return []
 
     output: list[InsiderTrade] = []
+    payload_currency = source_currency(payload)
     clean_ticker = display_ticker(ticker)
     for row in rows:
         if not isinstance(row, dict):
@@ -318,19 +418,32 @@ def parse_finnhub_insider_payload(
         trade_date = safe_date(row.get("transactionDate"))
         filing_date = safe_date(row.get("filingDate"))
         price = safe_float(row.get("transactionPrice"))
+        currency = source_currency(row) or payload_currency
         transaction_code = str(
             row.get("transactionCode") or ""
         ).strip().upper()
-        if transaction_code in SEC_CODES:
-            transaction_type, transaction_label = SEC_CODES[
-                transaction_code
-            ]
-        elif change is not None and change > 0:
-            transaction_type, transaction_label = "buy", "Achat"
-        elif change is not None and change < 0:
-            transaction_type, transaction_label = "sell", "Vente"
-        else:
-            transaction_type, transaction_label = "other", "Autre"
+        transaction_type, transaction_label, classification_source = classify_transaction(
+            str(row.get("transactionType") or row.get("type") or ""),
+            str(row.get("description") or ""),
+            acquired_disposed=str(
+                row.get("acquiredDisposedCode")
+                or row.get("acquiredDisposed")
+                or ""
+            ),
+            code=transaction_code,
+            code_mapping=FINNHUB_CODES,
+            code_source="provider_code",
+            change=change,
+        )
+        price_type = price_type_for_transaction(
+            transaction_type,
+            code=transaction_code,
+            label=transaction_label,
+            context=(
+                f"{row.get('transactionType') or row.get('type') or ''} "
+                f"{row.get('description') or ''}"
+            ),
+        )
         value = (
             abs(change * price)
             if change is not None and price is not None
@@ -360,6 +473,14 @@ def parse_finnhub_insider_payload(
                 filing_date=filing_date,
                 shares=shares,
                 price=price,
+                price_currency=currency,
+                value_currency=currency,
+                currency_source="source" if currency else "unknown",
+                price_type=price_type,
+                classification_source=classification_source,
+                price_validation=(
+                    "unavailable" if price_type == "market" else "not_applicable"
+                ),
                 value=value,
                 holdings_after=holdings_after,
                 ownership="",
@@ -371,6 +492,7 @@ def parse_finnhub_insider_payload(
                 source_url=FINNHUB_SOURCE_URL,
                 official_verification_url=SEDI_URL,
                 official_source=False,
+                regulatory_source_name="SEDI",
             )
         )
     return output
@@ -462,13 +584,21 @@ def parse_sec_ownership_xml(
             transaction,
             "./ownershipNature/directOrIndirectOwnership/value",
         )
-        transaction_type, label = infer_transaction_type(
+        transaction_type, label, classification_source = classify_transaction(
             acquired_disposed=acquired_disposed,
             code=code,
+            code_mapping=SEC_CODES,
+            code_source="regulatory_code",
         )
         if derivative and transaction_type == "other":
             transaction_type = "exercise"
             label = "Opération sur dérivé"
+            classification_source = "regulatory_code"
+        price_type = price_type_for_transaction(
+            transaction_type,
+            code=code,
+            label=label,
+        )
         value = (
             abs(shares * price)
             if shares is not None and price is not None
@@ -492,6 +622,15 @@ def parse_sec_ownership_xml(
                 filing_date=filing_date,
                 shares=shares,
                 price=price,
+                price_currency=None,
+                value_currency=None,
+                currency_source="unknown",
+                price_type=price_type,
+                classification_source=classification_source,
+                price_validation=(
+                    "unavailable" if price_type == "market" else "not_applicable"
+                ),
+                price_validation_detail=None,
                 value=value,
                 holdings_after=holdings_after,
                 ownership=ownership,
@@ -503,6 +642,7 @@ def parse_sec_ownership_xml(
                 source_url=source_url,
                 official_verification_url=source_url,
                 official_source=True,
+                regulatory_source_name="SEC EDGAR",
             )
         )
 
@@ -515,6 +655,127 @@ def parse_sec_ownership_xml(
     ):
         consume(transaction, derivative=True)
     return output
+
+
+def _candle_on(candles: list[Candle], trade_date: date) -> Candle | None:
+    return next(
+        (
+            candle
+            for candle in candles
+            if datetime.fromtimestamp(candle.time, tz=UTC).date() == trade_date
+        ),
+        None,
+    )
+
+
+def validate_trade_price(
+    trade: InsiderTrade,
+    histories: dict[str, list[Candle]],
+    *,
+    tolerance_percent: float = 3.0,
+) -> InsiderTrade:
+    if trade.price_type != "market":
+        return trade.model_copy(update={"price_validation": "not_applicable"})
+    if trade.price is None or trade.trade_date is None:
+        return trade.model_copy(update={"price_validation": "unavailable"})
+
+    listings = (
+        (canadian_symbol(trade.ticker), "CAD"),
+        (display_ticker(trade.ticker), "USD"),
+    )
+    ranges: list[InsiderMarketPriceRange] = []
+    for listing, currency in listings:
+        candles = histories.get(listing.upper(), histories.get(listing, []))
+        candle = _candle_on(candles, trade.trade_date)
+        if candle is None:
+            continue
+        ranges.append(InsiderMarketPriceRange(
+            listing=listing,
+            currency=currency,
+            low=round(candle.low, 4),
+            high=round(candle.high, 4),
+        ))
+
+    if not ranges:
+        return trade.model_copy(update={
+            "price_validation": "unavailable",
+            "market_price_ranges": [],
+        })
+
+    applicable = [
+        item for item in ranges
+        if trade.price_currency is None or item.currency == trade.price_currency
+    ]
+    exact = [
+        item for item in applicable
+        if item.low <= trade.price <= item.high
+    ]
+    tolerance = max(0.0, tolerance_percent) / 100
+    plausible = [
+        item for item in applicable
+        if item.low * (1 - tolerance) <= trade.price <= item.high * (1 + tolerance)
+    ]
+    matched = exact or plausible
+    if len(matched) == 1:
+        match = matched[0]
+        currency = trade.price_currency or match.currency
+        return trade.model_copy(update={
+            "price_currency": currency,
+            "value_currency": trade.value_currency or currency,
+            "currency_source": (
+                trade.currency_source
+                if trade.price_currency
+                else "verified"
+            ),
+            "price_validation": "verified" if exact else "plausible",
+            "price_validation_detail": (
+                f"Prix cohérent avec {match.listing} ({match.currency})."
+            ),
+            "market_price_ranges": ranges,
+        })
+    if len(matched) > 1:
+        return trade.model_copy(update={
+            "price_validation": "plausible",
+            "price_validation_detail": (
+                "Prix compatible avec plusieurs listings; devise à confirmer."
+            ),
+            "market_price_ranges": ranges,
+        })
+    return trade.model_copy(update={
+        "price_validation": "outside_market_range",
+        "price_validation_detail": (
+            "Prix déclaré hors de la fourchette du marché — vérifier la source."
+        ),
+        "market_price_ranges": ranges,
+    })
+
+
+async def validate_canadian_trade_prices(
+    trades: list[InsiderTrade],
+) -> list[InsiderTrade]:
+    candidates = list(dict.fromkeys(
+        listing.upper()
+        for trade in trades
+        if trade.price_type == "market"
+        and trade.price is not None
+        and trade.trade_date is not None
+        for listing in (
+            canadian_symbol(trade.ticker),
+            display_ticker(trade.ticker),
+        )
+    ))
+    if not candidates:
+        return trades
+    histories = await market_data_service.get_history_many_strict(
+        candidates,
+        range_="1y",
+        interval="1d",
+        concurrency=8,
+        deadline_seconds=8,
+        attempts=1,
+        exact_symbols=True,
+    )
+    return [validate_trade_price(trade, histories) for trade in trades]
 
 
 def deduplicate_trades(
@@ -550,6 +811,13 @@ def deduplicate_trades(
 def summarize_trades(
     trades: list[InsiderTrade],
 ) -> InsiderSummary:
+    def value_currency(items: list[InsiderTrade]) -> str | None:
+        valued = [item for item in items if item.value is not None]
+        currencies = {item.value_currency for item in valued}
+        if not valued or None in currencies or len(currencies) != 1:
+            return None
+        return next(iter(currencies))
+
     buys = [
         trade for trade in trades
         if trade.transaction_type == "buy"
@@ -561,6 +829,17 @@ def summarize_trades(
     denominator = len(buys) + len(sells)
     buy_value = sum(trade.value or 0 for trade in buys)
     sell_value = sum(trade.value or 0 for trade in sells)
+    buy_currency = value_currency(buys)
+    sell_currency = value_currency(sells)
+    net_currency = (
+        buy_currency
+        if buys and not sells
+        else sell_currency
+        if sells and not buys
+        else buy_currency
+        if buy_currency is not None and buy_currency == sell_currency
+        else None
+    )
     return InsiderSummary(
         transactions=len(trades),
         companies=len({trade.ticker for trade in trades if trade.ticker}),
@@ -573,6 +852,9 @@ def summarize_trades(
         buy_value=buy_value,
         sell_value=sell_value,
         net_value=buy_value - sell_value,
+        buy_value_currency=buy_currency,
+        sell_value_currency=sell_currency,
+        net_value_currency=net_currency,
         buy_ratio_percent=(
             len(buys) / denominator * 100
             if denominator else 0
@@ -1417,6 +1699,14 @@ class InsiderService:
                         url="https://www.sec.gov/search-filings",
                     )
                 )
+
+        if normalized_market == "Canada" and trades:
+            try:
+                trades = await validate_canadian_trade_prices(trades)
+            except Exception:
+                # Price validation is contextual enrichment. The regulatory or
+                # provider transaction remains visible with explicit unknowns.
+                pass
 
         cutoff = date.today() - timedelta(days=days)
         filtered = [

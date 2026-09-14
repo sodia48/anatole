@@ -82,7 +82,10 @@ describe("mobile IPO and insider radar", () => {
     expect(view.getAllByTestId("insider-card-trade-1")).toHaveLength(1);
     expect(consoleError.mock.calls.flat().join(" ")).not.toMatch(/same key|duplicate key/i);
     expect(view.getByText("Royal Bank")).toBeTruthy();
-    expect(view.getByText("Source : Finnhub")).toBeTruthy();
+    expect(view.getByText("Donnée : Finnhub")).toBeTruthy();
+    expect(view.getByText(/Prix déclaré: 200,00 — devise non fournie/)).toBeTruthy();
+    expect(view.getByText(/Transaction: 28 août 2026/)).toBeTruthy();
+    expect(view.getByText(/Dépôt: 29 août 2026/)).toBeTruthy();
     const previewOptions = mockUseQuery.mock.calls.map(([value]) => value).find((value) => value.queryKey?.[1] === "preview");
     const previewController = new AbortController();
     await previewOptions.queryFn({ signal: previewController.signal });

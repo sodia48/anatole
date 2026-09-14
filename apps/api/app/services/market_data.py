@@ -201,8 +201,14 @@ class YahooProvider:
         range_: str,
         interval: str,
         attempts: int | None = None,
+        *,
+        normalize_symbol: bool = True,
     ) -> dict[str, Any]:
-        symbol = self.normalize_ticker(ticker)
+        symbol = (
+            self.normalize_ticker(ticker)
+            if normalize_symbol
+            else ticker.strip().upper()
+        )
         key = (symbol, range_, interval)
         fresh, stale = self._cache_policy(range_, interval)
         return await self._chart_cache.get_or_load(
@@ -223,9 +229,24 @@ class YahooProvider:
         range_: str,
         interval: str,
         attempts: int | None = None,
+        *,
+        normalize_symbol: bool = True,
     ) -> list[Candle]:
-        symbol = self.normalize_ticker(ticker)
-        result = await self.chart(ticker, range_, interval, attempts)
+        symbol = (
+            self.normalize_ticker(ticker)
+            if normalize_symbol
+            else ticker.strip().upper()
+        )
+        if normalize_symbol:
+            result = await self.chart(ticker, range_, interval, attempts)
+        else:
+            result = await self.chart(
+                ticker,
+                range_,
+                interval,
+                attempts,
+                normalize_symbol=False,
+            )
         timestamps = result.get("timestamp") or []
         raw_quote = (
             ((result.get("indicators") or {}).get("quote") or [{}])[0]
@@ -260,6 +281,10 @@ class YahooProvider:
         native_currency = str(
             (result.get("meta") or {}).get("currency") or "CAD"
         )
+        if not normalize_symbol:
+            # Exact-symbol callers compare source-native listing prices. Do not
+            # convert a Nasdaq USD series to CAD before labeling its range USD.
+            return output
         return await currency_conversion_service.candles_to_cad(
             symbol,
             native_currency,
@@ -429,6 +454,7 @@ class MarketDataService:
         concurrency: int = 6,
         deadline_seconds: float | None = None,
         attempts: int = 1,
+        exact_symbols: bool = False,
     ) -> dict[str, list[Candle]]:
         """Load real Yahoo histories without silently substituting demo data.
 
@@ -447,16 +473,27 @@ class MarketDataService:
         async def load(ticker: str) -> tuple[str, list[Candle] | None]:
             async with semaphore:
                 try:
-                    history_call = (
-                        self.demo.history(ticker, range_, interval)
-                        if self.demo_mode
-                        else self.yahoo.history(
+                    if self.demo_mode:
+                        history_call = self.demo.history(
+                            ticker,
+                            range_,
+                            interval,
+                        )
+                    elif exact_symbols:
+                        history_call = self.yahoo.history(
+                            ticker,
+                            range_,
+                            interval,
+                            attempts=request_attempts,
+                            normalize_symbol=False,
+                        )
+                    else:
+                        history_call = self.yahoo.history(
                             ticker,
                             range_,
                             interval,
                             attempts=request_attempts,
                         )
-                    )
                     candles = await asyncio.wait_for(
                         history_call,
                         timeout=min(self.strict_history_timeout_seconds, deadline),
