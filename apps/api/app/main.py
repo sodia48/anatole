@@ -17,7 +17,6 @@ from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
-from app.services.analysis import analysis_service
 from app.services.calendar import calendar_service
 from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
@@ -69,7 +68,6 @@ async def _warm_public_snapshots() -> None:
     await asyncio.gather(
         _warm_source("news:fr", news_service.get_snapshot("fr")),
         _warm_source("calendar:fr", calendar_service.get_snapshot("fr")),
-        _warm_source("terminal", analysis_service.terminal()),
     )
 
     await asyncio.sleep(0.35)
