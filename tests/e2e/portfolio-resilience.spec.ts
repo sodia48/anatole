@@ -105,9 +105,10 @@ function historicalSnapshot() {
 }
 
 test.describe("Portfolio progressive degradation", () => {
-  test("keeps valuation visible when history fails and marks a missing quote unavailable", async ({ page }) => {
+  test("keeps valuation visible when history fails and retries the full snapshot directly", async ({ page }) => {
     let fastCalls = 0;
-    let partial = false;
+    let fullCalls = 0;
+    let fullReady = false;
     await page.addInitScript((saved) => {
       localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
       localStorage.setItem("anatole.appearance-choice.v1", "1");
@@ -116,10 +117,12 @@ test.describe("Portfolio progressive degradation", () => {
       const requestUrl = new URL(route.request().url());
       if (requestUrl.searchParams.get("fast") === "true") {
         fastCalls += 1;
-        const data = partial
-          ? snapshot([position("RY", 200, 12, 122)])
-          : snapshot();
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(snapshot()) });
+        return;
+      }
+      fullCalls += 1;
+      if (fullReady) {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(historicalSnapshot()) });
         return;
       }
       await route.fulfill({
@@ -140,14 +143,43 @@ test.describe("Portfolio progressive degradation", () => {
     await expect(page.getByText("Historique du portefeuille temporairement indisponible.")).toBeVisible();
     await expect(portfolioAlert).not.toContainText("technical-reference");
 
-    partial = true;
+    fullReady = true;
+    const fullCallsBeforeRetry = fullCalls;
     await portfolioAlert.getByRole("button", { name: "Réessayer" }).click();
-    await expect.poll(() => fastCalls).toBeGreaterThanOrEqual(2);
-    const tdRow = page.getByRole("row").filter({ hasText: "TD" });
-    await expect(tdRow.getByText("Données temporairement indisponibles")).toBeVisible();
-    await expect(tdRow.getByText("N/D", { exact: true }).first()).toBeVisible();
-    const ryRow = page.getByRole("row").filter({ hasText: "RY" });
-    await expect(ryRow.getByText("200,00 $", { exact: false })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Performance du portefeuille et du TSX Composite" })).toBeVisible();
+    expect(fastCalls).toBe(1);
+    expect(fullCalls).toBe(fullCallsBeforeRetry + 1);
+  });
+
+  test("does not restart a full snapshot for unchanged account sync events", async ({ page }) => {
+    let fastCalls = 0;
+    let fullCalls = 0;
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (requestUrl.searchParams.get("fast") === "true") {
+        fastCalls += 1;
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(snapshot()) });
+        return;
+      }
+      fullCalls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 1_500));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(historicalSnapshot()) });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+    await expect.poll(() => fullCalls).toBe(1);
+    for (let index = 0; index < 3; index += 1) {
+      await page.evaluate(() => window.dispatchEvent(new CustomEvent("anatole-workspace-sync-applied")));
+      await page.waitForTimeout(150);
+    }
+
+    await expect(page.getByRole("img", { name: "Performance du portefeuille et du TSX Composite" })).toBeVisible();
+    expect(fastCalls).toBe(1);
+    expect(fullCalls).toBe(1);
   });
 
   test("renders portfolio and benchmark curves and clears historical errors", async ({ page }) => {

@@ -79,9 +79,17 @@ function optionalFixed(value: number | null, digits: number, language: AnatoleLa
   return value === null ? pick(language, "N/D", "N/A") : `${value.toFixed(digits)}${suffix}`;
 }
 
-function hasUsableHistory(snapshot: PortfolioSnapshot | null): boolean {
+function hasCompleteHistory(snapshot: PortfolioSnapshot | null): boolean {
   if (!snapshot) return false;
-  return snapshot.performance.length > 0 || (snapshot.risk?.history_coverage_percent ?? 0) >= 70;
+  return snapshot.performance.length > 0 && (snapshot.risk?.history_coverage_percent ?? 0) >= 70;
+}
+
+function positionsFingerprint(positions: PortfolioPositionInput[]): string {
+  return JSON.stringify(positions.map((position) => ({
+    symbol: position.symbol,
+    quantity: position.quantity,
+    average_cost: position.average_cost,
+  })));
 }
 
 function logPortfolioSnapshot(kind: "fast" | "full", snapshot: PortfolioSnapshot): void {
@@ -251,6 +259,8 @@ export function PortfolioClient() {
   const [hydrated, setHydrated] = useState(false);
   const refreshSequenceRef = useRef(0);
   const snapshotRef = useRef<PortfolioSnapshot | null>(null);
+  const snapshotPositionsRef = useRef("");
+  const refreshPositionsRef = useRef("");
 
   useEffect(() => {
     snapshotRef.current = snapshot;
@@ -267,7 +277,10 @@ export function PortfolioClient() {
   }, [searchParams]);
 
   useEffect(() => {
-    const applySyncedPositions = () => setPositions(loadPositions());
+    const applySyncedPositions = () => {
+      const synced = loadPositions();
+      setPositions((current) => positionsFingerprint(current) === positionsFingerprint(synced) ? current : synced);
+    };
     window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
     return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
   }, []);
@@ -297,13 +310,27 @@ export function PortfolioClient() {
     };
   }, [symbol]);
 
-  const refresh = async (current = positions) => {
+  const refresh = async (
+    current = positions,
+    options: { fullOnly?: boolean } = {},
+  ) => {
     if (!current.length) {
       refreshControllerRef.current?.abort();
+      refreshPositionsRef.current = "";
+      snapshotRef.current = null;
+      snapshotPositionsRef.current = "";
       setSnapshot(null);
       setLoading(false);
       setError(null);
       setHistoryError(null);
+      return;
+    }
+    const targetPositions = positionsFingerprint(current);
+    if (
+      refreshControllerRef.current
+      && !refreshControllerRef.current.signal.aborted
+      && refreshPositionsRef.current === targetPositions
+    ) {
       return;
     }
     refreshControllerRef.current?.abort();
@@ -311,37 +338,60 @@ export function PortfolioClient() {
     const sequence = refreshSequenceRef.current + 1;
     refreshSequenceRef.current = sequence;
     refreshControllerRef.current = controller;
+    refreshPositionsRef.current = targetPositions;
     const isCurrentRequest = () => refreshControllerRef.current === controller && refreshSequenceRef.current === sequence && !controller.signal.aborted;
+    const applySnapshot = (nextSnapshot: PortfolioSnapshot) => {
+      snapshotRef.current = nextSnapshot;
+      snapshotPositionsRef.current = targetPositions;
+      setSnapshot(nextSnapshot);
+    };
+    const applyFullSnapshot = (fullSnapshot: PortfolioSnapshot) => {
+      logPortfolioSnapshot("full", fullSnapshot);
+      applySnapshot(fullSnapshot);
+      const historyIsUsable = hasCompleteHistory(fullSnapshot);
+      if (!historyIsUsable) {
+        const message = pick(
+          language,
+          "Certaines données historiques du portefeuille sont temporairement indisponibles.",
+          "Some historical portfolio data is temporarily unavailable.",
+        );
+        setError(message);
+        setHistoryError(message);
+      } else {
+        setError(null);
+        setHistoryError(null);
+      }
+    };
     setLoading(true);
     setError(null);
     setHistoryError(null);
     try {
+      if (options.fullOnly) {
+        const fullSnapshot = await analyzePortfolio(current, controller.signal);
+        if (!isCurrentRequest()) return;
+        applyFullSnapshot(fullSnapshot);
+        return;
+      }
       const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
       if (!isCurrentRequest()) return;
       logPortfolioSnapshot("fast", currentSnapshot);
-      setSnapshot((previous) => hasUsableHistory(previous) ? previous : currentSnapshot);
+      if (
+        snapshotPositionsRef.current !== targetPositions
+        || !hasCompleteHistory(snapshotRef.current)
+      ) {
+        applySnapshot(currentSnapshot);
+      }
       try {
         const fullSnapshot = await analyzePortfolio(current, controller.signal);
         if (!isCurrentRequest()) return;
-        logPortfolioSnapshot("full", fullSnapshot);
-        setSnapshot(fullSnapshot);
-        const historyIsUsable = hasUsableHistory(fullSnapshot) && (fullSnapshot.risk?.history_coverage_percent ?? 0) >= 70;
-        if (!historyIsUsable) {
-          const message = pick(
-            language,
-            "Certaines données historiques du portefeuille sont temporairement indisponibles.",
-            "Some historical portfolio data is temporarily unavailable.",
-          );
-          setError(message);
-          setHistoryError(message);
-        } else {
-          setError(null);
-          setHistoryError(null);
-        }
+        applyFullSnapshot(fullSnapshot);
       } catch (reason) {
         if (!isCurrentRequest()) return;
         console.error("portfolio_full_analysis_failed", reason);
-        if (hasUsableHistory(snapshotRef.current)) return;
+        if (
+          snapshotPositionsRef.current === targetPositions
+          && hasCompleteHistory(snapshotRef.current)
+        ) return;
         const message = pick(
           language,
           "Certaines données historiques du portefeuille sont temporairement indisponibles.",
@@ -352,6 +402,21 @@ export function PortfolioClient() {
       }
     } catch (reason) {
       if (controller.signal.aborted) return;
+      if (options.fullOnly) {
+        console.error("portfolio_full_analysis_failed", reason);
+        if (
+          snapshotPositionsRef.current === targetPositions
+          && hasCompleteHistory(snapshotRef.current)
+        ) return;
+        const message = pick(
+          language,
+          "Certaines données historiques du portefeuille sont temporairement indisponibles.",
+          "Some historical portfolio data is temporarily unavailable.",
+        );
+        setError(message);
+        setHistoryError(message);
+        return;
+      }
       console.error("portfolio_valuation_failed", reason);
       setError(pick(
         language,
@@ -359,7 +424,10 @@ export function PortfolioClient() {
         "Some portfolio data is temporarily unavailable.",
       ));
     } finally {
-      if (refreshControllerRef.current === controller) setLoading(false);
+      if (refreshControllerRef.current === controller) {
+        refreshPositionsRef.current = "";
+        setLoading(false);
+      }
     }
   };
 
@@ -484,7 +552,7 @@ export function PortfolioClient() {
         </div>
       </section>
 
-      {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button className={styles.secondaryButton} disabled={loading} onClick={() => void refresh()} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
+      {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button className={styles.secondaryButton} disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
 
       {!positions.length ? (
         <section className={`panel ${styles.emptyState}`}>
@@ -504,7 +572,7 @@ export function PortfolioClient() {
           </section>
 
           <section className={`panel ${styles.panel}`}>
-            <div className={styles.sectionHeading}><div><span className="eyebrow">POSITIONS</span><h2>{pick(language, "Détail du portefeuille", "Portfolio details")}</h2><p>{pick(language, "Modifie les quantités ou coûts moyens directement dans le tableau.", "Edit quantities or average costs directly in the table.")}</p></div><button className={styles.secondaryButton} type="button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button></div>
+            <div className={styles.sectionHeading}><div><span className="eyebrow">POSITIONS</span><h2>{pick(language, "Détail du portefeuille", "Portfolio details")}</h2><p>{pick(language, "Modifie les quantités ou coûts moyens directement dans le tableau.", "Edit quantities or average costs directly in the table.")}</p></div><button className={styles.secondaryButton} type="button" disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button></div>
             <div className={styles.tableWrap}>
               <table className={styles.table} data-mobile-cards="portfolio">
                 <thead><tr><th>{pick(language, "Titre", "Security")}</th><th>{pick(language, "Quantité", "Quantity")}</th><th>{pick(language, "Coût moyen", "Average cost")}</th><th>{pick(language, "Prix", "Price")}</th><th>{pick(language, "Valeur", "Value")}</th><th>{pick(language, "Poids", "Weight")}</th><th>P&amp;L</th><th>{pick(language, "Jour", "Day")}</th><th>Score</th><th /></tr></thead>
@@ -535,7 +603,7 @@ export function PortfolioClient() {
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.sectionHeading}><div><span className="eyebrow">PERFORMANCE</span><h2>{pick(language, "Portefeuille vs TSX Composite", "Portfolio vs TSX Composite")}</h2><p>{pick(language, "Indice base 100 fondé sur les poids actuels, et non sur les flux historiques réels.", "Base-100 index using current weights rather than actual historical cash flows.")}</p></div></div>
                   <div className={styles.legend}><span style={{ color: "var(--accent-text)" }}><i /> {pick(language, "Portefeuille", "Portfolio")}</span><span style={{ color: "var(--positive-text)" }}><i /> TSX Composite</span></div>
-                  <PerformanceChart error={historyError} language={language} loading={loading} onRetry={() => void refresh()} points={snapshot.performance} />
+                  <PerformanceChart error={historyError} language={language} loading={loading} onRetry={() => void refresh(positions, { fullOnly: true })} points={snapshot.performance} />
                 </section>
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk?.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk?.risk_level === "Modéré" ? styles.statusMonitoring : snapshot.risk?.risk_level ? styles.statusDegraded : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
