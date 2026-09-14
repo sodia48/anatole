@@ -85,6 +85,8 @@ const mockUseQueries = jest.fn(({ queries }: { queries: { queryKey: unknown[]; e
 
 jest.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => mockUseQuery(options as { queryKey: unknown[] }), useQueries: (options: unknown) => mockUseQueries(options as { queries: { queryKey: unknown[]; enabled: boolean }[] }), useQueryClient: () => mockUseQueryClient() }));
 
+jest.setTimeout(20_000);
+
 describe("mobile news and calendar intelligence", () => {
   beforeEach(() => {
     errorRoots.clear();

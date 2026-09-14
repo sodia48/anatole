@@ -109,17 +109,20 @@ async function proxy(
     const contentType =
       upstream.headers.get("content-type") ??
       "application/json; charset=utf-8";
-    const raw = await upstream.arrayBuffer();
-    const response =
-      upstream.status === 204
-        ? new NextResponse(null, {
-            status: 204,
-            headers: noStoreHeaders(contentType),
-          })
-        : new NextResponse(raw, {
-            status: upstream.status,
-            headers: noStoreHeaders(contentType),
-          });
+    const bodyless =
+      request.method === "HEAD" ||
+      upstream.status === 204 ||
+      upstream.status === 205 ||
+      upstream.status === 304;
+    const response = bodyless
+      ? new NextResponse(null, {
+          status: upstream.status,
+          headers: noStoreHeaders(contentType),
+        })
+      : new NextResponse(await upstream.arrayBuffer(), {
+          status: upstream.status,
+          headers: noStoreHeaders(contentType),
+        });
     const upstreamRequestId = upstream.headers.get("X-Request-ID");
     if (upstreamRequestId) {
       response.headers.set("X-Request-ID", upstreamRequestId);

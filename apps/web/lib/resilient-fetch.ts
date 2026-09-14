@@ -6,7 +6,12 @@ import {
 import { ANATOLE_VERSION } from "./version";
 
 const RETRYABLE_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
+const BODYLESS_STATUSES = new Set([204, 205, 304]);
 const CACHE_PREFIX = "anatole:0.9:last-good:";
+
+function responseMayHaveBody(method: string, status: number): boolean {
+  return method !== "HEAD" && !BODYLESS_STATUSES.has(status);
+}
 const DEFAULT_STALE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_BODY_LENGTH = 1_500_000;
 
@@ -185,10 +190,14 @@ export async function resilientFetch(
         signal: controller.signal,
       });
       lastStatus = response.status;
-      if (response.ok && response.body) {
+      if (response.ok && response.body && responseMayHaveBody(method, response.status)) {
         // The same abort timer also bounds body download, not just headers.
         const body = await response.arrayBuffer();
-        response = new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+        response = new Response(body, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
       }
 
       if (!RETRYABLE_STATUSES.has(response.status) || attempt === retries) {

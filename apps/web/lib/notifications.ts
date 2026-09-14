@@ -76,8 +76,16 @@ async function notificationRequest<T>(
     allowStale: false,
   });
   if (!response.ok) throw await notificationError(response);
-  if (response.status === 204) return undefined as T;
-  return await response.json() as T;
+  if (response.status === 204 || response.status === 205) return undefined as T;
+
+  const raw = await response.text();
+  if (!raw.trim()) return undefined as T;
+
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    throw new Error("Réponse de notifications invalide.");
+  }
 }
 
 export function getNotificationFeed(): Promise<NotificationFeed> {
