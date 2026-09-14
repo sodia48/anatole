@@ -13,8 +13,11 @@ import {
   dedupeInsiderTradesForRender,
   filterIpoItems,
   formatIpoPrice,
+  formatInsiderMoney,
   insiderCoverageUnavailable,
+  insiderPriceLabel,
   insiderPreviewScanLimit,
+  insiderValidationLabel,
   ipoPriceCaption,
   type InsiderMarket,
   type InsiderTypeFilter,
@@ -47,15 +50,16 @@ function formatDate(value: string | null, language: Language): string {
   if (!value) return language === "fr" ? "À confirmer" : "To be confirmed";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(locale(language), { day: "numeric", month: "short", year: "numeric", timeZone: "America/Toronto" }).format(date);
+  return new Intl.DateTimeFormat(locale(language), {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : "America/Toronto",
+  }).format(date);
 }
 function formatNumber(value: number | null, language: Language): string {
   return value === null || !Number.isFinite(value) ? "N/D" : new Intl.NumberFormat(locale(language), { maximumFractionDigits: 0 }).format(value);
 }
-function formatMoney(value: number, language: Language): string {
-  return new Intl.NumberFormat(locale(language), { style: "currency", currency: "CAD", notation: Math.abs(value) >= 1_000_000 ? "compact" : "standard", maximumFractionDigits: Math.abs(value) >= 1_000_000 ? 2 : 0 }).format(value);
-}
-
 function IpoCard({ item }: { item: IpoItem }) {
   useMobileTheme();
   const { language, pick } = useLocale();
@@ -100,9 +104,13 @@ function InsiderCard({ trade }: { trade: InsiderTrade }) {
   const tone = trade.transaction_type === "buy" ? styles.positive : trade.transaction_type === "sell" ? styles.negative : styles.neutral;
   return <View style={styles.card} testID={`insider-card-${trade.id}`}>
     <View style={styles.cardTop}><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: "/focus/[ticker]", params: { ticker: trade.ticker } })} style={styles.symbol} testID={`insider-focus-${trade.ticker}`}><Text style={styles.symbolText}>{trade.ticker}</Text></Pressable><View style={styles.cardCopy}><Text style={styles.cardTitle}>{trade.company}</Text><Text style={styles.meta}>{trade.insider_name}{trade.role ? ` · ${trade.role}` : ""}</Text></View>{trade.unusual ? <Text style={styles.unusual}>{pick("Inhabituelle", "Unusual")}</Text> : null}</View>
-    <View style={styles.cardGrid}><View><Text style={[styles.transaction, tone]}>{trade.transaction_label}</Text><Text style={styles.meta}>{pick("Transaction", "Trade")}: {formatDate(trade.trade_date, language)}</Text><Text style={styles.meta}>{pick("Dépôt", "Filing")}: {formatDate(trade.filing_date, language)}</Text></View><View style={styles.priceBlock}><Text style={styles.body}>{formatNumber(trade.shares, language)} {pick("actions", "shares")}</Text><Text style={styles.meta}>{pick("Prix", "Price")}: {trade.price === null ? "N/D" : formatMoney(trade.price, language)}</Text><Text style={styles.price}>{trade.value === null ? "N/D" : formatMoney(trade.value, language)}</Text></View></View>
+    <View style={styles.cardGrid}><View><Text style={[styles.transaction, tone]}>{trade.transaction_label}</Text><Text style={styles.meta}>{pick("Transaction", "Trade")}: {formatDate(trade.trade_date, language)}</Text><Text style={styles.meta}>{pick("Dépôt", "Filing")}: {formatDate(trade.filing_date, language)}</Text></View><View style={styles.priceBlock}><Text style={styles.body}>{formatNumber(trade.shares, language)} {pick("actions", "shares")}</Text><Text style={styles.meta}>{insiderPriceLabel(trade.price_type, language)}: {formatInsiderMoney(trade.price, trade.price_currency, language, false)}</Text><Text style={styles.price}>{formatInsiderMoney(trade.value, trade.value_currency, language)}</Text></View></View>
     <Text style={styles.meta}>{pick("Détention après", "Holdings after")}: {formatNumber(trade.holdings_after, language)}</Text>
-    <Text style={styles.meta}>{pick("Source", "Source")} : {trade.source_name}</Text>
+    <Text style={styles.meta}>{pick("Donnée", "Data")} : {trade.source_name}</Text>
+    <Text style={styles.meta}>{pick("Vérification officielle", "Official verification")} : {trade.regulatory_source_name ?? (trade.market === "Canada" ? "SEDI" : "SEC EDGAR")}</Text>
+    <Text style={styles.meta}>{pick("Code", "Code")} : {trade.transaction_code || "N/D"}</Text>
+    <Text style={styles.meta}>{trade.price_validation_detail ?? insiderValidationLabel(trade.price_validation, language)}</Text>
+    {trade.market_price_ranges?.map((item) => <Text key={`${trade.id}-${item.listing}`} style={styles.meta}>{item.listing}: {item.low.toFixed(2)}–{item.high.toFixed(2)} {item.currency}</Text>)}
     <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(trade.official_verification_url)} style={styles.actionSecondary} testID={`insider-source-${trade.id}`}><Text style={styles.actionText}>{pick("Vérification officielle", "Official verification")}</Text></Pressable>
   </View>;
 }
@@ -164,7 +172,7 @@ function InsiderPanel({ initialTicker = "" }: { initialTicker?: string }) {
     {stale ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
     <View style={styles.metrics}>
       <Metric label={pick("Transactions", "Transactions")} value={unavailable ? pick("Indisponible", "Unavailable") : summary?.transactions ?? "—"} /><Metric label={pick("Sociétés", "Companies")} value={unavailable ? "—" : summary?.companies ?? "—"} /><Metric label={pick("Achats", "Buys")} value={unavailable ? "—" : summary?.buys ?? "—"} tone="positive" /><Metric label={pick("Ventes", "Sells")} value={unavailable ? "—" : summary?.sells ?? "—"} tone="negative" />
-      <Metric label={pick("Attributions/exercices", "Grants/exercises")} value={unavailable ? "—" : summary?.grants_and_exercises ?? "—"} /><Metric label={pick("Valeur achats", "Buy value")} value={unavailable || !summary ? "—" : formatMoney(summary.buy_value, language)} tone="positive" /><Metric label={pick("Valeur ventes", "Sell value")} value={unavailable || !summary ? "—" : formatMoney(summary.sell_value, language)} tone="negative" /><Metric label={pick("Valeur nette", "Net value")} value={unavailable || !summary ? "—" : formatMoney(summary.net_value, language)} />
+      <Metric label={pick("Attributions/exercices", "Grants/exercises")} value={unavailable ? "—" : summary?.grants_and_exercises ?? "—"} /><Metric label={pick("Valeur achats", "Buy value")} value={unavailable || !summary ? "—" : formatInsiderMoney(summary.buy_value, summary.buy_value_currency, language)} tone="positive" /><Metric label={pick("Valeur ventes", "Sell value")} value={unavailable || !summary ? "—" : formatInsiderMoney(summary.sell_value, summary.sell_value_currency, language)} tone="negative" /><Metric label={pick("Valeur nette", "Net value")} value={unavailable || !summary ? "—" : formatInsiderMoney(summary.net_value, summary.net_value_currency, language)} />
       <Metric label={pick("Ratio achats", "Buy ratio")} value={unavailable || !summary ? "—" : `${summary.buy_ratio_percent.toFixed(1)} %`} /><Metric label={pick("Inhabituelles", "Unusual")} value={unavailable ? "—" : summary?.unusual_transactions ?? "—"} />
     </View>
     <Text style={styles.filterLabel}>{pick("Marché", "Market")}</Text><FilterRow><FilterChip active={market === "canada"} label="Canada" onPress={() => setMarket("canada")} testID="insider-market-canada" /><FilterChip active={market === "us"} label={pick("États-Unis", "USA")} onPress={() => setMarket("us")} testID="insider-market-us" /></FilterRow>

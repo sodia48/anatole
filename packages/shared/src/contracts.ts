@@ -168,16 +168,23 @@ export type IpoSnapshot = {
 };
 
 export type InsiderTransactionType = "buy" | "sell" | "grant" | "exercise" | "tax" | "other";
+export type InsiderCurrencySource = "source" | "verified" | "inferred" | "unknown";
+export type InsiderPriceType = "market" | "exercise" | "grant" | "conversion" | "private" | "unknown";
+export type InsiderClassificationSource = "regulatory_code" | "provider_code" | "inferred_change" | "unknown";
+export type InsiderPriceValidation = "verified" | "plausible" | "outside_market_range" | "not_applicable" | "unavailable";
 export type InsiderTrade = {
   id: string; ticker: string; company: string; market: "Canada" | "États-Unis"; insider_name: string; role: string;
   transaction_type: InsiderTransactionType; transaction_label: string; transaction_code: string;
   trade_date: string | null; filing_date: string | null; shares: number | null; price: number | null; value: number | null;
+  price_currency?: string | null; value_currency?: string | null; currency_source?: InsiderCurrencySource;
+  price_type?: InsiderPriceType; classification_source?: InsiderClassificationSource; price_validation?: InsiderPriceValidation;
+  price_validation_detail?: string | null; market_price_ranges?: Array<{ listing: string; currency: string; low: number; high: number }>;
   holdings_after: number | null; ownership: string; unusual: boolean; source_name: string; source_url: string;
-  official_verification_url: string; official_source: boolean;
+  official_verification_url: string; official_source: boolean; regulatory_source_name?: string | null;
 };
 export type InsiderSnapshot = {
   trades: InsiderTrade[];
-  summary: { transactions: number; companies: number; buys: number; sells: number; grants_and_exercises: number; buy_value: number; sell_value: number; net_value: number; buy_ratio_percent: number; unusual_transactions: number };
+  summary: { transactions: number; companies: number; buys: number; sells: number; grants_and_exercises: number; buy_value: number; sell_value: number; net_value: number; buy_value_currency?: string | null; sell_value_currency?: string | null; net_value_currency?: string | null; buy_ratio_percent: number; unusual_transactions: number };
   sources: DiscoverySourceStatus[]; market: "Canada" | "États-Unis"; requested_ticker: string | null;
   scanned_symbols: number; generated_at: string; refresh_after_seconds: number; message: string | null;
 };

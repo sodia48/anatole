@@ -109,6 +109,7 @@ function formatNumber(
 
 function formatMoney(
   value: number | null,
+  currency?: string | null,
 ): string {
   if (
     value === null ||
@@ -117,9 +118,7 @@ function formatMoney(
     return "N/D";
   }
 
-  return new Intl.NumberFormat("fr-CA", {
-    style: "currency",
-    currency: "CAD",
+  const formatted = new Intl.NumberFormat("fr-CA", {
     notation:
       Math.abs(value) >= 1_000_000
         ? "compact"
@@ -129,6 +128,7 @@ function formatMoney(
         ? 2
         : 0,
   }).format(value);
+  return currency ? `${formatted} ${currency}` : `${formatted} — devise non fournie`;
 }
 
 function formatIpoPrice(
@@ -1058,6 +1058,7 @@ export function IpoInsidersClient({
                 {formatMoney(
                   insiders.summary
                     .net_value,
+                  insiders.summary.net_value_currency,
                 )}
               </strong>
             </article>
@@ -1343,6 +1344,7 @@ export function IpoInsidersClient({
                       <span>
                         {formatMoney(
                           trade.price,
+                          trade.price_currency,
                         )}
                       </span>
                       <span
@@ -1352,6 +1354,7 @@ export function IpoInsidersClient({
                       >
                         {formatMoney(
                           trade.value,
+                          trade.value_currency,
                         )}
                         {trade.unusual ? (
                           <small
@@ -1425,6 +1428,7 @@ export function IpoInsidersClient({
                 {formatMoney(
                   insiders.summary
                     .buy_value,
+                  insiders.summary.buy_value_currency,
                 )}
               </strong>
             </article>
@@ -1440,6 +1444,7 @@ export function IpoInsidersClient({
                 {formatMoney(
                   insiders.summary
                     .sell_value,
+                  insiders.summary.sell_value_currency,
                 )}
               </strong>
             </article>

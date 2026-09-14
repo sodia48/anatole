@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any
 
 import httpx
@@ -9,6 +9,7 @@ import pytest
 
 from app.core.config import settings
 from app.schemas.ipo_insiders import InsiderTrade
+from app.schemas.stocks import Candle
 from app.services import insiders as insiders_module
 from app.services.insiders import (
     FINNHUB_SOURCE_URL,
@@ -17,6 +18,10 @@ from app.services.insiders import (
     SEDI_URL,
     InsiderService,
     parse_finnhub_insider_payload,
+    parse_yahoo_insider_frame,
+    summarize_trades,
+    validate_canadian_trade_prices,
+    validate_trade_price,
 )
 
 
@@ -80,6 +85,161 @@ def test_finnhub_normalizes_buy_price_value_and_source() -> None:
     assert trade.source_url == FINNHUB_SOURCE_URL
     assert trade.official_verification_url == SEDI_URL
     assert trade.official_source is False
+    assert trade.price_currency is None
+    assert trade.value_currency is None
+    assert trade.currency_source == "unknown"
+    assert trade.classification_source == "inferred_change"
+
+
+def test_shopify_source_currency_is_preserved_without_assuming_cad() -> None:
+    trades = parse_finnhub_insider_payload(
+        {"data": [finnhub_row(
+            name="Lutke (Tobias Albin)",
+            transactionDate="2026-09-08",
+            change=-15_000,
+            transactionPrice=129,
+            transactionCode="S",
+            currency="USD",
+        )]},
+        ticker="SHOP.TO",
+        company="Shopify",
+    )
+
+    trade = trades[0]
+    assert trade.price_currency == "USD"
+    assert trade.value_currency == "USD"
+    assert trade.currency_source == "source"
+    assert trade.transaction_type == "sell"
+    assert trade.classification_source == "provider_code"
+    assert trade.price_type == "market"
+    assert trade.value == 1_935_000
+
+
+def test_finnhub_option_exercise_has_explicit_price_context() -> None:
+    trade = parse_finnhub_insider_payload(
+        {"data": [finnhub_row(transactionCode="M", change=100)]},
+        ticker="SHOP.TO",
+        company="Shopify",
+    )[0]
+
+    assert trade.transaction_type == "exercise"
+    assert trade.price_type == "exercise"
+    assert trade.price_validation == "not_applicable"
+
+
+def test_yahoo_disposition_under_purchase_plan_is_a_sale() -> None:
+    frame = insiders_module.pd.DataFrame([{
+        "Shares": 15_000,
+        "Value": 1_935_795,
+        "Text": "Disposition under a purchase/ownership plan at price 129.05 per share.",
+        "Insider": "Lutke (Tobias Albin)",
+        "Transaction": "",
+        "Start Date": "2026-09-09",
+    }])
+
+    trade = parse_yahoo_insider_frame(
+        frame,
+        ticker="SHOP.TO",
+        company="Shopify",
+    )[0]
+
+    assert trade.transaction_type == "sell"
+    assert trade.classification_source == "provider_code"
+    assert trade.price == pytest.approx(129.053)
+
+
+def test_shopify_raw_price_matching_us_listing_is_verified_as_usd() -> None:
+    trade_date = date(2026, 9, 8)
+    trade = parse_finnhub_insider_payload(
+        {"data": [finnhub_row(
+            name="Lutke (Tobias Albin)",
+            transactionDate=trade_date.isoformat(),
+            change=-15_000,
+            transactionPrice=129,
+            transactionCode="S",
+        )]},
+        ticker="SHOP.TO",
+        company="Shopify",
+    )[0]
+    timestamp = int(datetime(2026, 9, 8, tzinfo=UTC).timestamp())
+    validated = validate_trade_price(trade, {
+        "SHOP.TO": [Candle(time=timestamp, open=176, high=180, low=174, close=178, volume=1)],
+        "SHOP": [Candle(time=timestamp, open=128, high=131, low=127, close=130, volume=1)],
+    })
+
+    assert validated.price == 129
+    assert validated.price_currency == "USD"
+    assert validated.value_currency == "USD"
+    assert validated.currency_source == "verified"
+    assert validated.price_validation == "verified"
+    assert validated.price_validation_detail == "Prix cohérent avec SHOP (USD)."
+
+
+@pytest.mark.asyncio
+async def test_dual_listing_validation_requests_exact_market_symbols(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[list[str], dict[str, Any]]] = []
+
+    async def histories(tickers: list[str], **kwargs: Any) -> dict[str, list[Candle]]:
+        calls.append((tickers, kwargs))
+        return {}
+
+    monkeypatch.setattr(
+        insiders_module.market_data_service,
+        "get_history_many_strict",
+        histories,
+    )
+    trade = parse_finnhub_insider_payload(
+        {"data": [finnhub_row(transactionCode="S", change=-10)]},
+        ticker="SHOP.TO",
+        company="Shopify",
+    )[0]
+
+    await validate_canadian_trade_prices([trade])
+
+    assert calls[0][0] == ["SHOP.TO", "SHOP"]
+    assert calls[0][1]["exact_symbols"] is True
+
+
+def test_market_price_outside_both_listings_is_preserved_with_warning() -> None:
+    trade_date = date(2026, 9, 9)
+    trade = parse_finnhub_insider_payload(
+        {"data": [finnhub_row(
+            transactionDate=trade_date.isoformat(),
+            transactionCode="S",
+            change=-10,
+            transactionPrice=90,
+        )]},
+        ticker="SHOP.TO",
+        company="Shopify",
+    )[0]
+    timestamp = int(datetime(2026, 9, 9, tzinfo=UTC).timestamp())
+
+    validated = validate_trade_price(trade, {
+        "SHOP.TO": [Candle(time=timestamp, open=180, high=190, low=174, close=175, volume=1)],
+        "SHOP": [Candle(time=timestamp, open=138, high=138, low=126, close=127, volume=1)],
+    })
+
+    assert validated.price == 90
+    assert validated.price_currency is None
+    assert validated.price_validation == "outside_market_range"
+
+
+def test_summary_currency_is_only_exposed_when_values_share_one_currency() -> None:
+    usd = yahoo_trade().model_copy(update={
+        "price_currency": "USD",
+        "value_currency": "USD",
+    })
+    cad = yahoo_trade().model_copy(update={
+        "id": "yahoo-ry-jane-cad",
+        "ticker": "TD",
+        "price_currency": "CAD",
+        "value_currency": "CAD",
+    })
+
+    assert summarize_trades([usd]).buy_value_currency == "USD"
+    assert summarize_trades([usd, cad]).buy_value_currency is None
 
 
 def test_finnhub_normalizes_sell_from_negative_change() -> None:
@@ -90,6 +250,7 @@ def test_finnhub_normalizes_sell_from_negative_change() -> None:
     )
 
     assert trades[0].transaction_type == "sell"
+    assert trades[0].classification_source == "inferred_change"
     assert trades[0].shares == 75
     assert trades[0].value == 3750
 

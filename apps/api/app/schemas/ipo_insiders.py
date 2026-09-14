@@ -68,6 +68,25 @@ class IpoSnapshot(BaseModel):
 InsiderTransactionType = Literal[
     "buy", "sell", "grant", "exercise", "tax", "other",
 ]
+InsiderCurrencySource = Literal[
+    "source", "verified", "inferred", "unknown",
+]
+InsiderPriceType = Literal[
+    "market", "exercise", "grant", "conversion", "private", "unknown",
+]
+InsiderClassificationSource = Literal[
+    "regulatory_code", "provider_code", "inferred_change", "unknown",
+]
+InsiderPriceValidation = Literal[
+    "verified", "plausible", "outside_market_range", "not_applicable", "unavailable",
+]
+
+
+class InsiderMarketPriceRange(BaseModel):
+    listing: str
+    currency: str
+    low: float
+    high: float
 
 
 class InsiderTrade(BaseModel):
@@ -84,6 +103,14 @@ class InsiderTrade(BaseModel):
     filing_date: date | None = None
     shares: float | None = None
     price: float | None = None
+    price_currency: str | None = None
+    value_currency: str | None = None
+    currency_source: InsiderCurrencySource = "unknown"
+    price_type: InsiderPriceType = "unknown"
+    classification_source: InsiderClassificationSource = "unknown"
+    price_validation: InsiderPriceValidation = "unavailable"
+    price_validation_detail: str | None = None
+    market_price_ranges: list[InsiderMarketPriceRange] = Field(default_factory=list)
     value: float | None = None
     holdings_after: float | None = None
     ownership: str = ""
@@ -92,6 +119,7 @@ class InsiderTrade(BaseModel):
     source_url: str
     official_verification_url: str
     official_source: bool = False
+    regulatory_source_name: str | None = None
 
 
 class InsiderSummary(BaseModel):
@@ -103,6 +131,9 @@ class InsiderSummary(BaseModel):
     buy_value: float = 0
     sell_value: float = 0
     net_value: float = 0
+    buy_value_currency: str | None = None
+    sell_value_currency: str | None = None
+    net_value_currency: str | None = None
     buy_ratio_percent: float = Field(ge=0, le=100)
     unusual_transactions: int = Field(ge=0)
 
