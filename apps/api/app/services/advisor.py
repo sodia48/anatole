@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 from math import isfinite
 
 from app.schemas.workspace import (
@@ -12,6 +13,8 @@ from app.schemas.workspace import (
     AdvisorStressTest,
 )
 from app.services.portfolio import portfolio_service
+
+logger = logging.getLogger(__name__)
 
 
 SCENARIOS: tuple[tuple[str, str, float], ...] = (
@@ -184,9 +187,16 @@ class AdvisorService:
 
         portfolio_snapshot = None
         if request.portfolio_positions:
-            portfolio_snapshot = await portfolio_service.analyze(
-                request.to_portfolio_request()
-            )
+            try:
+                portfolio_snapshot = await portfolio_service.analyze(
+                    request.to_portfolio_request()
+                )
+            except Exception as error:  # noqa: BLE001
+                logger.warning(
+                    "advisor_portfolio_enrichment_unavailable error=%s detail=%s",
+                    type(error).__name__,
+                    error,
+                )
         portfolio_score = portfolio_snapshot.portfolio_score if portfolio_snapshot else 55.0
 
         readiness_score = round(
