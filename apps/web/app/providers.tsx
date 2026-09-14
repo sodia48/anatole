@@ -4,9 +4,10 @@ import type {
   ReactNode,
 } from "react";
 
-import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
-import { AccountProvider } from "@/components/providers/AccountProvider";
 import { AppearanceChoiceModal } from "@/components/appearance/AppearanceChoiceModal";
+import { WebPerformanceWarmup } from "@/components/performance/WebPerformanceWarmup";
+import { AccountProvider } from "@/components/providers/AccountProvider";
+import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
 
 /**
  * Point unique pour les contextes globaux d’Anatole.
@@ -23,6 +24,7 @@ export function AppProviders({
   return (
     <PreferencesProvider>
       <AccountProvider>
+        <WebPerformanceWarmup />
         {children}
         <AppearanceChoiceModal />
       </AccountProvider>
