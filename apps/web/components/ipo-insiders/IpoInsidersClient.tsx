@@ -272,7 +272,7 @@ function insiderCacheKey({
   ticker: string;
 }): string {
   return [
-    "anatole:ipo-insiders:insiders:v2",
+    "anatole:ipo-insiders:insiders:v3",
     market,
     days,
     ticker || "radar",
@@ -1489,7 +1489,7 @@ export function IpoInsidersClient({
                 }}
               >
                 <option value="canada">
-                  {pick(language, "Canada — Initiés (fournisseurs · vérification SEDI)", "Canada — Insiders (providers · SEDI verification)")}
+                  {pick(language, "Canada — MarketBeat public · vérification SEDI", "Canada — MarketBeat public · SEDI verification")}
                 </option>
                 <option value="us">
                   {pick(language, "États-Unis — SEC", "United States — SEC")}
@@ -2014,7 +2014,7 @@ export function IpoInsidersClient({
               styles.methodFooter
             }
           >
-            {pick(language, "Au Canada, Finnhub est la source automatisée principale, Yahoo Finance sert de repli et SEDI reste le registre officiel de vérification, sans collecte automatisée. Aux États-Unis, les opérations proviennent des formulaires 4 et 4/A de la SEC. Les attributions et exercices sont exclus du flux net achats–ventes.", "In Canada, Finnhub is the primary automated source, Yahoo Finance is the fallback, and SEDI remains the official verification registry without automated collection. In the United States, transactions come from SEC Forms 4 and 4/A. Grants and exercises are excluded from net purchase-sale flow.")}
+            {pick(language, "Au Canada, MarketBeat public fournit la découverte automatisée et SEDI reste le registre officiel de vérification, sans collecte automatisée des pages SEDI. Aux États-Unis, les opérations proviennent des formulaires 4 et 4/A de la SEC. Les attributions et exercices sont exclus du flux net achats–ventes.", "In Canada, MarketBeat public provides automated discovery and SEDI remains the official verification registry, without automated collection from SEDI pages. In the United States, transactions come from SEC Forms 4 and 4/A. Grants and exercises are excluded from net purchase-sale flow.")}
           </footer>
         </>
       )}

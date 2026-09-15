@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from html.parser import HTMLParser
 import math
 import os
 import re
@@ -1743,5 +1744,471 @@ class InsiderService:
             update={"trades": full_snapshot.trades[:result_limit]}
         )
 
+MARKETBEAT_TSE_BASE_URL = "https://www.marketbeat.com/stocks/TSE"
+MARKETBEAT_RADAR_URL = "https://www.marketbeat.com/insider-trades/"
+MARKETBEAT_TIMEOUT_SECONDS = 14
+MARKETBEAT_FAILED_RETRY_SECONDS = 120
 
-insider_service = InsiderService()
+
+class _MarketBeatTableParser(HTMLParser):
+    # Extract table-cell text without a third-party HTML parser.
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[list[str]] = []
+        self._table_depth = 0
+        self._row: list[str] | None = None
+        self._cell_parts: list[str] | None = None
+
+    def handle_starttag(
+        self,
+        tag: str,
+        attrs: list[tuple[str, str | None]],
+    ) -> None:
+        del attrs
+        lowered = tag.lower()
+        if lowered == "table":
+            self._table_depth += 1
+        elif lowered == "tr" and self._table_depth:
+            self._row = []
+        elif lowered in {"td", "th"} and self._table_depth and self._row is not None:
+            self._cell_parts = []
+        elif lowered == "br" and self._cell_parts is not None:
+            self._cell_parts.append(" | ")
+
+    def handle_data(self, data: str) -> None:
+        if self._cell_parts is not None:
+            self._cell_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        lowered = tag.lower()
+        if lowered in {"td", "th"} and self._cell_parts is not None:
+            text = re.sub(
+                r"\s+",
+                " ",
+                "".join(self._cell_parts).replace("\xa0", " "),
+            ).strip()
+            if self._row is not None:
+                self._row.append(text)
+            self._cell_parts = None
+        elif lowered == "tr" and self._row is not None:
+            if self._row:
+                self.rows.append(self._row)
+            self._row = None
+            self._cell_parts = None
+        elif lowered == "table" and self._table_depth:
+            self._table_depth -= 1
+
+
+def marketbeat_tse_url(ticker: str) -> str:
+    slug = display_ticker(ticker).replace(".", "-")
+    return f"{MARKETBEAT_TSE_BASE_URL}/{slug}/insider-trades/"
+
+
+def _marketbeat_number(value: str) -> float | None:
+    cleaned = re.sub(r"[^0-9.\-]", "", value)
+    if not cleaned or cleaned in {"-", ".", "-."}:
+        return None
+    try:
+        parsed = float(cleaned)
+    except ValueError:
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
+def _marketbeat_currency(value: str) -> str | None:
+    normalized = value.upper().replace(" ", "")
+    if "C$" in normalized or "CA$" in normalized:
+        return "CAD"
+    if "US$" in normalized:
+        return "USD"
+    return None
+
+
+_MARKETBEAT_ROLES = (
+    "Chief Executive Officer",
+    "Chief Financial Officer",
+    "Senior Officer",
+    "Major Shareholder",
+    "10% Owner",
+    "Director",
+    "Officer",
+    "Insider",
+)
+
+
+def _marketbeat_insider_and_role(value: str) -> tuple[str, str]:
+    normalized = re.sub(r"\s+", " ", value.replace("|", " ")).strip()
+    for role in _MARKETBEAT_ROLES:
+        if normalized.casefold().endswith(role.casefold()):
+            name = normalized[: -len(role)].strip(" -–—|")
+            return name or normalized, role
+    return normalized, "Insider"
+
+
+def parse_marketbeat_insider_html(
+    html: str,
+    *,
+    ticker: str,
+    company: str,
+    source_url: str | None = None,
+) -> list[InsiderTrade]:
+    parser = _MarketBeatTableParser()
+    parser.feed(html)
+    source = source_url or marketbeat_tse_url(ticker)
+    trades: list[InsiderTrade] = []
+
+    for cells in parser.rows:
+        if len(cells) < 6:
+            continue
+
+        trade_date = safe_date(cells[0])
+        action = cells[2].strip().casefold()
+        if trade_date is None or action not in {"buy", "sell"}:
+            continue
+
+        insider_name, role = _marketbeat_insider_and_role(cells[1])
+        transaction_type = "buy" if action == "buy" else "sell"
+        transaction_label = "Achat" if transaction_type == "buy" else "Vente"
+        shares = _marketbeat_number(cells[3])
+        price = _marketbeat_number(cells[4])
+        value = _marketbeat_number(cells[5])
+        currency = _marketbeat_currency(cells[4]) or _marketbeat_currency(cells[5])
+
+        if value is None and shares is not None and price is not None:
+            value = abs(shares * price)
+
+        trades.append(
+            InsiderTrade(
+                id=trade_id(
+                    "marketbeat",
+                    ticker,
+                    insider_name,
+                    trade_date,
+                    transaction_type,
+                    shares,
+                    price,
+                ),
+                ticker=display_ticker(ticker),
+                company=company,
+                market="Canada",
+                insider_name=insider_name,
+                role=role,
+                transaction_type=transaction_type,
+                transaction_label=transaction_label,
+                transaction_code="BUY" if transaction_type == "buy" else "SELL",
+                trade_date=trade_date,
+                filing_date=None,
+                shares=shares,
+                price=price,
+                price_currency=currency,
+                value_currency=currency,
+                currency_source="source" if currency else "unknown",
+                price_type="market",
+                classification_source="provider_code",
+                price_validation="unavailable",
+                value=value,
+                holdings_after=None,
+                ownership="",
+                unusual=(
+                    (value is not None and abs(value) >= UNUSUAL_VALUE)
+                    or (shares is not None and abs(shares) >= UNUSUAL_SHARES)
+                ),
+                source_name="MarketBeat public",
+                source_url=source,
+                official_verification_url=SEDI_URL,
+                official_source=False,
+                regulatory_source_name="SEDI",
+            )
+        )
+
+    return deduplicate_trades(trades)
+
+
+class MarketBeatInsiderService(InsiderService):
+    # Canadian insiders from MarketBeat public pages, verified against SEDI.
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._marketbeat_attempts: dict[
+            tuple[str, int], ProviderTickerResult
+        ] = {}
+        self._marketbeat_failure_at: dict[
+            tuple[str, int], float
+        ] = {}
+        self._marketbeat_semaphore = asyncio.Semaphore(4)
+
+    @staticmethod
+    def marketbeat_headers() -> dict[str, str]:
+        return {
+            "User-Agent": (
+                "Mozilla/5.0 (compatible; Anatole/1.0; "
+                "+https://github.com/sodia48/anatole)"
+            ),
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "en-CA,en;q=0.9,fr-CA;q=0.8",
+        }
+
+    async def marketbeat_ticker(
+        self,
+        ticker: str,
+        company: str,
+        *,
+        days: int,
+        force_refresh: bool,
+    ) -> ProviderTickerResult:
+        clean_ticker = display_ticker(ticker)
+        attempt_key = (clean_ticker.upper(), days)
+        previous_failure = self._marketbeat_failure_at.get(attempt_key)
+        previous_result = self._marketbeat_attempts.get(attempt_key)
+
+        if (
+            previous_failure is not None
+            and previous_result is not None
+            and monotonic() - previous_failure < MARKETBEAT_FAILED_RETRY_SECONDS
+            and not force_refresh
+        ):
+            return previous_result
+
+        key = ("marketbeat", clean_ticker.upper(), days)
+        cached = self._ticker_cache.get(key)
+        cached_trades = self._cached_trades(
+            cached,
+            force_refresh=force_refresh,
+        )
+        if cached_trades is not None:
+            result = ProviderTickerResult(
+                trades=cached_trades,
+                succeeded=True,
+                detail="Résultat MarketBeat public servi depuis le cache.",
+            )
+            self._marketbeat_attempts[attempt_key] = result
+            return result
+
+        source_url = marketbeat_tse_url(clean_ticker)
+        try:
+            async with self._marketbeat_semaphore:
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(
+                        MARKETBEAT_TIMEOUT_SECONDS,
+                        connect=8,
+                    ),
+                    follow_redirects=True,
+                ) as client:
+                    response = await client.get(
+                        source_url,
+                        headers=self.marketbeat_headers(),
+                    )
+
+            if response.status_code in {401, 403}:
+                raise PermissionError(
+                    f"HTTP {response.status_code}: MarketBeat public a refusé la requête."
+                )
+            if response.status_code == 429:
+                raise RuntimeError("HTTP 429: limite MarketBeat public atteinte.")
+            response.raise_for_status()
+
+            marker = response.text.casefold()
+            if (
+                "insider buying and selling" not in marker
+                and "insider and congressional trades history" not in marker
+            ):
+                raise ValueError(
+                    "La page MarketBeat ne contient pas le tableau d’initiés attendu."
+                )
+
+            trades = parse_marketbeat_insider_html(
+                response.text,
+                ticker=clean_ticker,
+                company=company,
+                source_url=str(response.url),
+            )
+            cutoff = date.today() - timedelta(days=days)
+            trades = [
+                trade
+                for trade in trades
+                if trade.trade_date is None or trade.trade_date >= cutoff
+            ]
+            self._ticker_cache[key] = (monotonic(), trades)
+            self._marketbeat_failure_at.pop(attempt_key, None)
+            result = ProviderTickerResult(
+                trades=trades,
+                succeeded=True,
+                detail="Page publique MarketBeat reçue.",
+            )
+        except Exception as exc:
+            stale_trades = cached[1] if cached else []
+            if isinstance(exc, httpx.TimeoutException):
+                detail = "Délai d’attente MarketBeat public dépassé."
+            else:
+                detail = str(exc) or type(exc).__name__
+            result = ProviderTickerResult(
+                trades=stale_trades,
+                succeeded=False,
+                detail=detail,
+                stale=cached is not None,
+            )
+            self._marketbeat_failure_at[attempt_key] = monotonic()
+
+        self._marketbeat_attempts[attempt_key] = result
+        return result
+
+    async def snapshot(
+        self,
+        *,
+        market: str,
+        ticker: str | None,
+        days: int,
+        scan_limit: int,
+        result_limit: int,
+        force_refresh: bool = False,
+    ) -> InsiderSnapshot:
+        if market.lower() in {"us", "usa"}:
+            return await super().snapshot(
+                market=market,
+                ticker=ticker,
+                days=days,
+                scan_limit=scan_limit,
+                result_limit=result_limit,
+                force_refresh=force_refresh,
+            )
+
+        clean_ticker = display_ticker(ticker) if ticker else ""
+        cache_key = ("Canada", clean_ticker, days, scan_limit)
+        cached = self._snapshot_cache.get(cache_key)
+        if not force_refresh and cached:
+            ttl = CACHE_SECONDS if cached[1].trades else EMPTY_CACHE_SECONDS
+            if monotonic() - cached[0] < ttl:
+                return cached[1].model_copy(
+                    update={"trades": cached[1].trades[:result_limit]}
+                )
+
+        directory = tsx60_directory()
+        if clean_ticker:
+            company = next(
+                (
+                    name
+                    for symbol, name in directory
+                    if display_ticker(symbol) == clean_ticker
+                ),
+                clean_ticker,
+            )
+            selected = [(clean_ticker, company)]
+        else:
+            selected = directory[: max(1, min(scan_limit, 40))]
+
+        async def load(
+            symbol: str,
+            company: str,
+        ) -> ProviderTickerResult:
+            clean_symbol = display_ticker(symbol)
+            return await self.marketbeat_ticker(
+                clean_symbol,
+                company,
+                days=days,
+                force_refresh=force_refresh,
+            )
+
+        results = await asyncio.gather(
+            *[load(symbol, company) for symbol, company in selected]
+        )
+        trades = [
+            trade
+            for result in results
+            for trade in result.trades
+        ]
+
+        if trades:
+            try:
+                trades = await validate_canadian_trade_prices(trades)
+            except Exception:
+                # Enrichment must never hide a public transaction.
+                pass
+
+        cutoff = date.today() - timedelta(days=days)
+        filtered = [
+            trade
+            for trade in trades
+            if trade.trade_date is None or trade.trade_date >= cutoff
+        ]
+        deduplicated = deduplicate_trades(filtered)
+
+        successful = sum(result.succeeded for result in results)
+        stale = sum(result.stale for result in results)
+        count = sum(len(result.trades) for result in results)
+        scanned = len(selected)
+
+        if scanned and successful == scanned:
+            marketbeat_status = "available"
+        elif successful or stale:
+            marketbeat_status = "partial"
+        else:
+            marketbeat_status = "unavailable"
+
+        errors = sorted(
+            {
+                result.detail
+                for result in results
+                if not result.succeeded and result.detail
+            }
+        )
+        marketbeat_detail = (
+            f"{successful}/{scanned} titres ont répondu via les pages publiques MarketBeat."
+        )
+        if stale:
+            marketbeat_detail += (
+                f" {stale} résultat(s) antérieur(s) conservé(s)."
+            )
+        if errors:
+            marketbeat_detail += " " + " ".join(errors[:3])
+
+        sources = [
+            InsiderSourceStatus(
+                source="MarketBeat public",
+                status=marketbeat_status,
+                count=count,
+                detail=marketbeat_detail,
+                url=MARKETBEAT_RADAR_URL,
+            ),
+            InsiderSourceStatus(
+                source="SEDI — registre officiel",
+                status="available",
+                count=0,
+                detail=(
+                    "Registre officiel canadien de vérification. "
+                    "Anatole ne collecte pas automatiquement les pages SEDI; "
+                    "chaque transaction MarketBeat conserve un lien de vérification SEDI."
+                ),
+                url=SEDI_URL,
+            ),
+        ]
+
+        automated_succeeded = successful > 0
+        full_snapshot = InsiderSnapshot(
+            trades=deduplicated,
+            summary=summarize_trades(deduplicated),
+            sources=sources,
+            market="Canada",
+            requested_ticker=clean_ticker or None,
+            scanned_symbols=scanned,
+            generated_at=datetime.now(UTC),
+            message=(
+                None
+                if deduplicated
+                else (
+                    "Aucune transaction MarketBeat observée pour les critères sélectionnés."
+                    if automated_succeeded
+                    else (
+                        "MarketBeat public est temporairement indisponible. "
+                        "SEDI reste disponible pour la vérification officielle."
+                    )
+                )
+            ),
+        )
+        self._snapshot_cache[cache_key] = (monotonic(), full_snapshot)
+        return full_snapshot.model_copy(
+            update={"trades": full_snapshot.trades[:result_limit]}
+        )
+
+
+insider_service = MarketBeatInsiderService()

@@ -30,8 +30,8 @@ function trade(overrides: Record<string, unknown> = {}) {
     holdings_after: 1_000_000,
     ownership: "Direct",
     unusual: true,
-    source_name: "Finnhub — données d’initiés canadiennes",
-    source_url: "https://finnhub.io/docs/api/insider-transactions",
+    source_name: "MarketBeat public",
+    source_url: "https://www.marketbeat.com/stocks/TSE/SHOP/insider-trades/",
     official_verification_url: "https://www.sedi.ca/",
     official_source: false,
     regulatory_source_name: "SEDI",
@@ -114,5 +114,5 @@ test("insider prices always show their currency or explicit uncertainty", async 
   await expect(page.getByText(/SHOP: 127\.00–131\.00 USD/)).toBeVisible();
   await expect(page.getByText("Prix cohérent avec SHOP (USD).")).toBeVisible();
   await expect(page.getByRole("combobox", { name: "MARCHÉ" }).locator("option:checked"))
-    .toHaveText(/Canada — Initiés \(fournisseurs · vérification SEDI\)/);
+    .toHaveText(/Canada — MarketBeat public · vérification SEDI/);
 });
