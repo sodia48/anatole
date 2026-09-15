@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -15,7 +17,10 @@ from app.core.resilience import shared_http_client
 from app.core.telemetry import reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
+from app.services.calendar import calendar_service
+from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
+from app.services.news import news_service
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
 from app.services.psychology import psychology_service
@@ -25,6 +30,52 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
 logger = logging.getLogger("anatole.api")
+
+
+async def _warm_source(
+    label: str,
+    operation: Awaitable[object],
+) -> None:
+    started = time.perf_counter()
+    try:
+        await operation
+        logger.info(
+            "startup_warm_success source=%s duration_ms=%.1f",
+            label,
+            (time.perf_counter() - started) * 1000,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:  # noqa: BLE001
+        logger.warning(
+            "startup_warm_failed source=%s error=%s detail=%s",
+            label,
+            type(error).__name__,
+            error,
+        )
+
+
+async def _warm_public_snapshots() -> None:
+    # Launch only after the API is ready. No warm-up is awaited by startup.
+    await asyncio.gather(
+        _warm_source("cockpit:composite", cockpit_service.get_composite()),
+        _warm_source("cockpit:tsx60", cockpit_service.get_tsx60()),
+        _warm_source("psychology", psychology_service.get_snapshot()),
+    )
+
+    await asyncio.sleep(0.15)
+
+    await asyncio.gather(
+        _warm_source("news:fr", news_service.get_snapshot("fr")),
+        _warm_source("calendar:fr", calendar_service.get_snapshot("fr")),
+    )
+
+    await asyncio.sleep(0.35)
+
+    await asyncio.gather(
+        _warm_source("news:en", news_service.get_snapshot("en")),
+        _warm_source("calendar:en", calendar_service.get_snapshot("en")),
+    )
 
 
 @asynccontextmanager
@@ -37,10 +88,17 @@ async def lifespan(_: FastAPI):
     paper_trading_service.account_service = account_service
     await paper_trading_service.start()
     psychology_service.ensure_refresh()
+    warm_task = asyncio.create_task(
+        _warm_public_snapshots(),
+        name="anatole-public-warmup",
+    )
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
+        if not warm_task.done():
+            warm_task.cancel()
+        await asyncio.gather(warm_task, return_exceptions=True)
         await company_network_service.close()
         await shared_http_client.close()
         await account_service.close()
