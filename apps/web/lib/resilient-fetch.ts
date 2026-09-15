@@ -76,17 +76,36 @@ function cacheKey(url: string): string {
   return `${CACHE_PREFIX}${(hash >>> 0).toString(16)}`;
 }
 
-function canUseStorage(): boolean {
-  if (typeof window === "undefined") return false;
+const PERSISTENT_PUBLIC_CACHE_PREFIXES = [
+  "/api/anatole/api/v1/market/cockpit",
+  "/api/anatole/api/v1/discovery/psychology",
+  "/api/anatole/api/v1/discovery/news",
+  "/api/anatole/api/v1/discovery/calendar",
+  "/api/anatole/api/v1/discovery/earnings-calendar",
+  "/api/anatole/api/v1/discovery/etfs",
+  "/api/anatole/api/v1/discovery/screener",
+  "/api/anatole/api/v1/discovery/ipo",
+  "/api/anatole/api/v1/discovery/insiders",
+  "/api/anatole/api/v1/analysis/terminal",
+  "/api/anatole/api/v1/stocks/",
+];
+
+function cacheStorage(url: string): Storage | null {
+  if (typeof window === "undefined") return null;
+
   try {
-    return Boolean(window.sessionStorage);
+    const persistent = PERSISTENT_PUBLIC_CACHE_PREFIXES.some((prefix) =>
+      url.startsWith(prefix),
+    );
+    return persistent ? window.localStorage : window.sessionStorage;
   } catch {
-    return false;
+    return null;
   }
 }
 
 async function storeLastGood(response: Response, url: string, id: string): Promise<void> {
-  if (!canUseStorage() || !response.ok) return;
+  const storage = cacheStorage(url);
+  if (!storage || !response.ok) return;
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return;
 
@@ -99,20 +118,23 @@ async function storeLastGood(response: Response, url: string, id: string): Promi
       storedAt: Date.now(),
       requestId: response.headers.get("X-Request-ID") ?? id,
     };
-    window.sessionStorage.setItem(cacheKey(url), JSON.stringify(cached));
+    storage.setItem(cacheKey(url), JSON.stringify(cached));
   } catch {
     // Le cache de secours est facultatif.
   }
 }
 
 function readLastGood(url: string, staleTtlMs: number): CachedResponse | null {
-  if (!canUseStorage()) return null;
+  const storage = cacheStorage(url);
+  if (!storage) return null;
+
   try {
-    const raw = window.sessionStorage.getItem(cacheKey(url));
+    const key = cacheKey(url);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw) as CachedResponse;
     if (Date.now() - cached.storedAt > staleTtlMs) {
-      window.sessionStorage.removeItem(cacheKey(url));
+      storage.removeItem(key);
       return null;
     }
     return cached;
