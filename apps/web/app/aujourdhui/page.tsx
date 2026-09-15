@@ -327,7 +327,6 @@ export default function TodayPage() {
         }
 
         setUniverse(next);
-        setCockpit(null);
         setMarketSwitching(true);
         setIssues((current) =>
           current.filter(
@@ -461,7 +460,7 @@ export default function TodayPage() {
 
     if (workspace.portfolio.length) {
       tasks.push(
-        analyzePortfolio(workspace.portfolio, controller.signal)
+        analyzePortfolio(workspace.portfolio, controller.signal, true)
           .then((value) => { if (mounted.current && !controller.signal.aborted) setPortfolio(value); })
           .catch((reason) => {
             nextIssues.push({
