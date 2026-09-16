@@ -14,6 +14,7 @@ function responseMayHaveBody(method: string, status: number): boolean {
 }
 const DEFAULT_STALE_TTL_MS = 30 * 60 * 1000;
 const MAX_CACHE_BODY_LENGTH = 1_500_000;
+const MAX_LAST_GOOD_CACHE_ENTRIES = 24;
 
 type ResilientFetchOptions = RequestInit & {
   timeoutMs?: number;
@@ -29,6 +30,35 @@ type CachedResponse = {
   storedAt: number;
   requestId: string;
 };
+function pruneLastGoodCache(storage: Storage, reserve = 0): void {
+  const entries: Array<{ key: string; storedAt: number }> = [];
+
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (!key?.startsWith(CACHE_PREFIX)) continue;
+
+    let storedAt = 0;
+    try {
+      const raw = storage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { storedAt?: unknown };
+        const candidate = Number(parsed.storedAt);
+        if (Number.isFinite(candidate)) storedAt = candidate;
+      }
+    } catch {
+      // Corrupt cache entries are treated as oldest and removed first.
+    }
+    entries.push({ key, storedAt });
+  }
+
+  entries.sort((left, right) => left.storedAt - right.storedAt);
+  const target = Math.max(0, MAX_LAST_GOOD_CACHE_ENTRIES - reserve);
+  const removeCount = Math.max(0, entries.length - target);
+  for (const entry of entries.slice(0, removeCount)) {
+    storage.removeItem(entry.key);
+  }
+}
+
 
 function abortError(): DOMException {
   return new DOMException("The operation was aborted", "AbortError");
@@ -118,7 +148,15 @@ async function storeLastGood(response: Response, url: string, id: string): Promi
       storedAt: Date.now(),
       requestId: response.headers.get("X-Request-ID") ?? id,
     };
-    storage.setItem(cacheKey(url), JSON.stringify(cached));
+    const key = cacheKey(url);
+    const encoded = JSON.stringify(cached);
+    try {
+      storage.setItem(key, encoded);
+    } catch {
+      pruneLastGoodCache(storage, 1);
+      storage.setItem(key, encoded);
+    }
+    pruneLastGoodCache(storage);
   } catch {
     // Le cache de secours est facultatif.
   }
@@ -142,6 +180,20 @@ function readLastGood(url: string, staleTtlMs: number): CachedResponse | null {
     return null;
   }
 }
+export function readLastGoodJson<T>(
+  input: RequestInfo | URL,
+  staleTtlMs = DEFAULT_STALE_TTL_MS,
+): T | null {
+  const cached = readLastGood(urlString(input), staleTtlMs);
+  if (!cached) return null;
+
+  try {
+    return JSON.parse(cached.body) as T;
+  } catch {
+    return null;
+  }
+}
+
 
 function staleResponse(
   cached: CachedResponse,
