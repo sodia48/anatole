@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -73,5 +73,7 @@ class ReliabilitySnapshot(BaseModel):
     reports_received: int
     last_report_at: datetime | None = None
     upstream_metrics: dict[str, int | str | None]
+    performance_metrics: dict[str, Any]
+    route_metrics: list[dict[str, Any]]
     recent_errors: list[ReliabilityRequestSample]
     generated_at: datetime

@@ -68,6 +68,7 @@ class SharedDataHub:
             created: AsyncStaleCache[Any, Any] = AsyncStaleCache(
                 max_entries=capacity,
                 remote_backend=remote_backend,
+                metric_namespace=key,
             )
             self._caches[key] = created
             self._capacities[key] = capacity
