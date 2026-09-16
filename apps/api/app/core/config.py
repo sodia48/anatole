@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     cors_origin_regex: str = r"^https://anatole(?:-[a-z0-9-]+)*\.vercel\.app$"
     market_data_provider: str = "yahoo"
     yahoo_timeout_seconds: float = 8.0
+    redis_url: str = ""
+    redis_cache_prefix: str = "anatole:cache:v1"
+    redis_cache_timeout_seconds: float = Field(default=0.08, ge=0.02, le=1.0)
     finnhub_api_key: str = ""
     sec_user_agent: str = "Anatole contact@anatole.app"
     company_network_build_concurrency: int = Field(

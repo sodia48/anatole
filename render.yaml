@@ -19,6 +19,12 @@ services:
         value: production
       - key: MARKET_DATA_PROVIDER
         value: yahoo
+      - key: REDIS_URL
+        sync: false
+      - key: REDIS_CACHE_PREFIX
+        value: "anatole:cache:v1"
+      - key: REDIS_CACHE_TIMEOUT_SECONDS
+        value: "0.08"
       - key: CORS_ORIGINS
         sync: false
       - key: UPSTREAM_MAX_CONCURRENCY

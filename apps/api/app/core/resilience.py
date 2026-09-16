@@ -7,7 +7,7 @@ import random
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from time import monotonic
-from typing import Any, Awaitable, Callable, Generic, Hashable, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Hashable, Protocol, TypeVar
 
 import httpx
 
@@ -267,19 +267,52 @@ class _CacheEntry(Generic[T]):
     stored_at: float
 
 
+@dataclass(slots=True)
+class RemoteCacheEntry(Generic[T]):
+    value: T
+    age_seconds: float
+
+
+@dataclass(slots=True)
+class _CacheLoadResult(Generic[T]):
+    value: T
+    age_seconds: float = 0.0
+
+
+class RemoteCacheBackend(Protocol[K, T]):
+    async def read(self, key: K) -> RemoteCacheEntry[T] | None: ...
+
+    async def write(
+        self,
+        key: K,
+        value: T,
+        *,
+        ttl_seconds: float,
+    ) -> None: ...
+
+
 class AsyncStaleCache(Generic[K, T]):
     """Cache TTL avec stale-if-error et single-flight.
 
     Une seule coroutine recharge une clé donnée. Les autres attendent la même
-    tâche au lieu de lancer un nouvel appel identique vers Yahoo.
+    tâche au lieu de lancer un nouvel appel identique vers Yahoo. Un backend
+    distant facultatif peut fournir/publier des snapshots partagés sans jamais
+    remplacer le cache mémoire de premier niveau.
     """
 
-    def __init__(self, *, max_entries: int = 2048) -> None:
+    def __init__(
+        self,
+        *,
+        max_entries: int = 2048,
+        remote_backend: RemoteCacheBackend[K, T] | None = None,
+    ) -> None:
         self._entries: dict[K, _CacheEntry[T]] = {}
-        self._inflight: dict[K, asyncio.Task[T]] = {}
+        self._inflight: dict[K, asyncio.Task[_CacheLoadResult[T]]] = {}
         self._lock: asyncio.Lock | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._background_tasks: set[asyncio.Task[None]] = set()
         self._max_entries = max_entries
+        self._remote_backend = remote_backend
 
     def _age(self, key: K, now: float) -> float | None:
         entry = self._entries.get(key)
@@ -301,14 +334,113 @@ class AsyncStaleCache(Generic[K, T]):
             return None
         return entry.value
 
-    def store(self, key: K, value: T) -> None:
+    def store(
+        self,
+        key: K,
+        value: T,
+        *,
+        age_seconds: float = 0.0,
+    ) -> None:
         if len(self._entries) >= self._max_entries and key not in self._entries:
             oldest_key = min(
                 self._entries,
                 key=lambda candidate: self._entries[candidate].stored_at,
             )
             self._entries.pop(oldest_key, None)
-        self._entries[key] = _CacheEntry(value=value, stored_at=monotonic())
+        self._entries[key] = _CacheEntry(
+            value=value,
+            stored_at=monotonic() - max(0.0, float(age_seconds)),
+        )
+
+    def _publish_remote(
+        self,
+        key: K,
+        value: T,
+        *,
+        ttl_seconds: float,
+    ) -> None:
+        if self._remote_backend is None:
+            return
+
+        async def publish() -> None:
+            try:
+                await self._remote_backend.write(
+                    key,
+                    value,
+                    ttl_seconds=ttl_seconds,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("remote_cache_publish_failed", exc_info=True)
+
+        task = asyncio.create_task(publish())
+        self._background_tasks.add(task)
+
+        def finish(completed: asyncio.Task[None]) -> None:
+            self._background_tasks.discard(completed)
+            if completed.cancelled():
+                return
+            try:
+                completed.exception()
+            except Exception:
+                logger.debug(
+                    "remote_cache_background_task_failed",
+                    exc_info=True,
+                )
+
+        task.add_done_callback(finish)
+
+    async def _load_with_remote(
+        self,
+        key: K,
+        loader: Callable[[], Awaitable[T]],
+        *,
+        fresh_seconds: float,
+        stale_seconds: float,
+    ) -> _CacheLoadResult[T]:
+        remote_stale: RemoteCacheEntry[T] | None = None
+
+        if self._remote_backend is not None:
+            try:
+                remote = await self._remote_backend.read(key)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.debug("remote_cache_read_failed", exc_info=True)
+                remote = None
+
+            if remote is not None:
+                remote_age = max(0.0, float(remote.age_seconds))
+                if remote_age <= fresh_seconds:
+                    return _CacheLoadResult(
+                        value=remote.value,
+                        age_seconds=remote_age,
+                    )
+                if remote_age <= stale_seconds:
+                    remote_stale = RemoteCacheEntry(
+                        value=remote.value,
+                        age_seconds=remote_age,
+                    )
+
+        try:
+            value = await loader()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            if remote_stale is not None:
+                return _CacheLoadResult(
+                    value=remote_stale.value,
+                    age_seconds=remote_stale.age_seconds,
+                )
+            raise
+
+        self._publish_remote(
+            key,
+            value,
+            ttl_seconds=stale_seconds,
+        )
+        return _CacheLoadResult(value=value, age_seconds=0.0)
 
     async def get_or_load(
         self,
@@ -320,10 +452,8 @@ class AsyncStaleCache(Generic[K, T]):
     ) -> T:
         current_loop = asyncio.get_running_loop()
         if self._loop is not current_loop:
-            # Process-level caches can survive test clients/reloaders replacing
-            # their event loop. Cached values are plain data and remain valid;
-            # asyncio synchronization primitives and in-flight tasks do not.
             self._inflight = {}
+            self._background_tasks = set()
             self._lock = asyncio.Lock()
             self._loop = current_loop
 
@@ -342,13 +472,24 @@ class AsyncStaleCache(Generic[K, T]):
 
             task = self._inflight.get(key)
             if task is None:
-                task = asyncio.create_task(loader())
+                task = asyncio.create_task(
+                    self._load_with_remote(
+                        key,
+                        loader,
+                        fresh_seconds=fresh_seconds,
+                        stale_seconds=stale_seconds,
+                    )
+                )
                 self._inflight[key] = task
 
         try:
-            value = await asyncio.shield(task)
-            self.store(key, value)
-            return value
+            loaded = await asyncio.shield(task)
+            self.store(
+                key,
+                loaded.value,
+                age_seconds=loaded.age_seconds,
+            )
+            return loaded.value
         except asyncio.CancelledError:
             raise
         except Exception:
