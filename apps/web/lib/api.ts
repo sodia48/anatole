@@ -75,13 +75,112 @@ async function apiError(response: Response): Promise<Error> {
   return error;
 }
 
-async function apiRequest<T>(
-  path: string,
-  init: RequestInit = {},
+type PublicApiCacheEntry = {
+  value: unknown;
+  storedAt: number;
+};
+
+type ApiNetworkResult<T> = {
+  value: T;
+  stale: boolean;
+};
+
+const PUBLIC_API_MEMORY_CACHE = new Map<string, PublicApiCacheEntry>();
+const PUBLIC_API_INFLIGHT = new Map<string, Promise<unknown>>();
+const MAX_PUBLIC_API_MEMORY_ENTRIES = 32;
+
+function publicFreshTtlMs(path: string): number {
+  if (path.startsWith("/api/v1/market/cockpit")) {
+    return path.includes("universe=composite") ? 25_000 : 8_000;
+  }
+  if (path.startsWith("/api/v1/discovery/psychology")) return 20_000;
+  if (path.startsWith("/api/v1/discovery/news")) return 60_000;
+  if (path.startsWith("/api/v1/discovery/calendar")) return 60_000;
+  if (path.startsWith("/api/v1/discovery/earnings-calendar")) return 0;
+  if (path.startsWith("/api/v1/discovery/etfs")) return 60_000;
+  if (path.startsWith("/api/v1/discovery/screener")) {
+    return path.includes("universe=composite") ? 45_000 : 20_000;
+  }
+  if (path.startsWith("/api/v1/discovery/ipo")) return 120_000;
+  if (path.startsWith("/api/v1/discovery/insiders")) return 90_000;
+  if (path.startsWith("/api/v1/discovery/institutions")) return 120_000;
+  if (path.startsWith("/api/v1/analysis/terminal")) return 10_000;
+  return 0;
+}
+
+function readPublicApiMemoryCache<T>(
+  key: string,
+  freshTtlMs: number,
+): T | null {
+  const entry = PUBLIC_API_MEMORY_CACHE.get(key);
+  if (!entry) return null;
+
+  if (Date.now() - entry.storedAt > freshTtlMs) {
+    PUBLIC_API_MEMORY_CACHE.delete(key);
+    return null;
+  }
+
+  PUBLIC_API_MEMORY_CACHE.delete(key);
+  PUBLIC_API_MEMORY_CACHE.set(key, entry);
+  return entry.value as T;
+}
+
+function writePublicApiMemoryCache<T>(key: string, value: T): void {
+  if (PUBLIC_API_MEMORY_CACHE.has(key)) {
+    PUBLIC_API_MEMORY_CACHE.delete(key);
+  }
+
+  PUBLIC_API_MEMORY_CACHE.set(key, {
+    value,
+    storedAt: Date.now(),
+  });
+
+  while (PUBLIC_API_MEMORY_CACHE.size > MAX_PUBLIC_API_MEMORY_ENTRIES) {
+    const oldestKey = PUBLIC_API_MEMORY_CACHE.keys().next().value;
+    if (typeof oldestKey !== "string") break;
+    PUBLIC_API_MEMORY_CACHE.delete(oldestKey);
+  }
+}
+
+function clientAbortError(): DOMException {
+  return new DOMException("The operation was aborted", "AbortError");
+}
+
+function awaitWithoutCancellingSharedRequest<T>(
+  promise: Promise<T>,
   signal?: AbortSignal,
-  timeoutMs = 20_000,
-  idempotent = false,
 ): Promise<T> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(clientAbortError());
+
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener("abort", onAbort);
+      reject(clientAbortError());
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
+}
+
+async function apiNetworkRequest<T>(
+  path: string,
+  init: RequestInit,
+  signal: AbortSignal | undefined,
+  timeoutMs: number,
+  idempotent: boolean,
+): Promise<ApiNetworkResult<T>> {
   const response = await resilientFetch(`${apiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
@@ -100,10 +199,72 @@ async function apiRequest<T>(
   }
 
   const payload = await response.json();
-  if (response.headers.get("X-Anatole-Stale") === "true" && payload && typeof payload === "object" && !Array.isArray(payload)) {
-    return { ...payload, stale: true } as T;
+  const stale = response.headers.get("X-Anatole-Stale") === "true";
+  const value =
+    stale &&
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload)
+      ? ({ ...payload, stale: true } as T)
+      : (payload as T);
+
+  return { value, stale };
+}
+
+async function apiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+  signal?: AbortSignal,
+  timeoutMs = 20_000,
+  idempotent = false,
+): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+  const freshTtlMs = method === "GET" ? publicFreshTtlMs(path) : 0;
+
+  if (freshTtlMs <= 0) {
+    const result = await apiNetworkRequest<T>(
+      path,
+      init,
+      signal,
+      timeoutMs,
+      idempotent,
+    );
+    return result.value;
   }
-  return payload as T;
+
+  const cached = readPublicApiMemoryCache<T>(path, freshTtlMs);
+  if (cached !== null) {
+    return cached;
+  }
+
+  const existing = PUBLIC_API_INFLIGHT.get(path) as Promise<T> | undefined;
+  if (existing) {
+    return awaitWithoutCancellingSharedRequest(existing, signal);
+  }
+
+  const shared = apiNetworkRequest<T>(
+    path,
+    init,
+    undefined,
+    timeoutMs,
+    idempotent,
+  ).then((result) => {
+    if (!result.stale) {
+      writePublicApiMemoryCache(path, result.value);
+    }
+    return result.value;
+  });
+
+  PUBLIC_API_INFLIGHT.set(path, shared as Promise<unknown>);
+
+  const clearInflight = () => {
+    if (PUBLIC_API_INFLIGHT.get(path) === shared) {
+      PUBLIC_API_INFLIGHT.delete(path);
+    }
+  };
+  void shared.then(clearInflight, clearInflight);
+
+  return awaitWithoutCancellingSharedRequest(shared, signal);
 }
 
 export function getHealthStatus(
