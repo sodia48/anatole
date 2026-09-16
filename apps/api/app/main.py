@@ -55,7 +55,7 @@ async def _warm_source(
         )
 
 
-async def _warm_public_snapshots() -> None:
+async def _warm_public_snapshots_once() -> None:
     # Launch only after the API is ready. No warm-up is awaited by startup.
     await asyncio.gather(
         _warm_source("cockpit:composite", cockpit_service.get_composite()),
@@ -78,6 +78,68 @@ async def _warm_public_snapshots() -> None:
     )
 
 
+async def _maintain_public_hotset() -> None:
+    # Keep the most visited public snapshots warm without blocking startup.
+    # Each service still controls its own TTL and stale-refresh policy.
+    await _warm_public_snapshots_once()
+
+    cycle = 0
+    while True:
+        await asyncio.sleep(20.0)
+        cycle += 1
+
+        tasks: list[Awaitable[object]] = [
+            _warm_source(
+                "cockpit:tsx60",
+                cockpit_service.get_tsx60(),
+            ),
+        ]
+
+        # Psychology expires after 45 s, so check it every minute.
+        if cycle % 3 == 0:
+            tasks.append(
+                _warm_source(
+                    "psychology",
+                    psychology_service.get_snapshot(),
+                )
+            )
+
+        # Composite is intentionally heavier and has a 90 s cache.
+        if cycle % 5 == 0:
+            tasks.append(
+                _warm_source(
+                    "cockpit:composite",
+                    cockpit_service.get_composite(),
+                )
+            )
+
+        # News and calendars are slower-moving. Refresh both languages
+        # every two minutes so navigation normally lands on warm data.
+        if cycle % 6 == 0:
+            tasks.extend(
+                [
+                    _warm_source(
+                        "news:fr",
+                        news_service.get_snapshot("fr"),
+                    ),
+                    _warm_source(
+                        "calendar:fr",
+                        calendar_service.get_snapshot("fr"),
+                    ),
+                    _warm_source(
+                        "news:en",
+                        news_service.get_snapshot("en"),
+                    ),
+                    _warm_source(
+                        "calendar:en",
+                        calendar_service.get_snapshot("en"),
+                    ),
+                ]
+            )
+
+        await asyncio.gather(*tasks)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await shared_http_client.start()
@@ -89,8 +151,8 @@ async def lifespan(_: FastAPI):
     await paper_trading_service.start()
     psychology_service.ensure_refresh()
     warm_task = asyncio.create_task(
-        _warm_public_snapshots(),
-        name="anatole-public-warmup",
+        _maintain_public_hotset(),
+        name="anatole-public-hotset",
     )
     logger.info("anatole_api_started shared_http_pool=true")
     try:
