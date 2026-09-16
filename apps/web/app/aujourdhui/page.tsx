@@ -500,36 +500,64 @@ export default function TodayPage() {
 
   const loadContext = useCallback(() => contextLane.current.run(language, async (controller) => {
     if (document.visibilityState === "hidden") return;
+
     const nextIssues: SourceIssue[] = [];
-    const results = await Promise.allSettled([
-      getTerminalSnapshot(controller.signal),
-      getPsychologySnapshot(controller.signal),
-      getNewsSnapshot(language, controller.signal),
-      getCalendarSnapshot(
-        language,
-        controller.signal,
-      ),
-    ]);
-    const setters = [
-      (value: TerminalSnapshot) => setTerminal(value),
-      (value: PsychologySnapshot) => setPsychology(value),
-      (value: NewsSnapshot) => setNews(value),
-      (value: CalendarSnapshot) => setCalendar(value),
-    ] as const;
-    const names = ["Terminal", pick(language, "Psychologie", "Psychology"), pick(language, "Actualités", "News"), pick(language, "Calendrier", "Calendar")];
+    const names = [
+      "Terminal",
+      pick(language, "Psychologie", "Psychology"),
+      pick(language, "Actualités", "News"),
+      pick(language, "Calendrier", "Calendar"),
+    ];
 
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        if (mounted.current && !controller.signal.aborted) setters[index](result.value as never);
-      } else {
-        nextIssues.push({
-          source: names[index],
-          message: language === "fr" && result.reason instanceof Error ? result.reason.message : pick(language, "Données indisponibles", "Data unavailable"),
-        });
-      }
-    });
+    const recordFailure = (index: number, reason: unknown) => {
+      nextIssues.push({
+        source: names[index],
+        message:
+          language === "fr" && reason instanceof Error
+            ? reason.message
+            : pick(language, "Données indisponibles", "Data unavailable"),
+      });
+    };
 
-    if (!controller.signal.aborted) recordIssues(nextIssues);
+    const tasks: Array<Promise<void>> = [
+      getTerminalSnapshot(controller.signal)
+        .then((value) => {
+          if (mounted.current && !controller.signal.aborted) {
+            setTerminal(value as TerminalSnapshot);
+          }
+        })
+        .catch((reason) => recordFailure(0, reason)),
+
+      getPsychologySnapshot(controller.signal)
+        .then((value) => {
+          if (mounted.current && !controller.signal.aborted) {
+            setPsychology(value);
+          }
+        })
+        .catch((reason) => recordFailure(1, reason)),
+
+      getNewsSnapshot(language, controller.signal)
+        .then((value) => {
+          if (mounted.current && !controller.signal.aborted) {
+            setNews(value);
+          }
+        })
+        .catch((reason) => recordFailure(2, reason)),
+
+      getCalendarSnapshot(language, controller.signal)
+        .then((value) => {
+          if (mounted.current && !controller.signal.aborted) {
+            setCalendar(value);
+          }
+        })
+        .catch((reason) => recordFailure(3, reason)),
+    ];
+
+    await Promise.allSettled(tasks);
+
+    if (!controller.signal.aborted) {
+      recordIssues(nextIssues);
+    }
   }), [language, recordIssues]);
 
   const loadAll = useCallback(async () => {
