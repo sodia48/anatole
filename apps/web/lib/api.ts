@@ -96,7 +96,7 @@ function publicFreshTtlMs(path: string): number {
   if (path.startsWith("/api/v1/discovery/psychology")) return 20_000;
   if (path.startsWith("/api/v1/discovery/news")) return 60_000;
   if (path.startsWith("/api/v1/discovery/calendar")) return 60_000;
-  if (path.startsWith("/api/v1/discovery/earnings-calendar")) return 90_000;
+  if (path.startsWith("/api/v1/discovery/earnings-calendar")) return 0;
   if (path.startsWith("/api/v1/discovery/etfs")) return 60_000;
   if (path.startsWith("/api/v1/discovery/screener")) {
     return path.includes("universe=composite") ? 45_000 : 20_000;
