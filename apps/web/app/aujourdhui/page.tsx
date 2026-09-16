@@ -575,11 +575,6 @@ export default function TodayPage() {
   }, [loadContext, loadMarket, loadPersonal]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadAll(), 0);
-    return () => window.clearTimeout(timer);
-  }, [loadAll]);
-
-  useEffect(() => {
     // Key changes supersede only this lane's locally owned request.
     void loadMarket();
   }, [loadMarket]);
