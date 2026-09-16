@@ -13,8 +13,9 @@ from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.hotset_policy import choose_hotset_policy
 from app.core.resilience import shared_http_client
-from app.core.telemetry import reliability_monitor
+from app.core.telemetry import performance_monitor, reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
 from app.services.calendar import calendar_service
@@ -56,19 +57,24 @@ async def _warm_source(
 
 
 async def _warm_public_snapshots_once() -> None:
-    # Launch only after the API is ready. No warm-up is awaited by startup.
+    # The first visible request wins over background work. Warm the smallest,
+    # highest-value snapshots first and deliberately postpone heavier Composite
+    # and secondary-language discovery calls.
     await asyncio.gather(
-        _warm_source("cockpit:composite", cockpit_service.get_composite()),
         _warm_source("cockpit:tsx60", cockpit_service.get_tsx60()),
         _warm_source("psychology", psychology_service.get_snapshot()),
     )
 
-    await asyncio.sleep(0.15)
+    await asyncio.sleep(0.35)
 
     await asyncio.gather(
         _warm_source("news:fr", news_service.get_snapshot("fr")),
         _warm_source("calendar:fr", calendar_service.get_snapshot("fr")),
     )
+
+    await asyncio.sleep(0.75)
+
+    await _warm_source("cockpit:composite", cockpit_service.get_composite())
 
     await asyncio.sleep(0.35)
 
@@ -79,43 +85,67 @@ async def _warm_public_snapshots_once() -> None:
 
 
 async def _maintain_public_hotset() -> None:
-    # Keep the most visited public snapshots warm without blocking startup.
-    # Each service still controls its own TTL and stale-refresh policy.
+    # Keep public snapshots warm, but never let speculative background refresh
+    # compete indefinitely with interactive traffic. Phase 3H reads the real
+    # p95/error/provider telemetry introduced in Phase 3D and backs off
+    # automatically under pressure.
     await _warm_public_snapshots_once()
 
-    cycle = 0
+    now = time.monotonic()
+    next_due = {
+        "tsx60": now + 20.0,
+        "psychology": now + 60.0,
+        "composite": now + 100.0,
+        "discovery": now + 120.0,
+    }
+    last_level: str | None = None
+
     while True:
-        await asyncio.sleep(20.0)
-        cycle += 1
+        reliability = reliability_monitor.snapshot()
+        performance = performance_monitor.snapshot()
+        policy = choose_hotset_policy(reliability, performance)
 
-        tasks: list[Awaitable[object]] = [
-            _warm_source(
-                "cockpit:tsx60",
-                cockpit_service.get_tsx60(),
-            ),
-        ]
+        if policy.level != last_level:
+            logger.info(
+                "public_hotset_policy level=%s api_p95_ms=%.1f error_rate_5xx=%.3f",
+                policy.level,
+                float(reliability.get("p95_duration_ms") or 0.0),
+                float(reliability.get("error_rate_5xx") or 0.0),
+            )
+            last_level = policy.level
 
-        # Psychology expires after 45 s, so check it every minute.
-        if cycle % 3 == 0:
+        await asyncio.sleep(policy.poll_seconds)
+        now = time.monotonic()
+        tasks: list[Awaitable[object]] = []
+
+        if now >= next_due["tsx60"]:
+            tasks.append(
+                _warm_source(
+                    "cockpit:tsx60",
+                    cockpit_service.get_tsx60(),
+                )
+            )
+            next_due["tsx60"] = now + policy.tsx60_seconds
+
+        if now >= next_due["psychology"]:
             tasks.append(
                 _warm_source(
                     "psychology",
                     psychology_service.get_snapshot(),
                 )
             )
+            next_due["psychology"] = now + policy.psychology_seconds
 
-        # Composite is intentionally heavier and has a 90 s cache.
-        if cycle % 5 == 0:
+        if now >= next_due["composite"]:
             tasks.append(
                 _warm_source(
                     "cockpit:composite",
                     cockpit_service.get_composite(),
                 )
             )
+            next_due["composite"] = now + policy.composite_seconds
 
-        # News and calendars are slower-moving. Refresh both languages
-        # every two minutes so navigation normally lands on warm data.
-        if cycle % 6 == 0:
+        if now >= next_due["discovery"]:
             tasks.extend(
                 [
                     _warm_source(
@@ -136,8 +166,10 @@ async def _maintain_public_hotset() -> None:
                     ),
                 ]
             )
+            next_due["discovery"] = now + policy.discovery_seconds
 
-        await asyncio.gather(*tasks)
+        if tasks:
+            await asyncio.gather(*tasks)
 
 
 @asynccontextmanager
