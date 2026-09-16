@@ -5,10 +5,11 @@ import hashlib
 import importlib
 import json
 import logging
+import secrets
 from datetime import date, datetime
 from math import ceil
 from time import time
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 from pydantic import BaseModel
 from redis.asyncio import Redis
@@ -157,6 +158,22 @@ class RedisNamespaceBackend(RemoteCacheBackend[Any, Any]):
             ttl_seconds=ttl_seconds,
         )
 
+    async def load_through(
+        self,
+        key: Any,
+        loader: Callable[[], Awaitable[Any]],
+        *,
+        fresh_seconds: float,
+        stale_seconds: float,
+    ) -> RemoteCacheEntry[Any]:
+        return await self._store.load_through(
+            self._namespace,
+            key,
+            loader,
+            fresh_seconds=fresh_seconds,
+            stale_seconds=stale_seconds,
+        )
+
 
 class RedisSnapshotStore:
     """Best-effort shared snapshot layer.
@@ -172,10 +189,25 @@ class RedisSnapshotStore:
         url: str,
         prefix: str = "anatole:cache:v1",
         timeout_seconds: float = 0.08,
+        singleflight_lease_seconds: float = 30.0,
+        singleflight_wait_seconds: float = 1.5,
+        singleflight_poll_seconds: float = 0.05,
     ) -> None:
         self._url = url.strip()
         self._prefix = prefix.strip().strip(":") or "anatole:cache:v1"
         self._timeout_seconds = min(1.0, max(0.02, float(timeout_seconds)))
+        self._singleflight_lease_seconds = min(
+            120.0,
+            max(2.0, float(singleflight_lease_seconds)),
+        )
+        self._singleflight_wait_seconds = min(
+            10.0,
+            max(0.0, float(singleflight_wait_seconds)),
+        )
+        self._singleflight_poll_seconds = min(
+            1.0,
+            max(0.01, float(singleflight_poll_seconds)),
+        )
         self._client: Redis | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
 
@@ -211,23 +243,23 @@ class RedisSnapshotStore:
             self._loop = current_loop
         return self._client
 
-    async def read(
+    async def _read_once(
         self,
         namespace: str,
         key: Any,
-    ) -> RemoteCacheEntry[Any] | None:
+    ) -> tuple[bool, RemoteCacheEntry[Any] | None]:
         client = self._client_for_loop()
         if client is None:
-            return None
+            return False, None
 
         try:
             async with asyncio.timeout(self._timeout_seconds):
                 payload = await client.get(self._redis_key(namespace, key))
             if payload is None:
-                return None
+                return True, None
             if isinstance(payload, str):
                 payload = payload.encode("utf-8")
-            return decode_snapshot(payload)
+            return True, decode_snapshot(payload)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -236,7 +268,192 @@ class RedisSnapshotStore:
                 namespace,
                 exc_info=True,
             )
+            return False, None
+
+    async def read(
+        self,
+        namespace: str,
+        key: Any,
+    ) -> RemoteCacheEntry[Any] | None:
+        _, entry = await self._read_once(namespace, key)
+        return entry
+
+    def _lease_key(self, namespace: str, key: Any) -> str:
+        return f"{self._redis_key(namespace, key)}:fill-lock"
+
+    async def _acquire_fill_lease(
+        self,
+        namespace: str,
+        key: Any,
+    ) -> tuple[bool, str | None]:
+        client = self._client_for_loop()
+        if client is None:
+            return False, None
+
+        token = secrets.token_urlsafe(24)
+        try:
+            async with asyncio.timeout(self._timeout_seconds):
+                acquired = await client.set(
+                    self._lease_key(namespace, key),
+                    token,
+                    nx=True,
+                    px=max(
+                        1,
+                        ceil(self._singleflight_lease_seconds * 1000),
+                    ),
+                )
+            return True, token if acquired else None
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug(
+                "redis_fill_lease_acquire_failed namespace=%s",
+                namespace,
+                exc_info=True,
+            )
+            return False, None
+
+    async def _release_fill_lease(
+        self,
+        namespace: str,
+        key: Any,
+        token: str,
+    ) -> None:
+        client = self._client_for_loop()
+        if client is None:
+            return
+
+        script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) else return 0 end"
+        )
+        try:
+            async with asyncio.timeout(self._timeout_seconds):
+                await client.eval(
+                    script,
+                    1,
+                    self._lease_key(namespace, key),
+                    token,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug(
+                "redis_fill_lease_release_failed namespace=%s",
+                namespace,
+                exc_info=True,
+            )
+
+    async def _wait_for_peer_fill(
+        self,
+        namespace: str,
+        key: Any,
+        *,
+        fresh_seconds: float,
+    ) -> RemoteCacheEntry[Any] | None:
+        if self._singleflight_wait_seconds <= 0:
             return None
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._singleflight_wait_seconds
+
+        while loop.time() < deadline:
+            await asyncio.sleep(self._singleflight_poll_seconds)
+            available, entry = await self._read_once(namespace, key)
+            if not available:
+                return None
+            if (
+                entry is not None
+                and max(0.0, float(entry.age_seconds)) <= fresh_seconds
+            ):
+                return entry
+
+        return None
+
+    async def _run_provider(
+        self,
+        loader: Callable[[], Awaitable[Any]],
+        *,
+        stale: RemoteCacheEntry[Any] | None,
+    ) -> RemoteCacheEntry[Any]:
+        try:
+            value = await loader()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            if stale is not None:
+                return stale
+            raise
+        return RemoteCacheEntry(value=value, age_seconds=0.0)
+
+    async def load_through(
+        self,
+        namespace: str,
+        key: Any,
+        loader: Callable[[], Awaitable[Any]],
+        *,
+        fresh_seconds: float,
+        stale_seconds: float,
+    ) -> RemoteCacheEntry[Any]:
+        available, current = await self._read_once(namespace, key)
+
+        if not available:
+            return await self._run_provider(loader, stale=None)
+
+        stale: RemoteCacheEntry[Any] | None = None
+        if current is not None:
+            current_age = max(0.0, float(current.age_seconds))
+            if current_age <= fresh_seconds:
+                return current
+            if current_age <= stale_seconds:
+                stale = RemoteCacheEntry(
+                    value=current.value,
+                    age_seconds=current_age,
+                )
+
+        lease_available, token = await self._acquire_fill_lease(
+            namespace,
+            key,
+        )
+
+        if not lease_available:
+            return await self._run_provider(loader, stale=stale)
+
+        if token is None:
+            if stale is not None:
+                return stale
+
+            peer_value = await self._wait_for_peer_fill(
+                namespace,
+                key,
+                fresh_seconds=fresh_seconds,
+            )
+            if peer_value is not None:
+                return peer_value
+
+            lease_available, token = await self._acquire_fill_lease(
+                namespace,
+                key,
+            )
+            if not lease_available or token is None:
+                return await self._run_provider(loader, stale=None)
+
+        try:
+            result = await self._run_provider(loader, stale=stale)
+            if result.age_seconds == 0.0:
+                await self.write(
+                    namespace,
+                    key,
+                    result.value,
+                    ttl_seconds=stale_seconds,
+                )
+            return result
+        finally:
+            await self._release_fill_lease(
+                namespace,
+                key,
+                token,
+            )
 
     async def write(
         self,
@@ -273,4 +490,7 @@ redis_snapshot_store = RedisSnapshotStore(
     url=settings.redis_url,
     prefix=settings.redis_cache_prefix,
     timeout_seconds=settings.redis_cache_timeout_seconds,
+    singleflight_lease_seconds=settings.redis_singleflight_lease_seconds,
+    singleflight_wait_seconds=settings.redis_singleflight_wait_seconds,
+    singleflight_poll_seconds=settings.redis_singleflight_poll_seconds,
 )

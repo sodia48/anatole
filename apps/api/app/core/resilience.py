@@ -402,6 +402,27 @@ class AsyncStaleCache(Generic[K, T]):
         remote_stale: RemoteCacheEntry[T] | None = None
 
         if self._remote_backend is not None:
+            load_through = getattr(
+                self._remote_backend,
+                "load_through",
+                None,
+            )
+            if callable(load_through):
+                coordinated = await load_through(
+                    key,
+                    loader,
+                    fresh_seconds=fresh_seconds,
+                    stale_seconds=stale_seconds,
+                )
+                return _CacheLoadResult(
+                    value=coordinated.value,
+                    age_seconds=max(
+                        0.0,
+                        float(coordinated.age_seconds),
+                    ),
+                )
+
+        if self._remote_backend is not None:
             try:
                 remote = await self._remote_backend.read(key)
             except asyncio.CancelledError:
