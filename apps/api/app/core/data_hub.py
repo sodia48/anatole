@@ -1,27 +1,43 @@
 from __future__ import annotations
 
 from threading import Lock
-from typing import Any, Hashable, TypeVar, cast
+from typing import Any, Hashable, Protocol, TypeVar, cast
 
-from app.core.resilience import AsyncStaleCache
+from app.core.distributed_cache import redis_snapshot_store
+from app.core.resilience import AsyncStaleCache, RemoteCacheBackend
 
 K = TypeVar("K", bound=Hashable)
 T = TypeVar("T")
 
 
-class SharedDataHub:
-    """Registry of process-wide stale caches used by market-data services.
+class _SnapshotStore(Protocol):
+    @property
+    def enabled(self) -> bool: ...
 
-    Phase 3A deliberately keeps the backing store in memory. Services ask for a
-    stable namespace instead of owning isolated caches, so duplicate service
-    instances share the same snapshot and the same single-flight loader. A
-    later Redis backend can sit behind this boundary without changing callers.
+    def namespace(
+        self,
+        namespace: str,
+    ) -> RemoteCacheBackend[Any, Any]: ...
+
+
+class SharedDataHub:
+    """Registry of process-wide caches, optionally mirrored through Redis.
+
+    The in-process AsyncStaleCache remains the zero-latency first level. When a
+    Redis URL is configured, misses can reuse a recent snapshot produced by a
+    different API instance. Redis is strictly best-effort: timeouts, decode
+    failures and outages always fall back to the existing memory/upstream path.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        snapshot_store: _SnapshotStore | None = None,
+    ) -> None:
         self._caches: dict[str, AsyncStaleCache[Any, Any]] = {}
         self._capacities: dict[str, int] = {}
         self._registry_lock = Lock()
+        self._snapshot_store = snapshot_store
 
     def cache(
         self,
@@ -45,8 +61,13 @@ class SharedDataHub:
                     )
                 return cast(AsyncStaleCache[K, T], existing)
 
+            remote_backend: RemoteCacheBackend[Any, Any] | None = None
+            if self._snapshot_store is not None and self._snapshot_store.enabled:
+                remote_backend = self._snapshot_store.namespace(key)
+
             created: AsyncStaleCache[Any, Any] = AsyncStaleCache(
-                max_entries=capacity
+                max_entries=capacity,
+                remote_backend=remote_backend,
             )
             self._caches[key] = created
             self._capacities[key] = capacity
@@ -61,4 +82,4 @@ class SharedDataHub:
             return dict(self._capacities)
 
 
-shared_data_hub = SharedDataHub()
+shared_data_hub = SharedDataHub(snapshot_store=redis_snapshot_store)
