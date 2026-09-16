@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Request, status
 
 from app.core.resilience import shared_http_client
-from app.core.telemetry import reliability_monitor
+from app.core.telemetry import performance_monitor, reliability_monitor
 from app.services.accounts import account_service
 from app.schemas.reliability import (
     ClientEventRequest,
@@ -32,6 +32,7 @@ async def reliability_status() -> ReliabilitySnapshot:
     return ReliabilitySnapshot(
         **payload,
         upstream_metrics=shared_http_client.metrics.as_dict(),
+        performance_metrics=performance_monitor.snapshot(),
         generated_at=datetime.now(UTC),
     )
 

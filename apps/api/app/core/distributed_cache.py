@@ -8,7 +8,7 @@ import logging
 import secrets
 from datetime import date, datetime
 from math import ceil
-from time import time
+from time import monotonic, time
 from typing import Any, Awaitable, Callable
 
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.resilience import RemoteCacheBackend, RemoteCacheEntry
+from app.core.telemetry import performance_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -248,13 +249,26 @@ class RedisSnapshotStore:
         namespace: str,
         key: Any,
     ) -> tuple[bool, RemoteCacheEntry[Any] | None]:
+        started = monotonic()
         client = self._client_for_loop()
         if client is None:
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "unavailable",
+                duration_ms=(monotonic() - started) * 1000,
+            )
             return False, None
 
         try:
             async with asyncio.timeout(self._timeout_seconds):
                 payload = await client.get(self._redis_key(namespace, key))
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "hit" if payload is not None else "miss",
+                duration_ms=(monotonic() - started) * 1000,
+            )
             if payload is None:
                 return True, None
             if isinstance(payload, str):
@@ -263,6 +277,12 @@ class RedisSnapshotStore:
         except asyncio.CancelledError:
             raise
         except Exception:
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "error",
+                duration_ms=(monotonic() - started) * 1000,
+            )
             logger.debug(
                 "redis_snapshot_read_failed namespace=%s",
                 namespace,
@@ -395,9 +415,16 @@ class RedisSnapshotStore:
         fresh_seconds: float,
         stale_seconds: float,
     ) -> RemoteCacheEntry[Any]:
+        operation_started = monotonic()
         available, current = await self._read_once(namespace, key)
 
         if not available:
+            performance_monitor.record(
+                "singleflight",
+                namespace,
+                "fallback_provider",
+                duration_ms=(monotonic() - operation_started) * 1000,
+            )
             return await self._run_provider(loader, stale=None)
 
         stale: RemoteCacheEntry[Any] | None = None
@@ -417,10 +444,22 @@ class RedisSnapshotStore:
         )
 
         if not lease_available:
+            performance_monitor.record(
+                "singleflight",
+                namespace,
+                "fallback_provider",
+                duration_ms=(monotonic() - operation_started) * 1000,
+            )
             return await self._run_provider(loader, stale=stale)
 
         if token is None:
             if stale is not None:
+                performance_monitor.record(
+                    "singleflight",
+                    namespace,
+                    "peer_stale",
+                    duration_ms=(monotonic() - operation_started) * 1000,
+                )
                 return stale
 
             peer_value = await self._wait_for_peer_fill(
@@ -429,6 +468,12 @@ class RedisSnapshotStore:
                 fresh_seconds=fresh_seconds,
             )
             if peer_value is not None:
+                performance_monitor.record(
+                    "singleflight",
+                    namespace,
+                    "peer_hit",
+                    duration_ms=(monotonic() - operation_started) * 1000,
+                )
                 return peer_value
 
             lease_available, token = await self._acquire_fill_lease(
@@ -436,8 +481,20 @@ class RedisSnapshotStore:
                 key,
             )
             if not lease_available or token is None:
+                performance_monitor.record(
+                    "singleflight",
+                    namespace,
+                    "fallback_provider",
+                    duration_ms=(monotonic() - operation_started) * 1000,
+                )
                 return await self._run_provider(loader, stale=None)
 
+        performance_monitor.record(
+            "singleflight",
+            namespace,
+            "owner",
+            duration_ms=(monotonic() - operation_started) * 1000,
+        )
         try:
             result = await self._run_provider(loader, stale=stale)
             if result.age_seconds == 0.0:
@@ -463,8 +520,15 @@ class RedisSnapshotStore:
         *,
         ttl_seconds: float,
     ) -> None:
+        started = monotonic()
         client = self._client_for_loop()
         if client is None:
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "unavailable",
+                duration_ms=(monotonic() - started) * 1000,
+            )
             return
 
         try:
@@ -476,9 +540,21 @@ class RedisSnapshotStore:
                     payload,
                     ex=ttl,
                 )
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "write",
+                duration_ms=(monotonic() - started) * 1000,
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
+            performance_monitor.record(
+                "redis",
+                namespace,
+                "error",
+                duration_ms=(monotonic() - started) * 1000,
+            )
             logger.debug(
                 "redis_snapshot_write_failed namespace=%s",
                 namespace,

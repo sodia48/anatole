@@ -8,8 +8,11 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from time import monotonic
 from typing import Any, Awaitable, Callable, Generic, Hashable, Protocol, TypeVar
+from urllib.parse import urlsplit
 
 import httpx
+
+from app.core.telemetry import performance_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -192,8 +195,10 @@ class SharedHttpClient:
         )
         last_error: Exception | None = None
 
+        provider_name = urlsplit(url).netloc.lower() or "unknown"
         for attempt in range(max_attempts):
             self.metrics.requests += 1
+            attempt_started = monotonic()
             try:
                 async with self._semaphore:
                     self.metrics.active += 1
@@ -209,6 +214,13 @@ class SharedHttpClient:
                         )
                     finally:
                         self.metrics.active -= 1
+
+                performance_monitor.record(
+                    "upstream",
+                    provider_name,
+                    f"http_{response.status_code}",
+                    duration_ms=(monotonic() - attempt_started) * 1000,
+                )
 
                 if response.status_code not in _RETRYABLE_STATUS_CODES:
                     response.raise_for_status()
@@ -226,6 +238,12 @@ class SharedHttpClient:
                 raise
             except _RETRYABLE_ERRORS as error:
                 last_error = error
+                performance_monitor.record(
+                    "upstream",
+                    provider_name,
+                    "transport_error",
+                    duration_ms=(monotonic() - attempt_started) * 1000,
+                )
                 if attempt == max_attempts - 1:
                     break
                 self.metrics.retries += 1
@@ -305,6 +323,7 @@ class AsyncStaleCache(Generic[K, T]):
         *,
         max_entries: int = 2048,
         remote_backend: RemoteCacheBackend[K, T] | None = None,
+        metric_namespace: str = "anonymous",
     ) -> None:
         self._entries: dict[K, _CacheEntry[T]] = {}
         self._inflight: dict[K, asyncio.Task[_CacheLoadResult[T]]] = {}
@@ -313,6 +332,7 @@ class AsyncStaleCache(Generic[K, T]):
         self._background_tasks: set[asyncio.Task[None]] = set()
         self._max_entries = max_entries
         self._remote_backend = remote_backend
+        self._metric_namespace = metric_namespace.strip() or "anonymous"
 
     def _age(self, key: K, now: float) -> float | None:
         entry = self._entries.get(key)
@@ -481,18 +501,34 @@ class AsyncStaleCache(Generic[K, T]):
         now = monotonic()
         entry = self._entries.get(key)
         if entry is not None and now - entry.stored_at <= fresh_seconds:
+            performance_monitor.record(
+                "cache",
+                f"memory:{self._metric_namespace}",
+                "hit",
+            )
             return entry.value
 
         assert self._lock is not None
 
+        joined_inflight = False
         async with self._lock:
             now = monotonic()
             entry = self._entries.get(key)
             if entry is not None and now - entry.stored_at <= fresh_seconds:
+                performance_monitor.record(
+                    "cache",
+                    f"memory:{self._metric_namespace}",
+                    "hit",
+                )
                 return entry.value
 
             task = self._inflight.get(key)
             if task is None:
+                performance_monitor.record(
+                    "cache",
+                    f"memory:{self._metric_namespace}",
+                    "miss",
+                )
                 task = asyncio.create_task(
                     self._load_with_remote(
                         key,
@@ -502,9 +538,24 @@ class AsyncStaleCache(Generic[K, T]):
                     )
                 )
                 self._inflight[key] = task
+            else:
+                joined_inflight = True
+                performance_monitor.record(
+                    "cache",
+                    f"memory:{self._metric_namespace}",
+                    "local_join",
+                )
 
+        wait_started = monotonic()
         try:
             loaded = await asyncio.shield(task)
+            if joined_inflight:
+                performance_monitor.record(
+                    "singleflight",
+                    f"local:{self._metric_namespace}",
+                    "peer_hit",
+                    duration_ms=(monotonic() - wait_started) * 1000,
+                )
             self.store(
                 key,
                 loaded.value,
@@ -519,6 +570,11 @@ class AsyncStaleCache(Generic[K, T]):
                 entry is not None
                 and monotonic() - entry.stored_at <= stale_seconds
             ):
+                performance_monitor.record(
+                    "cache",
+                    f"memory:{self._metric_namespace}",
+                    "stale",
+                )
                 return entry.value
             raise
         finally:
