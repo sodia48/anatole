@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 
+from app.core.data_hub import shared_data_hub
 from app.core.resilience import AsyncStaleCache, shared_http_client
 
 
@@ -18,7 +19,13 @@ VALET_SERIES = {
 
 class BankOfCanadaValetService:
     def __init__(self) -> None:
-        self._cache: AsyncStaleCache[str, dict[str, list[tuple[int, float]]]] = AsyncStaleCache(max_entries=4)
+        self._cache: AsyncStaleCache[
+            str,
+            dict[str, list[tuple[int, float]]],
+        ] = shared_data_hub.cache(
+            "bank-of-canada-yields",
+            max_entries=4,
+        )
 
     async def _load(self) -> dict[str, list[tuple[int, float]]]:
         output: dict[str, list[tuple[int, float]]] = {"V39051": [], "V39055": []}

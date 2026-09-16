@@ -5,6 +5,7 @@ import logging
 from bisect import bisect_right
 from typing import Iterable
 
+from app.core.data_hub import shared_data_hub
 from app.core.resilience import AsyncStaleCache, shared_http_client
 from app.schemas.fundamentals import FundamentalSnapshot
 from app.schemas.stocks import Candle, Quote
@@ -135,12 +136,16 @@ class CurrencyConversionService:
     # CAD is Anatole's display currency. Native/source currencies are kept
     # as metadata. Index points and FX ratios are not monetary amounts.
     def __init__(self) -> None:
-        self._spot_cache: AsyncStaleCache[str, float] = AsyncStaleCache(
-            max_entries=32
+        self._spot_cache: AsyncStaleCache[str, float] = shared_data_hub.cache(
+            "fx-spot-cad",
+            max_entries=32,
         )
         self._history_cache: AsyncStaleCache[
             str, list[tuple[int, float]]
-        ] = AsyncStaleCache(max_entries=32)
+        ] = shared_data_hub.cache(
+            "fx-history-cad",
+            max_entries=32,
+        )
 
     async def _yahoo_pair(
         self,

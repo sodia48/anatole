@@ -278,6 +278,7 @@ class AsyncStaleCache(Generic[K, T]):
         self._entries: dict[K, _CacheEntry[T]] = {}
         self._inflight: dict[K, asyncio.Task[T]] = {}
         self._lock: asyncio.Lock | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._max_entries = max_entries
 
     def _age(self, key: K, now: float) -> float | None:
@@ -317,13 +318,21 @@ class AsyncStaleCache(Generic[K, T]):
         fresh_seconds: float,
         stale_seconds: float,
     ) -> T:
+        current_loop = asyncio.get_running_loop()
+        if self._loop is not current_loop:
+            # Process-level caches can survive test clients/reloaders replacing
+            # their event loop. Cached values are plain data and remain valid;
+            # asyncio synchronization primitives and in-flight tasks do not.
+            self._inflight = {}
+            self._lock = asyncio.Lock()
+            self._loop = current_loop
+
         now = monotonic()
         entry = self._entries.get(key)
         if entry is not None and now - entry.stored_at <= fresh_seconds:
             return entry.value
 
-        if self._lock is None:
-            self._lock = asyncio.Lock()
+        assert self._lock is not None
 
         async with self._lock:
             now = monotonic()

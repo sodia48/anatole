@@ -66,3 +66,25 @@ async def test_stale_value_is_used_when_reload_fails():
     )
 
     assert result == 7
+
+def test_stale_cache_rebinds_its_async_lock_across_event_loops():
+    cache = AsyncStaleCache[str, int]()
+
+    async def first_loop():
+        return await cache.get_or_load(
+            "first",
+            lambda: asyncio.sleep(0, result=1),
+            fresh_seconds=10,
+            stale_seconds=60,
+        )
+
+    async def second_loop():
+        return await cache.get_or_load(
+            "second",
+            lambda: asyncio.sleep(0, result=2),
+            fresh_seconds=10,
+            stale_seconds=60,
+        )
+
+    assert asyncio.run(first_loop()) == 1
+    assert asyncio.run(second_loop()) == 2

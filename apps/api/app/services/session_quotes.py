@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from app.core.data_hub import shared_data_hub
 from app.core.resilience import AsyncStaleCache, shared_http_client
 from app.schemas.stocks import Quote
 from app.services.currency_conversion import currency_conversion_service
@@ -29,8 +30,9 @@ class SessionQuoteService:
     default_exchange_timezone = "America/Toronto"
 
     def __init__(self) -> None:
-        self._cache: AsyncStaleCache[str, Quote] = AsyncStaleCache(
-            max_entries=3000
+        self._cache: AsyncStaleCache[str, Quote] = shared_data_hub.cache(
+            "session-quotes",
+            max_entries=3000,
         )
 
     @staticmethod

@@ -10,6 +10,7 @@ from time import monotonic
 from typing import Any
 
 from app.core.config import settings
+from app.core.data_hub import shared_data_hub
 from app.core.resilience import AsyncStaleCache, shared_http_client
 from app.schemas.stocks import (
     Candle,
@@ -150,7 +151,10 @@ class YahooProvider:
         self._chart_cache: AsyncStaleCache[
             tuple[str, str, str],
             dict[str, Any],
-        ] = AsyncStaleCache(max_entries=3000)
+        ] = shared_data_hub.cache(
+            "market-charts",
+            max_entries=3000,
+        )
 
     def normalize_ticker(self, ticker: str) -> str:
         return session_quote_service.normalize_ticker(ticker)
