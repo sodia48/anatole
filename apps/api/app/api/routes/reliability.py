@@ -4,9 +4,11 @@ import json
 import logging
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Query, Request, status
 
+from app.core.production_baseline import production_baseline_store
 from app.core.resilience import shared_http_client
 from app.core.telemetry import performance_monitor, reliability_monitor
 from app.services.accounts import account_service
@@ -35,6 +37,16 @@ async def reliability_status() -> ReliabilitySnapshot:
         performance_metrics=performance_monitor.snapshot(),
         generated_at=datetime.now(UTC),
     )
+
+
+@router.get(
+    "/baseline",
+    summary="Baseline de performance production persistée",
+)
+async def production_baseline(
+    hours: int = Query(default=48, ge=1, le=72),
+) -> dict[str, Any]:
+    return await production_baseline_store.summary(hours=hours)
 
 
 @router.post(
