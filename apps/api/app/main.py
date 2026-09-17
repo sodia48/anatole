@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.hotset_policy import choose_hotset_policy
+from app.core.production_baseline import production_baseline_store
 from app.core.resilience import shared_http_client
 from app.core.telemetry import performance_monitor, reliability_monitor
 from app.core.version import ANATOLE_VERSION
@@ -187,13 +188,23 @@ async def lifespan(_: FastAPI):
         _maintain_public_hotset(),
         name="anatole-public-hotset",
     )
+    baseline_task = asyncio.create_task(
+        production_baseline_store.run(),
+        name="anatole-production-baseline",
+    )
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
-        if not warm_task.done():
-            warm_task.cancel()
-        await asyncio.gather(warm_task, return_exceptions=True)
+        for task in (warm_task, baseline_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(
+            warm_task,
+            baseline_task,
+            return_exceptions=True,
+        )
+        await production_baseline_store.close()
         await company_network_service.close()
         await shared_http_client.close()
         await account_service.close()
