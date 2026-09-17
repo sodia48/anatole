@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "generated_at": "2026-09-16T15:53:35.669637+00:00",
+  "campaign": "3I-3Z",
+  "baseline": {
+    "web_js": {
+      "files": 44,
+      "total_bytes": 1683867,
+      "largest_bytes": 370462
+    },
+    "web_public": {
+      "files": 0,
+      "total_bytes": 0,
+      "largest_bytes": 0
+    },
+    "mobile_assets": {
+      "files": 1,
+      "total_bytes": 969584,
+      "largest_bytes": 969584
+    }
+  },
+  "optimized": {
+    "web_js": {
+      "files": 44,
+      "total_bytes": 1685489,
+      "largest_bytes": 370462
+    },
+    "web_public": {
+      "files": 0,
+      "total_bytes": 0,
+      "largest_bytes": 0
+    },
+    "mobile_assets": {
+      "files": 1,
+      "total_bytes": 969584,
+      "largest_bytes": 969584
+    }
+  },
+  "ceilings": {
+    "web_js_largest_bytes": 435998,
+    "web_js_total_bytes": 2209777,
+    "web_public_largest_bytes": 65536,
+    "web_public_total_bytes": 524288,
+    "mobile_assets_largest_bytes": 1066543,
+    "mobile_assets_total_bytes": 1493872
+  }
+}

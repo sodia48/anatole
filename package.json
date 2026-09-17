@@ -20,7 +20,8 @@
     "test:api": "python -m pytest apps/api/tests -q",
     "test:e2e": "playwright test",
     "quality:mobile": "pnpm typecheck:mobile && pnpm lint:mobile && pnpm test:mobile",
-    "quality": "pnpm test:api && pnpm typecheck:web && pnpm lint:web && pnpm build:web && pnpm quality:mobile && pnpm test:e2e"
+    "quality": "pnpm test:api && pnpm typecheck:web && pnpm lint:web && pnpm build:web && pnpm quality:mobile && pnpm test:e2e",
+    "check:performance": "node scripts/performance/check-web-budget.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.2",

@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  compress: true,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
   turbopack: {
     root: fileURLToPath(new URL("../..", import.meta.url)),
   },
