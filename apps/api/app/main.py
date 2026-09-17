@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
@@ -205,6 +206,13 @@ app = FastAPI(
     description="API de marché et d’analyse de la plateforme Anatole.",
     lifespan=lifespan,
 )
+
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1_024,
+    compresslevel=5,
+)
+
 
 app.add_middleware(
     CORSMiddleware,

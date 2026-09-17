@@ -34,7 +34,7 @@ import type {
   CompanyNetworkSnapshot,
   CompanyRelationshipPath,
 } from "./types";
-import { resilientFetch } from "./resilient-fetch";
+import { readLastGoodJson, resilientFetch } from "./resilient-fetch";
 
 const DEFAULT_API_URL = "https://anatole-api.onrender.com";
 
@@ -88,6 +88,65 @@ type ApiNetworkResult<T> = {
 const PUBLIC_API_MEMORY_CACHE = new Map<string, PublicApiCacheEntry>();
 const PUBLIC_API_INFLIGHT = new Map<string, Promise<unknown>>();
 const MAX_PUBLIC_API_MEMORY_ENTRIES = 32;
+const PUBLIC_API_STALE_RACE_MS = 650;
+
+function publicStaleTtlMs(path: string): number {
+  if (path.startsWith("/api/v1/market/cockpit")) return 5 * 60_000;
+  if (path.startsWith("/api/v1/discovery/psychology")) return 30 * 60_000;
+  if (path.startsWith("/api/v1/discovery/news")) return 2 * 60 * 60_000;
+  if (path.startsWith("/api/v1/discovery/calendar")) return 6 * 60 * 60_000;
+  if (path.startsWith("/api/v1/discovery/etfs")) return 24 * 60 * 60_000;
+  if (path.startsWith("/api/v1/discovery/screener")) return 30 * 60_000;
+  if (path.startsWith("/api/v1/discovery/ipo")) return 24 * 60 * 60_000;
+  if (path.startsWith("/api/v1/discovery/insiders")) return 2 * 60 * 60_000;
+  if (path.startsWith("/api/v1/discovery/institutions")) return 12 * 60 * 60_000;
+  if (path.startsWith("/api/v1/analysis/terminal")) return 5 * 60_000;
+  return 0;
+}
+
+function markSnapshotStale<T>(value: T): T {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return { ...(value as Record<string, unknown>), stale: true } as T;
+  }
+  return value;
+}
+
+function raceFreshWithCached<T>(
+  fresh: Promise<T>,
+  cached: T | null,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (cached === null) return fresh;
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timer = globalThis.setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve(markSnapshotStale(cached));
+    }, PUBLIC_API_STALE_RACE_MS);
+
+    fresh.then(
+      (value) => {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        globalThis.clearTimeout(timer);
+        if (signal?.aborted) {
+          reject(error);
+          return;
+        }
+        resolve(markSnapshotStale(cached));
+      },
+    );
+  });
+}
+
 
 function publicFreshTtlMs(path: string): number {
   if (path.startsWith("/api/v1/market/cockpit")) {
@@ -237,9 +296,18 @@ async function apiRequest<T>(
     return cached;
   }
 
+  const staleTtlMs = publicStaleTtlMs(path);
+  const persistentCached = staleTtlMs > 0
+    ? readLastGoodJson<T>(`${apiBaseUrl()}${path}`, staleTtlMs)
+    : null;
+
   const existing = PUBLIC_API_INFLIGHT.get(path) as Promise<T> | undefined;
   if (existing) {
-    return awaitWithoutCancellingSharedRequest(existing, signal);
+    return raceFreshWithCached(
+      awaitWithoutCancellingSharedRequest(existing, signal),
+      persistentCached,
+      signal,
+    );
   }
 
   const shared = apiNetworkRequest<T>(
@@ -264,7 +332,11 @@ async function apiRequest<T>(
   };
   void shared.then(clearInflight, clearInflight);
 
-  return awaitWithoutCancellingSharedRequest(shared, signal);
+  return raceFreshWithCached(
+    awaitWithoutCancellingSharedRequest(shared, signal),
+    persistentCached,
+    signal,
+  );
 }
 
 export function getHealthStatus(

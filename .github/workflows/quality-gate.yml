@@ -49,6 +49,8 @@ jobs:
           ANATOLE_API_URL: https://anatole-api.onrender.com
           NEXT_PUBLIC_API_URL: https://anatole-api.onrender.com
         run: pnpm build:web
+      - name: Enforce performance budgets
+        run: pnpm check:performance
 
   mobile-quality:
     runs-on: ubuntu-latest

@@ -2,7 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
 import { dehydrate, QueryClient } from "@tanstack/react-query";
 
-import { MOBILE_CACHE_BUSTER, MOBILE_CACHE_KEY, PERSISTED_QUERY_SCOPES, scheduleReconnectRefresh, shouldDehydrateMobileQuery } from "./offlineCache";
+import {
+  MOBILE_CACHE_BUSTER,
+  MOBILE_CACHE_KEY,
+  MOBILE_CACHE_MAX_AGE,
+  PERSISTED_QUERY_SCOPES,
+  RECONNECT_STAGES,
+  scheduleReconnectRefresh,
+  shouldDehydrateMobileQuery,
+} from "./offlineCache";
 
 beforeEach(async () => {
   await AsyncStorage.clear();
@@ -81,4 +89,38 @@ it("does not restore a portfolio snapshot stored under the v2 cache key", async 
   });
 
   expect(await persister.restoreClient()).toBeUndefined();
+});
+
+it("persists critical first-open market scopes", () => {
+  for (const scope of [
+    "cockpit",
+    "focus",
+    "news",
+    "calendar",
+    "terminal",
+    "screener",
+    "psychology",
+    "etf-directory",
+    "insiders",
+  ]) {
+    expect(PERSISTED_QUERY_SCOPES.has(scope)).toBe(true);
+  }
+});
+
+it("keeps a multi-day last-good cache", () => {
+  expect(MOBILE_CACHE_MAX_AGE).toBeGreaterThanOrEqual(
+    1000 * 60 * 60 * 24,
+  );
+});
+
+it("keeps reconnect fan-out staged from cockpit to heavier discovery scopes", () => {
+  const delays = RECONNECT_STAGES.map((stage) => stage.delay);
+  expect(delays[0]).toBe(0);
+  expect(
+    delays.every((delay, index) => (
+      index === 0 || delay > (delays[index - 1] ?? -1)
+    )),
+  ).toBe(true);
+  expect(RECONNECT_STAGES[0]?.scopes).toContain("cockpit");
+  expect(RECONNECT_STAGES[RECONNECT_STAGES.length - 1]?.scopes).toContain("insiders");
 });

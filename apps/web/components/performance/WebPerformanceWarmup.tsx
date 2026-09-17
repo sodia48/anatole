@@ -20,9 +20,7 @@ type ConnectionInfo = {
   effectiveType?: string;
 };
 
-function settle(promises: Promise<unknown>[]): void {
-  void Promise.allSettled(promises);
-}
+let warmupQueue: Promise<void> = Promise.resolve();
 
 function backgroundWarmupAllowed(): boolean {
   if (document.visibilityState === "hidden") return false;
@@ -35,14 +33,26 @@ function backgroundWarmupAllowed(): boolean {
   return !["slow-2g", "2g"].includes(connection?.effectiveType ?? "");
 }
 
+function scaledWarmupDelay(delayMs: number): number {
+  const connection = (
+    navigator as Navigator & { connection?: ConnectionInfo }
+  ).connection;
+  if (connection?.effectiveType === "3g") return Math.round(delayMs * 1.5);
+  return delayMs;
+}
+
 function scheduleWarmup(
   delayMs: number,
   operation: () => Promise<unknown>[],
 ): number {
   return window.setTimeout(() => {
-    if (!backgroundWarmupAllowed()) return;
-    settle(operation());
-  }, delayMs);
+    warmupQueue = warmupQueue
+      .catch(() => undefined)
+      .then(async () => {
+        if (!backgroundWarmupAllowed()) return;
+        await Promise.allSettled(operation());
+      });
+  }, scaledWarmupDelay(delayMs));
 }
 
 export function WebPerformanceWarmup() {
@@ -53,7 +63,7 @@ export function WebPerformanceWarmup() {
   useEffect(() => {
     if (!backgroundWarmupAllowed()) return;
 
-    const sessionKey = `anatole:warmup:v3e:${language}`;
+    const sessionKey = `anatole:warmup:v3iz:${language}`;
     try {
       if (window.sessionStorage.getItem(sessionKey) === "1") return;
       window.sessionStorage.setItem(sessionKey, "1");
