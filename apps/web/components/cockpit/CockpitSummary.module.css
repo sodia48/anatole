@@ -1,0 +1,54 @@
+.tape {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #285065;
+  border-radius: 22px;
+  background: #0c2232;
+  scrollbar-width: thin;
+}
+.quote {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid #285065;
+  border-radius: 16px;
+  background: #112e41;
+  color: #d3e7f3;
+  text-decoration: none;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.quote strong { color: #e8f3fa; }
+.quote:focus-visible, .tape:focus-visible { outline: 2px solid #74cdfb; outline-offset: 3px; }
+.cards { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 20px; }
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid #285065;
+  border-radius: 26px;
+  background: linear-gradient(145deg, #102d40, #0a1f2e);
+  color: #b4cede;
+}
+.card > span { font-size: 15px; color: #b4cede; }
+.card > strong { font-size: clamp(24px, 2.7vw, 42px); line-height: 1.15; font-weight: 800; color: #c4deee; font-variant-numeric: tabular-nums; }
+.card > .sector { font-size: clamp(20px, 1.9vw, 30px); overflow-wrap: anywhere; }
+.card > .time { white-space: nowrap; font-size: clamp(22px, 2.3vw, 36px); }
+.card > b { padding: 4px 10px; border-radius: 20px; background: #163a3d; }
+.positive { color: #49d5a4; }
+.negative { color: #ff8089; }
+@media (max-width: 1100px) { .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; } }
+@media (max-width: 600px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card { padding: 18px; gap: 12px; border-radius: 20px; }
+  .card:last-child { grid-column: 1 / -1; }
+  .quote { padding: 10px 12px; }
+}

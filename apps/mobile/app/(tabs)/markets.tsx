@@ -11,7 +11,6 @@ import { NewsIntelligenceScreen } from "@/src/components/news/NewsIntelligenceSc
 import { Card, Change, Field, QueryState, Screen, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
 import type { MarketTile } from "@/src/lib/api/types";
-import { isTerminalV2Snapshot } from "@anatole/shared";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { radius, spacing, typography } from "@/src/theme/tokens";
@@ -93,8 +92,7 @@ export default function MarketsScreen() {
   }, [requestedHub, requestedUniverse]);
 
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: ({ signal }) => marketApi.cockpit(universe, signal), enabled: hub === "cockpit", staleTime: 60_000 });
-  const terminal = useQuery({ queryKey: ["terminal", "market-context"], queryFn: ({ signal }) => marketApi.terminal(signal), enabled: hub === "cockpit", staleTime: 60_000 });
-  const terminalSnapshot = isTerminalV2Snapshot(terminal.data) ? terminal.data : null;
+  const bestSector = [...(cockpit.data?.sectors ?? [])].filter((item) => Number.isFinite(item.change_percent)).sort((a, b) => b.change_percent - a.change_percent)[0];
   const navigation = <MarketsNavigation hub={hub} onHub={setHub} />;
   if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} preferredRegions={workspace.data.preferences?.preferred_regions ?? []} />;
   if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialDayOffset={requestedDayOffset} initialKind={requestedKind} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
@@ -108,58 +106,28 @@ export default function MarketsScreen() {
   return <Screen onRefresh={hub === "cockpit" ? () => void cockpit.refetch() : undefined} refreshing={cockpit.isRefetching} testID="markets-screen">
     {navigation}
     {hub === "cockpit" ? <>
-      <ScrollView
-        horizontal
-        contentContainerStyle={styles.marketTape}
-        showsHorizontalScrollIndicator={false}
-      >
-        <View style={styles.marketTapeCard}>
-          <Text style={styles.marketTapeLabel}>
-            {cockpit.data?.universe ?? (universe === "tsx60" ? "S&P/TSX 60" : "S&P/TSX Composite")}
-          </Text>
-          <Text style={styles.marketTapeValue}>
-            {cockpit.data ? `${cockpit.data.constituents.length} ${pick("titres", "securities")}` : "…"}
-          </Text>
-          <Text
-            style={[
-              styles.marketTapeChange,
-              (cockpit.data?.weighted_change_percent ?? 0) >= 0
-                ? styles.marketTapePositive
-                : styles.marketTapeNegative,
-            ]}
-          >
-            {cockpit.data
-              ? `${cockpit.data.weighted_change_percent >= 0 ? "+" : ""}${cockpit.data.weighted_change_percent.toFixed(2)}%`
-              : "—"}
-          </Text>
-        </View>
-        {(["sp500", "nasdaq", "cadusd", "vix"] as const).map((key) => {
-          const item = terminalSnapshot?.market_drivers.find((driver) => driver.key === key);
-          const positive = (item?.change_1d ?? 0) >= 0;
-          return (
-            <View key={key} style={styles.marketTapeCard}>
-              <Text style={styles.marketTapeLabel}>{item?.label ?? key.toUpperCase()}</Text>
-              <Text style={styles.marketTapeValue}>
-                {item?.value == null
-                  ? "N/D"
-                  : `${item.value.toLocaleString(undefined, {
-                      maximumFractionDigits: key === "cadusd" ? 4 : 2,
-                    })} ${item.unit}`}
-              </Text>
-              <Text
-                style={[
-                  styles.marketTapeChange,
-                  positive ? styles.marketTapePositive : styles.marketTapeNegative,
-                ]}
-              >
-                {item?.change_1d == null
-                  ? "—"
-                  : `${positive ? "+" : ""}${item.change_1d.toFixed(2)}${item.change_unit}`}
-              </Text>
-            </View>
-          );
-        })}
+      <ScrollView horizontal contentContainerStyle={styles.marketTape} showsHorizontalScrollIndicator>
+        {(cockpit.data?.constituents ?? []).map((item) => (
+          <Pressable key={item.ticker} accessibilityRole="button" onPress={() => router.push({ pathname: "/focus/[ticker]", params: { ticker: item.ticker } })} style={[styles.marketTapeCard, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+            <Text style={styles.marketTapeValue}>{item.symbol}</Text>
+            <Text style={styles.marketTapeValue}>{Number.isFinite(item.price) && item.price > 0 ? `$${item.price.toFixed(2)}` : "—"}</Text>
+            <Text style={[styles.marketTapeChange, item.change_percent >= 0 ? styles.marketTapePositive : styles.marketTapeNegative]}>{Number.isFinite(item.change_percent) ? `${item.change_percent >= 0 ? "+" : ""}${item.change_percent.toFixed(2)}%` : "—"}</Text>
+          </Pressable>
+        ))}
       </ScrollView>
+      {cockpit.data ? <View style={styles.summaryGrid}>
+        {[
+          { label: `${universe === "tsx60" ? "TSX 60" : "TSX Composite"} ${pick("indicatif", "indicative")}`, value: `${cockpit.data.weighted_change_percent >= 0 ? "+" : ""}${cockpit.data.weighted_change_percent.toFixed(2)}%` },
+          { label: pick("Titres en hausse", "Advancing securities"), value: String(cockpit.data.breadth.advancers) },
+          { label: pick("Titres en baisse", "Declining securities"), value: String(cockpit.data.breadth.decliners) },
+          { label: pick("Meilleur secteur", "Best sector"), value: bestSector?.sector ?? "—", change: bestSector?.change_percent },
+          { label: pick("Mise à jour", "Updated"), value: new Date(cockpit.data.generated_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Toronto" }) + " ET" },
+        ].map((item) => <View key={item.label} style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{item.label}</Text>
+          <Text style={styles.summaryValue}>{item.value}</Text>
+          {item.change != null ? <Change value={item.change} /> : null}
+        </View>)}
+      </View> : null}
 
       <View style={styles.marketViewHeading}>
         <Text style={styles.marketViewLabel}>{pick("Vue du marché", "Market view")}</Text>
@@ -182,6 +150,10 @@ export default function MarketsScreen() {
 }
 
 const styles = createThemedStyles((colors) => ({
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  summaryCard: { flexGrow: 1, flexBasis: "45%", padding: spacing.md, gap: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: "#285065", backgroundColor: "#0c2637" },
+  summaryLabel: { ...typography.caption, color: "#b4cede" },
+  summaryValue: { ...typography.section, color: "#c4deee", fontWeight: "800" },
   marketTape: { gap: spacing.xs, paddingVertical: spacing.xs, paddingRight: spacing.sm },
   marketTapeCard: { minWidth: 118, gap: 2, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   marketTapeLabel: { ...typography.caption, color: colors.textMuted, fontSize: 8, fontWeight: "800", textTransform: "uppercase" },

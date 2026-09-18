@@ -7,22 +7,19 @@ import {
   useState,
 } from "react";
 import { MarketHeatmap } from "./MarketHeatmap";
-import heatmapStyles from "./MarketHeatmap.module.css";
+import styles from "./CockpitSummary.module.css";
 import { MoversList } from "./MoversList";
 import {
   getCockpitSnapshot,
-  getTerminalSnapshot,
   type CockpitUniverse,
 } from "@/lib/api";
-import type { CockpitSnapshot, TerminalSnapshot } from "@/lib/types";
-import { isTerminalV2Snapshot } from "@anatole/shared";
+import type { CockpitSnapshot } from "@/lib/types";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 const STORAGE_KEY = "anatole-cockpit-universe";
-const MARKET_TAPE_KEYS = ["sp500", "nasdaq", "cadusd", "vix"] as const;
 
 const UNIVERSES: Record<
   CockpitUniverse,
@@ -70,7 +67,6 @@ export function CockpitClient() {
   >({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [terminalSnapshot, setTerminalSnapshot] = useState<TerminalSnapshot | null>(null);
   const requestIdRef = useRef(0);
   const universeRef = useRef<CockpitUniverse>(universe);
 
@@ -102,32 +98,6 @@ export function CockpitClient() {
     window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
     return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
   }, []);
-
-  useEffect(() => {
-    if (!ready) return;
-
-    let disposed = false;
-    const refreshTerminal = async () => {
-      try {
-        const data = await getTerminalSnapshot();
-        if (!disposed && isTerminalV2Snapshot(data)) {
-          setTerminalSnapshot(data);
-        }
-      } catch {
-        // The contextual market tape is optional. Cockpit remains usable.
-      }
-    };
-
-    void refreshTerminal();
-    const interval = window.setInterval(() => {
-      if (!document.hidden) void refreshTerminal();
-    }, 60_000);
-
-    return () => {
-      disposed = true;
-      window.clearInterval(interval);
-    };
-  }, [ready]);
 
   const load = useCallback(
     async (target: CockpitUniverse, signal?: AbortSignal) => {
@@ -272,7 +242,7 @@ export function CockpitClient() {
   }
 
   const marketPositive = snapshot.weighted_change_percent >= 0;
-  const terminalGeneratedAt = terminalSnapshot?.generated_at ?? snapshot.generated_at;
+  const bestSector = [...snapshot.sectors].filter((sector) => Number.isFinite(sector.change_percent)).sort((a, b) => b.change_percent - a.change_percent)[0];
 
   return (
     <div className="cockpit-page">
@@ -297,81 +267,39 @@ export function CockpitClient() {
         {universeSelector}
       </header>
 
-      <section
-        className={heatmapStyles.marketTape}
-        aria-label={pick(language, "Contexte de marché", "Market context")}
-      >
-        <article className={heatmapStyles.marketTapeItem}>
-          <span>{snapshot.universe}</span>
-          <strong>
-            {snapshot.constituents.length} {pick(language, "titres", "securities")}
-          </strong>
-          <b className={marketPositive ? heatmapStyles.tapePositive : heatmapStyles.tapeNegative}>
-            {marketPositive ? "+" : ""}
-            {snapshot.weighted_change_percent.toFixed(2)}%
-          </b>
-        </article>
-
-        {MARKET_TAPE_KEYS.map((key) => {
-          const driver =
-            terminalSnapshot?.market_drivers.find((item) => item.key === key) ?? null;
-          const positive = (driver?.change_1d ?? 0) >= 0;
-          const value =
-            driver?.value == null
-              ? "N/D"
-              : driver.value.toLocaleString(localeFor(language), {
-                  maximumFractionDigits: key === "cadusd" ? 4 : 2,
-                }) + (driver.unit ? ` ${driver.unit}` : "");
-          const move =
-            driver?.change_1d == null
-              ? "—"
-              : `${positive ? "+" : ""}${driver.change_1d.toFixed(2)}${driver.change_unit}`;
-
-          return (
-            <article className={heatmapStyles.marketTapeItem} key={key}>
-              <span>{driver?.label ?? key.toUpperCase()}</span>
-              <strong>{value}</strong>
-              <b className={positive ? heatmapStyles.tapePositive : heatmapStyles.tapeNegative}>
-                {move}
-              </b>
-            </article>
-          );
-        })}
-
-        <div className={heatmapStyles.marketTapeStatus}>
-          <span className={heatmapStyles.liveDot} />
-          <strong>
-            {refreshing
-              ? pick(language, "Actualisation", "Refreshing")
-              : pick(language, "Données actives", "Live data")}
-          </strong>
-          <small>
-            {new Date(terminalGeneratedAt).toLocaleTimeString(localeFor(language), {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </small>
-        </div>
+      <section className={styles.tape} aria-label={pick(language, "Cotations du panier — défilement horizontal", "Basket quotes — scroll horizontally")} tabIndex={0}>
+        {snapshot.constituents.map((tile) => (
+          <a className={styles.quote} key={tile.ticker} href={`/focus/${encodeURIComponent(tile.ticker)}`}>
+            <span>{tile.symbol}</span>
+            <strong>{Number.isFinite(tile.price) && tile.price > 0 ? tile.price.toLocaleString(localeFor(language), { style: "currency", currency: "CAD" }) : "—"}</strong>
+            <b className={tile.change_percent >= 0 ? styles.positive : styles.negative}>
+              {Number.isFinite(tile.change_percent) ? `${tile.change_percent >= 0 ? "+" : ""}${tile.change_percent.toFixed(2)}%` : "—"}
+            </b>
+          </a>
+        ))}
       </section>
-
       {error ? <div className="cockpit-warning">{error}</div> : null}
-
-      <section className="cockpit-kpis">
-        <article className="panel cockpit-kpi">
-          <span>{pick(language, "Progressions", "Advancers")}</span>
-          <strong className="positive">{snapshot.breadth.advancers}</strong>
+      <section className={styles.cards} aria-label={pick(language, "Résumé du marché", "Market summary")}>
+        <article className={styles.card}>
+          <span>{selectedUniverse.shortLabel} {pick(language, "indicatif", "indicative")}</span>
+          <strong>{marketPositive ? "+" : ""}{snapshot.weighted_change_percent.toFixed(2)}%</strong>
         </article>
-        <article className="panel cockpit-kpi">
-          <span>{pick(language, "Baisses", "Decliners")}</span>
-          <strong className="negative">{snapshot.breadth.decliners}</strong>
+        <article className={styles.card}>
+          <span>{pick(language, "Titres en hausse", "Advancing securities")}</span>
+          <strong>{snapshot.breadth.advancers}</strong>
         </article>
-        <article className="panel cockpit-kpi">
-          <span>{pick(language, "Inchangées", "Unchanged")}</span>
-          <strong>{snapshot.breadth.unchanged}</strong>
+        <article className={styles.card}>
+          <span>{pick(language, "Titres en baisse", "Declining securities")}</span>
+          <strong>{snapshot.breadth.decliners}</strong>
         </article>
-        <article className="panel cockpit-kpi">
-          <span>{pick(language, "Ratio de hausse", "Advance ratio")}</span>
-          <strong>{snapshot.breadth.advance_ratio.toFixed(0)}%</strong>
+        <article className={styles.card}>
+          <span>{pick(language, "Meilleur secteur", "Best sector")}</span>
+          <strong className={styles.sector}>{bestSector?.sector ?? "—"}</strong>
+          {bestSector ? <b className={bestSector.change_percent >= 0 ? styles.positive : styles.negative}>{bestSector.change_percent >= 0 ? "↑ +" : "↓ "}{bestSector.change_percent.toFixed(2)}%</b> : null}
+        </article>
+        <article className={styles.card}>
+          <span>{pick(language, "Mise à jour", "Updated")}</span>
+          <strong className={styles.time}>{new Date(snapshot.generated_at).toLocaleTimeString(localeFor(language), { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Toronto" })} ET</strong>
         </article>
       </section>
 
