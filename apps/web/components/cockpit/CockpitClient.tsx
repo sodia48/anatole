@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import { MarketHeatmap } from "./MarketHeatmap";
-import styles from "./CockpitSummary.module.css";
 import { QuoteTape } from "./QuoteTape";
 import { MoversList } from "./MoversList";
 import {
@@ -243,7 +242,6 @@ export function CockpitClient() {
   }
 
   const marketPositive = snapshot.weighted_change_percent >= 0;
-  const bestSector = [...snapshot.sectors].filter((sector) => Number.isFinite(sector.change_percent)).sort((a, b) => b.change_percent - a.change_percent)[0];
 
   return (
     <div className="cockpit-page">
@@ -268,39 +266,32 @@ export function CockpitClient() {
         {universeSelector}
       </header>
 
-      <QuoteTape key={universe} tiles={snapshot.constituents} language={language} />
       {error ? <div className="cockpit-warning">{error}</div> : null}
-      <section className={styles.cards} aria-label={pick(language, "Résumé du marché", "Market summary")}>
-        <article className={styles.card}>
-          <span>{selectedUniverse.shortLabel} {pick(language, "indicatif", "indicative")}</span>
-          <strong>{marketPositive ? "+" : ""}{snapshot.weighted_change_percent.toFixed(2)}%</strong>
+
+      <QuoteTape key={universe} tiles={snapshot.constituents} language={language} />
+
+      <section className="cockpit-kpis">
+        <article className="panel cockpit-kpi">
+          <span>{pick(language, "Progressions", "Advancers")}</span>
+          <strong className="positive">{snapshot.breadth.advancers}</strong>
         </article>
-        <article className={styles.card}>
-          <span>{pick(language, "Titres en hausse", "Advancing securities")}</span>
-          <strong>{snapshot.breadth.advancers}</strong>
+        <article className="panel cockpit-kpi">
+          <span>{pick(language, "Baisses", "Decliners")}</span>
+          <strong className="negative">{snapshot.breadth.decliners}</strong>
         </article>
-        <article className={styles.card}>
-          <span>{pick(language, "Titres en baisse", "Declining securities")}</span>
-          <strong>{snapshot.breadth.decliners}</strong>
+        <article className="panel cockpit-kpi">
+          <span>{pick(language, "Inchangées", "Unchanged")}</span>
+          <strong>{snapshot.breadth.unchanged}</strong>
         </article>
-        <article className={styles.card}>
-          <span>{pick(language, "Meilleur secteur", "Best sector")}</span>
-          <strong className={styles.sector}>{bestSector?.sector ?? "—"}</strong>
-          {bestSector ? <b className={bestSector.change_percent >= 0 ? styles.positive : styles.negative}>{bestSector.change_percent >= 0 ? "↑ +" : "↓ "}{bestSector.change_percent.toFixed(2)}%</b> : null}
-        </article>
-        <article className={styles.card}>
-          <span>{pick(language, "Mise à jour", "Updated")}</span>
-          <strong className={styles.time}>{new Date(snapshot.generated_at).toLocaleTimeString(localeFor(language), { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Toronto" })} ET</strong>
+        <article className="panel cockpit-kpi">
+          <span>{pick(language, "Ratio de hausse", "Advance ratio")}</span>
+          <strong>{snapshot.breadth.advance_ratio.toFixed(0)}%</strong>
         </article>
       </section>
 
       <MarketHeatmap
-        generatedAt={snapshot.generated_at}
         initialSector={initialSector}
-        isRefreshing={refreshing}
-        onUniverseChange={selectUniverse}
         tiles={snapshot.constituents}
-        universeKey={universe}
         universeLabel={snapshot.universe}
       />
 
