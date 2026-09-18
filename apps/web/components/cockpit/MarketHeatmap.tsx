@@ -311,7 +311,6 @@ export function MarketHeatmap({
 
     const mobile = width <= 820;
     const outerPadding = mobile ? 2 : 4;
-    const gap = mobile ? 2 : 3;
     const totalTiles = normalizedTiles.length;
     const groupLayout = binaryTreemap(
       visibleGroups.map((group) => ({
@@ -327,23 +326,15 @@ export function MarketHeatmap({
     );
 
     return groupLayout.map(({ item: group, rect }) => {
-      const groupRect = {
-        x: rect.x + gap / 2,
-        y: rect.y + gap / 2,
-        width: Math.max(rect.width - gap, 0),
-        height: Math.max(rect.height - gap, 0),
-      };
-      const headerHeight = clamp(
-        groupRect.height * (mobile ? 0.12 : 0.15),
-        mobile ? 18 : 26,
-        mobile ? 30 : 40,
-      );
-      const innerGap = mobile ? 1 : 1.5;
+      const groupRect = rect;
+      // Reserve the same fraction of every sector for its heading. Fixed
+      // pixel headers and gutters would penalize small sectors and stocks.
+      const headerHeight = groupRect.height * 0.08;
       const bodyRect = {
-        x: groupRect.x + innerGap,
-        y: groupRect.y + headerHeight + innerGap,
-        width: Math.max(groupRect.width - innerGap * 2, 0),
-        height: Math.max(groupRect.height - headerHeight - innerGap * 2, 0),
+        x: groupRect.x,
+        y: groupRect.y + headerHeight,
+        width: groupRect.width,
+        height: groupRect.height - headerHeight,
       };
       const tileLayout = binaryTreemap(
         group.tiles.map((tile) => ({
@@ -360,12 +351,7 @@ export function MarketHeatmap({
         mobile,
         tiles: tileLayout.map(({ item: tile, rect: tileRect }) => ({
           tile,
-          rect: {
-            x: tileRect.x + innerGap,
-            y: tileRect.y + innerGap,
-            width: Math.max(tileRect.width - innerGap * 2, 0),
-            height: Math.max(tileRect.height - innerGap * 2, 0),
-          },
+          rect: tileRect,
         })),
       };
     });
