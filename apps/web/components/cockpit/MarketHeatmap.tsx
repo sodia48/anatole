@@ -481,38 +481,31 @@ export function MarketHeatmap({
       </div>
 
       <div className={styles.proToolbar}>
-        <label className={styles.controlField}>
+        <div className={styles.controlField}>
           <span>{pick(language, "Vue du marché", "Market view")}</span>
-          <select
-            aria-label={pick(language, "Vue du marché", "Market view")}
-            value={universeKey}
-            onChange={(event) =>
-              onUniverseChange?.(event.target.value as "tsx60" | "composite")
-            }
-          >
-            <option value="tsx60">🇨🇦 S&P/TSX 60</option>
-            <option value="composite">🇨🇦 S&P/TSX Composite</option>
-          </select>
-        </label>
-
-        <label className={styles.controlField}>
+          <div className={styles.modeButtons} role="group" aria-label={pick(language, "Vue du marché", "Market view")}>
+            {(["tsx60", "composite"] as const).map((value) => (
+              <button type="button" key={value}
+                className={universeKey === value ? styles.modeButtonActive : styles.modeButton}
+                aria-pressed={universeKey === value} disabled={!onUniverseChange}
+                onClick={() => onUniverseChange?.(value)}>
+                {value === "tsx60" ? "TSX 60" : "TSX Composite"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={styles.controlField}>
           <span>{pick(language, "Visualiser par", "Visualize by")}</span>
-          <select
-            aria-label={pick(language, "Visualiser par", "Visualize by")}
-            value={mode}
-            onChange={(event) => setMode(event.target.value as GroupingMode)}
-          >
-            <option value="sector">
-              {pick(language, "Capitalisation · secteur relatif", "Market cap · sector relative")}
-            </option>
-            <option value="flat">
-              {pick(language, "Capitalisation · marché absolu", "Market cap · absolute market")}
-            </option>
-            <option value="direction">
-              {pick(language, "Direction du marché", "Market direction")}
-            </option>
-          </select>
-        </label>
+          <div className={styles.modeButtons} role="group" aria-label={pick(language, "Regroupement de la carte", "Map grouping")}>
+            {(Object.keys(MODE_LABELS) as GroupingMode[]).map((value) => (
+              <button type="button" key={value}
+                className={mode === value ? styles.modeButtonActive : styles.modeButton}
+                aria-pressed={mode === value} onClick={() => setMode(value)}>
+                {pick(language, MODE_LABELS[value][0], MODE_LABELS[value][1])}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <div
           className={styles.performanceScale}

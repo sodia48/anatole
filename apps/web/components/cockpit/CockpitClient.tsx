@@ -8,6 +8,7 @@ import {
 } from "react";
 import { MarketHeatmap } from "./MarketHeatmap";
 import styles from "./CockpitSummary.module.css";
+import { QuoteTape } from "./QuoteTape";
 import { MoversList } from "./MoversList";
 import {
   getCockpitSnapshot,
@@ -267,17 +268,7 @@ export function CockpitClient() {
         {universeSelector}
       </header>
 
-      <section className={styles.tape} aria-label={pick(language, "Cotations du panier — défilement horizontal", "Basket quotes — scroll horizontally")} tabIndex={0}>
-        {snapshot.constituents.map((tile) => (
-          <a className={styles.quote} key={tile.ticker} href={`/focus/${encodeURIComponent(tile.ticker)}`}>
-            <span>{tile.symbol}</span>
-            <strong>{Number.isFinite(tile.price) && tile.price > 0 ? tile.price.toLocaleString(localeFor(language), { style: "currency", currency: "CAD" }) : "—"}</strong>
-            <b className={tile.change_percent >= 0 ? styles.positive : styles.negative}>
-              {Number.isFinite(tile.change_percent) ? `${tile.change_percent >= 0 ? "+" : ""}${tile.change_percent.toFixed(2)}%` : "—"}
-            </b>
-          </a>
-        ))}
-      </section>
+      <QuoteTape key={universe} tiles={snapshot.constituents} language={language} />
       {error ? <div className="cockpit-warning">{error}</div> : null}
       <section className={styles.cards} aria-label={pick(language, "Résumé du marché", "Market summary")}>
         <article className={styles.card}>

@@ -878,7 +878,7 @@
 }
 .proToolbar {
   display: grid;
-  grid-template-columns: minmax(165px, .85fr) minmax(225px, 1.25fr) minmax(300px, 1.45fr) auto;
+  grid-template-columns: minmax(190px, 1fr) minmax(260px, 1.4fr);
   align-items: end;
   gap: 8px;
   margin-bottom: 6px;
