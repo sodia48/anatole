@@ -7,18 +7,22 @@ import {
   useState,
 } from "react";
 import { MarketHeatmap } from "./MarketHeatmap";
+import heatmapStyles from "./MarketHeatmap.module.css";
 import { MoversList } from "./MoversList";
 import {
   getCockpitSnapshot,
+  getTerminalSnapshot,
   type CockpitUniverse,
 } from "@/lib/api";
-import type { CockpitSnapshot } from "@/lib/types";
+import type { CockpitSnapshot, TerminalSnapshot } from "@/lib/types";
+import { isTerminalV2Snapshot } from "@anatole/shared";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 const STORAGE_KEY = "anatole-cockpit-universe";
+const MARKET_TAPE_KEYS = ["sp500", "nasdaq", "cadusd", "vix"] as const;
 
 const UNIVERSES: Record<
   CockpitUniverse,
@@ -66,6 +70,7 @@ export function CockpitClient() {
   >({});
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [terminalSnapshot, setTerminalSnapshot] = useState<TerminalSnapshot | null>(null);
   const requestIdRef = useRef(0);
   const universeRef = useRef<CockpitUniverse>(universe);
 
@@ -97,6 +102,32 @@ export function CockpitClient() {
     window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
     return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedUniverse);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+
+    let disposed = false;
+    const refreshTerminal = async () => {
+      try {
+        const data = await getTerminalSnapshot();
+        if (!disposed && isTerminalV2Snapshot(data)) {
+          setTerminalSnapshot(data);
+        }
+      } catch {
+        // The contextual market tape is optional. Cockpit remains usable.
+      }
+    };
+
+    void refreshTerminal();
+    const interval = window.setInterval(() => {
+      if (!document.hidden) void refreshTerminal();
+    }, 60_000);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+    };
+  }, [ready]);
 
   const load = useCallback(
     async (target: CockpitUniverse, signal?: AbortSignal) => {
@@ -241,6 +272,7 @@ export function CockpitClient() {
   }
 
   const marketPositive = snapshot.weighted_change_percent >= 0;
+  const terminalGeneratedAt = terminalSnapshot?.generated_at ?? snapshot.generated_at;
 
   return (
     <div className="cockpit-page">
@@ -265,6 +297,63 @@ export function CockpitClient() {
         {universeSelector}
       </header>
 
+      <section
+        className={heatmapStyles.marketTape}
+        aria-label={pick(language, "Contexte de marché", "Market context")}
+      >
+        <article className={heatmapStyles.marketTapeItem}>
+          <span>{snapshot.universe}</span>
+          <strong>
+            {snapshot.constituents.length} {pick(language, "titres", "securities")}
+          </strong>
+          <b className={marketPositive ? heatmapStyles.tapePositive : heatmapStyles.tapeNegative}>
+            {marketPositive ? "+" : ""}
+            {snapshot.weighted_change_percent.toFixed(2)}%
+          </b>
+        </article>
+
+        {MARKET_TAPE_KEYS.map((key) => {
+          const driver =
+            terminalSnapshot?.market_drivers.find((item) => item.key === key) ?? null;
+          const positive = (driver?.change_1d ?? 0) >= 0;
+          const value =
+            driver?.value == null
+              ? "N/D"
+              : driver.value.toLocaleString(localeFor(language), {
+                  maximumFractionDigits: key === "cadusd" ? 4 : 2,
+                }) + (driver.unit ? ` ${driver.unit}` : "");
+          const move =
+            driver?.change_1d == null
+              ? "—"
+              : `${positive ? "+" : ""}${driver.change_1d.toFixed(2)}${driver.change_unit}`;
+
+          return (
+            <article className={heatmapStyles.marketTapeItem} key={key}>
+              <span>{driver?.label ?? key.toUpperCase()}</span>
+              <strong>{value}</strong>
+              <b className={positive ? heatmapStyles.tapePositive : heatmapStyles.tapeNegative}>
+                {move}
+              </b>
+            </article>
+          );
+        })}
+
+        <div className={heatmapStyles.marketTapeStatus}>
+          <span className={heatmapStyles.liveDot} />
+          <strong>
+            {refreshing
+              ? pick(language, "Actualisation", "Refreshing")
+              : pick(language, "Données actives", "Live data")}
+          </strong>
+          <small>
+            {new Date(terminalGeneratedAt).toLocaleTimeString(localeFor(language), {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </small>
+        </div>
+      </section>
+
       {error ? <div className="cockpit-warning">{error}</div> : null}
 
       <section className="cockpit-kpis">
@@ -287,8 +376,12 @@ export function CockpitClient() {
       </section>
 
       <MarketHeatmap
+        generatedAt={snapshot.generated_at}
         initialSector={initialSector}
+        isRefreshing={refreshing}
+        onUniverseChange={selectUniverse}
         tiles={snapshot.constituents}
+        universeKey={universe}
         universeLabel={snapshot.universe}
       />
 
