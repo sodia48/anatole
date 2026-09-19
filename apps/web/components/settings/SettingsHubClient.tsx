@@ -207,7 +207,7 @@ export function SettingsHubClient() {
           <div className={styles.navigationSummary}>
             <DatabaseZap size={18} />
             <div>
-              <strong>{preferences.defaultUniverse === "composite" ? "TSX Composite" : "TSX 60"}</strong>
+              <strong>{preferences.defaultUniverse === "composite" ? "TSX Composite" : preferences.defaultUniverse === "tsxv" ? "TSX Venture" : "TSX 60"}</strong>
               <span>
                 {preferences.theme === "blue" ? pick(language, "Thème bleu", "Blue theme") : pick(language, "Thème sombre", "Dark theme")} · {preferences.density === "compact" ? "Compact" : pick(language, "Confortable", "Comfortable")} · {language === "en" ? "EN" : "FR"}
               </span>

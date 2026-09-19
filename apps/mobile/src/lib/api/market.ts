@@ -25,8 +25,8 @@ import type {
 } from "./types";
 
 export const marketApi = {
-  cockpit: (universe: "tsx60" | "composite" = "tsx60", signal?: AbortSignal) => apiRequest<CockpitSnapshot>(`/api/v1/market/cockpit?universe=${universe}`, { timeoutMs: universe === "composite" ? 12_000 : 8_000, signal }),
-  screener: (universe: ScreenerUniverse = "composite", signal?: AbortSignal) => apiRequest<ScreenerSnapshot>(`/api/v1/discovery/screener?universe=${universe}`, { timeoutMs: universe === "composite" ? 15_000 : 10_000, signal }),
+  cockpit: (universe: "tsx60" | "composite" | "tsxv" = "tsx60", signal?: AbortSignal) => apiRequest<CockpitSnapshot>(`/api/v1/market/cockpit?universe=${universe}`, { timeoutMs: universe === "tsx60" ? 8_000 : 30_000, signal }),
+  screener: (universe: ScreenerUniverse = "composite", signal?: AbortSignal) => apiRequest<ScreenerSnapshot>(`/api/v1/discovery/screener?universe=${universe}`, { timeoutMs: universe === "tsx60" ? 10_000 : 35_000, signal }),
   terminal: (signal?: AbortSignal) => apiRequest<unknown>("/api/v1/analysis/terminal", { timeoutMs: 15_000, signal }),
   psychology: (signal?: AbortSignal) => apiRequest<PsychologySnapshot>("/api/v1/discovery/psychology", { timeoutMs: 10_000, signal }),
   focus: (ticker: string, range = "1y", interval = "1d", signal?: AbortSignal) => apiRequest<FocusSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/focus?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`, { timeoutMs: 12_000, signal }),

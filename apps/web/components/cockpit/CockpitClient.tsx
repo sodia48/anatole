@@ -42,10 +42,16 @@ const UNIVERSES: Record<
     description: "Le marché canadien élargi, selon les positions de XIC.",
     interval: REFRESH_INTERVALS.composite,
   },
+  tsxv: {
+    label: "TSX Venture",
+    shortLabel: "Venture",
+    description: "Les 300 principales capitalisations du TSX Venture.",
+    interval: REFRESH_INTERVALS.composite,
+  },
 };
 
 function isCockpitUniverse(value: string | null): value is CockpitUniverse {
-  return value === "tsx60" || value === "composite";
+  return value === "tsx60" || value === "composite" || value === "tsxv";
 }
 
 function refreshDescription(seconds: number, language: AnatoleLanguage): string {

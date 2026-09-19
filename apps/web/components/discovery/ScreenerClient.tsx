@@ -51,7 +51,9 @@ export function ScreenerClient() {
     const requestedUniverse = params.get("universe");
     const requestedSector = params.get("sector");
     const timer = window.setTimeout(() => {
-      if (requestedUniverse === "tsx60") setUniverse("tsx60");
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv") {
+        setUniverse(requestedUniverse);
+      }
       if (requestedSector) setSector(requestedSector);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -208,6 +210,9 @@ export function ScreenerClient() {
             </option>
             <option value="tsx60">
               TSX 60
+            </option>
+            <option value="tsxv">
+              TSX Venture
             </option>
           </select>
         </label>

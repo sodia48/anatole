@@ -35,7 +35,7 @@ export function TodayIntelligenceScreen() {
   useMobileTheme();
   const { language, pick } = useLocale();
   const { user, workspace } = useMobileAccount();
-  const [universe, setUniverse] = useState<TodayUniverse>("composite");
+  const [universe, setUniverse] = useState<TodayUniverse>(workspace.data.cockpit_universe ?? "composite");
   const [tier, setTier] = useState(1);
   const [appActive, setAppActive] = useState(AppState.currentState !== "background" && AppState.currentState !== "inactive");
   const [now, setNow] = useState(() => new Date());
