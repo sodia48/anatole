@@ -11,7 +11,7 @@ export type AnatolePreferences = {
   density: AnatoleDensity;
   decimals: AnatoleDecimals;
   defaultRange: AnatoleTimeRange;
-  defaultUniverse: "tsx60" | "composite";
+  defaultUniverse: "tsx60" | "composite" | "tsxv";
   language: AnatoleLanguage;
 };
 
@@ -37,7 +37,9 @@ export function readPreferences(): AnatolePreferences {
       defaultRange: ["1m", "3m", "6m", "1y", "5y"].includes(parsed.defaultRange ?? "")
         ? (parsed.defaultRange as AnatoleTimeRange)
         : "1y",
-      defaultUniverse: parsed.defaultUniverse === "composite" ? "composite" : "tsx60",
+      defaultUniverse: parsed.defaultUniverse === "composite" || parsed.defaultUniverse === "tsxv"
+        ? parsed.defaultUniverse
+        : "tsx60",
       language: parsed.language === "en" ? "en" : "fr",
     };
   } catch {

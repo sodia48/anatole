@@ -69,7 +69,7 @@ export function ScreenerScreen() {
   const requestedSignal = Array.isArray(params.signal) ? params.signal[0] : params.signal;
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse(requestedUniverse);
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv") setUniverse(requestedUniverse);
       if (requestedSector) setFilters((current) => ({ ...current, sector: requestedSector }));
       if (requestedSignal) setFilters((current) => ({ ...current, signal: requestedSignal }));
     }, 0);
@@ -82,8 +82,8 @@ export function ScreenerScreen() {
   const query = useQuery({
     queryKey: ["screener", universe],
     queryFn: ({ signal }) => marketApi.screener(universe, signal),
-    staleTime: universe === "composite" ? 180_000 : 45_000,
-    refetchInterval: (current) => appActive ? universe === "composite" ? 180_000 : Math.max(45_000, (current.state.data?.refresh_after_seconds ?? 45) * 1000) : false,
+    staleTime: universe === "tsx60" ? 45_000 : 180_000,
+    refetchInterval: (current) => appActive ? universe === "tsx60" ? Math.max(45_000, (current.state.data?.refresh_after_seconds ?? 45) * 1000) : 180_000 : false,
     refetchIntervalInBackground: false,
   });
   const data = query.data;
@@ -105,7 +105,7 @@ export function ScreenerScreen() {
     <ScreenHeader eyebrow={pick("Marchés", "Markets")} title="Screener" subtitle={pick("Repère rapidement les titres canadiens selon momentum, tendance, RSI et activité du volume.", "Quickly find Canadian securities by momentum, trend, RSI, and volume activity.")} />
     <View style={styles.summary}><View><Text style={styles.visible}>{data ? rows.length : "…"}</Text><Text style={styles.summaryLabel}>{pick("titres visibles", "securities shown")}</Text></View><View style={styles.summaryDetail}>{data ? <><Text style={styles.summaryText}>{data.live_items} live</Text><Text style={styles.summaryText}>{data.fallback_items} fallback</Text></> : <Text style={styles.refreshing}>{pick("Chargement…", "Loading…")}</Text>}{query.isFetching && data ? <Text style={styles.refreshing}>{pick("Actualisation…", "Refreshing…")}</Text> : null}</View></View>
     {data && query.isError ? <Text accessibilityRole="alert" style={styles.stale}>{pick("Dernières données disponibles", "Latest available data")}</Text> : null}
-    <View style={styles.segment}>{(["composite", "tsx60"] as ScreenerUniverse[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: universe === value }} key={value} onPress={() => changeUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]} testID={`screener-universe-${value}`}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "composite" ? "TSX Composite" : "TSX 60"}</Text></Pressable>)}</View>
+    <View style={styles.segment}>{(["composite", "tsx60", "tsxv"] as ScreenerUniverse[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: universe === value }} key={value} onPress={() => changeUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]} testID={`screener-universe-${value}`}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "composite" ? "TSX Composite" : value === "tsxv" ? "TSX Venture" : "TSX 60"}</Text></Pressable>)}</View>
     <Field autoCapitalize="characters" label={pick("Rechercher", "Search")} onChangeText={(queryText) => setFilters((current) => ({ ...current, query: queryText }))} placeholder={pick("Ticker ou entreprise", "Ticker or company")} testID="screener-search" value={filters.query} />
     <View style={styles.filterBar}><Pressable accessibilityRole="button" onPress={() => setFiltersOpen(true)} style={styles.filterButton} testID="screener-open-filters"><Text style={styles.filterButtonText}>{pick("Filtres", "Filters")}</Text></Pressable>{activeChips.length ? <Pressable accessibilityRole="button" onPress={reset} style={styles.reset}><Text style={styles.resetText}>{pick("Réinitialiser", "Reset")}</Text></Pressable> : null}</View>
     {activeChips.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false}>{activeChips.map((chip) => <Chip active key={chip.id} label={`${chip.label} ×`} onPress={chip.clear} testID={`screener-active-${chip.id}`} />)}</ScrollView> : null}

@@ -2,6 +2,7 @@ from app.schemas.search import SymbolSearchItem, SymbolSearchResponse
 from app.data.etf_catalog import ETF_CATALOG
 from app.services.tsx_composite_universe import tsx_composite_universe_service
 from app.services.tsx60 import TSX60
+from app.services.tsx_venture_universe import tsx_venture_universe_service
 
 
 class SymbolSearchService:
@@ -42,11 +43,16 @@ class SymbolSearchService:
 
         ranked = rank_rows(rows)
         if not ranked:
+            expanded: list[SymbolSearchItem] = []
             try:
-                composite = [SymbolSearchItem(symbol=item.ticker, ticker=item.ticker, name=item.name, sector=item.sector or "N/D", exchange=item.exchange or "TSX", universe="composite") for item in await tsx_composite_universe_service.get_constituents()]
-                ranked = rank_rows(composite)
+                expanded.extend(SymbolSearchItem(symbol=item.ticker, ticker=item.ticker, name=item.name, sector=item.sector or "N/D", exchange=item.exchange or "TSX", universe="composite") for item in await tsx_composite_universe_service.get_constituents())
             except Exception:  # noqa: BLE001
                 pass
+            try:
+                expanded.extend(SymbolSearchItem(symbol=item.ticker, ticker=item.ticker, name=item.name, sector=item.sector or "N/D", exchange="TSXV", universe="tsxv") for item in await tsx_venture_universe_service.get_all_listings())
+            except Exception:  # noqa: BLE001
+                pass
+            ranked = rank_rows(expanded)
 
         ranked.sort(key=lambda item: (item[0], item[1].symbol))
         items = [item for _, item in ranked[:limit]]

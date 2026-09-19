@@ -89,6 +89,12 @@ function formatPercent(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)} %`;
 }
 
+function universeName(universe: CockpitUniverse): string {
+  if (universe === "composite") return "S&P/TSX Composite";
+  if (universe === "tsxv") return "TSX Venture";
+  return "S&P/TSX 60";
+}
+
 function terminalRegimeLabel(value: string, language: AnatoleLanguage): string {
   if (language === "fr") return value;
   return ({
@@ -677,7 +683,7 @@ export default function TodayPage() {
       ? pick(language, `${topSector.sector} mène (${formatPercent(topSector.change_percent)}), tandis que ${weakSector.sector} ferme la marche (${formatPercent(weakSector.change_percent)}).`, `${topSector.sector} leads (${formatPercent(topSector.change_percent)}), while ${weakSector.sector} trails (${formatPercent(weakSector.change_percent)}).`)
       : pick(language, "Les données sectorielles se mettent à jour.", "Sector data is updating.");
     const regime = terminal?.regime && terminal.risk_level ? pick(language, ` Le régime Terminal est ${terminal.regime.toLowerCase()} avec un risque ${terminal.risk_level.toLowerCase()}.`, ` The Terminal regime is ${terminalRegimeLabel(terminal.regime, language).toLowerCase()} with ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} risk.`) : "";
-    return pick(language, `Le ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} de ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation} % des titres avancent. ${sectorSentence}${regime}`, `The ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation}% of securities are advancing. ${sectorSentence}${regime}`);
+    return pick(language, `Le ${universeName(universe)} ${direction} de ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation} % des titres avancent. ${sectorSentence}${regime}`, `The ${universeName(universe)} ${direction} ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation}% of securities are advancing. ${sectorSentence}${regime}`);
   }, [cockpit, language, terminal, topSector, universe, weakSector]);
 
   const displayName = firstName(user?.display_name);
@@ -735,11 +741,7 @@ export default function TodayPage() {
             <span className={styles.eyebrow}>
               {pick(language, "LE MARCHÉ EN 30 SECONDES", "THE MARKET IN 30 SECONDS")}
             </span>
-            <h2>
-              {universe === "composite"
-                ? "S&P/TSX Composite"
-                : "S&P/TSX 60"}
-            </h2>
+            <h2>{universeName(universe)}</h2>
             <span
               className={
                 styles.universeCaption
@@ -747,7 +749,9 @@ export default function TodayPage() {
             >
               {universe === "composite"
                 ? pick(language, "Vue principale · marché canadien élargi", "Primary view · broad Canadian market")
-                : pick(language, "Vue concentrée · grandes capitalisations", "Focused view · large caps")}
+                : universe === "tsxv"
+                  ? pick(language, "Croissance canadienne · 300 principales capitalisations", "Canadian growth · 300 largest market caps")
+                  : pick(language, "Vue concentrée · grandes capitalisations", "Focused view · large caps")}
               {marketSwitching
                 ? pick(language, " · actualisation…", " · refreshing…")
                 : ""}
@@ -803,6 +807,15 @@ export default function TodayPage() {
               >
                 TSX 60
               </button>
+
+              <button
+                type="button"
+                className={universe === "tsxv" ? styles.universeActive : undefined}
+                aria-pressed={universe === "tsxv"}
+                onClick={() => selectUniverse("tsxv")}
+              >
+                Venture
+              </button>
             </div>
 
             <Link
@@ -824,10 +837,11 @@ export default function TodayPage() {
               <strong>{cockpit ? formatPercent(marketChange) : "—"}</strong>
               <small>
                 {marketSwitching
-                  ? universe ===
-                    "composite"
+                  ? universe === "composite"
                     ? pick(language, "Chargement du marché canadien élargi…", "Loading the broad Canadian market…")
-                    : pick(language, "Chargement du TSX 60…", "Loading the TSX 60…")
+                    : universe === "tsxv"
+                      ? pick(language, "Chargement du TSX Venture…", "Loading TSX Venture…")
+                      : pick(language, "Chargement du TSX 60…", "Loading the TSX 60…")
                   : marketState}
               </small>
             </div>

@@ -22,6 +22,10 @@ from app.services.tsx_composite_universe import (
     XIC_UNIVERSE_SOURCE,
     tsx_composite_universe_service,
 )
+from app.services.tsx_venture_universe import (
+    TSXV_UNIVERSE_SOURCE,
+    tsx_venture_universe_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +52,8 @@ class CockpitService:
     composite_cache_ttl_seconds = 90.0
     tsx60_quote_deadline_seconds = 6.0
     composite_quote_deadline_seconds = 10.0
+    venture_cache_ttl_seconds = 180.0
+    venture_quote_deadline_seconds = 12.0
 
     def __init__(self) -> None:
         # Ces deux attributs restent les caches TSX 60 historiques afin de
@@ -63,6 +69,11 @@ class CockpitService:
         self._composite_refresh_task: asyncio.Task[CockpitSnapshot] | None = (
             None
         )
+
+        self._venture_cached: CockpitSnapshot | None = None
+        self._venture_cached_at = 0.0
+        self._venture_lock = asyncio.Lock()
+        self._venture_refresh_task: asyncio.Task[CockpitSnapshot] | None = None
 
     @staticmethod
     def _tsx60_constituents() -> list[CockpitConstituent]:
@@ -86,6 +97,18 @@ class CockpitService:
                 name=entry.name,
                 sector=entry.sector or "Other",
                 weight=max(entry.weight or fallback_weight, 0.01),
+            )
+            for entry in entries
+        ]
+
+    async def _venture_constituents(self) -> list[CockpitConstituent]:
+        entries = await tsx_venture_universe_service.get_constituents()
+        return [
+            CockpitConstituent(
+                symbol=entry.ticker,
+                name=entry.name,
+                sector=entry.sector or "Other",
+                weight=max(entry.weight or 0.01, 0.01),
             )
             for entry in entries
         ]
@@ -415,6 +438,61 @@ class CockpitService:
             self._schedule_composite_refresh()
             return self._composite_cached
         return await self._refresh_composite()
+
+    def _schedule_venture_refresh(self) -> None:
+        if self._venture_refresh_task is None or self._venture_refresh_task.done():
+            self._venture_refresh_task = asyncio.create_task(self._refresh_venture())
+            self._venture_refresh_task.add_done_callback(
+                lambda task: self._observe_background_refresh(task, "tsxv")
+            )
+
+    async def _refresh_venture(self) -> CockpitSnapshot:
+        async with self._venture_lock:
+            now = monotonic()
+            if (
+                self._venture_cached is not None
+                and now - self._venture_cached_at < self.venture_cache_ttl_seconds
+            ):
+                return self._venture_cached
+
+            try:
+                snapshot = await self._build_snapshot(
+                    constituents=await self._venture_constituents(),
+                    universe="TSX Venture - 300 largest market caps",
+                    universe_as_of=(
+                        tsx_venture_universe_service.as_of
+                        or datetime.now(UTC).date().isoformat()
+                    ),
+                    universe_source=TSXV_UNIVERSE_SOURCE,
+                    previous=self._venture_cached,
+                    refresh_after_seconds=180,
+                    quote_deadline_seconds=self.venture_quote_deadline_seconds,
+                )
+            except Exception as error:  # noqa: BLE001
+                if self._venture_cached is not None:
+                    logger.warning(
+                        "venture_cockpit_stale_fallback error=%s detail=%s",
+                        type(error).__name__,
+                        error,
+                    )
+                    return self._venture_cached
+                raise
+
+            self._venture_cached = snapshot
+            self._venture_cached_at = monotonic()
+            return snapshot
+
+    async def get_venture(self) -> CockpitSnapshot:
+        now = monotonic()
+        if (
+            self._venture_cached is not None
+            and now - self._venture_cached_at < self.venture_cache_ttl_seconds
+        ):
+            return self._venture_cached
+        if self._venture_cached is not None:
+            self._schedule_venture_refresh()
+            return self._venture_cached
+        return await self._refresh_venture()
 
 
 cockpit_service = CockpitService()

@@ -11,6 +11,7 @@ from app.services.tsx_composite_universe import (
     CompositeConstituent,
     tsx_composite_universe_service,
 )
+from app.services.tsx_venture_universe import tsx_venture_universe_service
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,10 @@ class ScreenerService:
     composite_history_concurrency = 16
     composite_max_constituents = 260
     composite_history_deadline_seconds = 7.0
+    venture_cache_ttl_seconds = 180.0
+    venture_stale_seconds = 21_600.0
+    venture_history_concurrency = 16
+    venture_history_deadline_seconds = 10.0
 
     def __init__(self) -> None:
         self._cache: dict[
@@ -167,6 +172,7 @@ class ScreenerService:
         self._locks = {
             "tsx60": asyncio.Lock(),
             "composite": asyncio.Lock(),
+            "tsxv": asyncio.Lock(),
         }
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
 
@@ -193,23 +199,25 @@ class ScreenerService:
             "60",
         }:
             return "tsx60"
+        if normalized in {"tsxv", "tsxventure", "venture"}:
+            return "tsxv"
         raise ValueError(
-            "Universe must be 'composite' or 'tsx60'"
+            "Universe must be 'composite', 'tsx60' or 'tsxv'"
         )
 
     def _ttl(self, universe: str) -> float:
-        return (
-            self.composite_cache_ttl_seconds
-            if universe == "composite"
-            else self.tsx60_cache_ttl_seconds
-        )
+        if universe == "composite":
+            return self.composite_cache_ttl_seconds
+        if universe == "tsxv":
+            return self.venture_cache_ttl_seconds
+        return self.tsx60_cache_ttl_seconds
 
     def _stale_ttl(self, universe: str) -> float:
-        return (
-            self.composite_stale_seconds
-            if universe == "composite"
-            else self.tsx60_stale_seconds
-        )
+        if universe == "composite":
+            return self.composite_stale_seconds
+        if universe == "tsxv":
+            return self.venture_stale_seconds
+        return self.tsx60_stale_seconds
 
     async def _constituents(
         self,
@@ -222,6 +230,12 @@ class ScreenerService:
             return (
                 "S&P/TSX 60",
                 tsx60_constituents(),
+            )
+
+        if universe == "tsxv":
+            return (
+                "TSX Venture - 300 largest market caps",
+                await tsx_venture_universe_service.get_constituents(),
             )
 
         try:
@@ -264,12 +278,16 @@ class ScreenerService:
                 range_="3mo",
                 interval="1d",
                 concurrency=(
-                    self.composite_history_concurrency
+                    self.venture_history_concurrency
+                    if normalized == "tsxv"
+                    else self.composite_history_concurrency
                     if normalized == "composite"
                     else 12
                 ),
                 deadline_seconds=(
-                    self.composite_history_deadline_seconds
+                    self.venture_history_deadline_seconds
+                    if normalized == "tsxv"
+                    else self.composite_history_deadline_seconds
                     if normalized == "composite"
                     else 5.0
                 ),
@@ -285,7 +303,7 @@ class ScreenerService:
             items=sorted(rows, key=lambda item: item.score if item.score is not None else -1, reverse=True),
             sectors=sorted({item.sector for item in rows}),
             generated_at=datetime.now(UTC),
-            refresh_after_seconds=180 if normalized == "composite" else 45,
+            refresh_after_seconds=180 if normalized in {"composite", "tsxv"} else 45,
             live_items=sum(item.source != "demo-fallback" for item in rows),
             fallback_items=sum(item.source == "demo-fallback" for item in rows),
         )
@@ -364,6 +382,9 @@ class ScreenerService:
         return await self.get_snapshot(
             "composite"
         )
+
+    async def get_venture(self) -> ScreenerSnapshot:
+        return await self.get_snapshot("tsxv")
 
 
 screener_service = ScreenerService()

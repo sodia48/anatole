@@ -17,6 +17,14 @@ import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
+type CockpitUniverse = "tsx60" | "composite" | "tsxv";
+
+function universeLabel(universe: CockpitUniverse) {
+  if (universe === "composite") return "TSX Composite";
+  if (universe === "tsxv") return "TSX Venture";
+  return "TSX 60";
+}
+
 const hubs = [
   { id: "cockpit", fr: "Cockpit", en: "Cockpit" },
   { id: "screener", fr: "Screener", en: "Screener" },
@@ -80,13 +88,13 @@ export default function MarketsScreen() {
   const requestedDayOffset = first(params.dayOffset);
   const requestedTicker = first(params.ticker);
   const [hub, setHub] = useState<Hub>(isHub(requestedHub) ? requestedHub : "cockpit");
-  const [universe, setUniverse] = useState<"tsx60" | "composite">(requestedUniverse === "composite" ? "composite" : "tsx60");
+  const [universe, setUniverse] = useState<CockpitUniverse>(requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv" ? requestedUniverse : workspace.data.cockpit_universe);
   const [constituentsOpen, setConstituentsOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (isHub(requestedHub)) setHub((current) => current === requestedHub ? current : requestedHub);
-      if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse((current) => current === requestedUniverse ? current : requestedUniverse);
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv") setUniverse((current) => current === requestedUniverse ? current : requestedUniverse);
     }, 0);
     return () => clearTimeout(timer);
   }, [requestedHub, requestedUniverse]);
@@ -117,7 +125,7 @@ export default function MarketsScreen() {
       </ScrollView>
       {cockpit.data ? <View style={styles.summaryGrid}>
         {[
-          { label: `${universe === "tsx60" ? "TSX 60" : "TSX Composite"} ${pick("indicatif", "indicative")}`, value: `${cockpit.data.weighted_change_percent >= 0 ? "+" : ""}${cockpit.data.weighted_change_percent.toFixed(2)}%` },
+          { label: `${universeLabel(universe)} ${pick("indicatif", "indicative")}`, value: `${cockpit.data.weighted_change_percent >= 0 ? "+" : ""}${cockpit.data.weighted_change_percent.toFixed(2)}%` },
           { label: pick("Titres en hausse", "Advancing securities"), value: String(cockpit.data.breadth.advancers) },
           { label: pick("Titres en baisse", "Declining securities"), value: String(cockpit.data.breadth.decliners) },
           { label: pick("Meilleur secteur", "Best sector"), value: bestSector?.sector ?? "—", change: bestSector?.change_percent },
@@ -136,7 +144,7 @@ export default function MarketsScreen() {
         </Text>
       </View>
 
-      <View style={styles.segment}>{(["tsx60", "composite"] as const).map((value) => <Pressable accessibilityState={{ selected: universe === value }} key={value} onPress={() => setUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "tsx60" ? "TSX 60" : "TSX Composite"}</Text></Pressable>)}</View>
+      <View style={styles.segment}>{(["tsx60", "composite", "tsxv"] as const).map((value) => <Pressable accessibilityState={{ selected: universe === value }} key={value} onPress={() => setUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{universeLabel(value)}</Text></Pressable>)}</View>
       <QueryState error={!cockpit.data ? cockpit.error : null} loading={cockpit.isLoading} onRetry={() => void cockpit.refetch()} />
       {cockpit.data ? <>
         <Card action={<Pressable onPress={() => setConstituentsOpen(true)} style={styles.link}><Text style={styles.linkText}>{pick("Voir les constituants", "View constituents")}</Text></Pressable>} title={pick("Carte du marché", "Market map")} testID="cockpit-heatmap"><MarketHeatmap initialSector={requestedSector ?? null} onAlert={() => router.push("/alerts")} onOpen={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })} onOpenSector={(selectedSector) => router.push({ pathname: "/screener", params: { universe, sector: selectedSector } } as Href)} onWatchlist={(ticker) => void addWatchlist(ticker)} isRefreshing={cockpit.isFetching} tiles={cockpit.data.constituents} /></Card>
