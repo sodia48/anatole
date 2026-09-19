@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.schemas.fundamentals import FinancialPeriod
+from app.core.resilience import RemoteCacheEntry
 from app.services.fundamentals import FundamentalsService, percent
 
 
@@ -205,3 +206,75 @@ async def test_quote_summary_failure_still_uses_structured_financials(
     assert snapshot.status == "partial"
     assert snapshot.annual_financials[0].total_revenue == 42_000_000_000
     assert "RuntimeError" not in (snapshot.message or "")
+
+
+@pytest.mark.asyncio
+async def test_background_refresh_retries_market_summary(monkeypatch) -> None:
+    service = FundamentalsService()
+    calls = 0
+
+    async def summary(symbol: str) -> dict:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise TimeoutError
+        return sample_payload()
+
+    async def empty(_: str) -> dict:
+        return {}
+
+    async def enrich(snapshot, *, upstream_failed: bool = False):
+        assert upstream_failed is False
+        return snapshot
+
+    monkeypatch.setattr(service, "_request_summary", summary)
+    monkeypatch.setattr(service, "_quote_fallback", empty)
+    monkeypatch.setattr(service, "_analyst_payload", empty)
+    monkeypatch.setattr(
+        "app.services.fundamentals.official_financials_service.enrich",
+        enrich,
+    )
+
+    await service.get_snapshot("RY")
+    if task := service._refresh_tasks.get("RY.TO"):
+        await task
+    snapshot = await service.get_snapshot("RY")
+
+    assert calls == 2
+    assert snapshot.metrics.market_cap == 200_000_000_000
+    assert snapshot.metrics.fifty_two_week_high == 310
+
+
+@pytest.mark.asyncio
+async def test_restores_last_valid_snapshot_after_restart() -> None:
+    service = FundamentalsService()
+    saved = service._snapshot("RY", "RY.TO", sample_payload())
+
+    class PersistentCache:
+        async def read(self, key: str) -> RemoteCacheEntry:
+            assert key == "RY.TO"
+            return RemoteCacheEntry(value=saved, age_seconds=12)
+
+        async def write(self, *args, **kwargs) -> None:
+            return None
+
+    service._persistent = PersistentCache()
+    await service._restore("RY.TO")
+
+    restored = service._cache["RY.TO"][1]
+    assert restored.stale is True
+    assert restored.generated_at == saved.generated_at
+    assert restored.metrics.market_cap == 200_000_000_000
+
+
+def test_expired_values_are_not_inherited() -> None:
+    service = FundamentalsService()
+    current = service._unavailable("RY", "RY.TO", "refreshing")
+    expired = service._snapshot("RY", "RY.TO", sample_payload()).model_copy(
+        update={"generated_at": datetime.now(UTC) - timedelta(days=2)}
+    )
+
+    merged = service._retain_components(current, expired)
+
+    assert merged.metrics.market_cap is None
+    assert merged.generated_at == current.generated_at

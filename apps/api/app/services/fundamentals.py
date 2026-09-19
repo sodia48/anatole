@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import math
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Any, Literal
 
 from app.core.config import settings
+from app.core.distributed_cache import redis_snapshot_store
 from app.schemas.fundamentals import (
     AnalystConsensus,
     CorporateEvents,
@@ -25,6 +27,8 @@ from app.services.official_financials import (
     official_financials_service,
 )
 
+
+logger = logging.getLogger(__name__)
 
 MODULES = (
     "assetProfile",
@@ -147,12 +151,49 @@ class FundamentalsService:
     unavailable_ttl_seconds = 300
     fast_budget_seconds = 2.5
     deep_budget_seconds = 20
+    market_retry_seconds = 10
     stale_seconds = 86_400
 
     def __init__(self) -> None:
         self._cache: dict[str, tuple[float, FundamentalSnapshot]] = {}
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
         self._fast_tasks: dict[str, asyncio.Task[FundamentalSnapshot]] = {}
+        self._persistent = redis_snapshot_store.namespace("fundamentals-v2")
+
+    @staticmethod
+    def _report_failure(symbol: str, stage: str, error: Exception) -> None:
+        # Never log exception text: provider URLs may contain credentials.
+        response = getattr(error, "response", None)
+        logger.warning(
+            "fundamentals_upstream_failure symbol=%s stage=%s error=%s http_status=%s",
+            symbol, stage, type(error).__name__, getattr(response, "status_code", None),
+        )
+
+    async def _restore(self, symbol: str) -> None:
+        try:
+            entry = await self._persistent.read(symbol)
+            if entry is None:
+                return
+            snapshot = FundamentalSnapshot.model_validate(entry.value).model_copy(deep=True)
+            age = (datetime.now(UTC) - snapshot.generated_at).total_seconds()
+            if snapshot.ticker != symbol or not 0 <= age < self.stale_seconds:
+                return
+            snapshot.stale = True
+            snapshot.refresh_in_progress = False
+            snapshot.refresh_after_seconds = 0
+            self._cache.setdefault(symbol, (monotonic(), snapshot))
+        except Exception as exc:
+            self._report_failure(symbol, "cache_read", exc)
+
+    async def _persist(self, symbol: str, snapshot: FundamentalSnapshot) -> None:
+        # Preserve the age of inherited data; repeated failures must not renew it.
+        remaining = self.stale_seconds - (datetime.now(UTC) - snapshot.generated_at).total_seconds()
+        if snapshot.status == "unavailable" or remaining <= 0:
+            return
+        try:
+            await self._persistent.write(symbol, snapshot, ttl_seconds=remaining)
+        except Exception as exc:
+            self._report_failure(symbol, "cache_write", exc)
 
     async def _request_summary(self, symbol: str) -> dict[str, Any]:
         body = await yahoo_public_service.request_json(
@@ -987,7 +1028,9 @@ class FundamentalsService:
 
     @staticmethod
     def _retain_components(new: FundamentalSnapshot, old: FundamentalSnapshot | None) -> FundamentalSnapshot:
-        if old is None:
+        if old is None or old.ticker != new.ticker:
+            return new
+        if (datetime.now(UTC) - old.generated_at).total_seconds() >= FundamentalsService.stale_seconds:
             return new
         new = new.model_copy(deep=True)
         retained = False
@@ -1025,6 +1068,7 @@ class FundamentalsService:
         if new.name in {new.ticker, new.symbol} and old.name not in {old.ticker, old.symbol}:
             new.name = old.name
         if retained:
+            new.generated_at = min(new.generated_at, old.generated_at)
             new.stale = True
             new.status = "partial"
             new.message = "Dernières données disponibles pour les sections en cours d'actualisation."
@@ -1051,8 +1095,8 @@ class FundamentalsService:
                         payload = await self._request_summary(symbol)
                     snapshot = self._snapshot(ticker, symbol, payload)
                     summary_failed = not any(v is not None for v in snapshot.metrics.model_dump().values())
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self._report_failure(symbol, "fast_summary", exc)
                 if not any(v is not None for k, v in snapshot.analysts.model_dump().items()
                            if k != "current_price") or snapshot.status == "unavailable":
                     async def fallback(loader):
@@ -1061,12 +1105,12 @@ class FundamentalsService:
                             payload = await loader(symbol)
                             if payload:
                                 snapshot = self._retain_components(self._snapshot(ticker, symbol, payload), snapshot)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            self._report_failure(symbol, loader.__name__, exc)
                     await asyncio.gather(
                         fallback(self._quote_fallback), fallback(self._analyst_payload))
-        except TimeoutError:
-            pass
+        except TimeoutError as exc:
+            self._report_failure(symbol, "fast_budget", exc)
         cached = self._cache.get(symbol)
         old = cached[1] if cached and monotonic() - cached[0] < self.stale_seconds else None
         snapshot = self._retain_components(snapshot, old)
@@ -1087,6 +1131,21 @@ class FundamentalsService:
     async def _deep_refresh(self, ticker: str, symbol: str, fast: FundamentalSnapshot, upstream_failed: bool) -> None:
         snapshot = fast.model_copy(deep=True)
         try:
+            # A fast-path deadline must not permanently exclude market data.
+            # This separate budget leaves the statement enrichment budget intact.
+            if upstream_failed or any(getattr(snapshot.metrics, key) is None for key in (
+                "market_cap", "fifty_two_week_high", "average_volume_3m",
+            )):
+                try:
+                    async with asyncio.timeout(self.market_retry_seconds):
+                        payload = await self._request_summary(symbol)
+                    recovered = self._snapshot(ticker, symbol, payload)
+                    upstream_failed = not any(v is not None for v in recovered.metrics.model_dump().values())
+                    snapshot = self._retain_components(recovered, snapshot)
+                    snapshot.refresh_in_progress = True
+                except Exception as exc:
+                    upstream_failed = True
+                    self._report_failure(symbol, "background_summary", exc)
             async with asyncio.timeout(self.deep_budget_seconds):
                 snapshot = await official_financials_service.enrich(
                     snapshot, upstream_failed=upstream_failed)
@@ -1102,10 +1161,11 @@ class FundamentalsService:
                             history = self._snapshot(ticker, symbol, rows[0]).earnings_history
                             if history:
                                 snapshot.earnings_history = history
-                    except Exception:
-                        pass
-        except Exception:
+                    except Exception as exc:
+                        self._report_failure(symbol, "earnings_history", exc)
+        except Exception as exc:
             snapshot.stale = True
+            self._report_failure(symbol, "background_enrichment", exc)
         finally:
             current = self._cache.get(symbol)
             snapshot = self._retain_components(snapshot, current[1] if current else fast)
@@ -1117,10 +1177,15 @@ class FundamentalsService:
             snapshot.refresh_in_progress = False
             snapshot.refresh_after_seconds = self.unavailable_ttl_seconds if upstream_failed or snapshot.stale or snapshot.status == "unavailable" else self.cache_ttl_seconds
             self._cache[symbol] = (monotonic(), snapshot)
-            self._refresh_tasks.pop(symbol, None)
+            try:
+                await self._persist(symbol, snapshot)
+            finally:
+                self._refresh_tasks.pop(symbol, None)
 
     async def get_snapshot(self, ticker: str) -> FundamentalSnapshot:
         symbol = market_data_service.normalize_ticker(ticker)
+        if symbol not in self._cache:
+            await self._restore(symbol)
         cached = self._cache.get(symbol)
         if cached and monotonic() - cached[0] < cached[1].refresh_after_seconds:
             return await currency_conversion_service.fundamental_to_cad(
