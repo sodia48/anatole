@@ -11,6 +11,16 @@ import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
 type TileLayout = { tile: NormalizedHeatmapTile; rect: HeatmapRect; group: HeatmapGroup };
 
+const LEGEND_STOPS = [
+  { value: "-3%", color: "#d94d4d" },
+  { value: "-2%", color: "#b94f56" },
+  { value: "-1%", color: "#85515b" },
+  { value: "0%", color: "#45515f" },
+  { value: "+1%", color: "#39785b" },
+  { value: "+2%", color: "#348f59" },
+  { value: "+3%", color: "#3cae5f" },
+] as const;
+
 function fillFor(tile: NormalizedHeatmapTile): string {
   if (!tile.available) return "#334655";
   const strength = Math.min(Math.max(Math.abs(tile.changePercent) / 5, 0.18), 1);
@@ -35,7 +45,7 @@ function layoutGroups(groups: HeatmapGroup[], width: number, height: number): Ti
     { x: 0, y: 0, width, height },
   );
   return groupRects.flatMap(({ item: group, rect }) => {
-    const header = groups.length > 1 && rect.height > 42 ? 25 : 0;
+    const header = groups.length > 1 && rect.height > 42 ? 28 : 0;
     const inner = {
       x: rect.x + 1,
       y: rect.y + header + 1,
@@ -57,6 +67,7 @@ export function MarketHeatmap({
   onAlert,
   initialSector = null,
   onOpenSector,
+  isRefreshing = false,
 }: {
   tiles: MarketTile[];
   height?: number;
@@ -65,6 +76,7 @@ export function MarketHeatmap({
   onAlert: (ticker: string) => void;
   initialSector?: string | null;
   onOpenSector?: (sector: string) => void;
+  isRefreshing?: boolean;
 }) {
   useMobileTheme();
   const { pick } = useLocale();
@@ -104,8 +116,9 @@ export function MarketHeatmap({
       <Svg accessibilityLabel={pick("Carte thermique du marché", "Market heatmap")} height={mapHeight} testID="market-heatmap-svg" width={mapWidth}>
         {groupRects.map(({ item: group, rect }) => groups.length > 1 && rect.height > 42 ? (
           <G key={`header-${group.key}`} onPress={() => mode === "sector" && setSector(group.key)}>
-            <Rect fill="#0b2333" height={24} stroke="#28526d" strokeWidth={1} width={Math.max(0, rect.width - 2)} x={rect.x + 1} y={rect.y + 1} />
-            <SvgText fill="#d8efff" fontSize={Math.min(11, Math.max(8, rect.width / 14))} fontWeight="700" x={rect.x + 6} y={rect.y + 17}>{group.label.slice(0, Math.max(5, Math.floor(rect.width / 8)))}</SvgText>
+            <Rect fill="#0b2333" height={27} stroke="#28526d" strokeWidth={1} width={Math.max(0, rect.width - 2)} x={rect.x + 1} y={rect.y + 1} />
+            <SvgText fill="#d8efff" fontSize={Math.min(10, Math.max(7, rect.width / 16))} fontWeight="700" x={rect.x + 6} y={rect.y + 13}>{group.label.slice(0, Math.max(5, Math.floor(rect.width / 8)))}</SvgText>
+            {rect.width > 92 ? <SvgText fill={group.changePercent >= 0 ? "#6fe0b6" : "#ff7b8d"} fontSize={7} fontWeight="700" textAnchor="end" x={rect.x + rect.width - 6} y={rect.y + 22}>{`${group.changePercent >= 0 ? "+" : ""}${group.changePercent.toFixed(2)}%`}</SvgText> : null}
           </G>
         ) : null)}
         {tileLayouts.map(({ tile, rect }) => {
@@ -135,9 +148,25 @@ export function MarketHeatmap({
 
   return (
     <View>
+      <View style={styles.toolbarHeading}>
+        <Text style={styles.toolbarLabel}>{pick("Visualiser par", "Visualize by")}</Text>
+        <View style={styles.liveBadge}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveText}>
+            {isRefreshing ? pick("Actualisation", "Refreshing") : pick("Données live", "Live data")}
+          </Text>
+        </View>
+      </View>
       <View style={styles.toolbar}>
         {modeOptions.map((option) => <Pressable accessibilityRole="button" key={option.id} onPress={() => { setSector(null); setMode(option.id); }} style={[styles.mode, mode === option.id && !sector && styles.modeActive]}><Text style={styles.modeText}>{option.label}</Text></Pressable>)}
         <Pressable accessibilityRole="button" onPress={() => setFullscreen(true)} style={styles.mode}><Text style={styles.modeText}>⛶</Text></Pressable>
+      </View>
+      <View style={styles.legend}>
+        {LEGEND_STOPS.map((stop) => (
+          <View key={stop.value} style={[styles.legendCell, { backgroundColor: stop.color }]}>
+            <Text style={styles.legendText}>{stop.value}</Text>
+          </View>
+        ))}
       </View>
       {sector ? <View style={styles.sectorActions}><Pressable onPress={() => setSector(null)} style={styles.back}><Text style={styles.backText}>‹ {pick("Retour au marché", "Back to market")} · {sector}</Text></Pressable>{onOpenSector ? <Pressable onPress={() => onOpenSector(sector)} style={styles.screenerLink} testID="heatmap-open-sector-screener"><Text style={styles.backText}>{pick("Ouvrir dans Screener", "Open in Screener")} →</Text></Pressable> : null}</View> : null}
       <View onLayout={(event) => setWidth(Math.max(280, event.nativeEvent.layout.width))} style={styles.canvas}>{renderMap(width, height)}</View>
@@ -171,7 +200,15 @@ export function MarketHeatmap({
 }
 
 const styles = createThemedStyles((colors) => ({
-  toolbar: { flexDirection: "row", gap: spacing.xs, marginBottom: spacing.sm },
+  toolbarHeading: { minHeight: 28, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
+  toolbarLabel: { ...typography.caption, color: colors.textMuted, fontWeight: "800", textTransform: "uppercase" },
+  liveBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: spacing.sm, minHeight: 26, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.positive, backgroundColor: "rgba(20,112,79,.16)" },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.positive },
+  liveText: { ...typography.caption, color: colors.positive, fontWeight: "800" },
+  toolbar: { flexDirection: "row", gap: spacing.xs, marginBottom: spacing.xs },
+  legend: { flexDirection: "row", overflow: "hidden", borderRadius: radius.sm, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  legendCell: { flex: 1, minHeight: 24, alignItems: "center", justifyContent: "center" },
+  legendText: { ...typography.caption, color: "#fff", fontSize: 8, fontWeight: "800" },
   mode: { minHeight: 44, minWidth: 44, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
   modeActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
   modeText: { ...typography.caption, color: colors.text, fontWeight: "800" },

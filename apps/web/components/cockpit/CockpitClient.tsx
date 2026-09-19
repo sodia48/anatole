@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { MarketHeatmap } from "./MarketHeatmap";
+import { QuoteTape } from "./QuoteTape";
 import { MoversList } from "./MoversList";
 import {
   getCockpitSnapshot,
@@ -266,6 +267,8 @@ export function CockpitClient() {
       </header>
 
       {error ? <div className="cockpit-warning">{error}</div> : null}
+
+      <QuoteTape key={universe} tiles={snapshot.constituents} language={language} />
 
       <section className="cockpit-kpis">
         <article className="panel cockpit-kpi">
