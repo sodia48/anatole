@@ -1,0 +1,2057 @@
+{
+  "asOf": "2026-09-18",
+  "source": "Last validated TSX Venture snapshot; sectors from TMX Money",
+  "rows": [
+    {
+      "symbol": "TOI.V",
+      "longName": "Topicus.com Inc.",
+      "sector": "Technology",
+      "marketCap": 15.842509474485073,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ARTG.V",
+      "longName": "Artemis Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 7.922759229400798,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LMN.V",
+      "longName": "Lumine Group Inc.",
+      "sector": "Technology",
+      "marketCap": 4.508252755819124,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AFM.V",
+      "longName": "Alphamin Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 1.52600892058284,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OMG.V",
+      "longName": "Omai Gold Mines Corp.",
+      "sector": "Materials",
+      "marketCap": 1.4607993045684409,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BZ.V",
+      "longName": "Benz Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 1.4480692474007926,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PNG.V",
+      "longName": "Kraken Robotics Inc.",
+      "sector": "Technology",
+      "marketCap": 1.4219334692860166,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SGML.V",
+      "longName": "Sigma Lithium Corporation",
+      "sector": "Materials",
+      "marketCap": 1.3059466065122851,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NCX.V",
+      "longName": "NorthIsle Copper and Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 1.2217372613771431,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MTA.V",
+      "longName": "Metalla Royalty & Streaming Ltd.",
+      "sector": "Materials",
+      "marketCap": 1.1024998936548833,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MKO.V",
+      "longName": "Mako Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 1.0686179538208682,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SCZ.V",
+      "longName": "Santacruz Silver Mining Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.9755567767565523,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OGG.V",
+      "longName": "Osisko Gold Group Inc.",
+      "sector": "Materials",
+      "marketCap": 0.9630659066882326,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TAU.V",
+      "longName": "Thesis Gold & Silver Inc.",
+      "sector": "Materials",
+      "marketCap": 0.8679520163912066,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GRZ.V",
+      "longName": "Gold Reserve Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.8515347654555454,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BYN.V",
+      "longName": "Banyan Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.783418204144381,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DB.V",
+      "longName": "Decibel Cannabis Company Inc.",
+      "sector": "Healthcare",
+      "marketCap": 0.7507395186140406,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ASE.V",
+      "longName": "Asante Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.7428967804628995,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "THX.V",
+      "longName": "Thor Explorations Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.734650341158745,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FDR.V",
+      "longName": "Founders Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.7250286555857,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AUXX.V",
+      "longName": "Gold X2 Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.7018139300334147,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LGN.V",
+      "longName": "Logan Energy Corp.",
+      "sector": "Energy",
+      "marketCap": 0.6992106091587466,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SLG.V",
+      "longName": "San Lorenzo Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.6533197267889176,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RML.V",
+      "longName": "Rusoro Mining Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.6473024476087074,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ITR.V",
+      "longName": "Integra Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.6455603593961236,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MOON.V",
+      "longName": "Blue Moon Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.6430359543537837,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SLI.V",
+      "longName": "Standard Lithium Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.6257774648882881,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AVTS.V",
+      "longName": "Aventus Capital Inc.",
+      "sector": "Finance",
+      "marketCap": 0.6253563152750353,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TTS.V",
+      "longName": "Tintina Mines Limited",
+      "sector": "Materials",
+      "marketCap": 0.606152826323778,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FWZ.V",
+      "longName": "Fireweed Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.5946391760985255,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AMX.V",
+      "longName": "Amex Gold Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.5829865746093612,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GORO.V",
+      "longName": "Goldgroup Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.5732631151907259,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HSTR.V",
+      "longName": "Heliostar Metals Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.5373478728730818,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GSKR.V",
+      "longName": "Goldsky Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.5102069785927895,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "REG.V",
+      "longName": "Regulus Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.5014487531448382,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FISH.V",
+      "longName": "Sailfish Royalty Corp.",
+      "sector": "Materials",
+      "marketCap": 0.48233420360945106,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "QTWO.V",
+      "longName": "Q2 Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.4627497654487749,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ALDE.V",
+      "longName": "Aldebaran Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.4592650586752717,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SICO.V",
+      "longName": "Silverco Mining Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.4516215193589597,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RDS.V",
+      "longName": "Radisson Mining Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.44491441609871174,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CBR.V",
+      "longName": "Cabral Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.4446384228248964,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ZDC.V",
+      "longName": "Zedcor Inc.",
+      "sector": "Industrials",
+      "marketCap": 0.43274347866380686,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "QNC.V",
+      "longName": "Quantum eMotion Corp.",
+      "sector": "Technology",
+      "marketCap": 0.4254735962673,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PML.V",
+      "longName": "Panoro Minerals Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.41638554718947607,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BIG.V",
+      "longName": "Hercules Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.39638839195408215,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CDPR.V",
+      "longName": "Cerro de Pasco Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.39082538264067923,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WGO.V",
+      "longName": "White Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.3887082851200346,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CUU.V",
+      "longName": "Copper Fox Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.3886458896383583,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GAL.V",
+      "longName": "Galantas Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.38620047998059726,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "IFOS.V",
+      "longName": "Itafos Inc.",
+      "sector": "Materials",
+      "marketCap": 0.37930982316141865,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CEI.V",
+      "longName": "Coelacanth Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.372928910644945,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BRVO.V",
+      "longName": "Bravo Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.36911849044116957,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SVRS.V",
+      "longName": "Silver Storm Mining Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.36734609282120956,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KRY.V",
+      "longName": "Koryx Copper S.A.",
+      "sector": "Materials",
+      "marketCap": 0.35961067065576513,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SIG.V",
+      "longName": "Sitka Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.35955904124530025,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BRC.V",
+      "longName": "Blackrock Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.3576933288357019,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NEXG.V",
+      "longName": "NeXGold Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.332983869534529,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DBG.V",
+      "longName": "Doubleview Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.33164789555988544,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SM.V",
+      "longName": "Sierra Madre Gold and Silver Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.3312317842558202,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ALV.V",
+      "longName": "Alvopetro Energy Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.32430543499365977,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PGLD.V",
+      "longName": "P2 Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.3234833950735718,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CAD.V",
+      "longName": "Colonial Coal International Corp.",
+      "sector": "Materials",
+      "marketCap": 0.3222565402689657,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TUD.V",
+      "longName": "Tudor Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.3211639696629185,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "UCU.V",
+      "longName": "Ucore Rare Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.31756019968808646,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SASK.V",
+      "longName": "Atha Energy Corp.",
+      "sector": "Energy",
+      "marketCap": 0.3104953234406828,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TNGD.V",
+      "longName": "Tiernan Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.30759023436309196,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ECU.V",
+      "longName": "Element 29 Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.3057522591714424,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PALI.V",
+      "longName": "Palisades Goldcorp Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.3038691513364384,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CNC.V",
+      "longName": "Canada Nickel Company Inc.",
+      "sector": "Materials",
+      "marketCap": 0.3002424703135109,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CERT.V",
+      "longName": "Cerrado Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.3001852987629397,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LA.V",
+      "longName": "Los Andes Copper Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.29800214635710354,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CAMB.V",
+      "longName": "Cambria Gold Mines Inc.",
+      "sector": "Materials",
+      "marketCap": 0.2965731227669893,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MMY.V",
+      "longName": "Monument Mining Limited",
+      "sector": "Materials",
+      "marketCap": 0.292638521500447,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GSVR.V",
+      "longName": "Guanajuato Silver Company Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.2831542756985574,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PCU.V",
+      "longName": "Pecoy Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.2794911332275616,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WRLG.V",
+      "longName": "West Red Lake Gold Mines Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.2782182707048473,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PNPN.V",
+      "longName": "Power Metallic Mines Inc.",
+      "sector": "Materials",
+      "marketCap": 0.2780199204273551,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ANDC.V",
+      "longName": "Andina Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.2750006208357056,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CGNT.V",
+      "longName": "Copper Giant Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.2741100864280826,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HCH.V",
+      "longName": "Hot Chili Limited",
+      "sector": "Materials",
+      "marketCap": 0.26902139414857035,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HITI.V",
+      "longName": "High Tide Inc.",
+      "sector": "Healthcare",
+      "marketCap": 0.2651923852356342,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MKA.V",
+      "longName": "Mkango Resources Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.2610742834449949,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HHH.V",
+      "longName": "Helius Minerals Limited",
+      "sector": "Materials",
+      "marketCap": 0.25487355677552115,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GOT.V",
+      "longName": "Goliath Resources Limited",
+      "sector": "Materials",
+      "marketCap": 0.2541614580653907,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OGN.V",
+      "longName": "Orogen Royalties Inc.",
+      "sector": "Materials",
+      "marketCap": 0.25389034399626237,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GMG.V",
+      "longName": "Graphene Manufacturing Group Ltd",
+      "sector": "Materials",
+      "marketCap": 0.251036460050468,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CAPT.V",
+      "longName": "Capitan Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.24757063367771004,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TECT.V",
+      "longName": "Tectonic Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.24627093552921742,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AUMB.V",
+      "longName": "1911 Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.24614174267467973,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EM.V",
+      "longName": "Errington Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.24583764093908073,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MLP.V",
+      "longName": "Millennial Potash Corp.",
+      "sector": "Materials",
+      "marketCap": 0.24489913652450804,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LUCA.V",
+      "longName": "Luca Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.23719190237309762,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RVG.V",
+      "longName": "Revival Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.23426851627793063,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PLSR.V",
+      "longName": "Pulsar Helium Inc.",
+      "sector": "Materials",
+      "marketCap": 0.23084188264716915,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EOG.V",
+      "longName": "Eco (Atlantic) Oil & Gas Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.2289365797343227,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MFG.V",
+      "longName": "Mayfair Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.22754963928463362,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SCMI.V",
+      "longName": "Selkirk Copper Mines Inc.",
+      "sector": "Materials",
+      "marketCap": 0.2247731861958282,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CKG.V",
+      "longName": "Chesapeake Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.22172034207195573,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SFR.V",
+      "longName": "Sandfire Resources America Inc.",
+      "sector": "Materials",
+      "marketCap": 0.2204854524900662,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AGX.V",
+      "longName": "Silver X Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.21610907106001856,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "APGO.V",
+      "longName": "Apollo Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.21571349749524724,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LCX.V",
+      "longName": "Lycos Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.2141541673190907,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LRA.V",
+      "longName": "Lara Exploration Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.21166626350094447,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GQC.V",
+      "longName": "Goldquest Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.2102500478231336,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GLAD.V",
+      "longName": "Gladiator Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.2083291128930971,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MOG.V",
+      "longName": "Mogotes Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.20819352934111612,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SSV.V",
+      "longName": "Southern Silver Exploration Corp.",
+      "sector": "Materials",
+      "marketCap": 0.20704057857706765,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CVW.V",
+      "longName": "CVW Sustainable Royalties Inc.",
+      "sector": "Materials",
+      "marketCap": 0.20606738938135058,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MACK.V",
+      "longName": "Mackay Gold & Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.20590823184585486,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RECO.V",
+      "longName": "Reconnaissance Energy Africa Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.20337031617966717,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EU.V",
+      "longName": "enCore Energy Corp.",
+      "sector": "Energy",
+      "marketCap": 0.20124334092127316,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AURO.V",
+      "longName": "Auro Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.19776770310430772,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LIB.V",
+      "longName": "LibertyStream Infrastructure Partners Inc.",
+      "sector": "Materials",
+      "marketCap": 0.19761064044473736,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ZNG.V",
+      "longName": "Group Eleven Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19753513210046475,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AHR.V",
+      "longName": "Amarc Resources Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.19738931282560784,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AXO.V",
+      "longName": "Axo Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19712193771224507,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LGC.V",
+      "longName": "Lavras Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19498809444290577,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AMT.V",
+      "longName": "AmeriTrust Financial Technologies Inc.",
+      "sector": "Technology",
+      "marketCap": 0.1947100460692902,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KCP.V",
+      "longName": "King Copper Discovery Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19351100803488322,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PGDC.V",
+      "longName": "Patagonia Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19268797371166613,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AAG.V",
+      "longName": "Aftermath Silver Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.1925074563969565,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KTO.V",
+      "longName": "K2 Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.19203796553291916,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PPX.V",
+      "longName": "PPX Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.19092012382868342,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AE.V",
+      "longName": "American Eagle Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.18949232003974098,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SCOT.V",
+      "longName": "Scottie Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.18867716138930665,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SUGR.V",
+      "longName": "Sucro Limited",
+      "sector": "Consumer Staples",
+      "marketCap": 0.18555161976733997,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SURG.V",
+      "longName": "Surge Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.18375472005427804,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ARK.V",
+      "longName": "Arras Minerals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.18250997925205584,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HME.V",
+      "longName": "Hemisphere Energy Corporation",
+      "sector": "Energy",
+      "marketCap": 0.18197805313021695,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NILI.V",
+      "longName": "Surge Battery Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.1810769382732999,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GG.V",
+      "longName": "Golconda Gold Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.1804627418659103,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CYG.V",
+      "longName": "Cygnus Metals Limited",
+      "sector": "Materials",
+      "marketCap": 0.17914544941138613,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MGM.V",
+      "longName": "Maple Gold Mines Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.17789594873285244,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LIFT.V",
+      "longName": "Li-FT Power Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.17648483765777115,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SEI.V",
+      "longName": "Sintana Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.17647701501982194,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NRC.V",
+      "longName": "Nations Royalty Corp.",
+      "sector": "Materials",
+      "marketCap": 0.17237071347964836,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FEO.V",
+      "longName": "Oceanic Iron Ore Corp.",
+      "sector": "Materials",
+      "marketCap": 0.16903061943853873,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NAU.V",
+      "longName": "Nevgold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.16836356056080412,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FPC.V",
+      "longName": "Falco Resources Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.16818076274825167,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WPG.V",
+      "longName": "West Point Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.16810248333392586,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AXL.V",
+      "longName": "Arrow Exploration Corp.",
+      "sector": "Energy",
+      "marketCap": 0.16582089827701335,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BMM.V",
+      "longName": "Black Mammoth Metals Corporation",
+      "sector": "Materials",
+      "marketCap": 0.1647139419723646,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GSI.V",
+      "longName": "Gatekeeper Systems Inc.",
+      "sector": "Industrials",
+      "marketCap": 0.1590542103812674,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SPA.V",
+      "longName": "Spanish Mountain Gold Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.1555608721886033,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SALT.V",
+      "longName": "Atlas Salt Inc.",
+      "sector": "Materials",
+      "marketCap": 0.15451673564429932,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GPH.V",
+      "longName": "Graphite One Inc.",
+      "sector": "Materials",
+      "marketCap": 0.1541169855863856,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "B.V",
+      "longName": "BCM Resources Corporation",
+      "sector": "Materials",
+      "marketCap": 0.1531092441966081,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GRSL.V",
+      "longName": "GR Silver Mining Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.15278746860272718,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TUF.V",
+      "longName": "Honey Badger Silver Inc.",
+      "sector": "Materials",
+      "marketCap": 0.15026464134668566,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KLD.V",
+      "longName": "Kenorland Minerals Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.1498762009670273,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RX.V",
+      "longName": "BioSyent Inc.",
+      "sector": "Healthcare",
+      "marketCap": 0.14741029334609768,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WI.V",
+      "longName": "The Western Investment Company of Canada Limited",
+      "sector": "Finance",
+      "marketCap": 0.1467455017074975,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KFR.V",
+      "longName": "Kingfisher Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.1424749910639322,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BLU.V",
+      "longName": "BluEnergies Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.14237183831266953,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ROCK.V",
+      "longName": "Trident Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.1418412910965031,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MGG.V",
+      "longName": "Minaurum Silver Inc.",
+      "sector": "Materials",
+      "marketCap": 0.14129101492225454,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NIM.V",
+      "longName": "Nicola Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.1388466659611646,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LG.V",
+      "longName": "Lahontan Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.1379381129688416,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NURS.V",
+      "longName": "Hydreight Technologies Inc.",
+      "sector": "Healthcare",
+      "marketCap": 0.13787518713882968,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EXN.V",
+      "longName": "Excellon Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.1371365312357971,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BOGO.V",
+      "longName": "Borealis Mining Company Limited",
+      "sector": "Materials",
+      "marketCap": 0.13698177559148636,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SUM.V",
+      "longName": "Summit Royalties Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.13648031798152432,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FLCN.V",
+      "longName": "Falcon Energy Materials plc",
+      "sector": "Materials",
+      "marketCap": 0.1359103526253188,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BRAU.V",
+      "longName": "Big Ridge Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.13394870020182117,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OCO.V",
+      "longName": "Oroco Resource Corp.",
+      "sector": "Materials",
+      "marketCap": 0.13370354668371753,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OMI.V",
+      "longName": "Orosur Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.13292023545083242,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DE.V",
+      "longName": "Decisive Dividend Corporation",
+      "sector": "Industrials",
+      "marketCap": 0.1324596544388322,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GHRT.V",
+      "longName": "Greenheart Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.13140061510629952,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LTC.V",
+      "longName": "Lotus Creek Exploration Inc.",
+      "sector": "Energy",
+      "marketCap": 0.1266504972041964,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CTH.V",
+      "longName": "CoTec Holdings Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12571786639743984,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PGE.V",
+      "longName": "Stillwater Critical Minerals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12425719427040227,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ENA.V",
+      "longName": "Enablence Technologies Inc.",
+      "sector": "Technology",
+      "marketCap": 0.12415397522559769,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "IRR.V",
+      "longName": "Irruptive Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12344691482465493,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ONYX.V",
+      "longName": "Onyx Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12229841898662495,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SVE.V",
+      "longName": "Silver One Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.12140529913086616,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GGO.V",
+      "longName": "Galleon Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12138149974930879,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AGA.V",
+      "longName": "Silver47 Exploration Corp.",
+      "sector": "Materials",
+      "marketCap": 0.12103613691320472,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ECR.V",
+      "longName": "Cartier Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.12015872862688633,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FTZ.V",
+      "longName": "Fitzroy Minerals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.1187743338492079,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SOI.V",
+      "longName": "Sirios Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.11678857709385994,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PPP.V",
+      "longName": "Prospector Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.11665337804442225,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EMPR.V",
+      "longName": "Empress Royalty Corp.",
+      "sector": "Materials",
+      "marketCap": 0.11584165339946055,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "THM.V",
+      "longName": "Thunder Mountain Gold, Inc.",
+      "sector": "Materials",
+      "marketCap": 0.11424262665038881,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CANX.V",
+      "longName": "CANEX Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.11407678672586527,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NET-UN.V",
+      "longName": "Canadian Net Real Estate Investment Trust",
+      "sector": "Other",
+      "marketCap": 0.11127882801205363,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MMA.V",
+      "longName": "Midnight Sun Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.10998140373204965,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FMAN.V",
+      "longName": "Freeman Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.10706448125722207,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AGAG.V",
+      "longName": "Argenta Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.10706422271240848,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TDG.V",
+      "longName": "TDG Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.1067000988039347,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KTN.V",
+      "longName": "Kootenay Silver Inc.",
+      "sector": "Materials",
+      "marketCap": 0.10469178898561786,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EBM.V",
+      "longName": "Eastwood Bio-Medical Canada Inc.",
+      "sector": "Consumer Staples",
+      "marketCap": 0.10332146832689383,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "JUN-A.V",
+      "longName": "Juno International Corporation",
+      "sector": "Other",
+      "marketCap": 0.10307995432424283,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CENT.V",
+      "longName": "CENTAURI MINERALS INC",
+      "sector": "Materials",
+      "marketCap": 0.10191438789916264,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MMET.V",
+      "longName": "Miata Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.100434603343983,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PESO.V",
+      "longName": "PesoRama Inc.",
+      "sector": "Consumer Staples",
+      "marketCap": 0.10026734473766187,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BILD.V",
+      "longName": "BuildDirect.com Technologies Inc.",
+      "sector": "Consumer Discretionary",
+      "marketCap": 0.10016900489754425,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TUNG.V",
+      "longName": "American Tungsten Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09991693033366181,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SERV.V",
+      "longName": "Elevate Service Group Inc.",
+      "sector": "Industrials",
+      "marketCap": 0.09865411128255186,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DMGI.V",
+      "longName": "DMG Blockchain Solutions Inc.",
+      "sector": "Finance",
+      "marketCap": 0.09809108686018775,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HI.V",
+      "longName": "Highland Copper Company Inc.",
+      "sector": "Materials",
+      "marketCap": 0.09787420753772261,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "REVX.V",
+      "longName": "Rev Exploration Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09651432811185451,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "VCU.V",
+      "longName": "Vizsla Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09634690377167854,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AUUA.V",
+      "longName": "Aluula Composites Inc.",
+      "sector": "Consumer Discretionary",
+      "marketCap": 0.09607071824659157,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EMO.V",
+      "longName": "Emerita Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09586323271901968,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LI.V",
+      "longName": "American Lithium Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09533764425979055,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FAN.V",
+      "longName": "First Atlantic Nickel & Cobalt Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09528464257300746,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TPL.V",
+      "longName": "Tethys Petroleum Limited",
+      "sector": "Energy",
+      "marketCap": 0.09517867234621225,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LTH.V",
+      "longName": "Lithium Ionic Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09482852311637995,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AGLD.V",
+      "longName": "Austral Gold Limited",
+      "sector": "Materials",
+      "marketCap": 0.09411828725477815,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WVM.V",
+      "longName": "West Vault Mining Inc.",
+      "sector": "Materials",
+      "marketCap": 0.0938446076255766,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CAM.V",
+      "longName": "Cascadia Minerals Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.09352645165908578,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FL.V",
+      "longName": "Frontier Lithium Inc.",
+      "sector": "Materials",
+      "marketCap": 0.09343674323812909,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AZS.V",
+      "longName": "Arizona Gold & Silver Inc.",
+      "sector": "Materials",
+      "marketCap": 0.09325567568702132,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SPRQ.V",
+      "longName": "SPARQ Systems Inc.",
+      "sector": "Energy",
+      "marketCap": 0.09323517772385269,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EDG.V",
+      "longName": "Endurance Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.09286879983495283,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SGQ.V",
+      "longName": "SouthGobi Resources Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.09211884751237324,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NEXM.V",
+      "longName": "NexMetals Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09157566474711254,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MJS.V",
+      "longName": "Majestic Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09072251326779093,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ARIC.V",
+      "longName": "Awalé Resources Limited",
+      "sector": "Materials",
+      "marketCap": 0.09034725204427078,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "INTR.V",
+      "longName": "Intrepid Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.09020305696119149,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ZIGY.V",
+      "longName": "STARDUST METAL CORP",
+      "sector": "Materials",
+      "marketCap": 0.08920564410524863,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RET.V",
+      "longName": "Reitmans (Canada) Limited",
+      "sector": "Consumer Discretionary",
+      "marketCap": 0.08908911994657617,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NCAU.V",
+      "longName": "Newcore Gold Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.0889620882615058,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SHL.V",
+      "longName": "Homeland Nickel Inc.",
+      "sector": "Materials",
+      "marketCap": 0.08853143215433842,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HAN.V",
+      "longName": "Hannan Metals Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.08640410554017211,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FPX.V",
+      "longName": "FPX Nickel Corp.",
+      "sector": "Materials",
+      "marketCap": 0.08636771701499982,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NSE.V",
+      "longName": "New Stratus Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.0860100832442822,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RET-A.V",
+      "longName": "Reitmans (Canada) Limited",
+      "sector": "Other",
+      "marketCap": 0.08577417104592534,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SRL.V",
+      "longName": "Salazar Resources Limited",
+      "sector": "Materials",
+      "marketCap": 0.0856699841154084,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SOMA.V",
+      "longName": "Soma Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.08558909273553006,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "COV.V",
+      "longName": "Covalon Technologies Ltd.",
+      "sector": "Healthcare",
+      "marketCap": 0.08467912769076366,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SGLD.V",
+      "longName": "Scorpio Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.0846224069362776,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "MSR.V",
+      "longName": "Minsud Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.0841600227399365,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PTF.V",
+      "longName": "Pender Growth Fund Inc.",
+      "sector": "Finance",
+      "marketCap": 0.08411287477290694,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "IPT.V",
+      "longName": "IMPACT Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.08399724557705071,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SCD.V",
+      "longName": "Scandium Canada Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.08368302744695127,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AEC.V",
+      "longName": "Anfield Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.08348626158511151,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "YGT.V",
+      "longName": "Gold Terra Resource Corp.",
+      "sector": "Materials",
+      "marketCap": 0.08321616180717487,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NVRO.V",
+      "longName": "NVRO Metals Limited",
+      "sector": "Materials",
+      "marketCap": 0.08179128819278628,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NWST.V",
+      "longName": "NorthWest Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.08100637928554037,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PALS.V",
+      "longName": "Paragon Advanced Labs Inc.",
+      "sector": "Technology",
+      "marketCap": 0.08097241047464898,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ADY.V",
+      "longName": "Adyton Resources Corporation",
+      "sector": "Materials",
+      "marketCap": 0.08093031407551546,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "YARR.V",
+      "longName": "Pirate Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07983852573326315,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ZEN.V",
+      "longName": "Zentek Ltd.",
+      "sector": "Healthcare",
+      "marketCap": 0.07974354697572202,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LITH.V",
+      "longName": "Lithium Chile Inc.",
+      "sector": "Materials",
+      "marketCap": 0.07957888044689085,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "VMXX.V",
+      "longName": "Valhalla Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.0789048607472523,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TUO.V",
+      "longName": "Teuton Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07888584775942316,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WHN.V",
+      "longName": "Westhaven Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07810197966078573,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NKL.V",
+      "longName": "Nickel 28 Capital Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07630488769645216,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SYH.V",
+      "longName": "Skyharbour Resources Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.07605236896583868,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ANK.V",
+      "longName": "Angkor Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07515790335117846,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NKG.V",
+      "longName": "Nevada King Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07485387453847561,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ARGH.V",
+      "longName": "Argo Corporation",
+      "sector": "Industrials",
+      "marketCap": 0.07459894935228963,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ABI.V",
+      "longName": "Abcourt Mines Inc.",
+      "sector": "Materials",
+      "marketCap": 0.0741668613046163,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BUFF.V",
+      "longName": "Buffalo Potash Corp.",
+      "sector": "Materials",
+      "marketCap": 0.0736012845808874,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "BQE.V",
+      "longName": "BQE Water Inc.",
+      "sector": "Industrials",
+      "marketCap": 0.07330891017285804,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "XXIX.V",
+      "longName": "XXIX Metal Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07282734062547878,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TSG.V",
+      "longName": "TriStar Gold, Inc.",
+      "sector": "Materials",
+      "marketCap": 0.0720267997010428,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ALTA.V",
+      "longName": "Altamira Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.07129110711933506,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PGZ.V",
+      "longName": "Pan Global Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.07128336403363617,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GWM.V",
+      "longName": "Galway Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.0709350179881447,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ROS.V",
+      "longName": "Roscan Gold Corporation",
+      "sector": "Materials",
+      "marketCap": 0.07085981459416503,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CCCM.V",
+      "longName": "C3 Metals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.07062836395118091,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ELBM.V",
+      "longName": "Electra Battery Materials Corporation",
+      "sector": "Materials",
+      "marketCap": 0.06991657682069766,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "GLDC.V",
+      "longName": "Cassiar Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06959277927378753,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KDK.V",
+      "longName": "Kodiak Copper Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06952034032050687,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HAM.V",
+      "longName": "Highwood Asset Management Ltd.",
+      "sector": "Energy",
+      "marketCap": 0.06871409815146384,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OGO.V",
+      "longName": "Organto Foods Inc.",
+      "sector": "Consumer Staples",
+      "marketCap": 0.0683982823470036,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "JEV.V",
+      "longName": "Jericho Energy Ventures Inc.",
+      "sector": "Energy",
+      "marketCap": 0.06830620724659954,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "CRE.V",
+      "longName": "Critical Elements Lithium Corporation",
+      "sector": "Materials",
+      "marketCap": 0.06826086909326502,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "FUU.V",
+      "longName": "F3 Uranium Corp.",
+      "sector": "Energy",
+      "marketCap": 0.06806790848073276,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "ROK.V",
+      "longName": "ROK Resources Inc.",
+      "sector": "Energy",
+      "marketCap": 0.06800178730199924,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PWM.V",
+      "longName": "Power Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.0679679974836711,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RCK.V",
+      "longName": "Rock Tech Lithium Inc.",
+      "sector": "Materials",
+      "marketCap": 0.06720953307030608,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DMX.V",
+      "longName": "District Metals Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06719236304294295,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NDA.V",
+      "longName": "Neptune Digital Assets Corp.",
+      "sector": "Finance",
+      "marketCap": 0.06697063766256181,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OGW.V",
+      "longName": "Ongwe Minerals Inc.",
+      "sector": "Materials",
+      "marketCap": 0.06673870970607569,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "TIGR.V",
+      "longName": "Tiger Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06669781322005133,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "PCRX.V",
+      "longName": "PharmaCorp Rx Inc.",
+      "sector": "Healthcare",
+      "marketCap": 0.0661089542043922,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "KLDC.V",
+      "longName": "Kirkland Lake Discoveries Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06560345931772583,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "WAM.V",
+      "longName": "Alaska Silver Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06424401742923458,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "HEVI.V",
+      "longName": "Helium Evolution Incorporated",
+      "sector": "Energy",
+      "marketCap": 0.06287131020300062,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "RPX.V",
+      "longName": "RPX Gold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.06282829895298828,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "DAN.V",
+      "longName": "Arianne Phosphate Inc.",
+      "sector": "Materials",
+      "marketCap": 0.06256901165174246,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "SEVA.V",
+      "longName": "Seva Mining Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06241257215146637,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "COSA.V",
+      "longName": "Cosa Resources Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06229515302997767,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "UGD.V",
+      "longName": "Unigold Inc.",
+      "sector": "Materials",
+      "marketCap": 0.061766389110089484,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "EK.V",
+      "longName": "Everkind Wellness Inc.",
+      "sector": "Finance",
+      "marketCap": 0.06141431736754084,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "NXLV.V",
+      "longName": "NexLiving Communities Inc.",
+      "sector": "Real Estate",
+      "marketCap": 0.061301419465612635,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "OYL.V",
+      "longName": "CGX Energy Inc.",
+      "sector": "Energy",
+      "marketCap": 0.06031720565387055,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "LEGY.V",
+      "longName": "Legacy Gold Mines Ltd.",
+      "sector": "Materials",
+      "marketCap": 0.060262984165915724,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AUAU.V",
+      "longName": "A2 Gold Corp.",
+      "sector": "Materials",
+      "marketCap": 0.06019722760166288,
+      "currency": "CAD"
+    },
+    {
+      "symbol": "AAN.V",
+      "longName": "Aton Resources Inc.",
+      "sector": "Materials",
+      "marketCap": 0.059323545012401654,
+      "currency": "CAD"
+    }
+  ]
+}
