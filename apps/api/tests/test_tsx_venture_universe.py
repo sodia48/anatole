@@ -136,6 +136,16 @@ async def test_venture_sector_failure_keeps_other(monkeypatch) -> None:
     assert enriched[0].sector == "Other"
 
 
+def test_venture_fallback_directory_is_complete_and_sectorized() -> None:
+    rows, as_of = TSXVentureUniverseService._fallback_directory()
+    constituents = TSXVentureUniverseService._constituents(rows)
+
+    assert as_of == "2026-09-18"
+    assert len(constituents) >= 290
+    assert len({item.sector for item in constituents}) >= 8
+    assert sum(item.weight or 0 for item in constituents) == pytest.approx(100)
+
+
 def test_screener_accepts_venture_aliases() -> None:
     assert ScreenerService._normalize_universe("tsxv") == "tsxv"
     assert ScreenerService._normalize_universe("TSX Venture") == "tsxv"
