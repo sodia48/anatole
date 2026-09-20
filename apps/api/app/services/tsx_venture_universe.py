@@ -4,6 +4,7 @@ import asyncio
 import json
 from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 from time import monotonic
 from typing import Any
 
@@ -21,6 +22,11 @@ TSXV_UNIVERSE_SOURCE = (
 )
 TMX_MONEY_GRAPHQL_URL = "https://app-money.tmx.com/graphql"
 TMX_SECTOR_BATCH_SIZE = 100
+TSXV_FALLBACK_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "data"
+    / "tsx_venture_fallback.json"
+)
 
 TMX_SECTOR_NAMES = {
     "basic materials": "Materials",
@@ -63,6 +69,19 @@ class TSXVentureUniverseService:
         if not sector or sector.casefold() in {"other", "n/a", "unknown"}:
             return None
         return TMX_SECTOR_NAMES.get(sector.casefold(), sector)
+
+    @staticmethod
+    def _fallback_directory() -> tuple[list[dict[str, Any]], str | None]:
+        try:
+            payload = json.loads(TSXV_FALLBACK_PATH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return [], None
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            return [], None
+        valid_rows = [row for row in rows if isinstance(row, dict)]
+        as_of = str(payload.get("asOf") or "").strip() or None
+        return valid_rows, as_of
 
     async def _fetch_sector_batch(
         self,
@@ -222,17 +241,23 @@ class TSXVentureUniverseService:
                     else self._cache[1][:limit]
                 )
 
+            fallback_as_of: str | None = None
             directory = canadian_equity_directory_service.peek()
             if directory is None:
                 task = canadian_equity_directory_service.ensure_refresh()
                 if task is not None:
                     directory = await asyncio.shield(task)
             if directory is None:
-                if self._cache:
-                    return self._cache[1]
-                raise RuntimeError("TSX Venture directory unavailable")
+                fallback_rows, fallback_as_of = self._fallback_directory()
+                if not fallback_rows:
+                    if self._cache:
+                        return self._cache[1]
+                    raise RuntimeError("TSX Venture directory unavailable")
+                rows = fallback_rows
+            else:
+                rows = directory.rows
 
-            constituents = self._constituents(directory.rows)
+            constituents = self._constituents(rows)
             if len(constituents) < self.minimum_directory_size:
                 if self._cache:
                     return self._cache[1]
@@ -240,7 +265,10 @@ class TSXVentureUniverseService:
 
             constituents = await self._enrich_sectors(constituents)
 
-            self.as_of = datetime.now(UTC).date().isoformat()
+            self.as_of = (
+                fallback_as_of
+                or datetime.now(UTC).date().isoformat()
+            )
             self._cache = (monotonic(), constituents)
             return constituents if limit == TSXV_MAX_CONSTITUENTS else constituents[:limit]
 
