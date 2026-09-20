@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.resilience import shared_http_client
 from app.main import app
 from app.schemas.market import CockpitSnapshot, MarketBreadth
 from app.services.cockpit import cockpit_service
@@ -55,6 +57,83 @@ def test_venture_universe_excludes_non_venture_and_missing_caps() -> None:
 
     assert all(item.ticker.endswith(".V") for item in constituents)
     assert all(item.ticker != "EMPTY.V" for item in constituents)
+
+
+@pytest.mark.asyncio
+async def test_venture_sectors_are_enriched_in_one_batch(monkeypatch) -> None:
+    service = TSXVentureUniverseService()
+    constituents = service._constituents([
+        {
+            "symbol": "TOI.V",
+            "longName": "Topicus.com",
+            "marketCap": 2_000_000_000,
+        },
+        {
+            "symbol": "ARTG.V",
+            "longName": "Artemis Gold",
+            "marketCap": 1_000_000_000,
+        },
+    ])
+    calls = 0
+
+    async def request(method: str, url: str, **kwargs):
+        nonlocal calls
+        calls += 1
+        assert method == "POST"
+        assert "TOI" in kwargs["json"]["query"]
+        assert "ARTG" in kwargs["json"]["query"]
+        return SimpleNamespace(
+            json=lambda: {
+                "data": {
+                    "q0": {
+                        "symbol": "TOI",
+                        "sector": "Technology",
+                        "exchangeCode": "CDX",
+                    },
+                    "q1": {
+                        "symbol": "ARTG",
+                        "sector": "Basic Materials",
+                        "exchangeCode": "CDX",
+                    },
+                }
+            }
+        )
+
+    monkeypatch.setattr(shared_http_client, "request", request)
+
+    enriched = await service._enrich_sectors(constituents)
+    cached = await service._enrich_sectors(constituents)
+
+    assert calls == 1
+    assert [item.sector for item in enriched] == [
+        "Information Technology",
+        "Materials",
+    ]
+    assert [item.sector for item in cached] == [
+        "Information Technology",
+        "Materials",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_venture_sector_failure_keeps_other(monkeypatch) -> None:
+    service = TSXVentureUniverseService()
+    constituents = service._constituents([
+        {
+            "symbol": "TOI.V",
+            "longName": "Topicus.com",
+            "marketCap": 2_000_000_000,
+        }
+    ])
+
+    async def request(*args, **kwargs):
+        raise RuntimeError("TMX unavailable")
+
+    monkeypatch.setattr(shared_http_client, "request", request)
+
+    enriched = await service._enrich_sectors(constituents)
+
+    assert enriched[0].sector == "Other"
 
 
 def test_screener_accepts_venture_aliases() -> None:
