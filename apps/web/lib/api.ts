@@ -347,18 +347,37 @@ export function getHealthStatus(
 
 export type CockpitUniverse = "tsx60" | "composite" | "tsxv";
 
-export function getCockpitSnapshot(
+function cockpitSnapshotMatchesUniverse(
+  snapshot: CockpitSnapshot,
+  universe: CockpitUniverse,
+): boolean {
+  const label = snapshot.universe.trim().toLowerCase();
+
+  if (universe === "tsxv") return label.includes("tsx venture");
+  if (universe === "composite") return label.includes("composite");
+  return label.includes("tsx 60") && !label.includes("composite");
+}
+
+export async function getCockpitSnapshot(
   universe: CockpitUniverse = "tsx60",
   signal?: AbortSignal,
 ): Promise<CockpitSnapshot> {
   const timeoutMs = universe === "tsx60" ? 30_000 : 95_000;
 
-  return apiRequest<CockpitSnapshot>(
+  const snapshot = await apiRequest<CockpitSnapshot>(
     `/api/v1/market/cockpit?universe=${encodeURIComponent(universe)}`,
     {},
     signal,
     timeoutMs,
   );
+
+  if (!cockpitSnapshotMatchesUniverse(snapshot, universe)) {
+    throw new Error(
+      `Réponse de marché incohérente pour l’univers ${universe}`,
+    );
+  }
+
+  return snapshot;
 }
 
 export function getWatchlistSnapshot(
