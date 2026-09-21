@@ -128,6 +128,23 @@ function dedupeNewsItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
   });
 }
 
+function provinceFirstItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
+  const newestFirst = (left: NewsDisplayItem, right: NewsDisplayItem) =>
+    Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "");
+  const direct = items.filter((item) => !isStatCan(item.source)).sort(newestFirst);
+  const statcan = items.filter((item) => isStatCan(item.source)).sort(newestFirst);
+
+  // StatCan is a resilience layer, not the main provincial feed. Once a direct
+  // provincial source is available, it must remain at least as prominent as
+  // the federal complement. If no direct source responds, retain a small,
+  // transparent StatCan fallback rather than showing an empty screen.
+  const statcanLimit = direct.length > 0
+    ? Math.min(direct.length, 6)
+    : 6;
+
+  return [...direct, ...statcan.slice(0, statcanLimit)];
+}
+
 export function NewsClient() {
   const { preferences } =
     usePreferences();
@@ -316,9 +333,8 @@ export function NewsClient() {
           region: regionLabel(region, language),
         }));
 
-      return dedupeNewsItems([...directItems, ...officialFallback]).sort(
-        (left, right) =>
-          Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? ""),
+      return provinceFirstItems(
+        dedupeNewsItems([...directItems, ...officialFallback]),
       );
     }
 
