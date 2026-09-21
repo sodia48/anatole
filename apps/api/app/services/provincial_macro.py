@@ -11,7 +11,7 @@ from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from time import monotonic
 from typing import Any, Iterable
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -23,7 +23,11 @@ from app.schemas.provincial_macro import (
     ProvincialMacroSnapshot,
     ProvincialMacroSource,
 )
-from app.services.news import PROVINCIAL_RSS_FEEDS, news_service
+from app.services.news import (
+    PROVINCIAL_HTML_FEEDS,
+    PROVINCIAL_RSS_FEEDS,
+    news_service,
+)
 
 TORONTO = ZoneInfo("America/Toronto")
 
@@ -1442,7 +1446,32 @@ def _dedupe_releases(items: list[ProvincialMacroRelease]) -> list[ProvincialMacr
     output: list[ProvincialMacroRelease] = []
     for item in items:
         key = _norm(f"{item.source}|{item.title}")
-        canonical_url = item.source_url.split("?", 1)[0].rstrip("/").casefold()
+        split_url = urlsplit(item.source_url)
+        query = urlencode(
+            sorted(
+                (key, value)
+                for key, value in parse_qsl(split_url.query, keep_blank_values=True)
+                if key.casefold()
+                not in {
+                    "utm_source",
+                    "utm_medium",
+                    "utm_campaign",
+                    "utm_term",
+                    "utm_content",
+                    "fbclid",
+                    "gclid",
+                }
+            )
+        )
+        canonical_url = urlunsplit(
+            (
+                split_url.scheme.casefold(),
+                split_url.netloc.casefold(),
+                split_url.path.rstrip("/").casefold(),
+                query,
+                "",
+            )
+        )
         if key in seen or (canonical_url and canonical_url in seen_urls):
             continue
         seen.add(key)
@@ -1457,6 +1486,22 @@ def _dedupe_releases(items: list[ProvincialMacroRelease]) -> list[ProvincialMacr
         reverse=True,
     )
     return output
+
+
+def _province_first_releases(
+    items: list[ProvincialMacroRelease],
+    *,
+    statcan_fallback_limit: int = 6,
+) -> list[ProvincialMacroRelease]:
+    """Keep direct provincial publications dominant over the federal relay."""
+    direct = [item for item in items if not _is_statcan_source(item.source)]
+    statcan = [item for item in items if _is_statcan_source(item.source)]
+    statcan_limit = (
+        min(len(direct), statcan_fallback_limit)
+        if direct
+        else statcan_fallback_limit
+    )
+    return direct + statcan[:statcan_limit]
 
 
 def _canonical_release_source(source: ProvincialMacroSource) -> str:
@@ -1542,7 +1587,10 @@ def _is_statcan_source(source: str) -> bool:
 def _direct_news_sources(region: str) -> set[str]:
     return {
         source_name
-        for source_region, source_name, _, _ in PROVINCIAL_RSS_FEEDS
+        for source_region, source_name, _, _ in (
+            *PROVINCIAL_RSS_FEEDS,
+            *PROVINCIAL_HTML_FEEDS,
+        )
         if source_region == region
     }
 
@@ -1578,7 +1626,14 @@ def _news_items_to_releases(
             continue
 
         category, score = classify_macro(f"{item.title} {item.summary}")
-        if category is None or (is_direct and score < 84):
+        if is_direct:
+            # Direct government feeds already passed the provincial economic
+            # classifier. Preserve policy, investment, energy and workforce
+            # releases even when the generic macro classifier assigns a weak
+            # statistical score. The original feed category is authoritative.
+            category = item.category
+            score = max(score, 88)
+        if category is None:
             continue
 
         source_kind = "statcan" if is_statcan else (
@@ -2423,7 +2478,7 @@ class ProvincialMacroService:
 
             # Province-direct events take precedence on identical dates/categories.
             events = _dedupe_events(direct_events + statcan_events)
-            releases = _dedupe_releases(releases)
+            releases = _province_first_releases(_dedupe_releases(releases))
 
             message = None
             if not releases:

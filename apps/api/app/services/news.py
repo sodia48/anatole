@@ -170,6 +170,18 @@ PROVINCIAL_RSS_FEEDS = (
         ("fr",),
     ),
     (
+        "ON",
+        "Gouvernement de l’Ontario",
+        "https://news.ontario.ca/newsroom/fr/rss/allnews.rss",
+        ("fr",),
+    ),
+    (
+        "ON",
+        "Government of Ontario",
+        "https://news.ontario.ca/newsroom/en/rss/allnews.rss",
+        ("en",),
+    ),
+    (
         "SK",
         "Gouvernement de la Saskatchewan",
         "https://www.saskatchewan.ca/Feeds/NewsFeed.ashx",
@@ -222,6 +234,18 @@ PROVINCIAL_RSS_FEEDS = (
         "Terre-Neuve-et-Labrador",
         "https://www.releases.gov.nl.ca/rss/all-gnl-releases.xml",
         ("en",),
+    ),
+)
+
+# A small number of official provincial newsrooms publish a stable HTML news
+# list but no usable RSS/Atom feed. They are parsed separately and subjected to
+# the same strict economic classifier as RSS sources.
+PROVINCIAL_HTML_FEEDS = (
+    (
+        "AB",
+        "Gouvernement de l’Alberta",
+        "https://www.alberta.ca/news",
+        ("fr", "en"),
     ),
 )
 
@@ -413,6 +437,49 @@ def _image_from_html(value: str) -> str | None:
     except (TypeError, ValueError):
         return None
     return parser.image_url
+
+
+_ALBERTA_NEWS_ITEM_PATTERN = re.compile(
+    r"<li[^>]*>.*?"
+    r"<div[^>]+class=[\"'][^\"']*goa-date[^\"']*[\"'][^>]*>(?P<date>.*?)</div>.*?"
+    r"<div[^>]+class=[\"'][^\"']*goa-title[^\"']*[\"'][^>]*>\s*"
+    r"<a[^>]+href=(?:[\"'](?P<quoted_url>[^\"']+)[\"']|(?P<plain_url>[^\s>]+))[^>]*>"
+    r"(?P<title>.*?)</a>.*?"
+    r"<div[^>]+class=[\"'][^\"']*goa-text[^\"']*[\"'][^>]*>(?P<summary>.*?)</div>.*?"
+    r"</li>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_alberta_news_entries(content: bytes) -> list[ParsedEntry]:
+    text = content.decode("utf-8", errors="replace")
+    entries: list[ParsedEntry] = []
+    for match in _ALBERTA_NEWS_ITEM_PATTERN.finditer(text):
+        title = _strip_html(match.group("title"))
+        summary = _strip_html(match.group("summary"))
+        url = html.unescape(
+            (match.group("quoted_url") or match.group("plain_url") or "").strip()
+        )
+        raw_date = _strip_html(match.group("date"))
+        if not title or not url or not raw_date:
+            continue
+        try:
+            published_at = datetime.strptime(raw_date, "%b %d, %Y").replace(tzinfo=UTC)
+        except ValueError:
+            published_at = _parse_datetime(
+                raw_date,
+                source="Gouvernement de l’Alberta",
+                title=title,
+            )
+        entries.append(
+            ParsedEntry(
+                title=title,
+                summary=summary,
+                url=url,
+                published_at=published_at,
+            )
+        )
+    return entries
 
 
 def _tag_namespace(tag: str) -> str:
@@ -683,7 +750,23 @@ def _classify_provincial(entry: ParsedEntry) -> str | None:
             if _normalise_text(keyword) in haystack
         )
     best = max(scores, key=scores.get)
-    return best if scores[best] > 0 else None
+    if scores[best] <= 0:
+        return None
+
+    title = _normalise_text(entry.title)
+    if re.search(
+        r"\b(week|statement|justice|violence|health|respiratory|education|fatality|"
+        r"athletes?|schools?|recovery)\b|parks? day|"
+        r"orders in council",
+        title,
+    ):
+        return None
+    title_has_economic_signal = re.search(
+        r"\b(energy|exports?|jobs?|workforce|housing|budget|economy|economic|"
+        r"trade|investment|minerals?|grid|business|manufacturing|gdp|pib|emploi)\b",
+        title,
+    )
+    return best if scores[best] >= 2 or title_has_economic_signal else None
 
 
 def _to_news_item(
@@ -1017,6 +1100,60 @@ class NewsService:
                 )
             ]
 
+    async def _fetch_provincial_html_feed(
+        self,
+        client: httpx.AsyncClient,
+        province: str,
+        source: str,
+        url: str,
+    ) -> tuple[list[NewsItem], list[FeedStatus]]:
+        source_label = f"{source} — Économie provinciale"
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
+            entries = _parse_alberta_news_entries(response.content)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "news_provincial_html_failed source=%r url=%r error=%r",
+                source_label,
+                url,
+                exc,
+            )
+            return [], [
+                FeedStatus(
+                    source=source_label,
+                    status="unavailable",
+                    detail="Source provinciale temporairement indisponible",
+                )
+            ]
+
+        items: list[NewsItem] = []
+        for entry in entries:
+            category = _classify_provincial(entry)
+            if category is None:
+                continue
+            items.append(
+                _to_news_item(
+                    entry,
+                    source=source,
+                    category=category,
+                    regions=province_region(province),
+                )
+            )
+
+        items = items[:12]
+        return items, [
+            FeedStatus(
+                source=source_label,
+                status="ok" if items else "unavailable",
+                detail=(
+                    f"{len(items)} éléments économiques"
+                    if items
+                    else "Aucune publication économique récente dans la source"
+                ),
+            )
+        ]
+
     @staticmethod
     async def _fetch_source_safe(
         source_label: str,
@@ -1269,6 +1406,21 @@ class NewsService:
                     ) in PROVINCIAL_RSS_FEEDS
                     if language in languages
                 ]
+                provincial_html_tasks = [
+                    self._fetch_provincial_html_feed(
+                        client,
+                        province,
+                        source,
+                        url,
+                    )
+                    for (
+                        province,
+                        source,
+                        url,
+                        languages,
+                    ) in PROVINCIAL_HTML_FEEDS
+                    if language in languages
+                ]
                 guarded_tasks = [
                     self._fetch_source_safe(
                         f"{source} — {category}",
@@ -1303,6 +1455,26 @@ class NewsService:
                             if language in feed[3]
                         ),
                         provincial_tasks,
+                        strict=True,
+                    )
+                )
+                guarded_tasks.extend(
+                    self._fetch_source_safe(
+                        f"{source} — Économie provinciale",
+                        task,
+                    )
+                    for (
+                        _province,
+                        source,
+                        _url,
+                        _languages,
+                    ), task in zip(
+                        (
+                            feed
+                            for feed in PROVINCIAL_HTML_FEEDS
+                            if language in feed[3]
+                        ),
+                        provincial_html_tasks,
                         strict=True,
                     )
                 )
