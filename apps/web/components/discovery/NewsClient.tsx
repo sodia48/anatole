@@ -39,6 +39,7 @@ import {
   type RegionCode,
 } from "@/lib/regions";
 import type {
+  NewsItem,
   NewsSnapshot,
 } from "@/lib/types";
 import {
@@ -60,6 +61,72 @@ type NewsDisplayItem = {
   importance: string | null;
   region: string;
 };
+
+const DIRECT_PROVINCIAL_MACRO_PATTERN = new RegExp(
+  [
+    "inflation",
+    "indice des prix",
+    "consumer price",
+    "emploi",
+    "chômage",
+    "population active",
+    "employment",
+    "unemployment",
+    "labour force",
+    "produit intérieur brut",
+    "gross domestic product",
+    "\\bpib\\b",
+    "\\bgdp\\b",
+    "commerce de détail",
+    "commerce de gros",
+    "retail trade",
+    "wholesale trade",
+    "exportations",
+    "importations",
+    "exports",
+    "imports",
+    "budget",
+    "déficit",
+    "excédent",
+    "comptes publics",
+    "fiscal",
+    "croissance économique",
+    "economic growth",
+    "mises en chantier",
+    "permis de bâtir",
+    "housing starts",
+    "building permits",
+  ].join("|"),
+  "i",
+);
+
+function hasPublishedDate(value: string | null): value is string {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return false;
+  const age = Date.now() - timestamp;
+  return age >= -86_400_000 && age <= 180 * 86_400_000;
+}
+
+function isStatCan(source: string): boolean {
+  return /statistique canada|statistics canada/i.test(source);
+}
+
+function isEssentialProvincialItem(item: NewsItem): boolean {
+  return isStatCan(item.source) ||
+    DIRECT_PROVINCIAL_MACRO_PATTERN.test(`${item.title} ${item.summary}`);
+}
+
+function dedupeNewsItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const canonicalUrl = item.url.split("?", 1)[0].replace(/\/+$/, "").toLowerCase();
+    const key = canonicalUrl || `${item.source}|${item.title}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function NewsClient() {
   const { preferences } =
@@ -129,30 +196,33 @@ export function NewsClient() {
         new AbortController();
 
       try {
-        const snapshot = provinceMode
-          ? await getProvincialMacroSnapshot(
-              region,
-              language,
-              controller.signal,
-            )
-          : await getNewsSnapshot(
-              language,
-              controller.signal,
+        if (provinceMode) {
+          const [provinceResult, newsResult] = await Promise.allSettled([
+            getProvincialMacroSnapshot(region, language, controller.signal),
+            getNewsSnapshot(language, controller.signal),
+          ]);
+
+          if (provinceResult.status === "rejected" && newsResult.status === "rejected") {
+            throw provinceResult.reason;
+          }
+
+          if (active && !controller.signal.aborted) {
+            setProvincialData(
+              provinceResult.status === "fulfilled" ? provinceResult.value : null,
             );
+            setData(newsResult.status === "fulfilled" ? newsResult.value : null);
+            setError(null);
+          }
+          return;
+        }
+
+        const snapshot = await getNewsSnapshot(language, controller.signal);
 
         if (
           active &&
           !controller.signal.aborted
         ) {
-          if (provinceMode) {
-            setProvincialData(
-              snapshot as ProvincialMacroSnapshot,
-            );
-          } else {
-            setData(
-              snapshot as NewsSnapshot,
-            );
-          }
+          setData(snapshot as NewsSnapshot);
           setError(null);
         }
       } catch {
@@ -203,20 +273,52 @@ export function NewsClient() {
 
   const items = useMemo<NewsDisplayItem[]>(() => {
     if (provinceMode) {
-      return (provincialData?.latest_releases ?? []).map(
-        (item) => ({
-          id: item.id,
+      const directItems = (provincialData?.latest_releases ?? [])
+        .filter(
+          (item) =>
+            item.source_kind !== "dashboard" &&
+            hasPublishedDate(item.published_at),
+        )
+        .map(
+          (item) => ({
+            id: item.id,
+            title: item.title,
+            summary: item.summary,
+            url: item.source_url,
+            source: item.source,
+            category: item.category,
+            publishedAt: item.published_at,
+            sentiment: null,
+            sentimentScore: null,
+            importance: item.importance,
+            region: item.province,
+          }),
+        );
+
+      const officialFallback = (data?.items ?? [])
+        .filter(
+          (item) =>
+            item.regions?.includes(region) &&
+            hasPublishedDate(item.published_at) &&
+            isEssentialProvincialItem(item),
+        )
+        .map((item) => ({
+          id: `official-${item.id}`,
           title: item.title,
           summary: item.summary,
-          url: item.source_url,
+          url: item.url,
           source: item.source,
           category: item.category,
           publishedAt: item.published_at,
           sentiment: null,
           sentimentScore: null,
-          importance: item.importance,
-          region: item.province,
-        }),
+          importance: null,
+          region: regionLabel(region, language),
+        }));
+
+      return dedupeNewsItems([...directItems, ...officialFallback]).sort(
+        (left, right) =>
+          Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? ""),
       );
     }
 
@@ -312,23 +414,24 @@ export function NewsClient() {
   ]);
 
   const activeData = provinceMode
-    ? provincialData
+    ? provincialData ?? data
     : data;
   const sourceStatuses = provinceMode
-    ? (provincialData?.sources ?? [])
-      .filter(
-        (item) =>
-          !item.key.startsWith("calendar-") &&
-          !item.key.startsWith("statcan-"),
-      )
-      .map(
-        (item) => ({
-          key: item.key,
-          label: item.label,
-          status: item.status,
-          detail: item.detail,
-        }),
-      )
+    ? Array.from(
+        items.reduce((grouped, item) => {
+          grouped.set(item.source, (grouped.get(item.source) ?? 0) + 1);
+          return grouped;
+        }, new Map<string, number>()),
+      ).map(([label, count]) => ({
+        key: `display-${label}`,
+        label,
+        status: "available",
+        detail: pick(
+          language,
+          `${count} publication${count === 1 ? "" : "s"} officielle${count === 1 ? "" : "s"} datée${count === 1 ? "" : "s"}.`,
+          `${count} dated official release${count === 1 ? "" : "s"}.`,
+        ),
+      }))
     : (data?.source_statuses ?? [])
         .filter((item) =>
           item.source.startsWith("Statistique Canada") ||
