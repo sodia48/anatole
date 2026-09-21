@@ -14,6 +14,9 @@ type Context = {
 };
 
 function publicCacheTtl(pathname: string): number {
+  // These responses change as background recovery finishes. Do not freeze a
+  // partial response at either the Next.js fetch cache or the CDN layer.
+  if (pathname.endsWith("/fundamentals")) return 0;
   if (pathname === "/health" || pathname.includes("/reliability/status")) {
     return 0;
   }

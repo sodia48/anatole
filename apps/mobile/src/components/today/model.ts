@@ -14,7 +14,13 @@ import type {
 } from "@/src/lib/api/types";
 
 export type TodayLanguage = "fr" | "en";
-export type TodayUniverse = "composite" | "tsx60";
+export type TodayUniverse = "composite" | "tsx60" | "tsxv";
+
+export function todayUniverseLabel(universe: TodayUniverse): string {
+  if (universe === "composite") return "S&P/TSX Composite";
+  if (universe === "tsxv") return "TSX Venture";
+  return "S&P/TSX 60";
+}
 export type TodayPhase = "pre_market" | "session" | "post_market" | "off_hours";
 export type TodayTone = "positive" | "negative" | "watch" | "neutral";
 
@@ -197,7 +203,7 @@ export function buildTodayMarketReading(input: {
   }
   const change = cockpit.weighted_change_percent;
   const tone: TodayTone = change > 0.05 ? "positive" : change < -0.05 ? "negative" : "neutral";
-  const label = universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60";
+  const label = todayUniverseLabel(universe);
   const directional = cockpit.breadth.advancers + cockpit.breadth.decliners;
   const participation = directional > 0 ? Math.round(cockpit.breadth.advancers / directional * 100) : null;
   const sorted = [...cockpit.sectors].sort((left, right) => right.change_percent - left.change_percent);

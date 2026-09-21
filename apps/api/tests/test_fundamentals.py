@@ -1,9 +1,10 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.core.resilience import RemoteCacheEntry
 from app.schemas.fundamentals import FinancialPeriod
+from app.core.resilience import RemoteCacheEntry
 from app.services.fundamentals import FundamentalsService, percent
 
 

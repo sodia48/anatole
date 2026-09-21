@@ -4,7 +4,7 @@ import { Card, QueryState } from "@/src/components/ui";
 import type { CockpitSnapshot, PsychologySnapshot, TerminalSnapshot } from "@/src/lib/api/types";
 import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
-import { buildTodayMarketReading, classifyTrailingSector, latestCockpitQuoteTime, type TodayUniverse } from "./model";
+import { buildTodayMarketReading, classifyTrailingSector, latestCockpitQuoteTime, todayUniverseLabel, type TodayUniverse } from "./model";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
@@ -61,10 +61,10 @@ export function TodayMarketBrief({
   const loadingLabel = pick("Chargement…", "Loading…");
   return <View style={styles.stack}>
     <Card title={pick("LE MARCHÉ EN 15 SECONDES", "THE MARKET IN 15 SECONDS")} testID="today-market-brief">
-      <View style={styles.segment}>{(["composite", "tsx60"] as TodayUniverse[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: universe === value }} key={value} onPress={() => onUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]} testID={`today-universe-${value}`}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "composite" ? "Composite" : "TSX 60"}</Text></Pressable>)}</View>
+      <View style={styles.segment}>{(["composite", "tsx60", "tsxv"] as TodayUniverse[]).map((value) => <Pressable accessibilityRole="tab" accessibilityState={{ selected: universe === value }} key={value} onPress={() => onUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]} testID={`today-universe-${value}`}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "composite" ? "Composite" : value === "tsxv" ? "Venture" : "TSX 60"}</Text></Pressable>)}</View>
       <QueryState error={!cockpit ? error : null} loading={!cockpit && loading} onRetry={onRetry} />
       {cockpit ? <>
-        <View style={styles.hero}><View><Text style={styles.marketName}>{universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"}</Text><Text style={styles.asOf}>{pick("Données marché", "Market data")} · {time(quoteTime, language)}{delayed ? ` · ${pick("Différé", "Delayed")}` : ""}</Text></View><Text style={[styles.change, { color: cockpit.weighted_change_percent >= 0 ? colors.positive : colors.negative }]}>{percentOrNd(cockpit.weighted_change_percent, language)}</Text></View>
+        <View style={styles.hero}><View><Text style={styles.marketName}>{todayUniverseLabel(universe)}</Text><Text style={styles.asOf}>{pick("Données marché", "Market data")} · {time(quoteTime, language)}{delayed ? ` · ${pick("Différé", "Delayed")}` : ""}</Text></View><Text style={[styles.change, { color: cockpit.weighted_change_percent >= 0 ? colors.positive : colors.negative }]}>{percentOrNd(cockpit.weighted_change_percent, language)}</Text></View>
         <View style={styles.grid}>
           <Metric label={pick("Largeur", "Breadth")} value={`${cockpit.breadth.advancers}↑ · ${cockpit.breadth.decliners}↓`} />
           <Metric label={pick("Ratio de hausse", "Advance ratio")} value={valueOrNd(cockpit.breadth.advance_ratio, 1, language) === "N/D" ? "N/D" : `${valueOrNd(cockpit.breadth.advance_ratio, 1, language)} %`} />

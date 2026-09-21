@@ -1521,6 +1521,8 @@ export function FocusFundamentals({
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let failures = 0;
+    let progressPolls = 0;
 
     async function load(): Promise<void> {
       setLoading(true);
@@ -1529,7 +1531,14 @@ export function FocusFundamentals({
         if (controller.signal.aborted) return;
         setSnapshot((old) => old?.ticker === value.ticker && old.status !== "unavailable" && value.status === "unavailable" ? old : value);
         setError(null);
-        if (value.refresh_in_progress) timer = setTimeout(() => void load(), 3_000);
+        failures = 0;
+        progressPolls = value.refresh_in_progress ? progressPolls + 1 : 0;
+        const refreshSeconds = Number.isFinite(value.refresh_after_seconds)
+          ? Math.max(30, Math.min(value.refresh_after_seconds, 1_800)) : 300;
+        const delay = value.refresh_in_progress
+          ? (progressPolls <= 15 ? 3_000 : 30_000)
+          : Math.min(refreshSeconds, value.stale || value.status === "unavailable" ? 300 : 1_800) * 1_000;
+        timer = setTimeout(() => void load(), delay);
       } catch {
         if (!controller.signal.aborted) {
           setError(
@@ -1539,6 +1548,8 @@ export function FocusFundamentals({
               "The fundamental data source is temporarily unavailable.",
             ),
           );
+          failures += 1;
+          timer = setTimeout(() => void load(), Math.min(30_000 * 2 ** Math.min(failures - 1, 4), 300_000));
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);

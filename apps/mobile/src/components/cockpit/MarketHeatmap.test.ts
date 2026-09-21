@@ -26,9 +26,55 @@ describe("shared market heatmap calculations", () => {
     expect(groupHeatmapTiles(rows, "direction", labels).map((group) => group.key)).toEqual(["gainers", "unchanged", "losers"]);
   });
 
-  it("uses the dense composite layout curve above 150 constituents", () => {
+  it("keeps exact market weight regardless of universe density", () => {
     const row = tile("RY", "Financials", 20, 1);
-    expect(layoutTileWeight(row, 200)).toBeLessThan(layoutTileWeight(row, 60));
+    expect(layoutTileWeight(row, 60)).toBe(20);
+    expect(layoutTileWeight(row, 200)).toBe(20);
+  });
+
+  it("makes sector and company areas proportional to their real market weights", () => {
+    const rows = [
+      tile("RY", "Financials", 6, 1),
+      tile("TD", "Financials", 4, -0.2),
+      tile("CNQ", "Energy", 3, 0.5),
+    ];
+    const groups = groupHeatmapTiles(rows, "sector", labels);
+    const financials = groups.find((group) => group.key === "Financials");
+    const energy = groups.find((group) => group.key === "Energy");
+
+    expect(financials?.layoutWeight).toBe(10);
+    expect(energy?.layoutWeight).toBe(3);
+
+    const sectorRects = binaryTreemap(
+      groups.map((group) => ({ item: group, weight: group.layoutWeight })),
+      { x: 0, y: 0, width: 130, height: 100 },
+    );
+    const financialRect = sectorRects.find(({ item }) => item.key === "Financials")?.rect;
+    const energyRect = sectorRects.find(({ item }) => item.key === "Energy")?.rect;
+
+    expect(financialRect).toBeDefined();
+    expect(energyRect).toBeDefined();
+
+    const financialArea = financialRect!.width * financialRect!.height;
+    const energyArea = energyRect!.width * energyRect!.height;
+    expect(financialArea / energyArea).toBeCloseTo(10 / 3, 5);
+
+    const companyRects = binaryTreemap(
+      financials!.tiles.map((company) => ({
+        item: company,
+        weight: layoutTileWeight(company, financials!.tiles.length),
+      })),
+      { x: 0, y: 0, width: 100, height: 100 },
+    );
+    const ryRect = companyRects.find(({ item }) => item.symbol === "RY")?.rect;
+    const tdRect = companyRects.find(({ item }) => item.symbol === "TD")?.rect;
+
+    expect(ryRect).toBeDefined();
+    expect(tdRect).toBeDefined();
+
+    const ryArea = ryRect!.width * ryRect!.height;
+    const tdArea = tdRect!.width * tdRect!.height;
+    expect(ryArea / tdArea).toBeCloseTo(6 / 4, 5);
   });
 
   it("keeps missing weight visible but never invents missing quote values", () => {

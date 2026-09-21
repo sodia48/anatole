@@ -101,10 +101,21 @@ export function marketWeight(tile: NormalizedHeatmapTile): number {
   return Math.max(tile.weight, 0.05);
 }
 
-export function layoutTileWeight(tile: NormalizedHeatmapTile, totalTiles: number): number {
-  const exponent = totalTiles > 150 ? 0.31 : totalTiles > 90 ? 0.4 : 0.58;
-  const floor = totalTiles > 150 ? 0.42 : totalTiles > 90 ? 0.32 : 0.22;
-  return Math.pow(Math.max(tile.weight, floor), exponent);
+/**
+ * Visual area contract shared by web and mobile market maps.
+ *
+ * A stock's rectangle is proportional to its actual index/holding weight.
+ * There is deliberately no exponent, density compression or visual floor:
+ * the sector rectangle is the sum of its members' real weights, then each
+ * company receives its real relative share inside that sector. The treemap
+ * algorithm itself keeps a microscopic fallback only for a true zero-weight
+ * item so missing weights never distort positive-weight constituents.
+ */
+export function layoutTileWeight(
+  tile: NormalizedHeatmapTile,
+  _totalTiles: number,
+): number {
+  return Math.max(tile.weight, 0);
 }
 
 export function weightedHeatmapChange(tiles: NormalizedHeatmapTile[]): number {

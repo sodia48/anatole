@@ -30,6 +30,8 @@ from app.services.yahoo_public import yahoo_public_service
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 MODULES = (
     "assetProfile",
     "price",
@@ -1041,7 +1043,9 @@ class FundamentalsService:
 
     @staticmethod
     def _retain_components(new: FundamentalSnapshot, old: FundamentalSnapshot | None) -> FundamentalSnapshot:
-        if old is None:
+        if old is None or old.ticker != new.ticker:
+            return new
+        if (datetime.now(UTC) - old.generated_at).total_seconds() >= FundamentalsService.stale_seconds:
             return new
         new = new.model_copy(deep=True)
         retained = False
@@ -1153,16 +1157,21 @@ class FundamentalsService:
     async def _deep_refresh(self, ticker: str, symbol: str, fast: FundamentalSnapshot, upstream_failed: bool) -> None:
         snapshot = fast.model_copy(deep=True)
         try:
-            if upstream_failed:
+            # A fast-path deadline must not permanently exclude market data.
+            # This separate budget leaves the statement enrichment budget intact.
+            if upstream_failed or any(getattr(snapshot.metrics, key) is None for key in (
+                "market_cap", "fifty_two_week_high", "average_volume_3m",
+            )):
                 try:
                     async with asyncio.timeout(self.market_retry_seconds):
-                        payload = await self._quote_fallback(symbol)
-                    if payload:
-                        recovered = self._snapshot(ticker, symbol, payload)
-                        snapshot = self._retain_components(recovered, snapshot)
-                        snapshot.refresh_in_progress = True
+                        payload = await self._request_summary(symbol)
+                    recovered = self._snapshot(ticker, symbol, payload)
+                    upstream_failed = not any(v is not None for v in recovered.metrics.model_dump().values())
+                    snapshot = self._retain_components(recovered, snapshot)
+                    snapshot.refresh_in_progress = True
                 except Exception as exc:
-                    self._report_failure(symbol, "background_market_fallback", exc)
+                    upstream_failed = True
+                    self._report_failure(symbol, "background_summary", exc)
             async with asyncio.timeout(self.deep_budget_seconds):
                 snapshot = await official_financials_service.enrich(
                     snapshot, upstream_failed=upstream_failed)

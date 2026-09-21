@@ -3,6 +3,7 @@ import {
   buildTodayAttention,
   buildTodayHeatmap,
   buildTodayMarketReading,
+  todayUniverseLabel,
   buildTodayTimeline,
   classifyTrailingSector,
   driverMove,
@@ -47,6 +48,10 @@ const terminal = {
 } as unknown as TerminalSnapshot;
 
 describe("Today intelligence model", () => {
+  it("labels the TSX Venture universe explicitly", () => {
+    expect(todayUniverseLabel("tsxv")).toBe("TSX Venture");
+  });
+
   it.each([
     ["2026-09-02T12:00:00Z", "pre_market"],
     ["2026-09-02T15:00:00Z", "session"],

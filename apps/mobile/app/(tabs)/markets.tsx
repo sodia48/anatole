@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { router, type Href, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, Modal, Pressable, Text, View } from "react-native";
+import { FlatList, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
 import { GlobalSearchButton } from "@/src/components/search/GlobalSearchButton";
@@ -16,6 +16,14 @@ import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
+
+type CockpitUniverse = "tsx60" | "composite" | "tsxv";
+
+function universeLabel(universe: CockpitUniverse) {
+  if (universe === "composite") return "TSX Composite";
+  if (universe === "tsxv") return "TSX Venture";
+  return "TSX 60";
+}
 
 const hubs = [
   { id: "cockpit", fr: "Cockpit", en: "Cockpit" },
@@ -80,18 +88,19 @@ export default function MarketsScreen() {
   const requestedDayOffset = first(params.dayOffset);
   const requestedTicker = first(params.ticker);
   const [hub, setHub] = useState<Hub>(isHub(requestedHub) ? requestedHub : "cockpit");
-  const [universe, setUniverse] = useState<"tsx60" | "composite">(requestedUniverse === "composite" ? "composite" : "tsx60");
+  const [universe, setUniverse] = useState<CockpitUniverse>(requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv" ? requestedUniverse : workspace.data.cockpit_universe);
   const [constituentsOpen, setConstituentsOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       if (isHub(requestedHub)) setHub((current) => current === requestedHub ? current : requestedHub);
-      if (requestedUniverse === "tsx60" || requestedUniverse === "composite") setUniverse((current) => current === requestedUniverse ? current : requestedUniverse);
+      if (requestedUniverse === "tsx60" || requestedUniverse === "composite" || requestedUniverse === "tsxv") setUniverse((current) => current === requestedUniverse ? current : requestedUniverse);
     }, 0);
     return () => clearTimeout(timer);
   }, [requestedHub, requestedUniverse]);
 
   const cockpit = useQuery({ queryKey: ["cockpit", universe], queryFn: ({ signal }) => marketApi.cockpit(universe, signal), enabled: hub === "cockpit", staleTime: 60_000 });
+  const bestSector = [...(cockpit.data?.sectors ?? [])].filter((item) => Number.isFinite(item.change_percent)).sort((a, b) => b.change_percent - a.change_percent)[0];
   const navigation = <MarketsNavigation hub={hub} onHub={setHub} />;
   if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} preferredRegions={workspace.data.preferences?.preferred_regions ?? []} />;
   if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialDayOffset={requestedDayOffset} initialKind={requestedKind} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
@@ -105,10 +114,40 @@ export default function MarketsScreen() {
   return <Screen onRefresh={hub === "cockpit" ? () => void cockpit.refetch() : undefined} refreshing={cockpit.isRefetching} testID="markets-screen">
     {navigation}
     {hub === "cockpit" ? <>
-      <View style={styles.segment}>{(["tsx60", "composite"] as const).map((value) => <Pressable accessibilityState={{ selected: universe === value }} key={value} onPress={() => setUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{value === "tsx60" ? "TSX 60" : "TSX Composite"}</Text></Pressable>)}</View>
+      <ScrollView horizontal contentContainerStyle={styles.marketTape} showsHorizontalScrollIndicator>
+        {(cockpit.data?.constituents ?? []).map((item) => (
+          <Pressable key={item.ticker} accessibilityRole="button" onPress={() => router.push({ pathname: "/focus/[ticker]", params: { ticker: item.ticker } })} style={[styles.marketTapeCard, { flexDirection: "row", alignItems: "center", gap: 8 }]}>
+            <Text style={styles.marketTapeValue}>{item.symbol}</Text>
+            <Text style={styles.marketTapeValue}>{Number.isFinite(item.price) && item.price > 0 ? `$${item.price.toFixed(2)}` : "—"}</Text>
+            <Text style={[styles.marketTapeChange, item.change_percent >= 0 ? styles.marketTapePositive : styles.marketTapeNegative]}>{Number.isFinite(item.change_percent) ? `${item.change_percent >= 0 ? "+" : ""}${item.change_percent.toFixed(2)}%` : "—"}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+      {cockpit.data ? <View style={styles.summaryGrid}>
+        {[
+          { label: `${universeLabel(universe)} ${pick("indicatif", "indicative")}`, value: `${cockpit.data.weighted_change_percent >= 0 ? "+" : ""}${cockpit.data.weighted_change_percent.toFixed(2)}%` },
+          { label: pick("Titres en hausse", "Advancing securities"), value: String(cockpit.data.breadth.advancers) },
+          { label: pick("Titres en baisse", "Declining securities"), value: String(cockpit.data.breadth.decliners) },
+          { label: pick("Meilleur secteur", "Best sector"), value: bestSector?.sector ?? "—", change: bestSector?.change_percent },
+          { label: pick("Mise à jour", "Updated"), value: new Date(cockpit.data.generated_at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Toronto" }) + " ET" },
+        ].map((item) => <View key={item.label} style={styles.summaryCard}>
+          <Text style={styles.summaryLabel}>{item.label}</Text>
+          <Text style={styles.summaryValue}>{item.value}</Text>
+          {item.change != null ? <Change value={item.change} /> : null}
+        </View>)}
+      </View> : null}
+
+      <View style={styles.marketViewHeading}>
+        <Text style={styles.marketViewLabel}>{pick("Vue du marché", "Market view")}</Text>
+        <Text style={styles.marketViewLive}>
+          ● {cockpit.isFetching ? pick("Actualisation", "Refreshing") : "Live"}
+        </Text>
+      </View>
+
+      <View style={styles.segment}>{(["tsx60", "composite", "tsxv"] as const).map((value) => <Pressable accessibilityState={{ selected: universe === value }} key={value} onPress={() => setUniverse(value)} style={[styles.segmentButton, universe === value && styles.segmentActive]}><Text style={[styles.segmentText, universe === value && styles.segmentTextActive]}>{universeLabel(value)}</Text></Pressable>)}</View>
       <QueryState error={!cockpit.data ? cockpit.error : null} loading={cockpit.isLoading} onRetry={() => void cockpit.refetch()} />
       {cockpit.data ? <>
-        <Card action={<Pressable onPress={() => setConstituentsOpen(true)} style={styles.link}><Text style={styles.linkText}>{pick("Voir les constituants", "View constituents")}</Text></Pressable>} title={pick("Carte du marché", "Market map")} testID="cockpit-heatmap"><MarketHeatmap initialSector={requestedSector ?? null} onAlert={() => router.push("/alerts")} onOpen={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })} onOpenSector={(selectedSector) => router.push({ pathname: "/screener", params: { universe, sector: selectedSector } } as Href)} onWatchlist={(ticker) => void addWatchlist(ticker)} tiles={cockpit.data.constituents} /></Card>
+        <Card action={<Pressable onPress={() => setConstituentsOpen(true)} style={styles.link}><Text style={styles.linkText}>{pick("Voir les constituants", "View constituents")}</Text></Pressable>} title={pick("Carte du marché", "Market map")} testID="cockpit-heatmap"><MarketHeatmap initialSector={requestedSector ?? null} onAlert={() => router.push("/alerts")} onOpen={(ticker) => router.push({ pathname: "/focus/[ticker]", params: { ticker } })} onOpenSector={(selectedSector) => router.push({ pathname: "/screener", params: { universe, sector: selectedSector } } as Href)} onWatchlist={(ticker) => void addWatchlist(ticker)} isRefreshing={cockpit.isFetching} tiles={cockpit.data.constituents} /></Card>
         <Card title={pick("Largeur du marché", "Market breadth")}><View style={styles.breadth}><View><Text style={styles.breadthValue}>{cockpit.data.breadth.advancers}</Text><Text style={styles.positive}>{pick("Hausses", "Advancers")}</Text></View><View><Text style={styles.breadthValue}>{cockpit.data.breadth.unchanged}</Text><Text style={styles.neutral}>{pick("Inchangés", "Unchanged")}</Text></View><View><Text style={styles.breadthValue}>{cockpit.data.breadth.decliners}</Text><Text style={styles.negative}>{pick("Baisses", "Decliners")}</Text></View><Change value={cockpit.data.weighted_change_percent} /></View></Card>
         <Card title={pick("Leaders", "Movers")}><Text style={styles.subhead}>{pick("Principales hausses", "Top gainers")}</Text>{cockpit.data.top_gainers.slice(0, 5).map((item) => <StockRow key={item.ticker} quote={item} />)}<Text style={styles.subhead}>{pick("Principales baisses", "Top losers")}</Text>{cockpit.data.top_losers.slice(0, 5).map((item) => <StockRow key={item.ticker} quote={item} />)}</Card>
         <ConstituentsModal items={cockpit.data.constituents} onClose={() => setConstituentsOpen(false)} visible={constituentsOpen} />
@@ -119,6 +158,20 @@ export default function MarketsScreen() {
 }
 
 const styles = createThemedStyles((colors) => ({
+  summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  summaryCard: { flexGrow: 1, flexBasis: "45%", padding: spacing.md, gap: spacing.sm, borderRadius: radius.lg, borderWidth: 1, borderColor: "#285065", backgroundColor: "#0c2637" },
+  summaryLabel: { ...typography.caption, color: "#b4cede" },
+  summaryValue: { ...typography.section, color: "#c4deee", fontWeight: "800" },
+  marketTape: { gap: spacing.xs, paddingVertical: spacing.xs, paddingRight: spacing.sm },
+  marketTapeCard: { minWidth: 118, gap: 2, paddingHorizontal: spacing.sm, paddingVertical: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised },
+  marketTapeLabel: { ...typography.caption, color: colors.textMuted, fontSize: 8, fontWeight: "800", textTransform: "uppercase" },
+  marketTapeValue: { ...typography.label, color: colors.text, fontWeight: "800" },
+  marketTapeChange: { ...typography.caption, fontWeight: "800" },
+  marketTapePositive: { color: colors.positive },
+  marketTapeNegative: { color: colors.negative },
+  marketViewHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing.xs },
+  marketViewLabel: { ...typography.caption, color: colors.textMuted, fontWeight: "800", textTransform: "uppercase" },
+  marketViewLive: { ...typography.caption, color: colors.positive, fontWeight: "800" },
   hubs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs }, hub: { minHeight: 44, flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceRaised }, hubActive: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.18)" }, hubText: { ...typography.caption, color: colors.textMuted, textAlign: "center" }, hubTextActive: { color: colors.text, fontWeight: "800" },
   segment: { flexDirection: "row", padding: spacing.xs, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }, segmentButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: radius.sm }, segmentActive: { backgroundColor: colors.primarySurfaceStrong }, segmentText: { ...typography.label, color: colors.textMuted }, segmentTextActive: { color: colors.onPrimary },
   link: { minHeight: 44, justifyContent: "center" }, linkText: { ...typography.caption, color: colors.primary, fontWeight: "800" }, breadth: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: spacing.md }, breadthValue: { ...typography.section, color: colors.text }, positive: { ...typography.caption, color: colors.positive }, negative: { ...typography.caption, color: colors.negative }, neutral: { ...typography.caption, color: colors.textMuted }, subhead: { ...typography.label, color: colors.primary, marginTop: spacing.sm, textTransform: "uppercase" }, coming: { ...typography.body, color: colors.textMuted },
