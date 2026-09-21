@@ -6,9 +6,11 @@ import {
   useState,
 } from "react";
 import {
+  BookOpen,
   ExternalLink,
   Newspaper,
   Search,
+  X,
 } from "lucide-react";
 
 import {
@@ -99,6 +101,8 @@ export function NewsClient() {
     useState("Tous");
   const [region, setRegion] =
     useState<RegionCode>("ALL");
+  const [selectedItem, setSelectedItem] =
+    useState<NewsDisplayItem | null>(null);
   const provinceMode =
     isProvinceRegion(region);
 
@@ -187,6 +191,15 @@ export function NewsClient() {
       window.clearInterval(timer);
     };
   }, [language, provinceMode, region]);
+
+  useEffect(() => {
+    if (!selectedItem) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedItem(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedItem]);
 
   const items = useMemo<NewsDisplayItem[]>(() => {
     if (provinceMode) {
@@ -302,7 +315,13 @@ export function NewsClient() {
     ? provincialData
     : data;
   const sourceStatuses = provinceMode
-    ? (provincialData?.sources ?? []).map(
+    ? (provincialData?.sources ?? [])
+      .filter(
+        (item) =>
+          !item.key.startsWith("calendar-") &&
+          !item.key.startsWith("statcan-"),
+      )
+      .map(
         (item) => ({
           key: item.key,
           label: item.label,
@@ -686,7 +705,7 @@ export function NewsClient() {
             <h2>{item.title}</h2>
 
             {item.summary ? (
-              <p>
+              <p className="news-card-summary">
                 {item.summary}
               </p>
             ) : null}
@@ -720,20 +739,29 @@ export function NewsClient() {
                 </span>
               ) : null}
 
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {pick(
-                  language,
-                  "Source officielle",
-                  "Official source",
-                )}
-                <ExternalLink
-                  size={14}
-                />
-              </a>
+              <div className="news-card-actions">
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(item)}
+                >
+                  <BookOpen size={14} />
+                  {pick(language, "Lire le résumé", "Read summary")}
+                </button>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {pick(
+                    language,
+                    "Source officielle",
+                    "Official source",
+                  )}
+                  <ExternalLink
+                    size={14}
+                  />
+                </a>
+              </div>
             </div>
           </article>
         ))}
@@ -751,6 +779,66 @@ export function NewsClient() {
           </div>
         ) : null}
       </section>
+
+      {selectedItem ? (
+        <div
+          className="news-reader-backdrop"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setSelectedItem(null);
+          }}
+        >
+          <section
+            className="panel news-reader"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="news-reader-title"
+          >
+            <header>
+              <div className="news-card-meta">
+                <span>{localizeSource(selectedItem.source, language)}</span>
+                <span>{selectedItem.region}</span>
+                <em>{localizeCategory(selectedItem.category, language)}</em>
+              </div>
+              <button
+                className="news-reader-close"
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                aria-label={pick(language, "Fermer le résumé", "Close summary")}
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="news-reader-content">
+              <p className="eyebrow">
+                {pick(language, "RÉSUMÉ DANS ANATOLE", "SUMMARY IN ANATOLE")}
+              </p>
+              <h2 id="news-reader-title">{selectedItem.title}</h2>
+              <p>{selectedItem.summary || pick(
+                language,
+                "Aucun résumé officiel n’est disponible pour cette publication.",
+                "No official summary is available for this publication.",
+              )}</p>
+            </div>
+
+            <footer>
+              {selectedItem.publishedAt ? (
+                <time dateTime={selectedItem.publishedAt}>
+                  {formatter.format(new Date(selectedItem.publishedAt))} ET
+                </time>
+              ) : <span />}
+              <a
+                href={selectedItem.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {pick(language, "Consulter la source officielle", "View official source")}
+                <ExternalLink size={15} />
+              </a>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
