@@ -432,6 +432,25 @@ export function PreferencesForm() {
               <Check size={17} />
             ) : null}
           </button>
+
+          <button
+            type="button"
+            className={`choice-card ${preferences.defaultUniverse === "tsxv" ? "is-selected" : ""}`}
+            onClick={() => updatePreferences({ defaultUniverse: "tsxv" })}
+          >
+            <span className="universe-logo">V</span>
+            <span>
+              <strong>TSX Venture</strong>
+              <small>
+                {pick(
+                  language,
+                  "Sociétés émergentes canadiennes",
+                  "Canadian growth companies",
+                )}
+              </small>
+            </span>
+            {preferences.defaultUniverse === "tsxv" ? <Check size={17} /> : null}
+          </button>
         </div>
       </section>
 

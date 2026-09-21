@@ -98,14 +98,14 @@ export type SyncedWorkspaceData = {
     density: "comfortable" | "compact";
     decimals: 2 | 3;
     default_range: "1m" | "3m" | "6m" | "1y" | "5y";
-    default_universe: "tsx60" | "composite";
+    default_universe: "tsx60" | "composite" | "tsxv";
     language: "fr" | "en";
     preferred_regions?: string[];
     preferred_sectors?: string[];
     onboarding_version?: number;
   };
   advisor_profile?: unknown;
-  cockpit_universe: "tsx60" | "composite";
+  cockpit_universe: "tsx60" | "composite" | "tsxv";
   comparator_symbols: string[];
   focus_layouts: unknown[];
   focus_scripts: unknown[];

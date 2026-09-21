@@ -31,7 +31,7 @@ async def screener(
             status_code=400,
             detail=(
                 "Univers invalide. Utilise "
-                "'composite' ou 'tsx60'."
+                "'composite', 'tsx60' ou 'tsxv'."
             ),
         ) from exc
 

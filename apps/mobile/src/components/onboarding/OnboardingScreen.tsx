@@ -59,7 +59,7 @@ export function OnboardingScreen() {
   const summary = useMemo(() => [
     draft.language.toUpperCase(),
     draft.theme === "dark" ? "Anatole Original" : pick("Anatole Ciel", "Anatole Sky"),
-    draft.universe === "composite" ? "TSX Composite" : "TSX 60",
+    draft.universe === "composite" ? "TSX Composite" : draft.universe === "tsxv" ? "TSX Venture" : "TSX 60",
     `${draft.symbols.length} ${pick("titres", "securities")}`,
     `${draft.sectors.length} ${pick("secteurs", "sectors")}`,
     `${draft.regions.length} ${pick("régions", "regions")}`,
@@ -83,7 +83,7 @@ export function OnboardingScreen() {
 
     {step === 0 ? <Card><View style={styles.wrap}><Choice label="Français" onPress={() => updateLanguage("fr")} selected={draft.language === "fr"} /><Choice label="English" onPress={() => updateLanguage("en")} selected={draft.language === "en"} /></View></Card> : null}
     {step === 1 ? <AppearanceChooser onSelect={updateTheme} selected={draft.theme} showHeading={false} /> : null}
-    {step === 2 ? <Card><Choice label="TSX Composite · recommandé" onPress={() => setDraft((current) => ({ ...current, universe: "composite" }))} selected={draft.universe === "composite"} /><Choice label="TSX 60" onPress={() => setDraft((current) => ({ ...current, universe: "tsx60" }))} selected={draft.universe === "tsx60"} /></Card> : null}
+    {step === 2 ? <Card><Choice label="TSX Composite · recommandé" onPress={() => setDraft((current) => ({ ...current, universe: "composite" }))} selected={draft.universe === "composite"} /><Choice label="TSX 60" onPress={() => setDraft((current) => ({ ...current, universe: "tsx60" }))} selected={draft.universe === "tsx60"} /><Choice label="TSX Venture · 300 principales capitalisations" onPress={() => setDraft((current) => ({ ...current, universe: "tsxv" }))} selected={draft.universe === "tsxv"} /></Card> : null}
     {step === 3 ? <Card><Field autoCapitalize="characters" label={pick("Rechercher", "Search")} onChangeText={setSearch} placeholder="RY · Royal Bank" value={search} /><Text style={styles.hint}>{draft.symbols.length}/5</Text><View style={styles.wrap}>{draft.symbols.map((symbol) => <Choice key={symbol} label={symbol} onPress={() => setDraft((current) => ({ ...current, symbols: toggle(current.symbols, symbol, 5) }))} selected />)}{results.data?.items.filter((item) => !draft.symbols.includes(item.symbol)).slice(0, 8).map((item) => <Choice key={item.symbol} label={`${item.symbol} · ${item.name}`} onPress={() => setDraft((current) => ({ ...current, symbols: toggle(current.symbols, item.symbol, 5) }))} selected={false} />)}</View></Card> : null}
     {step === 4 ? <Card><View style={styles.wrap}>{SECTORS.map((sector) => <Choice key={sector} label={sector} onPress={() => setDraft((current) => ({ ...current, sectors: toggle(current.sectors, sector) }))} selected={draft.sectors.includes(sector)} />)}</View></Card> : null}
     {step === 5 ? <Card><View style={styles.wrap}>{REGIONS.map((region) => <Choice key={region} label={region === "CA" ? "Canada" : region === "atlantic" ? pick("Atlantique", "Atlantic") : region === "prairies" ? "Prairies" : region} onPress={() => setDraft((current) => ({ ...current, regions: toggle(current.regions, region) }))} selected={draft.regions.includes(region)} />)}</View></Card> : null}

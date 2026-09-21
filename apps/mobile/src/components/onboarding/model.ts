@@ -5,7 +5,7 @@ export const ONBOARDING_STEP_COUNT = 8;
 export type OnboardingDraft = {
   language: "fr" | "en";
   theme: "dark" | "blue";
-  universe: "tsx60" | "composite";
+  universe: "tsx60" | "composite" | "tsxv";
   symbols: string[];
   sectors: string[];
   regions: string[];

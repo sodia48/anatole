@@ -16,7 +16,7 @@ export type SyncedPreferences = {
   density: "comfortable" | "compact";
   decimals: 2 | 3;
   default_range: "1m" | "3m" | "6m" | "1y" | "5y";
-  default_universe: "tsx60" | "composite";
+  default_universe: "tsx60" | "composite" | "tsxv";
   language: "fr" | "en";
 };
 
@@ -26,7 +26,7 @@ export type SyncedWorkspaceData = {
   alerts: AlertRule[];
   preferences: SyncedPreferences;
   advisor_profile: AdvisorProfile | null;
-  cockpit_universe: "tsx60" | "composite";
+  cockpit_universe: "tsx60" | "composite" | "tsxv";
   comparator_symbols: string[];
   focus_layouts: FocusLayout[];
   focus_scripts: FocusScript[];
@@ -238,7 +238,7 @@ function preferences(value: unknown): SyncedPreferences {
     default_range: ["1m", "3m", "6m", "1y", "5y"].includes(range ?? "")
       ? (range as SyncedPreferences["default_range"])
       : "1y",
-    default_universe: universe === "composite" ? "composite" : "tsx60",
+    default_universe: universe === "composite" || universe === "tsxv" ? universe : "tsx60",
     language: raw.language === "en" ? "en" : "fr",
   };
 }
@@ -273,7 +273,9 @@ export function readLocalWorkspace(): LocalWorkspaceSnapshot {
     Object.entries(KEYS).map(([key, storageKey]) => [key, window.localStorage.getItem(storageKey)]),
   ) as Record<keyof typeof KEYS, string | null>;
 
-  const universe = raw.cockpit_universe === "composite" ? "composite" : "tsx60";
+  const universe = raw.cockpit_universe === "composite" || raw.cockpit_universe === "tsxv"
+    ? raw.cockpit_universe
+    : "tsx60";
   return {
     data: {
       watchlist: symbols(parseJson(raw.watchlist, []), 30),

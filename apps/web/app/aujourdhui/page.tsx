@@ -89,6 +89,12 @@ function formatPercent(value: number | null | undefined): string {
   return `${sign}${value.toFixed(2)} %`;
 }
 
+function universeName(universe: CockpitUniverse): string {
+  if (universe === "composite") return "S&P/TSX Composite";
+  if (universe === "tsxv") return "TSX Venture";
+  return "S&P/TSX 60";
+}
+
 function terminalRegimeLabel(value: string, language: AnatoleLanguage): string {
   if (language === "fr") return value;
   return ({
@@ -288,6 +294,8 @@ export default function TodayPage() {
     preferences.language;
   const [workspace, setWorkspace] = useState<SyncedWorkspaceData>(() => emptyWorkspace());
   const [cockpit, setCockpit] = useState<CockpitSnapshot | null>(null);
+  const [cockpitUniverse, setCockpitUniverse] =
+    useState<CockpitUniverse | null>(null);
   const [watchlist, setWatchlist] = useState<WatchlistSnapshot | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [alerts, setAlerts] = useState<AlertSnapshot | null>(null);
@@ -408,6 +416,7 @@ export default function TodayPage() {
 
       if (mounted.current && !controller.signal.aborted) {
         setCockpit(value);
+        setCockpitUniverse(universe);
       }
     } catch (reason) {
       nextIssues.push({
@@ -660,37 +669,40 @@ export default function TodayPage() {
     return uniqueAttention(items);
   }, [alerts, language, news, terminal, watchlist]);
 
+  const activeCockpit =
+    cockpitUniverse === universe ? cockpit : null;
+
   const topSector = useMemo(
-    () => [...(cockpit?.sectors ?? [])].sort((a, b) => b.change_percent - a.change_percent)[0] ?? null,
-    [cockpit],
+    () => [...(activeCockpit?.sectors ?? [])].sort((a, b) => b.change_percent - a.change_percent)[0] ?? null,
+    [activeCockpit],
   );
   const weakSector = useMemo(
-    () => [...(cockpit?.sectors ?? [])].sort((a, b) => a.change_percent - b.change_percent)[0] ?? null,
-    [cockpit],
+    () => [...(activeCockpit?.sectors ?? [])].sort((a, b) => a.change_percent - b.change_percent)[0] ?? null,
+    [activeCockpit],
   );
 
   const marketReading = useMemo(() => {
-    if (!cockpit) return pick(language, "La lecture du marché sera disponible dès la première synchronisation.", "The market reading will be available after the first synchronization.");
-    const direction = cockpit.weighted_change_percent >= 0 ? pick(language, "progresse", "is up") : pick(language, "recule", "is down");
-    const participation = Math.round(normalizeAdvanceRatio(cockpit.breadth) * 100);
+    if (!activeCockpit) return pick(language, "La lecture du marché sera disponible dès la première synchronisation.", "The market reading will be available after the first synchronization.");
+    const direction = activeCockpit.weighted_change_percent >= 0 ? pick(language, "progresse", "is up") : pick(language, "recule", "is down");
+    const participation = Math.round(normalizeAdvanceRatio(activeCockpit.breadth) * 100);
     const sectorSentence = topSector && weakSector
       ? pick(language, `${topSector.sector} mène (${formatPercent(topSector.change_percent)}), tandis que ${weakSector.sector} ferme la marche (${formatPercent(weakSector.change_percent)}).`, `${topSector.sector} leads (${formatPercent(topSector.change_percent)}), while ${weakSector.sector} trails (${formatPercent(weakSector.change_percent)}).`)
       : pick(language, "Les données sectorielles se mettent à jour.", "Sector data is updating.");
     const regime = terminal?.regime && terminal.risk_level ? pick(language, ` Le régime Terminal est ${terminal.regime.toLowerCase()} avec un risque ${terminal.risk_level.toLowerCase()}.`, ` The Terminal regime is ${terminalRegimeLabel(terminal.regime, language).toLowerCase()} with ${terminalRiskLabel(terminal.risk_level, language).toLowerCase()} risk.`) : "";
-    return pick(language, `Le ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} de ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation} % des titres avancent. ${sectorSentence}${regime}`, `The ${universe === "composite" ? "S&P/TSX Composite" : "S&P/TSX 60"} ${direction} ${formatPercent(Math.abs(cockpit.weighted_change_percent))}. ${participation}% of securities are advancing. ${sectorSentence}${regime}`);
-  }, [cockpit, language, terminal, topSector, universe, weakSector]);
+    return pick(language, `Le ${universeName(universe)} ${direction} de ${formatPercent(Math.abs(activeCockpit.weighted_change_percent))}. ${participation} % des titres avancent. ${sectorSentence}${regime}`, `The ${universeName(universe)} ${direction} ${formatPercent(Math.abs(activeCockpit.weighted_change_percent))}. ${participation}% of securities are advancing. ${sectorSentence}${regime}`);
+  }, [activeCockpit, language, terminal, topSector, universe, weakSector]);
 
   const displayName = firstName(user?.display_name);
   const hasPersonalData = Boolean(workspace.watchlist.length || workspace.portfolio.length || workspace.alerts.length);
-  const marketChange = cockpit?.weighted_change_percent ?? 0;
-  const advanceRatio = normalizeAdvanceRatio(cockpit?.breadth);
-  const marketState = cockpit ? marketLabel(marketChange, advanceRatio, language) : pick(language, "Synchronisation du marché", "Synchronizing market");
+  const marketChange = activeCockpit?.weighted_change_percent ?? 0;
+  const advanceRatio = normalizeAdvanceRatio(activeCockpit?.breadth);
+  const marketState = activeCockpit ? marketLabel(marketChange, advanceRatio, language) : pick(language, "Synchronisation du marché", "Synchronizing market");
   const expectedSourceCount = 5
     + (workspace.watchlist.length ? 1 : 0)
     + (workspace.portfolio.length ? 1 : 0)
     + (workspace.alerts.length ? 1 : 0);
   const sourceCount =
-    Number(Boolean(cockpit))
+    Number(Boolean(activeCockpit))
     + Number(Boolean(terminal))
     + Number(Boolean(psychology))
     + Number(Boolean(news))
@@ -735,11 +747,7 @@ export default function TodayPage() {
             <span className={styles.eyebrow}>
               {pick(language, "LE MARCHÉ EN 30 SECONDES", "THE MARKET IN 30 SECONDS")}
             </span>
-            <h2>
-              {universe === "composite"
-                ? "S&P/TSX Composite"
-                : "S&P/TSX 60"}
-            </h2>
+            <h2>{universeName(universe)}</h2>
             <span
               className={
                 styles.universeCaption
@@ -747,7 +755,9 @@ export default function TodayPage() {
             >
               {universe === "composite"
                 ? pick(language, "Vue principale · marché canadien élargi", "Primary view · broad Canadian market")
-                : pick(language, "Vue concentrée · grandes capitalisations", "Focused view · large caps")}
+                : universe === "tsxv"
+                  ? pick(language, "Croissance canadienne · 300 principales capitalisations", "Canadian growth · 300 largest market caps")
+                  : pick(language, "Vue concentrée · grandes capitalisations", "Focused view · large caps")}
               {marketSwitching
                 ? pick(language, " · actualisation…", " · refreshing…")
                 : ""}
@@ -803,6 +813,15 @@ export default function TodayPage() {
               >
                 TSX 60
               </button>
+
+              <button
+                type="button"
+                className={universe === "tsxv" ? styles.universeActive : undefined}
+                aria-pressed={universe === "tsxv"}
+                onClick={() => selectUniverse("tsxv")}
+              >
+                Venture
+              </button>
             </div>
 
             <Link
@@ -821,20 +840,21 @@ export default function TodayPage() {
           <article className={`${styles.primaryMarketCard} ${marketChange >= 0 ? styles.positiveCard : styles.negativeCard}`}>
             <div>
               <span>{pick(language, "Variation pondérée", "Weighted change")}</span>
-              <strong>{cockpit ? formatPercent(marketChange) : "—"}</strong>
+              <strong>{activeCockpit ? formatPercent(marketChange) : "—"}</strong>
               <small>
                 {marketSwitching
-                  ? universe ===
-                    "composite"
+                  ? universe === "composite"
                     ? pick(language, "Chargement du marché canadien élargi…", "Loading the broad Canadian market…")
-                    : pick(language, "Chargement du TSX 60…", "Loading the TSX 60…")
+                    : universe === "tsxv"
+                      ? pick(language, "Chargement du TSX Venture…", "Loading TSX Venture…")
+                      : pick(language, "Chargement du TSX 60…", "Loading the TSX 60…")
                   : marketState}
               </small>
             </div>
             <dl>
-              <div><dt>{pick(language, "Progressions", "Advancers")}</dt><dd>{cockpit?.breadth.advancers ?? "—"}</dd></div>
-              <div><dt>{pick(language, "Baisses", "Decliners")}</dt><dd>{cockpit?.breadth.decliners ?? "—"}</dd></div>
-              <div><dt>{pick(language, "Ratio de hausse", "Advance ratio")}</dt><dd>{cockpit ? formatParticipation(advanceRatio) : "—"}</dd></div>
+              <div><dt>{pick(language, "Progressions", "Advancers")}</dt><dd>{activeCockpit?.breadth.advancers ?? "—"}</dd></div>
+              <div><dt>{pick(language, "Baisses", "Decliners")}</dt><dd>{activeCockpit?.breadth.decliners ?? "—"}</dd></div>
+              <div><dt>{pick(language, "Ratio de hausse", "Advance ratio")}</dt><dd>{activeCockpit ? formatParticipation(advanceRatio) : "—"}</dd></div>
             </dl>
           </article>
 
