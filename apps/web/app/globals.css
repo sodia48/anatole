@@ -457,7 +457,7 @@ html[data-density="compact"] .watchlist-page { gap: 11px; }
 .news-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; }
 .news-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .news-card-actions a, .news-card-actions button { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-size: 11px; }
-.news-card-actions button { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); padding: 8px 10px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
+.news-card-actions button { border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); color: var(--text); padding: 8px 10px; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700; }
 .news-card-actions button:hover { border-color: var(--blue); }
 .news-reader-backdrop { position: fixed; z-index: 120; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(5, 20, 34, .56); backdrop-filter: blur(6px); }
 .news-reader { width: min(720px, 100%); max-height: min(78vh, 760px); overflow: auto; padding: 24px; display: grid; gap: 20px; box-shadow: 0 28px 90px rgba(5, 20, 34, .28); }
