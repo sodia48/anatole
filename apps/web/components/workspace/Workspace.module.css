@@ -2521,3 +2521,33 @@
     flex-direction: column;
   }
 }
+
+
+/* Portfolio Performance Observatory -------------------------------------- */
+.portfolioObservatory {
+  min-height: 30px;
+  margin-top: -12px;
+  padding: 5px 9px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+.portfolioObservatory strong { color: var(--text); font-size: 9px; letter-spacing: .04em; text-transform: uppercase; }
+.portfolioObservatory span { white-space: nowrap; }
+.portfolioObservatory i { padding: 3px 7px; border-radius: 999px; background: var(--surface-raised); font-size: 8px; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.portfolioObservatory_instant i { color: var(--positive-text); }
+.portfolioObservatory_fast i { color: var(--accent-text); }
+.portfolioObservatory_slow i { color: var(--negative-text); }
+.portfolioObservatory_pending i { color: var(--muted); }
+@media (max-width: 680px) {
+  .portfolioObservatory { width: 100%; overflow-x: auto; border-radius: 12px; scrollbar-width: none; }
+  .portfolioObservatory::-webkit-scrollbar { display: none; }
+}
