@@ -95,6 +95,57 @@ class PortfolioContributor(BaseModel):
     kind: Literal["day", "unrealized"]
 
 
+PortfolioPerformanceRange = Literal["1w", "1m", "3m", "ytd", "1y", "max"]
+
+
+class PortfolioPerformanceWeight(BaseModel):
+    symbol: str
+    weight_percent: float = Field(gt=0, le=100)
+
+    @field_validator("symbol")
+    @classmethod
+    def normalize_symbol(cls, value: str) -> str:
+        symbol = value.strip().upper().removesuffix(".TO")
+        if not symbol or len(symbol) > 15:
+            raise ValueError("Symbole de portefeuille invalide.")
+        return symbol
+
+
+class PortfolioPerformanceRequest(BaseModel):
+    positions: list[PortfolioPerformanceWeight] = Field(min_length=1, max_length=30)
+    benchmark: str = "^GSPTSE"
+    range: PortfolioPerformanceRange = "1y"
+
+    @field_validator("benchmark")
+    @classmethod
+    def normalize_benchmark(cls, value: str) -> str:
+        return value.strip().upper() or "^GSPTSE"
+
+    @model_validator(mode="after")
+    def validate_weights(self) -> "PortfolioPerformanceRequest":
+        symbols = [item.symbol for item in self.positions]
+        if len(symbols) != len(set(symbols)):
+            raise ValueError("Les poids de performance doivent Ãªtre uniques par symbole.")
+        if sum(item.weight_percent for item in self.positions) <= 0:
+            raise ValueError("Le portefeuille doit avoir un poids positif.")
+        return self
+
+
+class PortfolioPerformanceView(BaseModel):
+    range: PortfolioPerformanceRange
+    range_label: str
+    benchmark: str
+    benchmark_name: str
+    points: list[PortfolioPerformancePoint]
+    portfolio_return_percent: float | None = None
+    benchmark_return_percent: float | None = None
+    excess_return_percent: float | None = None
+    coverage_percent: float = Field(ge=0, le=100)
+    methodology: str
+    generated_at: datetime
+    refresh_after_seconds: int = 300
+
+
 class PortfolioRisk(BaseModel):
     volatility_percent: float | None = None
     beta: float | None = None

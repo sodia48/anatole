@@ -2551,3 +2551,127 @@
   .portfolioObservatory { width: 100%; overflow-x: auto; border-radius: 12px; scrollbar-width: none; }
   .portfolioObservatory::-webkit-scrollbar { display: none; }
 }
+
+
+/* Portfolio 3.0 â€” performance / benchmark ------------------------------- */
+.performancePanelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+}
+
+.performancePanelHeader h2 { margin: 4px 0 0; }
+.performancePanelHeader p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.performanceBenchmarkControls {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.performanceBenchmarkControls label { display: grid; gap: 5px; }
+.performanceBenchmarkControls label > span {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.performanceBenchmarkControls select,
+.performanceCustomBenchmark input {
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-raised);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+}
+.performanceCustomBenchmark { display: flex; align-items: center; gap: 6px; }
+.performanceCustomBenchmark input { width: 145px; }
+
+.performanceRanges {
+  display: flex;
+  gap: 5px;
+  margin: 4px 0 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.performanceRanges::-webkit-scrollbar { display: none; }
+.performanceRanges button {
+  min-width: 46px;
+  min-height: 31px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+.performanceRanges button:hover,
+.performanceRanges .performanceRangeActive {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--accent-text);
+}
+
+.performanceSummary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 11px;
+}
+.performanceSummary > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+.performanceSummary span {
+  display: block;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.performanceSummary strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.performanceMethodology {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+  .performancePanelHeader { flex-direction: column; }
+  .performanceBenchmarkControls {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .performanceBenchmarkControls select { width: 100%; }
+  .performanceCustomBenchmark input { flex: 1; width: auto; }
+}
+
+@media (max-width: 620px) {
+  .performanceSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

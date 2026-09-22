@@ -677,6 +677,29 @@ export type PortfolioPerformancePoint = {
   benchmark: number | null;
 };
 
+export type PortfolioPerformanceRange =
+  | "1w"
+  | "1m"
+  | "3m"
+  | "ytd"
+  | "1y"
+  | "max";
+
+export type PortfolioPerformanceView = {
+  range: PortfolioPerformanceRange;
+  range_label: string;
+  benchmark: string;
+  benchmark_name: string;
+  points: PortfolioPerformancePoint[];
+  portfolio_return_percent: number | null;
+  benchmark_return_percent: number | null;
+  excess_return_percent: number | null;
+  coverage_percent: number;
+  methodology: string;
+  generated_at: string;
+  refresh_after_seconds: number;
+};
+
 export type PortfolioContributor = {
   symbol: string;
   name: string;

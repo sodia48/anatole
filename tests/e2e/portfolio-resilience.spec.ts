@@ -277,6 +277,79 @@ test.describe("Portfolio progressive degradation", () => {
     await expect(chart.locator("path").nth(1)).toHaveAttribute("d", "");
     await expect(page.getByText("La courbe du portefeuille reste disponible; l’historique du TSX Composite est temporairement indisponible.")).toBeVisible();
   });
+
+  test("switches performance benchmark on demand without slowing the default TSX view", async ({ page }) => {
+    let performanceCalls = 0;
+    let lastPerformanceBody: Record<string, unknown> | null = null;
+
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio/performance", async (route) => {
+      performanceCalls += 1;
+      lastPerformanceBody = route.request().postDataJSON() as Record<string, unknown>;
+      const points = Array.from({ length: 25 }, (_, index) => ({
+        time: 1_777_000_000 + index * 86_400,
+        portfolio: 100 + index * 0.3,
+        benchmark: 100 + index * 0.2,
+      }));
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          range: "1y",
+          range_label: "1 an",
+          benchmark: "^GSPC",
+          benchmark_name: "S&P 500",
+          points,
+          portfolio_return_percent: 7.2,
+          benchmark_return_percent: 4.8,
+          excess_return_percent: 2.4,
+          coverage_percent: 100,
+          methodology: "Current-weight reconstruction.",
+          generated_at: "2026-09-22T18:00:00Z",
+          refresh_after_seconds: 300,
+        }),
+      });
+    });
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (requestUrl.pathname.endsWith("/portfolio/performance")) {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          requestUrl.searchParams.get("fast") === "true"
+            ? snapshot()
+            : historicalSnapshot(),
+        ),
+      });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { name: "Portefeuille vs S&P/TSX Composite" })).toBeVisible();
+    expect(performanceCalls).toBe(0);
+
+    await page.getByLabel("Benchmark de performance").selectOption("^GSPC");
+
+    await expect.poll(() => performanceCalls).toBe(1);
+    await expect(page.getByRole("heading", { name: "Portefeuille vs S&P 500" })).toBeVisible();
+    await expect(page.getByText("+7.20 %", { exact: true })).toBeVisible();
+    await expect(page.getByText("+2.40 %", { exact: true })).toBeVisible();
+
+    expect(lastPerformanceBody).toMatchObject({
+      benchmark: "^GSPC",
+      range: "1y",
+    });
+  });
+
   test("shows advanced portfolio intelligence without extra network calls when switching tabs", async ({ page }) => {
     let fullCalls = 0;
     await page.addInitScript((saved) => {
