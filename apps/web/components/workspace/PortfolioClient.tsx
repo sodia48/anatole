@@ -37,6 +37,10 @@ import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import styles from "./Workspace.module.css";
 
 const STORAGE_KEY = "anatole:portfolio:v1";
+const SNAPSHOT_CACHE_KEY = "anatole:portfolio:snapshot:v2";
+const SNAPSHOT_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+const MONEY_FORMATTERS = new Map<string, Intl.NumberFormat>();
+
 const COLORS = [
   "#2d76ff",
   "#16c79a",
@@ -49,11 +53,17 @@ const COLORS = [
 ];
 
 function money(value: number, currency = "CAD", language: AnatoleLanguage = "fr"): string {
-  return new Intl.NumberFormat(localeFor(language), {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 2,
-  }).format(value);
+  const key = `${language}:${currency}`;
+  let formatter = MONEY_FORMATTERS.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(localeFor(language), {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    });
+    MONEY_FORMATTERS.set(key, formatter);
+  }
+  return formatter.format(value);
 }
 
 function percent(value: number | null, digits = 1): string {
@@ -90,6 +100,45 @@ function positionsFingerprint(positions: PortfolioPositionInput[]): string {
     quantity: position.quantity,
     average_cost: position.average_cost,
   })));
+}
+
+type CachedPortfolioSnapshot = {
+  fingerprint: string;
+  saved_at: number;
+  snapshot: PortfolioSnapshot;
+};
+
+function loadCachedPortfolioSnapshot(positions: PortfolioPositionInput[]): PortfolioSnapshot | null {
+  if (typeof window === "undefined" || !positions.length) return null;
+  try {
+    const raw = window.localStorage.getItem(SNAPSHOT_CACHE_KEY);
+    if (!raw) return null;
+    const cached = JSON.parse(raw) as CachedPortfolioSnapshot;
+    if (
+      cached.fingerprint !== positionsFingerprint(positions)
+      || !cached.snapshot
+      || Date.now() - Number(cached.saved_at) > SNAPSHOT_CACHE_MAX_AGE_MS
+    ) {
+      return null;
+    }
+    return cached.snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedPortfolioSnapshot(fingerprint: string, snapshot: PortfolioSnapshot): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: CachedPortfolioSnapshot = {
+      fingerprint,
+      saved_at: Date.now(),
+      snapshot,
+    };
+    window.localStorage.setItem(SNAPSHOT_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // Le portefeuille reste utilisable si le stockage du cache est indisponible.
+  }
 }
 
 function logPortfolioSnapshot(kind: "fast" | "full", snapshot: PortfolioSnapshot): void {
@@ -257,6 +306,8 @@ export function PortfolioClient() {
   const [error, setError] = useState<string | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [builderOpen, setBuilderOpen] = useState(true);
+  const [snapshotFromCache, setSnapshotFromCache] = useState(false);
   const refreshSequenceRef = useRef(0);
   const snapshotRef = useRef<PortfolioSnapshot | null>(null);
   const snapshotPositionsRef = useRef("");
@@ -269,8 +320,20 @@ export function PortfolioClient() {
   useEffect(() => {
     const saved = loadPositions();
     const add = searchParams.get("add")?.toUpperCase().replace(/\.TO$/, "");
+    const nextPositions = add && !saved.some((item) => item.symbol === add)
+      ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }]
+      : saved;
+    const cached = loadCachedPortfolioSnapshot(nextPositions);
     const timer = window.setTimeout(() => {
-      setPositions(add && !saved.some((item) => item.symbol === add) ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }] : saved);
+      setPositions(nextPositions);
+      setBuilderOpen(nextPositions.length === 0 || Boolean(add));
+      if (cached) {
+        const fingerprint = positionsFingerprint(nextPositions);
+        snapshotRef.current = cached;
+        snapshotPositionsRef.current = fingerprint;
+        setSnapshot(cached);
+        setSnapshotFromCache(true);
+      }
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -320,9 +383,15 @@ export function PortfolioClient() {
       snapshotRef.current = null;
       snapshotPositionsRef.current = "";
       setSnapshot(null);
+      setSnapshotFromCache(false);
       setLoading(false);
       setError(null);
       setHistoryError(null);
+      try {
+        window.localStorage.removeItem(SNAPSHOT_CACHE_KEY);
+      } catch {
+        // Ignore storage failures.
+      }
       return;
     }
     const targetPositions = positionsFingerprint(current);
@@ -344,6 +413,8 @@ export function PortfolioClient() {
       snapshotRef.current = nextSnapshot;
       snapshotPositionsRef.current = targetPositions;
       setSnapshot(nextSnapshot);
+      setSnapshotFromCache(false);
+      saveCachedPortfolioSnapshot(targetPositions, nextSnapshot);
     };
     const applyFullSnapshot = (fullSnapshot: PortfolioSnapshot) => {
       logPortfolioSnapshot("full", fullSnapshot);
@@ -372,17 +443,27 @@ export function PortfolioClient() {
         applyFullSnapshot(fullSnapshot);
         return;
       }
-      const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
-      if (!isCurrentRequest()) return;
-      logPortfolioSnapshot("fast", currentSnapshot);
-      if (
-        snapshotPositionsRef.current !== targetPositions
-        || !hasCompleteHistory(snapshotRef.current)
-      ) {
-        applySnapshot(currentSnapshot);
-      }
+      // Lance la valorisation rapide et l'analyse historique en parallèle.
+      // L'utilisateur voit les prix dès que le fast snapshot arrive sans payer
+      // sa latence une seconde fois avant le calcul complet.
+      const fullPromise = analyzePortfolio(current, controller.signal);
       try {
-        const fullSnapshot = await analyzePortfolio(current, controller.signal);
+        const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
+        if (!isCurrentRequest()) return;
+        logPortfolioSnapshot("fast", currentSnapshot);
+        if (
+          snapshotPositionsRef.current !== targetPositions
+          || !hasCompleteHistory(snapshotRef.current)
+        ) {
+          applySnapshot(currentSnapshot);
+        }
+      } catch (reason) {
+        if (!isCurrentRequest()) return;
+        console.error("portfolio_fast_valuation_failed", reason);
+      }
+
+      try {
+        const fullSnapshot = await fullPromise;
         if (!isCurrentRequest()) return;
         applyFullSnapshot(fullSnapshot);
       } catch (reason) {
@@ -459,6 +540,7 @@ export function PortfolioClient() {
     setAverageCost("");
     setSuggestions([]);
     setError(null);
+    setBuilderOpen(false);
   };
 
   const updatePosition = (index: number, patch: Partial<PortfolioPositionInput>) => {
@@ -472,6 +554,7 @@ export function PortfolioClient() {
       { symbol: "XIC", quantity: 25, average_cost: 33 },
       { symbol: "SHOP", quantity: 6, average_cost: 92 },
     ]);
+    setBuilderOpen(false);
   };
 
   const exportCsv = () => {
@@ -511,8 +594,16 @@ export function PortfolioClient() {
     () => snapshot?.positions.filter((item) => !item.source.startsWith("demo")).length ?? 0,
     [snapshot],
   );
+  const snapshotBySymbol = useMemo(
+    () => new Map(snapshot?.positions.map((item) => [item.symbol, item]) ?? []),
+    [snapshot],
+  );
+  const analyticsPending = Boolean(loading && snapshot && !hasCompleteHistory(snapshot));
   const pendingValue = loading && !snapshot
     ? pick(language, "Chargement…", "Loading…")
+    : pick(language, "N/D", "N/A");
+  const analyticsValue = analyticsPending
+    ? pick(language, "Analyse…", "Analyzing…")
     : pick(language, "N/D", "N/A");
 
   return (
@@ -524,23 +615,38 @@ export function PortfolioClient() {
           <p>{pick(language, "Positions locales, performance, P&L, allocation sectorielle, concentration et risque. Aucun ordre n’est exécuté et les positions restent dans ce navigateur.", "Local positions, performance, P&L, sector allocation, concentration, and risk. No order is executed and positions remain in this browser.")}</p>
         </div>
         <div className={styles.heroMetric}>
-          <strong>{snapshot?.portfolio_score?.toFixed(1) ?? pick(language, "N/D", "N/A")}</strong>
+          <strong>{snapshot?.portfolio_score?.toFixed(1) ?? (analyticsPending ? "…" : pick(language, "N/D", "N/A"))}</strong>
           <span>{pick(language, "score portefeuille", "portfolio score")}</span>
           <small>{positions.length} {pick(language, `position${positions.length > 1 ? "s" : ""}`, `position${positions.length === 1 ? "" : "s"}`)} · {liveCount} {pick(language, `cotation${liveCount > 1 ? "s" : ""} publique${liveCount > 1 ? "s" : ""}`, `public quote${liveCount === 1 ? "" : "s"}`)}</small>
         </div>
       </section>
 
+      {positions.length ? (
+        <div className={styles.portfolioStatus} role="status">
+          <span className={loading ? styles.statusDotBusy : styles.statusDot} />
+          <strong>
+            {snapshotFromCache
+              ? pick(language, "Affichage instantané du dernier calcul", "Showing the latest cached calculation")
+              : loading
+                ? pick(language, "Mise à jour des données en arrière-plan", "Refreshing data in the background")
+                : pick(language, "Portefeuille à jour", "Portfolio up to date")}
+          </strong>
+          {analyticsPending ? <small>{pick(language, "Valorisation disponible · intelligence historique en cours", "Valuation available · historical intelligence loading")}</small> : null}
+        </div>
+      ) : null}
+
       <section className={`panel ${styles.toolbar}`}>
         <div className={styles.toolbarTop}>
           <div><span className="eyebrow">{pick(language, "CONSTRUCTION", "BUILD")}</span><h2>{pick(language, "Ajouter ou importer des positions", "Add or import positions")}</h2><p>{pick(language, "Le coût moyen est saisi dans la devise de cotation du titre.", "Average cost is entered in the security’s quote currency.")}</p></div>
           <div className={styles.actionRow}>
-            <button className={styles.secondaryButton} type="button" onClick={loadExample}>{pick(language, "Charger un exemple", "Load example")}</button>
+            <button className={styles.primaryButton} type="button" onClick={() => setBuilderOpen((current) => !current)}><Plus size={15} /> {builderOpen ? pick(language, "Fermer", "Close") : pick(language, "Ajouter", "Add")}</button>
+            {!positions.length ? <button className={styles.secondaryButton} type="button" onClick={loadExample}>{pick(language, "Charger un exemple", "Load example")}</button> : null}
             <button className={styles.secondaryButton} type="button" onClick={() => importedRef.current?.click()}><Upload size={15} /> {pick(language, "Importer CSV", "Import CSV")}</button>
             <button className={styles.secondaryButton} type="button" disabled={!positions.length} onClick={exportCsv}><Download size={15} /> {pick(language, "Exporter", "Export")}</button>
             <input ref={importedRef} aria-label={pick(language, "Importer un portefeuille CSV", "Import a CSV portfolio")} hidden type="file" accept=".csv,text/csv" onChange={(event) => importCsv(event.target.files?.[0])} />
           </div>
         </div>
-        <div className={styles.formGrid}>
+        {builderOpen ? <div className={styles.formGrid}>
           <div className={styles.searchField}>
             <label htmlFor="portfolio-symbol">{pick(language, "Symbole ou entreprise", "Symbol or company")}</label>
             <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
@@ -549,7 +655,7 @@ export function PortfolioClient() {
           <div className={styles.field}><label htmlFor="portfolio-quantity">{pick(language, "Quantité", "Quantity")}</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
           <div className={styles.field}><label htmlFor="portfolio-average-cost">{pick(language, "Coût moyen", "Average cost")}</label><input id="portfolio-average-cost" inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0.00" /></div>
           <button className={styles.primaryButton} type="button" onClick={addPosition}><Plus size={16} /> {pick(language, "Ajouter", "Add")}</button>
-        </div>
+        </div> : null}
       </section>
 
       {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button className={styles.secondaryButton} disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
@@ -567,8 +673,8 @@ export function PortfolioClient() {
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Valeur actuelle", "Current value")}</span><strong>{snapshot ? money(snapshot.total_market_value, snapshot.base_currency, language) : pendingValue}</strong><small>CAD</small></article>
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pendingValue}</small></article>
             <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pendingValue}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? percent(performanceReturn) : pendingValue}</strong><small>{pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? riskLabel(snapshot.risk?.risk_level ?? null, language) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(1)}/100`}` : pendingValue}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? (performanceReturn === null ? analyticsValue : percent(performanceReturn)) : pendingValue}</strong><small>{analyticsPending ? pick(language, "Historique en cours de calcul", "Historical analysis in progress") : pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
+            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? (snapshot.risk?.risk_level ? riskLabel(snapshot.risk.risk_level, language) : analyticsValue) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(1)}/100`}` : pendingValue}</small></article>
           </section>
 
           <section className={`panel ${styles.panel}`}>
@@ -578,7 +684,7 @@ export function PortfolioClient() {
                 <thead><tr><th>{pick(language, "Titre", "Security")}</th><th>{pick(language, "Quantité", "Quantity")}</th><th>{pick(language, "Coût moyen", "Average cost")}</th><th>{pick(language, "Prix", "Price")}</th><th>{pick(language, "Valeur", "Value")}</th><th>{pick(language, "Poids", "Weight")}</th><th>P&amp;L</th><th>{pick(language, "Jour", "Day")}</th><th>Score</th><th /></tr></thead>
                 <tbody>
                   {positions.map((position, index) => {
-                    const result = snapshot?.positions.find((item) => item.symbol === position.symbol);
+                    const result = snapshotBySymbol.get(position.symbol);
                     return <tr key={position.symbol}>
                       <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
                       <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
@@ -588,7 +694,7 @@ export function PortfolioClient() {
                       <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : pendingValue}</td>
                       <td data-label={pick(language, "P&L latent", "Unrealized P&L")} className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency, language)} · ${percent(result.unrealized_pnl_percent)}` : pendingValue}</td>
                       <td data-label={pick(language, "Séance", "Session")} className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency, language)} · ${percent(result.day_change_percent)}` : pendingValue}</td>
-                      <td data-label="Score">{result?.score !== null && result?.score !== undefined ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : pendingValue}</td>
+                      <td data-label="Score">{result?.score !== null && result?.score !== undefined ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : analyticsPending ? analyticsValue : pendingValue}</td>
                       <td data-label="Action"><button className={styles.iconButton} type="button" aria-label={pick(language, `Supprimer ${position.symbol}`, `Delete ${position.symbol}`)} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
                     </tr>;
                   })}
