@@ -6,9 +6,11 @@ import {
   useState,
 } from "react";
 import {
+  BookOpen,
   ExternalLink,
   Newspaper,
   Search,
+  X,
 } from "lucide-react";
 
 import {
@@ -37,6 +39,7 @@ import {
   type RegionCode,
 } from "@/lib/regions";
 import type {
+  NewsItem,
   NewsSnapshot,
 } from "@/lib/types";
 import {
@@ -58,6 +61,89 @@ type NewsDisplayItem = {
   importance: string | null;
   region: string;
 };
+
+const DIRECT_PROVINCIAL_MACRO_PATTERN = new RegExp(
+  [
+    "inflation",
+    "indice des prix",
+    "consumer price",
+    "emploi",
+    "chômage",
+    "population active",
+    "employment",
+    "unemployment",
+    "labour force",
+    "produit intérieur brut",
+    "gross domestic product",
+    "\\bpib\\b",
+    "\\bgdp\\b",
+    "commerce de détail",
+    "commerce de gros",
+    "retail trade",
+    "wholesale trade",
+    "exportations",
+    "importations",
+    "exports",
+    "imports",
+    "budget",
+    "déficit",
+    "excédent",
+    "comptes publics",
+    "fiscal",
+    "croissance économique",
+    "economic growth",
+    "mises en chantier",
+    "permis de bâtir",
+    "housing starts",
+    "building permits",
+  ].join("|"),
+  "i",
+);
+
+function hasPublishedDate(value: string | null): value is string {
+  if (!value) return false;
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return false;
+  const age = Date.now() - timestamp;
+  return age >= -86_400_000 && age <= 180 * 86_400_000;
+}
+
+function isStatCan(source: string): boolean {
+  return /statistique canada|statistics canada/i.test(source);
+}
+
+function isEssentialProvincialItem(item: NewsItem): boolean {
+  return isStatCan(item.source) ||
+    DIRECT_PROVINCIAL_MACRO_PATTERN.test(`${item.title} ${item.summary}`);
+}
+
+function dedupeNewsItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const canonicalUrl = item.url.split("?", 1)[0].replace(/\/+$/, "").toLowerCase();
+    const key = canonicalUrl || `${item.source}|${item.title}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function provinceFirstItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
+  const newestFirst = (left: NewsDisplayItem, right: NewsDisplayItem) =>
+    Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "");
+  const direct = items.filter((item) => !isStatCan(item.source)).sort(newestFirst);
+  const statcan = items.filter((item) => isStatCan(item.source)).sort(newestFirst);
+
+  // StatCan is a resilience layer, not the main provincial feed. Once a direct
+  // provincial source is available, it must remain at least as prominent as
+  // the federal complement. If no direct source responds, retain a small,
+  // transparent StatCan fallback rather than showing an empty screen.
+  const statcanLimit = direct.length > 0
+    ? Math.min(direct.length, 6)
+    : 6;
+
+  return [...direct, ...statcan.slice(0, statcanLimit)];
+}
 
 export function NewsClient() {
   const { preferences } =
@@ -99,6 +185,8 @@ export function NewsClient() {
     useState("Tous");
   const [region, setRegion] =
     useState<RegionCode>("ALL");
+  const [selectedItem, setSelectedItem] =
+    useState<NewsDisplayItem | null>(null);
   const provinceMode =
     isProvinceRegion(region);
 
@@ -125,30 +213,33 @@ export function NewsClient() {
         new AbortController();
 
       try {
-        const snapshot = provinceMode
-          ? await getProvincialMacroSnapshot(
-              region,
-              language,
-              controller.signal,
-            )
-          : await getNewsSnapshot(
-              language,
-              controller.signal,
+        if (provinceMode) {
+          const [provinceResult, newsResult] = await Promise.allSettled([
+            getProvincialMacroSnapshot(region, language, controller.signal),
+            getNewsSnapshot(language, controller.signal),
+          ]);
+
+          if (provinceResult.status === "rejected" && newsResult.status === "rejected") {
+            throw provinceResult.reason;
+          }
+
+          if (active && !controller.signal.aborted) {
+            setProvincialData(
+              provinceResult.status === "fulfilled" ? provinceResult.value : null,
             );
+            setData(newsResult.status === "fulfilled" ? newsResult.value : null);
+            setError(null);
+          }
+          return;
+        }
+
+        const snapshot = await getNewsSnapshot(language, controller.signal);
 
         if (
           active &&
           !controller.signal.aborted
         ) {
-          if (provinceMode) {
-            setProvincialData(
-              snapshot as ProvincialMacroSnapshot,
-            );
-          } else {
-            setData(
-              snapshot as NewsSnapshot,
-            );
-          }
+          setData(snapshot as NewsSnapshot);
           setError(null);
         }
       } catch {
@@ -188,22 +279,62 @@ export function NewsClient() {
     };
   }, [language, provinceMode, region]);
 
+  useEffect(() => {
+    if (!selectedItem) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedItem(null);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedItem]);
+
   const items = useMemo<NewsDisplayItem[]>(() => {
     if (provinceMode) {
-      return (provincialData?.latest_releases ?? []).map(
-        (item) => ({
-          id: item.id,
+      const directItems = (provincialData?.latest_releases ?? [])
+        .filter(
+          (item) =>
+            item.source_kind !== "dashboard" &&
+            hasPublishedDate(item.published_at),
+        )
+        .map(
+          (item) => ({
+            id: item.id,
+            title: item.title,
+            summary: item.summary,
+            url: item.source_url,
+            source: item.source,
+            category: item.category,
+            publishedAt: item.published_at,
+            sentiment: null,
+            sentimentScore: null,
+            importance: item.importance,
+            region: item.province,
+          }),
+        );
+
+      const officialFallback = (data?.items ?? [])
+        .filter(
+          (item) =>
+            item.regions?.includes(region) &&
+            hasPublishedDate(item.published_at) &&
+            isEssentialProvincialItem(item),
+        )
+        .map((item) => ({
+          id: `official-${item.id}`,
           title: item.title,
           summary: item.summary,
-          url: item.source_url,
+          url: item.url,
           source: item.source,
           category: item.category,
           publishedAt: item.published_at,
           sentiment: null,
           sentimentScore: null,
-          importance: item.importance,
-          region: item.province,
-        }),
+          importance: null,
+          region: regionLabel(region, language),
+        }));
+
+      return provinceFirstItems(
+        dedupeNewsItems([...directItems, ...officialFallback]),
       );
     }
 
@@ -299,17 +430,24 @@ export function NewsClient() {
   ]);
 
   const activeData = provinceMode
-    ? provincialData
+    ? provincialData ?? data
     : data;
   const sourceStatuses = provinceMode
-    ? (provincialData?.sources ?? []).map(
-        (item) => ({
-          key: item.key,
-          label: item.label,
-          status: item.status,
-          detail: item.detail,
-        }),
-      )
+    ? Array.from(
+        items.reduce((grouped, item) => {
+          grouped.set(item.source, (grouped.get(item.source) ?? 0) + 1);
+          return grouped;
+        }, new Map<string, number>()),
+      ).map(([label, count]) => ({
+        key: `display-${label}`,
+        label,
+        status: "available",
+        detail: pick(
+          language,
+          `${count} publication${count === 1 ? "" : "s"} officielle${count === 1 ? "" : "s"} datée${count === 1 ? "" : "s"}.`,
+          `${count} dated official release${count === 1 ? "" : "s"}.`,
+        ),
+      }))
     : (data?.source_statuses ?? [])
         .filter((item) =>
           item.source.startsWith("Statistique Canada") ||
@@ -686,7 +824,7 @@ export function NewsClient() {
             <h2>{item.title}</h2>
 
             {item.summary ? (
-              <p>
+              <p className="news-card-summary">
                 {item.summary}
               </p>
             ) : null}
@@ -720,20 +858,29 @@ export function NewsClient() {
                 </span>
               ) : null}
 
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {pick(
-                  language,
-                  "Source officielle",
-                  "Official source",
-                )}
-                <ExternalLink
-                  size={14}
-                />
-              </a>
+              <div className="news-card-actions">
+                <button
+                  type="button"
+                  onClick={() => setSelectedItem(item)}
+                >
+                  <BookOpen size={14} />
+                  {pick(language, "Lire le résumé", "Read summary")}
+                </button>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {pick(
+                    language,
+                    "Source officielle",
+                    "Official source",
+                  )}
+                  <ExternalLink
+                    size={14}
+                  />
+                </a>
+              </div>
             </div>
           </article>
         ))}
@@ -751,6 +898,66 @@ export function NewsClient() {
           </div>
         ) : null}
       </section>
+
+      {selectedItem ? (
+        <div
+          className="news-reader-backdrop"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setSelectedItem(null);
+          }}
+        >
+          <section
+            className="panel news-reader"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="news-reader-title"
+          >
+            <header>
+              <div className="news-card-meta">
+                <span>{localizeSource(selectedItem.source, language)}</span>
+                <span>{selectedItem.region}</span>
+                <em>{localizeCategory(selectedItem.category, language)}</em>
+              </div>
+              <button
+                className="news-reader-close"
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                aria-label={pick(language, "Fermer le résumé", "Close summary")}
+              >
+                <X size={20} />
+              </button>
+            </header>
+
+            <div className="news-reader-content">
+              <p className="eyebrow">
+                {pick(language, "RÉSUMÉ DANS ANATOLE", "SUMMARY IN ANATOLE")}
+              </p>
+              <h2 id="news-reader-title">{selectedItem.title}</h2>
+              <p>{selectedItem.summary || pick(
+                language,
+                "Aucun résumé officiel n’est disponible pour cette publication.",
+                "No official summary is available for this publication.",
+              )}</p>
+            </div>
+
+            <footer>
+              {selectedItem.publishedAt ? (
+                <time dateTime={selectedItem.publishedAt}>
+                  {formatter.format(new Date(selectedItem.publishedAt))} ET
+                </time>
+              ) : <span />}
+              <a
+                href={selectedItem.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {pick(language, "Consulter la source officielle", "View official source")}
+                <ExternalLink size={15} />
+              </a>
+            </footer>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

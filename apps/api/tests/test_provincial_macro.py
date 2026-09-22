@@ -4,18 +4,25 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.schemas.discovery import NewsItem
 from app.schemas.provincial_macro import (
     ProvincialMacroEvent,
+    ProvincialMacroRelease,
     ProvincialMacroSnapshot,
     ProvincialMacroSource,
 )
 from app.services.provincial_macro import (
     PROVINCES,
+    PageSpec,
     ProvincialMacroService,
+    _aggregate_release_sources,
     _alberta_calendar_events,
     _british_columbia_calendar_events,
     _dedupe_events,
+    _extract_page_release,
+    _news_items_to_releases,
     _ontario_calendar_events,
+    _province_first_releases,
     _quebec_calendar_events,
     _quebec_general_calendar_events,
     _saskatchewan_calendar_events,
@@ -114,6 +121,106 @@ def test_essential_macro_is_kept() -> None:
     )
     assert category == "Emploi"
     assert score >= 88
+
+
+def test_static_dashboard_is_not_presented_as_a_publication() -> None:
+    spec = PageSpec(
+        "ab-dashboard",
+        "Alberta Economic Dashboard",
+        "dashboard",
+        "https://example.test/dashboard",
+        "PIB",
+    )
+    assert _extract_page_release(
+        "<h1>Alberta Economic Dashboard</h1><p>GDP and jobs</p>",
+        spec=spec,
+        region="AB",
+        lang="fr",
+        base_url=spec.url,
+    ) == []
+
+
+def test_release_source_health_is_grouped_by_provider() -> None:
+    sources = [
+        ProvincialMacroSource(
+            key=f"qc-{index}",
+            label="Statistique Québec",
+            region="QC",
+            kind="statistics",
+            url=f"https://example.test/{index}",
+            status="available" if index == 0 else "unavailable",
+            count=1 if index == 0 else 0,
+        )
+        for index in range(6)
+    ]
+    grouped = _aggregate_release_sources(sources, lang="fr")
+    assert len(grouped) == 1
+    assert grouped[0].label == "Statistique Québec"
+    assert grouped[0].status == "partial"
+    assert grouped[0].count == 1
+
+
+def test_official_news_feed_keeps_only_dated_relevant_provincial_releases() -> None:
+    now = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    items = [
+        NewsItem(
+            id="statcan-cpi",
+            title="Consumer Price Index by province",
+            summary="Inflation data include Ontario.",
+            url="https://www150.statcan.gc.ca/example",
+            source="Statistics Canada",
+            category="Inflation",
+            published_at=now - timedelta(days=1),
+            sentiment="Neutre",
+            sentiment_score=0,
+            regions=["ON"],
+        ),
+        NewsItem(
+            id="other-region",
+            title="Consumer Price Index by province",
+            summary="Inflation data include Quebec.",
+            url="https://www150.statcan.gc.ca/other",
+            source="Statistics Canada",
+            category="Inflation",
+            published_at=now - timedelta(days=1),
+            sentiment="Neutre",
+            sentiment_score=0,
+            regions=["QC"],
+        ),
+    ]
+    releases = _news_items_to_releases(items, region="ON", lang="fr", now=now)
+    assert [release.id for release in releases] == ["news-statcan-cpi"]
+    assert releases[0].specificity == "province-normalized"
+    assert releases[0].published_at == now - timedelta(days=1)
+
+
+def test_official_news_feed_keeps_distinct_release_ids_in_query_string() -> None:
+    now = datetime(2026, 9, 21, 12, tzinfo=UTC)
+    items = [
+        NewsItem(
+            id=f"alberta-{release_id}",
+            title=title,
+            summary="Official provincial economic release.",
+            url=f"https://www.alberta.ca/announcements.cfm?xID={release_id}",
+            source="Gouvernement de l’Alberta",
+            category="Investissement",
+            published_at=now - timedelta(days=index),
+            sentiment="Neutre",
+            sentiment_score=0,
+            regions=["AB"],
+        )
+        for index, (release_id, title) in enumerate(
+            (("100", "Investment summit"), ("200", "Workforce investment")),
+            start=1,
+        )
+    ]
+
+    releases = _news_items_to_releases(items, region="AB", lang="fr", now=now)
+
+    assert {release.id for release in releases} == {
+        "news-alberta-100",
+        "news-alberta-200",
+    }
 
 
 def test_quebec_calendar_parser_uses_explicit_next_release_column() -> None:
@@ -417,6 +524,64 @@ def test_province_direct_event_suppresses_same_day_statcan_duplicate() -> None:
     )
 
     assert _dedupe_events([direct, normalized]) == [direct]
+
+
+def test_province_first_releases_never_lets_statcan_outnumber_direct_sources() -> None:
+    def release(index: int, source: str, source_kind: str) -> ProvincialMacroRelease:
+        return ProvincialMacroRelease(
+            id=f"release-{index}",
+            region="QC",
+            province="Québec",
+            title=f"Publication {index}",
+            summary="Publication économique officielle.",
+            category="PIB",
+            importance="Élevée",
+            importance_score=90,
+            source=source,
+            source_kind=source_kind,
+            source_url=f"https://example.test/{index}",
+            published_at=datetime(2026, 9, index + 1, 12, tzinfo=UTC),
+            official=True,
+            specificity=(
+                "province-normalized" if source_kind == "statcan" else "province-direct"
+            ),
+        )
+
+    direct = [release(index, "Statistique Québec", "statistics") for index in range(3)]
+    statcan = [
+        release(index + 10, "Statistique Canada", "statcan")
+        for index in range(10)
+    ]
+
+    output = _province_first_releases(direct + statcan)
+
+    assert output[:3] == direct
+    assert len(output) == 6
+    assert sum(item.source_kind == "statcan" for item in output) == len(direct)
+
+
+def test_province_first_releases_keeps_bounded_statcan_when_direct_feed_is_down() -> None:
+    releases = [
+        ProvincialMacroRelease(
+            id=f"statcan-{index}",
+            region="AB",
+            province="Alberta",
+            title=f"Publication {index}",
+            summary="Volet provincial officiel.",
+            category="Emploi",
+            importance="Élevée",
+            importance_score=90,
+            source="Statistique Canada",
+            source_kind="statcan",
+            source_url=f"https://example.test/{index}",
+            published_at=datetime(2026, 9, index + 1, 12, tzinfo=UTC),
+            official=True,
+            specificity="province-normalized",
+        )
+        for index in range(10)
+    ]
+
+    assert len(_province_first_releases(releases)) == 6
 
 
 def test_dedupe_keeps_distinct_employment_releases_on_same_day() -> None:
@@ -789,8 +954,16 @@ def test_empty_full_snapshot_uses_failure_ttl(monkeypatch) -> None:
             url="https://example.test/statcan", status="unavailable", count=0,
         )
 
+    async def fake_official_releases(*args, **kwargs):
+        return [], []
+
     monkeypatch.setattr(module, "monotonic", lambda: clock[0])
     monkeypatch.setattr(service, "_fetch_page", fake_page)
+    monkeypatch.setattr(
+        service,
+        "_official_release_feed_with_deadline",
+        fake_official_releases,
+    )
     monkeypatch.setattr(service, "_direct_calendar", fake_direct)
     monkeypatch.setattr(service, "_statcan_calendar_fallback", fake_statcan)
 

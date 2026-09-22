@@ -10,7 +10,7 @@ export type ProvincialMacroSource = {
   key: string;
   label: string;
   region: ProvinceCode;
-  kind: "statistics" | "economic_accounts" | "dashboard" | "finance" | "statcan";
+  kind: "statistics" | "economic_accounts" | "dashboard" | "finance" | "government" | "statcan";
   url: string;
   status: "available" | "partial" | "unavailable";
   count: number;

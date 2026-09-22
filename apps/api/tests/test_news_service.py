@@ -10,11 +10,13 @@ from app.services.news import (
     STATCAN_URLS,
     FeedFormatError,
     NewsService,
+    PROVINCIAL_HTML_FEEDS,
     PROVINCIAL_RSS_FEEDS,
     ParsedEntry,
     _classify_provincial,
     _classify_statcan,
     _deduplicate,
+    _parse_alberta_news_entries,
     _parse_entries,
     _to_news_item,
 )
@@ -380,9 +382,51 @@ def test_provincial_economic_feed_classification() -> None:
     }
 
 
+def test_provincial_classifier_rejects_generic_government_noise() -> None:
+    entry = ParsedEntry(
+        title="Investing in community-led restorative justice",
+        summary="New funding expands a justice program.",
+        url="https://example.test/justice",
+        published_at=datetime(2026, 9, 18, tzinfo=UTC),
+    )
+
+    assert _classify_provincial(entry) is None
+
+
+def test_provincial_classifier_keeps_explicit_economic_policy() -> None:
+    entry = ParsedEntry(
+        title="Energy agreement to strengthen grid reliability",
+        summary="The agreement supports investment in Alberta's electricity grid.",
+        url="https://example.test/energy",
+        published_at=datetime(2026, 9, 18, tzinfo=UTC),
+    )
+
+    assert _classify_provincial(entry) == "Énergie et ressources"
+
+
+def test_alberta_official_news_page_parser_keeps_dated_release_content() -> None:
+    html = b"""
+    <ul class="goa-news goa-news--release">
+      <li>
+        <div class="goa-date">Sep 18, 2026</div>
+        <div class="goa-title"><a href="https://www.alberta.ca/example">Growing Alberta exports</a></div>
+        <div class="goa-text"><p>A new trade program supports exporters and jobs.</p></div>
+      </li>
+    </ul>
+    """
+
+    entries = _parse_alberta_news_entries(html)
+
+    assert len(entries) == 1
+    assert entries[0].title == "Growing Alberta exports"
+    assert entries[0].summary == "A new trade program supports exporters and jobs."
+    assert entries[0].published_at == datetime(2026, 9, 18, tzinfo=UTC)
+
+
 def test_direct_provincial_feed_registry_covers_multiple_provinces() -> None:
     provinces = {item[0] for item in PROVINCIAL_RSS_FEEDS}
-    assert {"QC", "BC", "SK", "NS", "PE", "NL"}.issubset(provinces)
+    assert {"QC", "ON", "BC", "SK", "NS", "PE", "NL"}.issubset(provinces)
+    assert {"AB"}.issubset({item[0] for item in PROVINCIAL_HTML_FEEDS})
 
 
 def test_provincial_feed_language_is_respected() -> None:
@@ -401,4 +445,6 @@ def test_provincial_feed_language_is_respected() -> None:
     # mixed into the French edition; French StatCan coverage remains available
     # for all ten provinces through regional tagging.
     assert "QC" in french_provinces
+    assert "ON" in french_provinces
+    assert "ON" in english_provinces
     assert {"BC", "SK", "NS", "PE", "NL"}.issubset(english_provinces)
