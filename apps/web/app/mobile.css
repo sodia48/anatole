@@ -1502,6 +1502,37 @@
     line-height: 1.35 !important;
   }
 
+  body[data-anatole-section="actualites"] .news-card-footer {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  body[data-anatole-section="actualites"] .news-card-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  body[data-anatole-section="actualites"] .news-reader-backdrop {
+    align-items: end !important;
+    padding: 0 !important;
+  }
+
+  body[data-anatole-section="actualites"] .news-reader {
+    width: 100% !important;
+    max-height: 88dvh !important;
+    border-radius: 24px 24px 0 0 !important;
+    padding: 20px !important;
+  }
+
+  body[data-anatole-section="actualites"] .news-reader > footer {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  body[data-anatole-section="actualites"] .news-reader > footer a {
+    justify-content: center !important;
+  }
+
   body[data-anatole-section="actualites"]
   .app-main :is(
     .sentiment-chart,

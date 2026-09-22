@@ -11,16 +11,22 @@ from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
 from time import monotonic
 from typing import Any, Iterable
-from urllib.parse import urljoin
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from zoneinfo import ZoneInfo
 
 import httpx
 
+from app.schemas.discovery import NewsItem
 from app.schemas.provincial_macro import (
     ProvincialMacroEvent,
     ProvincialMacroRelease,
     ProvincialMacroSnapshot,
     ProvincialMacroSource,
+)
+from app.services.news import (
+    PROVINCIAL_HTML_FEEDS,
+    PROVINCIAL_RSS_FEEDS,
+    news_service,
 )
 
 TORONTO = ZoneInfo("America/Toronto")
@@ -122,6 +128,7 @@ ON_PAGES = (
         "economic_accounts",
         "https://data.ontario.ca/dataset/ontario-economic-accounts",
         "PIB",
+        mode="reference",
     ),
     PageSpec(
         "on-budget",
@@ -771,6 +778,11 @@ def _extract_page_release(
     base_url: str,
     last_modified: str | None = None,
 ) -> list[ProvincialMacroRelease]:
+    # Dashboards and catalogues are discovery surfaces, not dated publications.
+    # Keeping them out prevents static pages from crowding out real releases.
+    if spec.kind == "dashboard" or spec.mode == "reference":
+        return []
+
     parser = ContentParser()
     parser.feed(html_text)
 
@@ -1430,12 +1442,41 @@ def _dedupe_events(events: list[ProvincialMacroEvent]) -> list[ProvincialMacroEv
 
 def _dedupe_releases(items: list[ProvincialMacroRelease]) -> list[ProvincialMacroRelease]:
     seen: set[str] = set()
+    seen_urls: set[str] = set()
     output: list[ProvincialMacroRelease] = []
     for item in items:
         key = _norm(f"{item.source}|{item.title}")
-        if key in seen:
+        split_url = urlsplit(item.source_url)
+        query = urlencode(
+            sorted(
+                (key, value)
+                for key, value in parse_qsl(split_url.query, keep_blank_values=True)
+                if key.casefold()
+                not in {
+                    "utm_source",
+                    "utm_medium",
+                    "utm_campaign",
+                    "utm_term",
+                    "utm_content",
+                    "fbclid",
+                    "gclid",
+                }
+            )
+        )
+        canonical_url = urlunsplit(
+            (
+                split_url.scheme.casefold(),
+                split_url.netloc.casefold(),
+                split_url.path.rstrip("/").casefold(),
+                query,
+                "",
+            )
+        )
+        if key in seen or (canonical_url and canonical_url in seen_urls):
             continue
         seen.add(key)
+        if canonical_url:
+            seen_urls.add(canonical_url)
         output.append(item)
     output.sort(
         key=lambda item: (
@@ -1445,6 +1486,215 @@ def _dedupe_releases(items: list[ProvincialMacroRelease]) -> list[ProvincialMacr
         reverse=True,
     )
     return output
+
+
+def _province_first_releases(
+    items: list[ProvincialMacroRelease],
+    *,
+    statcan_fallback_limit: int = 6,
+) -> list[ProvincialMacroRelease]:
+    """Keep direct provincial publications dominant over the federal relay."""
+    direct = [item for item in items if not _is_statcan_source(item.source)]
+    statcan = [item for item in items if _is_statcan_source(item.source)]
+    statcan_limit = (
+        min(len(direct), statcan_fallback_limit)
+        if direct
+        else statcan_fallback_limit
+    )
+    return direct + statcan[:statcan_limit]
+
+
+def _canonical_release_source(source: ProvincialMacroSource) -> str:
+    """Collapse page-level probes into one user-facing official provider."""
+    label = source.label
+    normalized = _norm(label)
+    if "statistique quebec" in normalized:
+        return "Statistique Québec"
+    if "ontario economic accounts" in normalized or "ontario data catalogue" in normalized:
+        return "Ontario Economic Accounts"
+    if "alberta economic dashboard" in normalized:
+        return "Alberta Economic Dashboard"
+    return label
+
+
+def _aggregate_release_sources(
+    sources: list[ProvincialMacroSource],
+    *,
+    lang: str,
+) -> list[ProvincialMacroSource]:
+    """Return provider health, not one noisy card per probed URL."""
+    grouped: dict[str, list[ProvincialMacroSource]] = {}
+    for source in sources:
+        if source.key.startswith(("calendar-", "statcan-")) or source.kind == "dashboard":
+            continue
+        grouped.setdefault(_canonical_release_source(source), []).append(source)
+
+    output: list[ProvincialMacroSource] = []
+    for label, entries in grouped.items():
+        count = sum(entry.count for entry in entries)
+        available = sum(entry.status == "available" for entry in entries)
+        partial = sum(entry.status == "partial" for entry in entries)
+        if available and available == len(entries):
+            status = "available"
+        elif available or partial:
+            status = "partial"
+        else:
+            status = "unavailable"
+
+        if count:
+            detail = (
+                f"{count} publication{'s' if count != 1 else ''} officielle{'s' if count != 1 else ''} chargée{'s' if count != 1 else ''}."
+                if lang == "fr"
+                else f"{count} official publication{'s' if count != 1 else ''} loaded."
+            )
+            if status == "partial":
+                detail += (
+                    " Certaines pages de l’organisme répondent lentement."
+                    if lang == "fr"
+                    else " Some provider pages are responding slowly."
+                )
+        else:
+            detail = (
+                "Aucune publication récente n’a pu être chargée depuis cet organisme."
+                if lang == "fr"
+                else "No recent publication could be loaded from this provider."
+            )
+
+        preferred = next(
+            (entry for entry in entries if entry.status == "available"),
+            entries[0],
+        )
+        output.append(
+            ProvincialMacroSource(
+                key=f"release-{_id(label)}",
+                label=label,
+                region=preferred.region,
+                kind=preferred.kind,
+                url=preferred.url,
+                status=status,
+                count=count,
+                detail=detail,
+            )
+        )
+    return output
+
+
+def _is_statcan_source(source: str) -> bool:
+    normalized = _norm(source)
+    return "statistique canada" in normalized or "statistics canada" in normalized
+
+
+def _direct_news_sources(region: str) -> set[str]:
+    return {
+        source_name
+        for source_region, source_name, _, _ in (
+            *PROVINCIAL_RSS_FEEDS,
+            *PROVINCIAL_HTML_FEEDS,
+        )
+        if source_region == region
+    }
+
+
+def _news_items_to_releases(
+    items: Iterable[NewsItem],
+    *,
+    region: str,
+    lang: str,
+    now: datetime,
+) -> list[ProvincialMacroRelease]:
+    """Keep only recent, dated and province-relevant official publications."""
+    cutoff = now - timedelta(days=180)
+    direct_sources = _direct_news_sources(region)
+    releases: list[ProvincialMacroRelease] = []
+
+    for item in items:
+        published_at = item.published_at
+        if published_at.tzinfo is None:
+            published_at = published_at.replace(tzinfo=UTC)
+        else:
+            published_at = published_at.astimezone(UTC)
+        if (
+            region not in item.regions
+            or published_at < cutoff
+            or published_at > now + timedelta(days=1)
+        ):
+            continue
+
+        is_statcan = _is_statcan_source(item.source)
+        is_direct = item.source in direct_sources
+        if not is_statcan and not is_direct:
+            continue
+
+        category, score = classify_macro(f"{item.title} {item.summary}")
+        if is_direct:
+            # Direct government feeds already passed the provincial economic
+            # classifier. Preserve policy, investment, energy and workforce
+            # releases even when the generic macro classifier assigns a weak
+            # statistical score. The original feed category is authoritative.
+            category = item.category
+            score = max(score, 88)
+        if category is None:
+            continue
+
+        source_kind = "statcan" if is_statcan else (
+            "finance" if category == "Finances publiques" else "government"
+        )
+        specificity = "province-normalized" if is_statcan else (
+            "fiscal-direct" if category == "Finances publiques" else "province-direct"
+        )
+        releases.append(
+            ProvincialMacroRelease(
+                id=f"news-{item.id}",
+                region=region,
+                province=province_name(region, lang),
+                title=item.title.strip()[:220],
+                summary=item.summary.strip()[:1400],
+                category=category,
+                importance=importance_label(score),
+                importance_score=score,
+                source=item.source.strip(),
+                source_kind=source_kind,
+                source_url=item.url,
+                published_at=published_at,
+                official=True,
+                specificity=specificity,
+            )
+        )
+
+    return _dedupe_releases(releases)
+
+
+def _release_sources_from_news(
+    releases: Iterable[ProvincialMacroRelease],
+    *,
+    region: str,
+    lang: str,
+) -> list[ProvincialMacroSource]:
+    grouped: dict[str, list[ProvincialMacroRelease]] = {}
+    for release in releases:
+        grouped.setdefault(release.source, []).append(release)
+
+    sources: list[ProvincialMacroSource] = []
+    for label, entries in grouped.items():
+        first = entries[0]
+        count = len(entries)
+        sources.append(
+            ProvincialMacroSource(
+                key=f"release-news-{region.lower()}-{_id(label)}",
+                label=label,
+                region=region,
+                kind=first.source_kind,
+                url=first.source_url,
+                status="available",
+                count=count,
+                detail=(
+                    f"{count} publication{'s' if count != 1 else ''} officielle{'s' if count != 1 else ''} récente{'s' if count != 1 else ''}."
+                    if lang == "fr"
+                    else f"{count} recent official release{'s' if count != 1 else ''}."
+                ),
+            )
+        )
+    return sources
 
 
 class ProvincialMacroService:
@@ -1626,6 +1876,33 @@ class ProvincialMacroService:
             detail=detail,
         )
 
+    async def _official_release_feed_with_deadline(
+        self,
+        *,
+        region: str,
+        lang: str,
+        now: datetime,
+    ) -> tuple[list[ProvincialMacroRelease], list[ProvincialMacroSource]]:
+        try:
+            snapshot = await asyncio.wait_for(
+                news_service.get_snapshot(lang),
+                timeout=8.0,
+            )
+        except Exception:
+            return [], []
+
+        releases = _news_items_to_releases(
+            snapshot.items,
+            region=region,
+            lang=lang,
+            now=now,
+        )
+        return releases, _release_sources_from_news(
+            releases,
+            region=region,
+            lang=lang,
+        )
+
     def _statcan_official_calendar_fallback(
         self,
         *,
@@ -1689,6 +1966,7 @@ class ProvincialMacroService:
                 base_url=str(response.url),
                 last_modified=response.headers.get("last-modified"),
             )
+            releases = [release for release in releases if release.published_at is not None]
             return releases, ProvincialMacroSource(
                 key=spec.key,
                 label=spec.source,
@@ -2121,6 +2399,11 @@ class ProvincialMacroService:
                     self._fetch_page(client, spec=spec, region=code, lang=language)
                     for spec in config.pages
                 ]
+                official_release_task = self._official_release_feed_with_deadline(
+                    region=code,
+                    lang=language,
+                    now=now,
+                )
                 direct_calendar_task = self._direct_calendar_with_deadline(
                     client,
                     config=config,
@@ -2134,19 +2417,30 @@ class ProvincialMacroService:
                 )
                 results = await asyncio.gather(
                     *page_tasks,
+                    official_release_task,
                     direct_calendar_task,
                     statcan_calendar_task,
                     return_exceptions=True,
                 )
 
             releases: list[ProvincialMacroRelease] = []
+            release_sources: list[ProvincialMacroSource] = []
             sources: list[ProvincialMacroSource] = []
-            for result in results[:-2]:
+            page_result_count = len(page_tasks)
+            for result in results[:page_result_count]:
                 if isinstance(result, Exception):
                     continue
                 page_releases, source_status = result
                 releases.extend(page_releases)
-                sources.append(source_status)
+                release_sources.append(source_status)
+
+            official_release_result = results[page_result_count]
+            if not isinstance(official_release_result, Exception):
+                official_releases, official_sources = official_release_result
+                releases.extend(official_releases)
+                release_sources.extend(official_sources)
+
+            sources.extend(_aggregate_release_sources(release_sources, lang=language))
 
             direct_calendar_result = results[-2]
             if isinstance(direct_calendar_result, Exception):
@@ -2184,16 +2478,16 @@ class ProvincialMacroService:
 
             # Province-direct events take precedence on identical dates/categories.
             events = _dedupe_events(direct_events + statcan_events)
-            releases = _dedupe_releases(releases)
+            releases = _province_first_releases(_dedupe_releases(releases))
 
             message = None
-            if not releases and not events:
+            if not releases:
                 message = (
-                    "Les sources provinciales sont temporairement indisponibles. "
-                    "Anatole n’invente aucune donnée et réessaiera au prochain rafraîchissement."
+                    "Aucune publication économique provinciale récente n’a pu être chargée. "
+                    "Anatole n’invente aucune publication et réessaiera au prochain rafraîchissement."
                     if language == "fr"
-                    else "Provincial sources are temporarily unavailable. "
-                    "Anatole does not fabricate data and will retry on refresh."
+                    else "No recent provincial economic publication could be loaded. "
+                    "Anatole does not fabricate releases and will retry on refresh."
                 )
 
             snapshot = ProvincialMacroSnapshot(

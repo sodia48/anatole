@@ -21,6 +21,7 @@ SourceKind = Literal[
     "economic_accounts",
     "dashboard",
     "finance",
+    "government",
     "statcan",
 ]
 
