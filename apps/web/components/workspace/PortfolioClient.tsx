@@ -34,6 +34,15 @@ import type {
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
+import {
+  beginPortfolioObservation,
+  elapsedPortfolioMs,
+  formatPortfolioMs,
+  markPortfolioObservation,
+  portfolioSpeedGrade,
+  type PortfolioObservation,
+  type PortfolioObservationHandle,
+} from "@/lib/portfolio-observatory";
 import { PortfolioIntelligence } from "./PortfolioIntelligence";
 
 import styles from "./Workspace.module.css";
@@ -394,6 +403,8 @@ export function PortfolioClient() {
   const [hydrated, setHydrated] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(true);
   const [snapshotFromCache, setSnapshotFromCache] = useState(false);
+  const [observation, setObservation] = useState<PortfolioObservation | null>(null);
+  const observationRef = useRef<PortfolioObservationHandle | null>(null);
   const refreshSequenceRef = useRef(0);
   const snapshotRef = useRef<PortfolioSnapshot | null>(null);
   const snapshotPositionsRef = useRef("");
@@ -404,6 +415,7 @@ export function PortfolioClient() {
   }, [snapshot]);
 
   useLayoutEffect(() => {
+    if (!observationRef.current) observationRef.current = beginPortfolioObservation();
     const saved = loadPositions();
     const add = searchParams.get("add")?.toUpperCase().replace(/\.TO$/, "");
     const nextPositions = add && !saved.some((item) => item.symbol === add)
@@ -426,6 +438,12 @@ export function PortfolioClient() {
         snapshotPositionsRef.current = fingerprint;
         setSnapshot(cached);
         setSnapshotFromCache(true);
+      }
+      if (observationRef.current) {
+        setObservation(markPortfolioObservation(observationRef.current, {
+          cache_hit: Boolean(cached),
+          display_ms: cached ? elapsedPortfolioMs(observationRef.current) : null,
+        }));
       }
       setHydrated(true);
     });
@@ -542,6 +560,11 @@ export function PortfolioClient() {
       applySnapshot(fullSnapshot);
       saveHistoricalPortfolioSnapshot(targetPositions, fullSnapshot);
       const historyIsUsable = hasCompleteHistory(fullSnapshot);
+      if (observationRef.current) {
+        setObservation(markPortfolioObservation(observationRef.current, {
+          analysis_ms: elapsedPortfolioMs(observationRef.current),
+        }));
+      }
       if (!historyIsUsable) {
         const message = pick(
           language,
@@ -598,6 +621,11 @@ export function PortfolioClient() {
         const currentSnapshot = await fastPromise;
         if (!isCurrentRequest()) return;
         logPortfolioSnapshot("fast", currentSnapshot);
+        if (observationRef.current) {
+          setObservation(markPortfolioObservation(observationRef.current, {
+            price_ms: elapsedPortfolioMs(observationRef.current),
+          }));
+        }
         if (
           snapshotPositionsRef.current === targetPositions
           && hasCompleteHistory(snapshotRef.current)
@@ -765,6 +793,7 @@ export function PortfolioClient() {
   const analyticsValue = analyticsPending
     ? pick(language, "Analyse…", "Analyzing…")
     : pick(language, "N/D", "N/A");
+  const observationGrade = observation ? portfolioSpeedGrade(observation) : "pending";
 
   return (
     <main className={styles.page}>
@@ -782,17 +811,28 @@ export function PortfolioClient() {
       </section>
 
       {positions.length ? (
-        <div className={styles.portfolioStatus} role="status">
-          <span className={loading ? styles.statusDotBusy : styles.statusDot} />
-          <strong>
-            {snapshotFromCache
-              ? pick(language, "Affichage instantané du dernier calcul", "Showing the latest cached calculation")
-              : loading
-                ? pick(language, "Mise à jour des données en arrière-plan", "Refreshing data in the background")
-                : pick(language, "Portefeuille à jour", "Portfolio up to date")}
-          </strong>
-          {analyticsPending ? <small>{pick(language, "Valorisation disponible · intelligence historique en cours", "Valuation available · historical intelligence loading")}</small> : null}
-        </div>
+        <>
+          <div className={styles.portfolioStatus} role="status">
+            <span className={loading ? styles.statusDotBusy : styles.statusDot} />
+            <strong>
+              {snapshotFromCache
+                ? pick(language, "Affichage instantané du dernier calcul", "Showing the latest cached calculation")
+                : loading
+                  ? pick(language, "Mise à jour des données en arrière-plan", "Refreshing data in the background")
+                  : pick(language, "Portefeuille à jour", "Portfolio up to date")}
+            </strong>
+            {analyticsPending ? <small>{pick(language, "Valorisation disponible · intelligence historique en cours", "Valuation available · historical intelligence loading")}</small> : null}
+          </div>
+          {observation ? (
+            <div className={`${styles.portfolioObservatory} ${styles[`portfolioObservatory_${observationGrade}`]}`} data-testid="portfolio-observatory">
+              <strong>{pick(language, "Vitesse", "Speed")}</strong>
+              <span>{observation.cache_hit ? `${pick(language, "Affichage", "Display")} ${formatPortfolioMs(observation.display_ms)}` : pick(language, "Sans cache", "No cache")}</span>
+              <span>{pick(language, "Prix", "Prices")} {formatPortfolioMs(observation.price_ms)}</span>
+              <span>{pick(language, "Analyse", "Analysis")} {formatPortfolioMs(observation.analysis_ms)}</span>
+              <i>{observationGrade === "instant" ? pick(language, "Instantané", "Instant") : observationGrade === "fast" ? pick(language, "Rapide", "Fast") : observationGrade === "slow" ? pick(language, "À optimiser", "Needs optimization") : pick(language, "Mesure…", "Measuring…")}</i>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <section className={`panel ${styles.toolbar}`}>
