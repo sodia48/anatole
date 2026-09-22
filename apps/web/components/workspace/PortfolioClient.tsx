@@ -39,7 +39,10 @@ import styles from "./Workspace.module.css";
 
 const STORAGE_KEY = "anatole:portfolio:v1";
 const SNAPSHOT_CACHE_KEY = "anatole:portfolio:snapshot:v2";
-const SNAPSHOT_CACHE_MAX_AGE_MS = 10 * 60 * 1000;
+// Un snapshot ancien reste meilleur qu'un écran vide. Il est toujours
+// signalé comme cache puis remplacé par les nouvelles cotations en arrière-plan.
+const SNAPSHOT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const PORTFOLIO_FAST_HEAD_START_MS = 900;
 const MONEY_FORMATTERS = new Map<string, Intl.NumberFormat>();
 
 const COLORS = [
@@ -444,12 +447,37 @@ export function PortfolioClient() {
         applyFullSnapshot(fullSnapshot);
         return;
       }
-      // Lance la valorisation rapide et l'analyse historique en parallèle.
-      // L'utilisateur voit les prix dès que le fast snapshot arrive sans payer
-      // sa latence une seconde fois avant le calcul complet.
-      const fullPromise = analyzePortfolio(current, controller.signal);
+      // Donne une courte priorité réseau aux cotations de séance. Auparavant
+      // le full snapshot lançait immédiatement 10+ historiques et pouvait
+      // occuper le pool HTTP avant même la première valorisation.
+      const fastPromise = analyzePortfolio(
+        current,
+        controller.signal,
+        true,
+      );
+      const cachedForCurrentPositions =
+        snapshotPositionsRef.current === targetPositions;
+      const fullHeadStartMs = cachedForCurrentPositions
+        ? 150
+        : PORTFOLIO_FAST_HEAD_START_MS;
+      const fullPromise = (async () => {
+        await Promise.race([
+          fastPromise.then(
+            () => undefined,
+            () => undefined,
+          ),
+          new Promise<void>((resolve) => {
+            window.setTimeout(resolve, fullHeadStartMs);
+          }),
+        ]);
+        if (!isCurrentRequest()) {
+          throw new DOMException("Portfolio refresh aborted", "AbortError");
+        }
+        return analyzePortfolio(current, controller.signal);
+      })();
+
       try {
-        const currentSnapshot = await analyzePortfolio(current, controller.signal, true);
+        const currentSnapshot = await fastPromise;
         if (!isCurrentRequest()) return;
         logPortfolioSnapshot("fast", currentSnapshot);
         if (
@@ -517,7 +545,13 @@ export function PortfolioClient() {
 
   useEffect(() => {
     if (!hydrated || !positions.length) return;
-    const timer = window.setTimeout(() => void refresh(positions), 450);
+    // Premier affichage sans cache : presque immédiat. Une vue déjà visible
+    // peut attendre un peu afin d'absorber les éditions rapides de quantité.
+    const refreshDelayMs = snapshotRef.current ? 250 : 60;
+    const timer = window.setTimeout(
+      () => void refresh(positions),
+      refreshDelayMs,
+    );
     return () => window.clearTimeout(timer);
     // refresh intentionally follows the position state.
     // eslint-disable-next-line react-hooks/exhaustive-deps

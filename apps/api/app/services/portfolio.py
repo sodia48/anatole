@@ -8,6 +8,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from time import monotonic
 
+from app.core.resilience import AsyncStaleCache
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.stocks import Candle, Quote
 from app.schemas.workspace import (
@@ -249,9 +250,92 @@ def _allocation(
 
 
 class PortfolioService:
-    core_history_deadline_seconds = 12.0
-    optional_history_deadline_seconds = 4.0
-    driver_deadline_seconds = 1.5
+    # La valorisation doit gagner la course aux connexions HTTP.
+    fast_quote_deadline_seconds = 4.0
+
+    # Les historiques quotidiens changent lentement : on peut les réutiliser
+    # plusieurs minutes sans figer les cotations de séance.
+    core_history_deadline_seconds = 10.0
+    optional_history_deadline_seconds = 2.0
+    driver_deadline_seconds = 1.25
+    history_cache_fresh_seconds = 15 * 60.0
+    history_cache_stale_seconds = 24 * 60 * 60.0
+    driver_cache_fresh_seconds = 30 * 60.0
+    driver_cache_stale_seconds = 24 * 60 * 60.0
+
+    def __init__(self) -> None:
+        # Cache par instance : le singleton de production le conserve entre les
+        # requêtes, tandis que chaque test PortfolioService() reste isolé.
+        self._core_history_cache: AsyncStaleCache[
+            tuple[tuple[str, ...], str, str],
+            dict[str, list[Candle]],
+        ] = AsyncStaleCache(
+            max_entries=256,
+            metric_namespace="portfolio-core-history",
+        )
+        self._driver_history_cache: AsyncStaleCache[
+            tuple[tuple[str, ...], str, str],
+            dict[str, list[Candle]],
+        ] = AsyncStaleCache(
+            max_entries=32,
+            metric_namespace="portfolio-driver-history",
+        )
+
+    async def _cached_history_batch(
+        self,
+        tickers: list[str],
+        *,
+        optional: bool,
+    ) -> dict[str, list[Candle]]:
+        normalized = tuple(sorted(dict.fromkeys(tickers)))
+        key = (normalized, "1y", "1d")
+        cache = (
+            self._driver_history_cache
+            if optional
+            else self._core_history_cache
+        )
+        deadline = (
+            self.optional_history_deadline_seconds
+            if optional
+            else self.core_history_deadline_seconds
+        )
+        concurrency = 2 if optional else 8
+        attempts = 1 if optional else 2
+        return await cache.get_or_load(
+            key,
+            lambda: market_data_service.get_history_many_strict(
+                list(normalized),
+                range_="1y",
+                interval="1d",
+                concurrency=concurrency,
+                deadline_seconds=deadline,
+                attempts=attempts,
+            ),
+            fresh_seconds=(
+                self.driver_cache_fresh_seconds
+                if optional
+                else self.history_cache_fresh_seconds
+            ),
+            stale_seconds=(
+                self.driver_cache_stale_seconds
+                if optional
+                else self.history_cache_stale_seconds
+            ),
+        )
+
+    async def _canada_10y_driver(
+        self,
+    ) -> tuple[list[tuple[int, float]], bool]:
+        if market_data_service.demo_mode:
+            return [], False
+        try:
+            yields = await asyncio.wait_for(
+                bank_of_canada_valet_service.yields(),
+                timeout=self.driver_deadline_seconds,
+            )
+            return yields.get("V39055", []), False
+        except Exception:  # noqa: BLE001
+            return [], True
 
     async def _fx_rates(
         self,
@@ -301,29 +385,34 @@ class PortfolioService:
             benchmark_ticker,
         ]))
         optional_history_tickers = ["CL=F", "CAD=X"]
+        canada_10y: list[tuple[int, float]] = []
+        canada_10y_unavailable = False
         if fast:
-            quotes = await market_data_service.get_quotes(symbols)
+            # Un symbole lent ne doit plus bloquer toute la première peinture.
+            # Les cotations terminées dans la fenêtre sont rendues immédiatement;
+            # les loaders restants continuent à nourrir le cache partagé.
+            quotes = await market_data_service.get_quotes(
+                symbols,
+                deadline_seconds=self.fast_quote_deadline_seconds,
+            )
             histories = {}
         else:
-            quotes, core_histories, optional_histories = await asyncio.gather(
+            # Quotes, historiques principaux, drivers de stress et Banque du
+            # Canada démarrent ensemble. La série 10 ans ne rajoute donc plus
+            # jusqu'à 1.25 s après le reste du calcul.
+            quotes, core_histories, optional_histories, driver_result = await asyncio.gather(
                 market_data_service.get_quotes(symbols),
-                market_data_service.get_history_many_strict(
+                self._cached_history_batch(
                     core_history_tickers,
-                    range_="1y",
-                    interval="1d",
-                    concurrency=6,
-                    deadline_seconds=self.core_history_deadline_seconds,
-                    attempts=2,
+                    optional=False,
                 ),
-                market_data_service.get_history_many_strict(
+                self._cached_history_batch(
                     optional_history_tickers,
-                    range_="1y",
-                    interval="1d",
-                    concurrency=2,
-                    deadline_seconds=self.optional_history_deadline_seconds,
-                    attempts=1,
+                    optional=True,
                 ),
+                self._canada_10y_driver(),
             )
+            canada_10y, canada_10y_unavailable = driver_result
             histories = {
                 symbol: core_histories.get(ticker, core_histories.get(symbol, []))
                 for symbol, ticker in history_tickers.items()
@@ -365,6 +454,10 @@ class PortfolioService:
             currencies,
             request.base_currency,
         )
+        if canada_10y_unavailable:
+            notes.append(
+                "La série officielle Canada 10 ans est temporairement indisponible."
+            )
 
         raw_positions: list[dict[str, object]] = []
         for item in request.positions:
@@ -533,17 +626,6 @@ class PortfolioService:
         observed_at = datetime.now(UTC)
         performance_horizons, contribution_horizons = build_horizon_results(positions, histories, observed_at)
         correlation = build_correlation_matrix(positions, histories)
-        canada_10y: list[tuple[int, float]] = []
-        if not fast and not market_data_service.demo_mode:
-            try:
-                canada_10y = (
-                    await asyncio.wait_for(
-                        bank_of_canada_valet_service.yields(),
-                        timeout=self.driver_deadline_seconds,
-                    )
-                ).get("V39055", [])
-            except Exception:  # noqa: BLE001
-                notes.append("La série officielle Canada 10 ans est temporairement indisponible.")
         stress_tests = build_stress_tests(positions, histories, canada_10y)
         sector_allocation = _allocation(positions, "sector")
         risk_reading = build_portfolio_risk_reading(

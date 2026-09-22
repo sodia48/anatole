@@ -199,11 +199,12 @@ async def test_portfolio_keeps_base_metrics_when_histories_are_unavailable(monke
     assert snapshot.risk.history_coverage_percent == 0
     assert histories.await_count == 2
     core_call, optional_call = histories.await_args_list
-    assert core_call.args[0] == ["RY.TO", "^GSPTSE"]
-    assert core_call.kwargs["deadline_seconds"] == 12.0
+    assert set(core_call.args[0]) == {"RY.TO", "^GSPTSE"}
+    assert core_call.kwargs["deadline_seconds"] == 10.0
+    assert core_call.kwargs["concurrency"] == 8
     assert core_call.kwargs["attempts"] == 2
-    assert optional_call.args[0] == ["CL=F", "CAD=X"]
-    assert optional_call.kwargs["deadline_seconds"] == 4.0
+    assert set(optional_call.args[0]) == {"CL=F", "CAD=X"}
+    assert optional_call.kwargs["deadline_seconds"] == 2.0
 
 
 @pytest.mark.asyncio
@@ -284,9 +285,10 @@ async def test_portfolio_uses_quote_normalization_for_core_history_and_logs_cove
         base_currency="CAD",
     ))
 
-    assert calls[0][0] == ["RY.TO", "TD.TO", "XIC.TO", "^GSPTSE"]
+    assert set(calls[0][0]) == {"RY.TO", "TD.TO", "XIC.TO", "^GSPTSE"}
     assert calls[0][1]["attempts"] == 2
-    assert calls[1][0] == ["CL=F", "CAD=X"]
+    assert calls[0][1]["concurrency"] == 8
+    assert set(calls[1][0]) == {"CL=F", "CAD=X"}
     assert snapshot.risk is not None
     assert snapshot.risk.history_coverage_percent == 100
     assert snapshot.risk.volatility_percent is not None
@@ -298,3 +300,45 @@ async def test_portfolio_uses_quote_normalization_for_core_history_and_logs_cove
     assert snapshot.performance[0].portfolio == 100
     assert "portfolio_history ticker=RY.TO points=80 status=ok" in caplog.text
     assert "weighted_coverage=100.00%" in caplog.text
+
+@pytest.mark.asyncio
+async def test_portfolio_reuses_history_batch_for_identical_positions(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "market_data_provider", "yahoo")
+    monkeypatch.setattr(
+        market_data_service,
+        "get_quotes",
+        AsyncMock(return_value=[quote("RY", 200)]),
+    )
+    histories = AsyncMock(side_effect=[
+        {"RY.TO": candles(), "^GSPTSE": candles(seed=120)},
+        {},
+    ])
+    monkeypatch.setattr(
+        market_data_service,
+        "get_history_many_strict",
+        histories,
+    )
+    monkeypatch.setattr(
+        bank_of_canada_valet_service,
+        "yields",
+        AsyncMock(return_value={}),
+    )
+
+    service = PortfolioService()
+    request = PortfolioAnalyzeRequest(
+        positions=[
+            {"symbol": "RY", "quantity": 12, "average_cost": 122},
+        ],
+        base_currency="CAD",
+    )
+
+    first = await service.analyze(request)
+    second = await service.analyze(request)
+
+    assert first.total_market_value == second.total_market_value
+    # Core + optional drivers only once; the second analysis reuses both
+    # history batches while refreshing current quotes.
+    assert histories.await_count == 2
+
