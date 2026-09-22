@@ -14,6 +14,7 @@ import {
   getScreenerSnapshot,
   getTerminalSnapshot,
 } from "@/lib/api";
+import { prewarmPortfolio } from "@/lib/portfolio-prefetch";
 
 type ConnectionInfo = {
   saveData?: boolean;
@@ -81,6 +82,25 @@ export function WebPerformanceWarmup() {
     const etf = pathname === "/etf" || pathname.startsWith("/etf/");
 
     const timers: number[] = [];
+
+    // Portfolio is local-first: warm quotes early, then historical analytics
+    // in the background so navigation usually opens an already-filled view.
+    if (pathname !== "/portefeuille") {
+      timers.push(
+        window.setTimeout(() => {
+          if (backgroundWarmupAllowed()) {
+            void prewarmPortfolio("fast");
+          }
+        }, scaledWarmupDelay(450)),
+      );
+      timers.push(
+        window.setTimeout(() => {
+          if (backgroundWarmupAllowed()) {
+            void prewarmPortfolio("full");
+          }
+        }, scaledWarmupDelay(2_400)),
+      );
+    }
 
     // Never duplicate Today's own initial fan-out. On other pages, warm
     // only destinations the user is not currently loading.
