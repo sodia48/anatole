@@ -63,7 +63,7 @@ for (const route of routes) {
     await expect(page.locator("body")).not.toContainText(/Application error|Internal Server Error/i);
     await expect(page.locator("h1:visible, h2:visible").first()).toBeVisible();
 
-    if (testInfo.project.name === "mobile-pixel-7") {
+    if (testInfo.project.name.startsWith("mobile-")) {
       await page.waitForTimeout(350);
       const dimensions = await page.evaluate(() => ({
         client: document.documentElement.clientWidth,

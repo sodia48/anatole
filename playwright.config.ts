@@ -57,6 +57,10 @@ export default defineConfig({
       name: "mobile-pixel-7",
       use: { ...devices["Pixel 7"] },
     },
+    {
+      name: "mobile-iphone-14",
+      use: { ...devices["iPhone 14"] },
+    },
   ],
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
@@ -76,7 +80,7 @@ export default defineConfig({
             ACCOUNT_REGISTRATION_ENABLED: "true",
             ACCOUNT_INVITE_CODES: "",
             ACCOUNT_ADMIN_EMAILS:
-              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com",
+              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com",
           },
         },
         {
