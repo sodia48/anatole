@@ -79,6 +79,47 @@
   line-height: 1.45;
 }
 
+.portfolioStatus {
+  min-height: 34px;
+  margin-top: -6px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.portfolioStatus strong {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.portfolioStatus small {
+  color: var(--muted);
+}
+
+.statusDot,
+.statusDotBusy {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--teal);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--teal) 65%, transparent);
+}
+
+.statusDotBusy {
+  background: var(--blue);
+  animation: portfolioPulse 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes portfolioPulse {
+  from { opacity: .42; transform: scale(.82); }
+  to { opacity: 1; transform: scale(1.16); }
+}
+
 .toolbar,
 .panel {
   padding: 18px;
@@ -2077,4 +2118,17 @@
 .embedded .kpiCard,
 .embedded .sourceCard {
   box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .portfolioStatus {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-inline: 2px;
+  }
+
+  .portfolioStatus small {
+    width: 100%;
+    padding-left: 15px;
+  }
 }
