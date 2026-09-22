@@ -95,7 +95,7 @@ class PortfolioContributor(BaseModel):
     kind: Literal["day", "unrealized"]
 
 
-PortfolioPerformanceRange = Literal["1w", "1m", "3m", "ytd", "1y", "max"]
+PortfolioPerformanceRange = Literal["1w", "1m", "3m", "ytd", "1y", "5y", "10y", "max"]
 
 
 class PortfolioPerformanceWeight(BaseModel):
@@ -125,7 +125,7 @@ class PortfolioPerformanceRequest(BaseModel):
     def validate_weights(self) -> "PortfolioPerformanceRequest":
         symbols = [item.symbol for item in self.positions]
         if len(symbols) != len(set(symbols)):
-            raise ValueError("Les poids de performance doivent Ãªtre uniques par symbole.")
+            raise ValueError("Les poids de performance doivent être uniques par symbole.")
         if sum(item.weight_percent for item in self.positions) <= 0:
             raise ValueError("Le portefeuille doit avoir un poids positif.")
         return self

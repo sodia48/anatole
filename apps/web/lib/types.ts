@@ -683,6 +683,8 @@ export type PortfolioPerformanceRange =
   | "3m"
   | "ytd"
   | "1y"
+  | "5y"
+  | "10y"
   | "max";
 
 export type PortfolioPerformanceView = {

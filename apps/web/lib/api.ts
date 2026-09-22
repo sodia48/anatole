@@ -770,7 +770,7 @@ export function getPortfolioPerformance(
       body: JSON.stringify({ positions, benchmark, range }),
     },
     signal,
-    range === "max" ? 90_000 : 45_000,
+    ["5y", "10y", "max"].includes(range) ? 90_000 : 45_000,
     true,
   );
 }

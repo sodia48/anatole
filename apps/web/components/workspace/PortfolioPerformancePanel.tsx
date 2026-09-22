@@ -23,16 +23,18 @@ const RANGE_OPTIONS: Array<{
   { value: "3m", label: "3M" },
   { value: "ytd", label: "YTD" },
   { value: "1y", label: "1A" },
+  { value: "5y", label: "5A" },
+  { value: "10y", label: "10A" },
   { value: "max", label: "MAX" },
 ];
 
 const BENCHMARKS = [
   { value: "^GSPTSE", label: "S&P/TSX Composite" },
   { value: "^GSPC", label: "S&P 500" },
-  { value: "VFV", label: "VFV Â· S&P 500 CAD" },
-  { value: "XIC", label: "XIC Â· TSX Composite" },
-  { value: "XIU", label: "XIU Â· TSX 60" },
-  { value: "custom", label: "ETF / ticker personnalisÃ©" },
+  { value: "VFV", label: "VFV · S&P 500 CAD" },
+  { value: "XIC", label: "XIC · TSX Composite" },
+  { value: "XIU", label: "XIU · TSX 60" },
+  { value: "custom", label: "ETF / ticker personnalisé" },
 ] as const;
 
 function cutoffForRange(
@@ -144,10 +146,41 @@ function percent(value: number | null): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)} %`;
 }
 
+function chartDateLabel(
+  time: number,
+  range: PortfolioPerformanceRange,
+  language: AnatoleLanguage,
+): string {
+  const date = new Date(time * 1000);
+  const locale = language === "fr" ? "fr-CA" : "en-CA";
+
+  if (["5y", "10y", "max"].includes(range)) {
+    return new Intl.DateTimeFormat(locale, {
+      year: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  }
+
+  if (range === "1w" || range === "1m") {
+    return new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 function PerformanceChart({
   points,
   benchmarkName,
   language,
+  range,
   loading,
   error,
   onRetry,
@@ -155,6 +188,7 @@ function PerformanceChart({
   points: PortfolioPerformancePoint[];
   benchmarkName: string;
   language: AnatoleLanguage;
+  range: PortfolioPerformanceRange;
   loading: boolean;
   error: string | null;
   onRetry: () => void;
@@ -184,6 +218,10 @@ function PerformanceChart({
     { length: 5 },
     (_, index) => high - ((high - low) / 4) * index,
   );
+  const xTickIndexes = points.length >= 2
+    ? [0, 0.25, 0.5, 0.75, 1].map((ratio) =>
+        Math.round((points.length - 1) * ratio))
+    : [];
 
   if (loading && !points.length) {
     return (
@@ -191,7 +229,7 @@ function PerformanceChart({
         aria-busy="true"
         aria-label={pick(
           language,
-          "Chargement de lâ€™historique",
+          "Chargement de l’historique",
           "Loading history",
         )}
         className={`${styles.chartWrap} ${styles.chartState}`}
@@ -220,7 +258,7 @@ function PerformanceChart({
           type="button"
         >
           <RefreshCw aria-hidden="true" size={15} />
-          {pick(language, "RÃ©essayer", "Retry")}
+          {pick(language, "Réessayer", "Retry")}
         </button>
       </div>
     );
@@ -266,6 +304,27 @@ function PerformanceChart({
                   {tick.toFixed(0)}
                 </text>
               </g>
+            );
+          })}
+          {xTickIndexes.map((pointIndex, index) => {
+            const point = points[pointIndex];
+            const x = 46 + (index / 4) * (width - 64);
+            return (
+              <text
+                key={`x-${point.time}-${index}`}
+                className={styles.chartAxis}
+                x={x}
+                y={height - 8}
+                textAnchor={
+                  index === 0
+                    ? "start"
+                    : index === xTickIndexes.length - 1
+                      ? "end"
+                      : "middle"
+                }
+              >
+                {chartDateLabel(point.time, range, language)}
+              </text>
             );
           })}
           <path
@@ -327,7 +386,9 @@ export function PortfolioPerformancePanel({
     ? customBenchmark.trim().toUpperCase()
     : benchmarkChoice;
 
-  const useLocal = currentBenchmark === "^GSPTSE" && range !== "max";
+  const useLocal =
+    currentBenchmark === "^GSPTSE"
+    && !["5y", "10y", "max"].includes(range);
   const localPoints = useLocal
     ? rebaseLocalPoints(snapshot.performance, range)
     : [];
@@ -344,6 +405,9 @@ export function PortfolioPerformancePanel({
   const coverage = activeRemote?.coverage_percent
     ?? snapshot.risk?.history_coverage_percent
     ?? 0;
+  const historyStartYear = points.length
+    ? new Date(points[0].time * 1000).getUTCFullYear()
+    : null;
 
   const benchmarkName = activeRemote?.benchmark_name
     ?? (
@@ -353,7 +417,7 @@ export function PortfolioPerformancePanel({
           ? BENCHMARKS.find(
               (item) => item.value === currentBenchmark,
             )?.label ?? currentBenchmark
-          : pick(language, "Benchmark personnalisÃ©", "Custom benchmark")
+          : pick(language, "Benchmark personnalisé", "Custom benchmark")
     );
 
   async function loadRemote(
@@ -412,7 +476,10 @@ export function PortfolioPerformancePanel({
     setRange(nextRange);
     setError(null);
 
-    if (currentBenchmark === "^GSPTSE" && nextRange !== "max") {
+    if (
+      currentBenchmark === "^GSPTSE"
+      && !["5y", "10y", "max"].includes(nextRange)
+    ) {
       requestSequence.current += 1;
       setRemote(null);
       setRemoteKey(null);
@@ -435,7 +502,10 @@ export function PortfolioPerformancePanel({
       return;
     }
 
-    if (value === "^GSPTSE" && range !== "max") {
+    if (
+      value === "^GSPTSE"
+      && !["5y", "10y", "max"].includes(range)
+    ) {
       requestSequence.current += 1;
       setRemote(null);
       setRemoteKey(null);
@@ -467,7 +537,7 @@ export function PortfolioPerformancePanel({
           <p>
             {pick(
               language,
-              "Base 100 reconstituÃ©e avec les poids actuels. Les flux rÃ©els seront intÃ©grÃ©s Ã  la prochaine phase.",
+              "Base 100 reconstituée avec les poids actuels. Les flux réels seront intégrés à la prochaine phase.",
               "Base-100 reconstruction using current weights. Actual cash flows are coming in the next phase.",
             )}
           </p>
@@ -501,7 +571,7 @@ export function PortfolioPerformancePanel({
                   "Ticker du benchmark",
                   "Benchmark ticker",
                 )}
-                placeholder="VFV, XIC, XIUâ€¦"
+                placeholder="VFV, XIC, XIU…"
                 value={customBenchmark}
                 onChange={(event) => setCustomBenchmark(event.target.value)}
               />
@@ -523,7 +593,7 @@ export function PortfolioPerformancePanel({
         role="group"
         aria-label={pick(
           language,
-          "PÃ©riode de performance",
+          "Période de performance",
           "Performance period",
         )}
       >
@@ -542,6 +612,27 @@ export function PortfolioPerformancePanel({
             {item.label}
           </button>
         ))}
+        {range === "max" ? (
+          <span className={styles.performanceRangeMeta}>
+            {historyStartYear
+              ? pick(
+                  language,
+                  `MAX : depuis ${historyStartYear}`,
+                  `MAX: since ${historyStartYear}`,
+                )
+              : loading
+                ? pick(
+                    language,
+                    "MAX : recherche du premier historique…",
+                    "MAX: finding earliest history…",
+                  )
+                : pick(
+                    language,
+                    "MAX : historique indisponible",
+                    "MAX: history unavailable",
+                  )}
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.performanceSummary}>
@@ -555,7 +646,7 @@ export function PortfolioPerformancePanel({
         </div>
         <div>
           <span>
-            {pick(language, "Ã‰cart vs benchmark", "Excess vs benchmark")}
+            {pick(language, "Écart vs benchmark", "Excess vs benchmark")}
           </span>
           <strong>{percent(excessReturn)}</strong>
         </div>
@@ -578,6 +669,7 @@ export function PortfolioPerformancePanel({
         benchmarkName={benchmarkName}
         error={error}
         language={language}
+        range={range}
         loading={loading}
         onRetry={() => void loadRemote(range, currentBenchmark)}
         points={points}
@@ -587,7 +679,7 @@ export function PortfolioPerformancePanel({
         {activeRemote?.methodology
           ?? pick(
             language,
-            "Les pÃ©riodes jusquâ€™Ã  1 an rÃ©utilisent le snapshot dÃ©jÃ  chargÃ© : aucun appel rÃ©seau supplÃ©mentaire avec le TSX. MAX et les benchmarks alternatifs sont chargÃ©s Ã  la demande puis mis en cache.",
+            "Les périodes jusqu’à 1 an réutilisent le snapshot déjà chargé : aucun appel réseau supplémentaire avec le TSX. MAX et les benchmarks alternatifs sont chargés à la demande puis mis en cache.",
             "Periods up to 1 year reuse the loaded snapshot: no extra network request with the TSX. MAX and alternate benchmarks load on demand and are then cached.",
           )}
       </div>
