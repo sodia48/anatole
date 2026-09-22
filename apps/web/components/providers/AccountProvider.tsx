@@ -71,6 +71,15 @@ function online(): boolean {
   return typeof navigator === "undefined" || navigator.onLine;
 }
 
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function isMissingSession(reason: unknown): boolean {
+  const message = reason instanceof Error ? reason.message : "";
+  return message.includes("Connexion requise");
+}
+
 function fullyPresent(data: SyncedWorkspaceData) {
   return {
     data,
@@ -187,22 +196,50 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
       setSyncState("connecting");
       try {
         let status;
-        try {
-          status = await getAccountStatus();
-        } catch (reason) {
+        let lastStatusError: unknown = null;
+
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          try {
+            status = await getAccountStatus();
+            break;
+          } catch (reason) {
+            lastStatusError = reason;
+            if (cancelled) return;
+
+            if (isMissingSession(reason)) {
+              setUser(null);
+              setWorkspaceRevision(0);
+              setLastSyncedAt(null);
+              setError(null);
+              setSyncState("anonymous");
+              return;
+            }
+
+            if (attempt < 3) {
+              setSyncState(online() ? "connecting" : "offline");
+              await wait(600 * (attempt + 1));
+            }
+          }
+        }
+
+        if (!status) {
           if (cancelled) return;
-          const message = reason instanceof Error ? reason.message : "";
-          setUser(null);
-          setWorkspaceRevision(0);
-          setLastSyncedAt(null);
-          setError(message.includes("Connexion requise") ? null : message || null);
-          setSyncState("anonymous");
+          const message = lastStatusError instanceof Error
+            ? lastStatusError.message
+            : "Session temporairement impossible à vérifier.";
+          setError(message || "Session temporairement impossible à vérifier.");
+          setSyncState(online() ? "error" : "offline");
           return;
         }
 
         if (cancelled) return;
         setUser(status.user);
         setError(null);
+
+        // La session est déjà authentifiée. Ne bloque pas l'interface privée
+        // pendant la récupération/synchronisation du workspace, qui peut être
+        // plus lente ou momentanément indisponible pendant un déploiement.
+        setHydrated(true);
 
         try {
           const remote = await getRemoteWorkspace();
