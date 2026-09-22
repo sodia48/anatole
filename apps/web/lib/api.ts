@@ -150,7 +150,7 @@ function raceFreshWithCached<T>(
 
 function publicFreshTtlMs(path: string): number {
   if (path.startsWith("/api/v1/market/cockpit")) {
-    return path.includes("universe=composite") ? 25_000 : 8_000;
+    return path.includes("universe=composite") || path.includes("universe=tsxv") ? 25_000 : 8_000;
   }
   if (path.startsWith("/api/v1/discovery/psychology")) return 20_000;
   if (path.startsWith("/api/v1/discovery/news")) return 60_000;
@@ -158,7 +158,7 @@ function publicFreshTtlMs(path: string): number {
   if (path.startsWith("/api/v1/discovery/earnings-calendar")) return 0;
   if (path.startsWith("/api/v1/discovery/etfs")) return 60_000;
   if (path.startsWith("/api/v1/discovery/screener")) {
-    return path.includes("universe=composite") ? 45_000 : 20_000;
+    return path.includes("universe=composite") || path.includes("universe=tsxv") ? 45_000 : 20_000;
   }
   if (path.startsWith("/api/v1/discovery/ipo")) return 120_000;
   if (path.startsWith("/api/v1/discovery/insiders")) return 90_000;
@@ -345,20 +345,39 @@ export function getHealthStatus(
   return apiRequest<HealthStatus>("/health", {}, signal, 10_000);
 }
 
-export type CockpitUniverse = "tsx60" | "composite";
+export type CockpitUniverse = "tsx60" | "composite" | "tsxv";
 
-export function getCockpitSnapshot(
+function cockpitSnapshotMatchesUniverse(
+  snapshot: CockpitSnapshot,
+  universe: CockpitUniverse,
+): boolean {
+  const label = snapshot.universe.trim().toLowerCase();
+
+  if (universe === "tsxv") return label.includes("tsx venture");
+  if (universe === "composite") return label.includes("composite");
+  return label.includes("tsx 60") && !label.includes("composite");
+}
+
+export async function getCockpitSnapshot(
   universe: CockpitUniverse = "tsx60",
   signal?: AbortSignal,
 ): Promise<CockpitSnapshot> {
-  const timeoutMs = universe === "composite" ? 95_000 : 30_000;
+  const timeoutMs = universe === "tsx60" ? 30_000 : 95_000;
 
-  return apiRequest<CockpitSnapshot>(
+  const snapshot = await apiRequest<CockpitSnapshot>(
     `/api/v1/market/cockpit?universe=${encodeURIComponent(universe)}`,
     {},
     signal,
     timeoutMs,
   );
+
+  if (!cockpitSnapshotMatchesUniverse(snapshot, universe)) {
+    throw new Error(
+      `Réponse de marché incohérente pour l’univers ${universe}`,
+    );
+  }
+
+  return snapshot;
 }
 
 export function getWatchlistSnapshot(
@@ -410,7 +429,8 @@ export function getStockNewsSnapshot(
 
 export type ScreenerUniverse =
   | "composite"
-  | "tsx60";
+  | "tsx60"
+  | "tsxv";
 
 export function getScreenerSnapshot(
   universe: ScreenerUniverse =
@@ -421,7 +441,7 @@ export function getScreenerSnapshot(
     `/api/v1/discovery/screener?universe=${universe}`,
     {},
     signal,
-    universe === "composite"
+    universe !== "tsx60"
       ? 120_000
       : 45_000,
   );

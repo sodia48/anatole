@@ -23,6 +23,12 @@ it("persists language, universe, watchlist, sectors and regions", () => {
   expect(result.preferences).toEqual(expect.objectContaining({ theme: "blue", language: "en", default_universe: "composite", preferred_sectors: ["Financials"], preferred_regions: ["QC", "CA"], onboarding_version: 2 }));
 });
 
+it("persists the TSX Venture universe", () => {
+  const result = completeOnboarding(workspace(), { ...draft(), universe: "tsxv" });
+  expect(result.cockpit_universe).toBe("tsxv");
+  expect(result.preferences.default_universe).toBe("tsxv");
+});
+
 it("creates optional alerts only after explicit selection", () => {
   expect(explicitOnboardingAlerts(draft())).toEqual([]);
   const selected = explicitOnboardingAlerts(draft(["earnings_upcoming"]));

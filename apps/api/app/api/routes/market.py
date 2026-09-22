@@ -22,9 +22,12 @@ async def cockpit(universe: str = Query("tsx60")) -> CockpitSnapshot:
     }:
         return await cockpit_service.get_composite()
 
+    if normalized in {"tsxv", "venture", "tsx-venture"}:
+        return await cockpit_service.get_venture()
+
     raise HTTPException(
         status_code=400,
-        detail="universe doit être 'tsx60' ou 'composite'",
+        detail="universe doit etre 'tsx60', 'composite' ou 'tsxv'",
     )
 
 

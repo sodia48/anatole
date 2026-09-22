@@ -90,7 +90,7 @@ class SyncedPreferences(BaseModel):
     density: Literal["comfortable", "compact"] = "comfortable"
     decimals: Literal[2, 3] = 2
     default_range: Literal["1m", "3m", "6m", "1y", "5y"] = "1y"
-    default_universe: Literal["tsx60", "composite"] = "tsx60"
+    default_universe: Literal["tsx60", "composite", "tsxv"] = "tsx60"
     language: Literal["fr", "en"] = "fr"
     preferred_regions: list[str] = Field(default_factory=list, max_length=10)
     preferred_sectors: list[str] = Field(default_factory=list, max_length=20)
@@ -299,7 +299,7 @@ class SyncedWorkspaceData(BaseModel):
     alerts: list[AlertRule] = Field(default_factory=list, max_length=50)
     preferences: SyncedPreferences = Field(default_factory=SyncedPreferences)
     advisor_profile: AdvisorProfile | None = None
-    cockpit_universe: Literal["tsx60", "composite"] = "tsx60"
+    cockpit_universe: Literal["tsx60", "composite", "tsxv"] = "tsx60"
     comparator_symbols: list[str] = Field(default_factory=list, max_length=5)
     focus_layouts: list[FocusLayout] = Field(default_factory=list, max_length=10)
     focus_scripts: list[FocusScript] = Field(default_factory=list, max_length=10)
@@ -424,4 +424,3 @@ class AccountExport(BaseModel):
     workspace: WorkspaceSnapshot
     notification_preferences: NotificationPreferences | None = None
     notifications: list[NotificationItem] = Field(default_factory=list)
-

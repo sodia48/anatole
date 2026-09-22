@@ -11,7 +11,7 @@ export type CockpitSnapshot = {
   generated_at: string; refresh_after_seconds: number;
 };
 
-export type ScreenerUniverse = "composite" | "tsx60";
+export type ScreenerUniverse = "composite" | "tsx60" | "tsxv";
 export type ScreenerRow = {
   ticker: string; symbol: string; name: string; sector: string; price: number; change_percent: number;
   volume: number; average_volume_20d: number | null; relative_volume: number | null; momentum_20d: number | null;
