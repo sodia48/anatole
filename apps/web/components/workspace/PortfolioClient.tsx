@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -143,12 +144,16 @@ function loadCachedPortfolioSnapshot(positions: PortfolioPositionInput[]): Portf
     positions,
     HISTORY_SNAPSHOT_CACHE_MAX_AGE_MS,
   );
-  if (historical && hasCompleteHistory(historical)) return historical;
-  return readPortfolioCache(
+  const valuation = readPortfolioCache(
     SNAPSHOT_CACHE_KEY,
     positions,
     SNAPSHOT_CACHE_MAX_AGE_MS,
   );
+
+  if (valuation && historical && hasCompleteHistory(historical)) {
+    return mergeFastSnapshotWithHistory(valuation, historical);
+  }
+  return valuation ?? historical;
 }
 
 function writePortfolioCache(
@@ -398,14 +403,21 @@ export function PortfolioClient() {
     snapshotRef.current = snapshot;
   }, [snapshot]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const saved = loadPositions();
     const add = searchParams.get("add")?.toUpperCase().replace(/\.TO$/, "");
     const nextPositions = add && !saved.some((item) => item.symbol === add)
       ? [...saved, { symbol: add, quantity: 1, average_cost: 0 }]
       : saved;
     const cached = loadCachedPortfolioSnapshot(nextPositions);
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+
+    // React lint interdit les setState synchrones dans le corps d'un effect.
+    // Une microtask conserve le démarrage avant la prochaine opportunité de
+    // peinture tout en évitant une cascade synchrone de renders.
+    queueMicrotask(() => {
+      if (cancelled) return;
+
       setPositions(nextPositions);
       setBuilderOpen(nextPositions.length === 0 || Boolean(add));
       if (cached) {
@@ -416,8 +428,11 @@ export function PortfolioClient() {
         setSnapshotFromCache(true);
       }
       setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [searchParams]);
 
   useEffect(() => {
@@ -428,6 +443,30 @@ export function PortfolioClient() {
     window.addEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
     return () => window.removeEventListener(WORKSPACE_SYNC_EVENT, applySyncedPositions);
   }, []);
+
+  useEffect(() => {
+    const applyPrewarmedSnapshot = () => {
+      const currentPositions = loadPositions();
+      const cached = loadCachedPortfolioSnapshot(currentPositions);
+      if (!cached) return;
+      const fingerprint = positionsFingerprint(currentPositions);
+      if (fingerprint !== positionsFingerprint(positions)) return;
+
+      snapshotRef.current = cached;
+      snapshotPositionsRef.current = fingerprint;
+      setSnapshot(cached);
+      setSnapshotFromCache(true);
+    };
+
+    window.addEventListener(
+      "anatole:portfolio-cache-updated",
+      applyPrewarmedSnapshot,
+    );
+    return () => window.removeEventListener(
+      "anatole:portfolio-cache-updated",
+      applyPrewarmedSnapshot,
+    );
+  }, [positions]);
 
   useEffect(() => {
     if (!hydrated) return;

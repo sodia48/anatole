@@ -45,6 +45,7 @@ import { AccountStatus } from "@/components/account/AccountStatus";
 import { useAccount } from "@/components/providers/AccountProvider";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { navLabel, pick } from "@/lib/i18n";
+import { prewarmPortfolio } from "@/lib/portfolio-prefetch";
 import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 
 type NavItem = {
@@ -603,6 +604,9 @@ export function AppSidebar({
   function chooseResult(
     result: SearchResult,
   ): void {
+    if (result.href === "/portefeuille") {
+      void prewarmPortfolio("fast");
+    }
     closeSearch();
     router.push(result.href);
   }
@@ -969,6 +973,16 @@ export function AppSidebar({
                   <Link
                     key={item.label}
                     href={item.href}
+                    onPointerEnter={() => {
+                      if (item.href === "/portefeuille") {
+                        void prewarmPortfolio("fast");
+                      }
+                    }}
+                    onFocus={() => {
+                      if (item.href === "/portefeuille") {
+                        void prewarmPortfolio("fast");
+                      }
+                    }}
                     onClick={() =>
                       setDrawerOpen(false)
                     }
