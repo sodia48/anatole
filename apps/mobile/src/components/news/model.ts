@@ -1,4 +1,4 @@
-import type { FeedStatus, NewsItem, StockNewsItem, SyncedWorkspaceData } from "@/src/lib/api/types";
+import type { FeedStatus, NewsItem, ProvincialMacroRelease, ProvinceCode, StockNewsItem, SyncedWorkspaceData } from "@/src/lib/api/types";
 
 export type NewsLanguage = "fr" | "en";
 export type NewsPrimaryFilter = "all" | "canada" | "provinces" | "boc" | "statcan" | "my-regions" | "personal";
@@ -53,6 +53,76 @@ export function normalizeNewsRegion(value: string): string {
   const region = value.trim().toUpperCase();
   if (region === "CANADA") return "CA";
   return region;
+}
+
+export function isStatCanNewsSource(source: string): boolean {
+  const value = normalized(source);
+  return value.includes("statistique canada") || value.includes("statistics canada") || value.includes("statcan");
+}
+
+function canonicalNewsKey(item: NewsItem): string {
+  const canonicalUrl = item.url.split("?", 1)[0]?.replace(/\/+$/, "").toLowerCase() ?? "";
+  return canonicalUrl || `${normalized(item.source)}|${normalized(item.title)}`;
+}
+
+function provincialReleaseToNewsItem(release: ProvincialMacroRelease): NewsItem | null {
+  if (!release.published_at) return null;
+  const timestamp = Date.parse(release.published_at);
+  if (!Number.isFinite(timestamp)) return null;
+  return {
+    id: `provincial:${release.id}`,
+    title: release.title,
+    summary: release.summary,
+    url: release.source_url,
+    source: release.source,
+    category: release.category,
+    published_at: release.published_at,
+    sentiment: "Neutre",
+    sentiment_score: 0,
+    regions: [release.region],
+    image_url: null,
+  };
+}
+
+export function provinceFirstNewsItems(
+  releases: readonly ProvincialMacroRelease[],
+  fallbackItems: readonly NewsItem[],
+  region: ProvinceCode,
+  statcanFallbackLimit = 6,
+): NewsItem[] {
+  const releaseItems = releases
+    .map(provincialReleaseToNewsItem)
+    .filter((item): item is NewsItem => item !== null);
+
+  const regionalFallback = fallbackItems.filter((item) =>
+    item.regions.map(normalizeNewsRegion).includes(region),
+  );
+
+  const indexes = new Map<string, number>();
+  const deduplicated: NewsItem[] = [];
+  for (const item of [...releaseItems, ...regionalFallback]) {
+    const key = canonicalNewsKey(item);
+    const existingIndex = indexes.get(key);
+    if (existingIndex === undefined) {
+      indexes.set(key, deduplicated.length);
+      deduplicated.push(item);
+      continue;
+    }
+    const existing = deduplicated[existingIndex];
+    if (existing && !existing.image_url && item.image_url) {
+      deduplicated[existingIndex] = { ...existing, image_url: item.image_url };
+    }
+  }
+
+  const newestFirst = (left: NewsItem, right: NewsItem) =>
+    Date.parse(right.published_at) - Date.parse(left.published_at);
+  const direct = deduplicated.filter((item) => !isStatCanNewsSource(item.source)).sort(newestFirst);
+  const statcan = deduplicated.filter((item) => isStatCanNewsSource(item.source)).sort(newestFirst);
+  const statcanLimit = direct.length > 0
+    ? Math.min(direct.length, statcanFallbackLimit)
+    : statcanFallbackLimit;
+
+  return [...direct, ...statcan.slice(0, statcanLimit)];
 }
 
 export function classifyNewsCategory(item: Pick<NewsItem, "category" | "title" | "summary">): Exclude<NewsCategoryFilter, "all"> {

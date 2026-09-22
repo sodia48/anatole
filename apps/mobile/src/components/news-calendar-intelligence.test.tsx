@@ -37,7 +37,42 @@ function provincialSnapshot(region: string) {
     province: region,
     language: mockLanguage,
     mode: "province-first",
-    latest_releases: [],
+    latest_releases: [
+      {
+        id: `release-direct-${region}`,
+        region,
+        province: region,
+        title: `Investissement ${region}`,
+        summary: "Publication directe du gouvernement provincial.",
+        category: "Investissement",
+        importance: "Élevée",
+        importance_score: 92,
+        source: `Gouvernement ${region}`,
+        source_kind: "government",
+        source_url: `https://example.com/${region}/release`,
+        published_at: "2026-09-03T12:45:00Z",
+        period: null,
+        official: true,
+        specificity: "province-direct",
+      },
+      {
+        id: `release-statcan-${region}`,
+        region,
+        province: region,
+        title: `StatCan ${region}`,
+        summary: "Complément fédéral provincial.",
+        category: "PIB",
+        importance: "Moyenne",
+        importance_score: 70,
+        source: "Statistique Canada",
+        source_kind: "statcan",
+        source_url: `https://example.com/${region}/statcan`,
+        published_at: "2026-09-03T12:15:00Z",
+        period: null,
+        official: true,
+        specificity: "province-normalized",
+      },
+    ],
     upcoming_events: [{
       id: `provincial-${region}`,
       region,
@@ -55,7 +90,10 @@ function provincialSnapshot(region: string) {
       official: true,
       specificity: "province-normalized",
     }],
-    sources: [{ key: `statcan-${region}`, label: `StatCan ${region}`, region, kind: "statcan", url: "https://statcan.gc.ca", status: "available", count: 1, detail: null }],
+    sources: [
+      { key: `direct-${region}`, label: `Gouvernement ${region}`, region, kind: "government", url: `https://example.com/${region}`, status: "available", count: 1, detail: null },
+      { key: `statcan-${region}`, label: `StatCan ${region}`, region, kind: "statcan", url: "https://statcan.gc.ca", status: "available", count: 1, detail: null },
+    ],
     generated_at: "2026-09-03T13:05:00Z",
     refresh_after_seconds: 900,
     message: null,
@@ -68,9 +106,18 @@ const dataByRoot: Record<string, unknown> = {
   earnings: { universe: "composite", universe_as_of: null, constituent_count: 2, companies_with_dates: 2, events: earnings, source_statuses: [{ source: "Public earnings", status: "ok", detail: null }], generated_at: "2026-09-03T13:05:00Z", refresh_after_seconds: 10800 },
 };
 
-const mockUseQuery = jest.fn(({ queryKey }: { queryKey: unknown[] }) => {
+const mockUseQuery = jest.fn(({ queryKey }: { queryKey: unknown[]; enabled?: boolean }) => {
   const root = String(queryKey[0]);
-  return { data: dataByRoot[root], isLoading: false, isError: errorRoots.has(root), isRefetching: false, error: errorRoots.has(root) ? new Error("network") : null, refetch: jest.fn() };
+  const region = String(queryKey[1] ?? "");
+  const provincialError = root === "provincial-news" && provincialErrorRegions.has(region);
+  // React Query keeps cached data visible when a query becomes disabled
+  // (for example while the app moves to the background). The mock must
+  // preserve that behavior instead of blanking the calendar.
+  const data = root === "provincial-news"
+    ? provincialSnapshot(region)
+    : dataByRoot[root];
+  const isError = errorRoots.has(root) || provincialError;
+  return { data, isLoading: false, isError, isRefetching: false, error: isError ? new Error("network") : null, refetch: jest.fn() };
 });
 const mockUseQueries = jest.fn(({ queries }: { queries: { queryKey: unknown[]; enabled: boolean }[] }) => queries.map((query) => {
   const root = String(query.queryKey[0]);
@@ -134,6 +181,24 @@ describe("mobile news and calendar intelligence", () => {
     await waitFor(() => expect(view.getByTestId("news-region-QC").props.accessibilityState.selected).toBe(true));
     expect(view.getAllByText("Emploi au Québec")).toHaveLength(2);
     expect(view.getAllByText("Décision de la Banque du Canada")).toHaveLength(1);
+    await view.unmount();
+  });
+
+  it("loads province-first releases for mobile news when an exact province is selected", async () => {
+    const view = await render(<NewsIntelligenceScreen initialRegion="QC" />);
+    await waitFor(() => expect(view.getByText("Investissement QC")).toBeTruthy());
+
+    const call = mockUseQuery.mock.calls
+      .map(([options]) => options as { queryKey: unknown[]; enabled?: boolean; queryFn?: (context: { signal: AbortSignal }) => unknown })
+      .find((options) => String(options.queryKey[0]) === "provincial-news");
+
+    expect(call?.enabled).toBe(true);
+    const controller = new AbortController();
+    await call?.queryFn?.({ signal: controller.signal });
+    expect(marketApi.provincialCalendar).toHaveBeenCalledWith("QC", "fr", controller.signal);
+    const user = userEvent.setup();
+    await user.press(view.getByText("SOURCES"));
+    expect(view.getByText("Gouvernement QC")).toBeTruthy();
     await view.unmount();
   });
 

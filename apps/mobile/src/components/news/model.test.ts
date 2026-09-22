@@ -1,8 +1,29 @@
-import type { NewsItem, SyncedWorkspaceData } from "@/src/lib/api/types";
-import { classifyNewsCategory, dedupeNewsItems, filterNewsItems, lexicalToneLabel, rankNewsItems, selectPersonalNewsSymbols, sourceHealthLabel, type NewsFiltersState } from "./model";
+import type { NewsItem, ProvincialMacroRelease, SyncedWorkspaceData } from "@/src/lib/api/types";
+import { classifyNewsCategory, dedupeNewsItems, filterNewsItems, lexicalToneLabel, provinceFirstNewsItems, rankNewsItems, selectPersonalNewsSymbols, sourceHealthLabel, type NewsFiltersState } from "./model";
 
 function news(overrides: Partial<NewsItem> = {}): NewsItem {
   return { id: "n1", title: "La Banque du Canada publie sa décision", summary: "Décision de politique monétaire.", url: "https://example.com/n1", source: "Banque du Canada", category: "Politique monétaire", published_at: "2026-09-03T13:00:00Z", sentiment: "Neutre", sentiment_score: 0, regions: ["CA"], ...overrides };
+}
+
+function release(overrides: Partial<ProvincialMacroRelease> = {}): ProvincialMacroRelease {
+  return {
+    id: "r1",
+    region: "QC",
+    province: "Québec",
+    title: "Investissement majeur au Québec",
+    summary: "Publication économique provinciale.",
+    category: "Investissement",
+    importance: "Élevée",
+    importance_score: 90,
+    source: "Gouvernement du Québec",
+    source_kind: "government",
+    source_url: "https://example.com/qc-release",
+    published_at: "2026-09-03T13:15:00Z",
+    period: null,
+    official: true,
+    specificity: "province-direct",
+    ...overrides,
+  };
 }
 
 const filters: NewsFiltersState = { primary: "all", region: "all", category: "all", search: "" };
@@ -60,6 +81,43 @@ describe("news intelligence model", () => {
     const items = [news({ id: "ca", regions: ["CA"] }), news({ id: "qc", regions: ["QC"] })];
     expect(filterNewsItems(items, { ...filters, primary: "my-regions" }, [])).toEqual([]);
     expect(filterNewsItems(items, { ...filters, primary: "my-regions" }, ["QC"]).map((item) => item.id)).toEqual(["qc"]);
+  });
+
+  it("prioritizes direct provincial releases, enriches duplicates and caps StatCan fallback", () => {
+    const releases = [
+      release(),
+      ...Array.from({ length: 4 }, (_, index) => release({
+        id: `statcan-${index}`,
+        title: `StatCan release ${index}`,
+        source: "Statistique Canada",
+        source_kind: "statcan",
+        source_url: `https://example.com/statcan-${index}`,
+        published_at: `2026-09-03T1${index}:00:00Z`,
+        specificity: "province-normalized",
+      })),
+    ];
+    const fallback = [
+      news({
+        id: "same-direct",
+        title: "Investissement majeur au Québec",
+        source: "Gouvernement du Québec",
+        url: "https://example.com/qc-release?utm_source=mobile",
+        regions: ["QC"],
+        image_url: "https://images.example.com/qc-release.jpg",
+      }),
+      news({
+        id: "statcan-extra",
+        title: "StatCan extra",
+        source: "Statistique Canada",
+        url: "https://example.com/statcan-extra",
+        regions: ["QC"],
+      }),
+    ];
+
+    const items = provinceFirstNewsItems(releases, fallback, "QC");
+    expect(items[0]?.source).toBe("Gouvernement du Québec");
+    expect(items[0]?.image_url).toBe("https://images.example.com/qc-release.jpg");
+    expect(items.filter((item) => item.source === "Statistique Canada")).toHaveLength(1);
   });
 
   it("keeps FR and EN lexical tone explicitly separate from market impact", () => {

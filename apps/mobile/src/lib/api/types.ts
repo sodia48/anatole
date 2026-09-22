@@ -203,11 +203,28 @@ export type ProvincialMacroSource = {
   key: string;
   label: string;
   region: ProvinceCode;
-  kind: "statistics" | "economic_accounts" | "dashboard" | "finance" | "statcan";
+  kind: "statistics" | "economic_accounts" | "dashboard" | "finance" | "government" | "statcan";
   url: string;
   status: "available" | "partial" | "unavailable";
   count: number;
   detail: string | null;
+};
+export type ProvincialMacroRelease = {
+  id: string;
+  region: ProvinceCode;
+  province: string;
+  title: string;
+  summary: string;
+  category: string;
+  importance: "Élevée" | "Moyenne" | "Faible";
+  importance_score: number;
+  source: string;
+  source_kind: ProvincialMacroSource["kind"];
+  source_url: string;
+  published_at: string | null;
+  period: string | null;
+  official: boolean;
+  specificity: "province-direct" | "province-normalized" | "fiscal-direct";
 };
 export type ProvincialMacroEvent = {
   id: string;
@@ -231,7 +248,7 @@ export type ProvincialMacroSnapshot = {
   province: string;
   language: "fr" | "en";
   mode: "province-first";
-  latest_releases: unknown[];
+  latest_releases: ProvincialMacroRelease[];
   upcoming_events: ProvincialMacroEvent[];
   sources: ProvincialMacroSource[];
   generated_at: string;
