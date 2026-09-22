@@ -211,14 +211,16 @@ class FundamentalsService:
         return rows[0]
 
     async def _quote_fallback(self, symbol: str) -> dict[str, Any]:
-        if settings.market_data_provider.strip().lower() == "demo":
-            return {}
         try:
             payload = await tmx_money_service.get_summary(symbol)
             if payload:
                 return payload
         except Exception as exc:
             self._report_failure(symbol, "tmx_money", exc)
+
+        if settings.market_data_provider.strip().lower() == "demo":
+            return {}
+
         body = await yahoo_public_service.request_json(
             "/v7/finance/quote", params={"symbols": symbol},
         )
