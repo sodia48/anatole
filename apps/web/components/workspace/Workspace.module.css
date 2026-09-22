@@ -2675,3 +2675,19 @@
 @media (max-width: 620px) {
   .performanceSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+.performanceRangeMeta {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 750;
+  white-space: nowrap;
+}

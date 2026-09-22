@@ -74,3 +74,43 @@ async def test_portfolio_performance_supports_alternate_benchmark(
     assert kwargs["range_"] == "3mo"
     assert kwargs["interval"] == "1d"
     assert kwargs["attempts"] == 1
+
+
+@pytest.mark.parametrize(
+    ("range_", "provider_range"),
+    [
+        ("5y", "5y"),
+        ("10y", "10y"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_portfolio_performance_long_horizons_use_matching_provider_range(
+    monkeypatch: pytest.MonkeyPatch,
+    range_: str,
+    provider_range: str,
+) -> None:
+    histories = {
+        "RY.TO": candles(100, 0.001, count=90),
+        "^GSPTSE": candles(100, 0.0008, count=90),
+    }
+    loader = AsyncMock(return_value=histories)
+    monkeypatch.setattr(
+        market_data_service,
+        "get_history_many_strict",
+        loader,
+    )
+
+    result = await PortfolioPerformanceService().analyze(
+        PortfolioPerformanceRequest(
+            positions=[
+                {"symbol": "RY", "weight_percent": 100},
+            ],
+            benchmark="^GSPTSE",
+            range=range_,
+        )
+    )
+
+    assert result.range == range_
+    assert result.points
+    assert loader.await_args.kwargs["range_"] == provider_range
+    assert loader.await_args.kwargs["deadline_seconds"] == 12.0

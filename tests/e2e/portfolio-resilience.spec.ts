@@ -350,6 +350,78 @@ test.describe("Portfolio progressive degradation", () => {
     });
   });
 
+
+  test("supports 5-year, 10-year and dated MAX performance horizons", async ({ page }) => {
+    const requestedRanges: string[] = [];
+
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio/performance", async (route) => {
+      const body = route.request().postDataJSON() as { range: string; benchmark: string };
+      requestedRanges.push(body.range);
+
+      const start = body.range === "max"
+        ? Date.UTC(1998, 0, 2) / 1000
+        : Date.UTC(2016, 0, 2) / 1000;
+      const points = Array.from({ length: 40 }, (_, index) => ({
+        time: start + index * 31 * 86_400,
+        portfolio: 100 + index * 0.4,
+        benchmark: 100 + index * 0.25,
+      }));
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          range: body.range,
+          range_label: body.range,
+          benchmark: body.benchmark,
+          benchmark_name: "S&P/TSX Composite",
+          points,
+          portfolio_return_percent: 15.6,
+          benchmark_return_percent: 9.75,
+          excess_return_percent: 5.85,
+          coverage_percent: 100,
+          methodology: "Performance reconstituée.",
+          generated_at: "2026-09-22T22:00:00Z",
+          refresh_after_seconds: 300,
+        }),
+      });
+    });
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (requestUrl.pathname.endsWith("/portfolio/performance")) {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          requestUrl.searchParams.get("fast") === "true"
+            ? snapshot()
+            : historicalSnapshot(),
+        ),
+      });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+
+    await page.getByRole("button", { name: "5A", exact: true }).click();
+    await expect.poll(() => requestedRanges).toContain("5y");
+
+    await page.getByRole("button", { name: "10A", exact: true }).click();
+    await expect.poll(() => requestedRanges).toContain("10y");
+
+    await page.getByRole("button", { name: "MAX", exact: true }).click();
+    await expect.poll(() => requestedRanges).toContain("max");
+    await expect(page.getByText("MAX : depuis 1998", { exact: true })).toBeVisible();
+  });
+
   test("shows advanced portfolio intelligence without extra network calls when switching tabs", async ({ page }) => {
     let fullCalls = 0;
     await page.addInitScript((saved) => {

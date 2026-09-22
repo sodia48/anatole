@@ -16,8 +16,10 @@ _RANGE_LABELS = {
     "1w": "1 semaine",
     "1m": "1 mois",
     "3m": "3 mois",
-    "ytd": "AnnÃ©e en cours",
+    "ytd": "Année en cours",
     "1y": "1 an",
+    "5y": "5 ans",
+    "10y": "10 ans",
     "max": "Maximum disponible",
 }
 
@@ -27,6 +29,8 @@ _PROVIDER_RANGES = {
     "3m": "6mo",
     "ytd": "ytd",
     "1y": "1y",
+    "5y": "5y",
+    "10y": "10y",
     "max": "max",
 }
 
@@ -55,6 +59,8 @@ def _cutoff(range_: str, now: datetime) -> int | None:
         "1m": 33,
         "3m": 96,
         "1y": 370,
+        "5y": 1_835,
+        "10y": 3_665,
     }[range_]
     return int((now - timedelta(days=days)).timestamp())
 
@@ -144,7 +150,11 @@ class PortfolioPerformanceService:
             range_=_PROVIDER_RANGES[request.range],
             interval="1d",
             concurrency=10,
-            deadline_seconds=12.0 if request.range == "max" else 8.0,
+            deadline_seconds=(
+                12.0
+                if request.range in {"5y", "10y", "max"}
+                else 8.0
+            ),
             attempts=1,
         )
 
@@ -258,7 +268,7 @@ class PortfolioPerformanceService:
             ),
             coverage_percent=round(coverage, 2),
             methodology=(
-                "Performance reconstituÃ©e avec les poids actuels du portefeuille. "
+                "Performance reconstituée avec les poids actuels du portefeuille. "
                 "Cette courbe ne tient pas encore compte des dates d'achat, "
                 "apports, retraits ou dividendes personnels."
             ),
