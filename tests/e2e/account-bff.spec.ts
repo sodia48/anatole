@@ -171,6 +171,52 @@ test("le BFF compte protège le jeton et couvre le cycle de vie", async ({ conte
   expect((await api.get("/api/account/me")).status()).toBe(401);
 });
 
+
+test("une panne transitoire de session est retentée avant de déclarer l'utilisateur déconnecté", async ({ page }) => {
+  let meRequests = 0;
+
+  await page.route("**/api/account/me", (route) => {
+    meRequests += 1;
+    if (meRequests < 3) {
+      return route.fulfill({
+        status: 502,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Le service de compte est temporairement indisponible." }),
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        user: {
+          id: "retry-user",
+          email: "retry@example.com",
+          display_name: "Session Persistante",
+          created_at: "2026-08-01T00:00:00Z",
+          last_login_at: "2026-08-01T00:00:00Z",
+        },
+        workspace_revision: 4,
+        workspace_updated_at: "2026-09-22T12:00:00Z",
+      }),
+    });
+  });
+
+  await page.route("**/api/account/workspace", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      revision: 4,
+      data: {},
+      updated_at: "2026-09-22T12:00:00Z",
+    }),
+  }));
+
+  await page.goto("/parametres?section=account");
+  await expect.poll(() => meRequests, { timeout: 8_000 }).toBeGreaterThanOrEqual(3);
+  await expect(page.getByText("retry@example.com", { exact: true }).first()).toBeVisible();
+});
+
 test("une panne workspace conserve la session utilisateur", async ({ page }) => {
   let workspaceRequests = 0;
   await page.route("**/api/account/registration", (route) => route.fulfill({
