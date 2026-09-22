@@ -685,6 +685,53 @@ export type PortfolioContributor = {
   kind: "day" | "unrealized";
 };
 
+export type PortfolioCoverage = {
+  symbols_expected: number;
+  symbols_available: number;
+  coverage_percent: number;
+};
+
+export type PortfolioHorizon = {
+  horizon: "1d" | "1w" | "1m" | "3m" | "ytd" | "1y";
+  return_percent: number | null;
+  coverage: PortfolioCoverage;
+  methodology: "observed_day" | "current_positions_reconstructed";
+};
+
+export type PortfolioHorizonContribution = {
+  symbol: string;
+  contribution_percent: number;
+  security_return_percent: number;
+  current_weight_percent: number;
+};
+
+export type PortfolioContributionResult = {
+  horizon: PortfolioHorizon["horizon"];
+  items: PortfolioHorizonContribution[];
+  coverage: PortfolioCoverage;
+  methodology: PortfolioHorizon["methodology"];
+};
+
+export type PortfolioCorrelation = {
+  symbols: string[];
+  values: Array<Array<number | null>>;
+  observations: number[][];
+  average_correlation: number | null;
+  highest_pair: [string, string, number] | null;
+  lowest_pair: [string, string, number] | null;
+  minimum_observations?: number;
+};
+
+export type PortfolioStressTest = {
+  key: "tsx" | "wti" | "cad_usd" | "canada_10y";
+  label: string;
+  shock: number;
+  shock_unit: "percent" | "basis_points";
+  estimated_portfolio_change_percent: number | null;
+  coverage: PortfolioCoverage;
+  methodology: string;
+};
+
 export type PortfolioSnapshot = {
   base_currency: string;
   benchmark: string;
@@ -715,6 +762,12 @@ export type PortfolioSnapshot = {
   } | null;
   contributors: PortfolioContributor[];
   detractors: PortfolioContributor[];
+  performance_horizons?: PortfolioHorizon[];
+  contribution_horizons?: PortfolioContributionResult[];
+  correlation?: PortfolioCorrelation | null;
+  stress_tests?: PortfolioStressTest[];
+  risk_reading?: string[];
+  methodology?: string;
   notes: string[];
   generated_at: string;
   refresh_after_seconds: number;

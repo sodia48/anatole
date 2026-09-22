@@ -91,6 +91,47 @@ function historicalSnapshot() {
     ...data,
     portfolio_score: 61.7,
     performance,
+    performance_horizons: [
+      { horizon: "1d", return_percent: 0.5, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "observed_day" },
+      { horizon: "1w", return_percent: 1.2, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "current_positions_reconstructed" },
+      { horizon: "1m", return_percent: 3.4, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "current_positions_reconstructed" },
+      { horizon: "3m", return_percent: 6.8, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "current_positions_reconstructed" },
+      { horizon: "ytd", return_percent: 9.1, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "current_positions_reconstructed" },
+      { horizon: "1y", return_percent: 12.5, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "current_positions_reconstructed" },
+    ],
+    contribution_horizons: [
+      {
+        horizon: "1d",
+        coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 },
+        methodology: "observed_day",
+        items: [
+          { symbol: "RY", contribution_percent: 0.28, security_return_percent: 0.8, current_weight_percent: 38.3 },
+          { symbol: "TD", contribution_percent: 0.14, security_return_percent: 0.5, current_weight_percent: 28.7 },
+          { symbol: "XIC", contribution_percent: 0.08, security_return_percent: 0.3, current_weight_percent: 33.0 },
+        ],
+      },
+    ],
+    correlation: {
+      symbols: ["RY", "TD", "XIC"],
+      values: [[1, 0.72, 0.64], [0.72, 1, 0.58], [0.64, 0.58, 1]],
+      observations: [[251, 251, 251], [251, 251, 251], [251, 251, 251]],
+      average_correlation: 0.65,
+      highest_pair: ["RY", "TD", 0.72],
+      lowest_pair: ["TD", "XIC", 0.58],
+      minimum_observations: 40,
+    },
+    stress_tests: [
+      { key: "tsx", label: "TSX -5 %", shock: -5, shock_unit: "percent", estimated_portfolio_change_percent: -4.1, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "historical sensitivity" },
+      { key: "wti", label: "WTI -10 %", shock: -10, shock_unit: "percent", estimated_portfolio_change_percent: -1.2, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "historical sensitivity" },
+      { key: "cad_usd", label: "CAD/USD +5 %", shock: 5, shock_unit: "percent", estimated_portfolio_change_percent: 0.6, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "historical sensitivity" },
+      { key: "canada_10y", label: "Canada 10 ans +50 pdb", shock: 50, shock_unit: "basis_points", estimated_portfolio_change_percent: -0.7, coverage: { symbols_expected: 3, symbols_available: 3, coverage_percent: 100 }, methodology: "historical sensitivity" },
+    ],
+    risk_reading: [
+      "67.0 % du portefeuille est concentré dans le secteur Financials.",
+      "Les trois principales positions représentent 100.0 %.",
+      "RY et TD présentent une corrélation récente de 0.72, calculée sur des rendements quotidiens partagés.",
+    ],
+    methodology: "Les horizons supérieurs à un jour reconstituent la performance des positions actuelles en supposant les quantités constantes.",
     risk: {
       ...data.risk,
       volatility_percent: 15.8,
@@ -236,4 +277,44 @@ test.describe("Portfolio progressive degradation", () => {
     await expect(chart.locator("path").nth(1)).toHaveAttribute("d", "");
     await expect(page.getByText("La courbe du portefeuille reste disponible; l’historique du TSX Composite est temporairement indisponible.")).toBeVisible();
   });
+  test("shows advanced portfolio intelligence without extra network calls when switching tabs", async ({ page }) => {
+    let fullCalls = 0;
+    await page.addInitScript((saved) => {
+      localStorage.setItem("anatole:portfolio:v1", JSON.stringify(saved));
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    }, positions);
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const requestUrl = new URL(route.request().url());
+      if (requestUrl.searchParams.get("fast") === "true") {
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(snapshot()) });
+        return;
+      }
+      fullCalls += 1;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(historicalSnapshot()) });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+
+    const intelligence = page.getByTestId("portfolio-intelligence");
+    await expect(intelligence).toBeVisible();
+    await expect(intelligence.getByRole("heading", { name: "Intelligence du portefeuille" })).toBeVisible();
+    const oneYearReturn = intelligence.getByText("+12.50 %", { exact: true });
+    await expect(oneYearReturn).toHaveCount(2);
+    await expect(oneYearReturn.first()).toBeVisible();
+
+    await intelligence.getByRole("tab", { name: "Contribution" }).click();
+    await expect(intelligence.getByText("+0.28 %", { exact: true })).toBeVisible();
+
+    await intelligence.getByRole("tab", { name: "Corrélations" }).click();
+    await expect(intelligence.getByText("RY / TD", { exact: true })).toBeVisible();
+    await expect(intelligence.getByText("0.65", { exact: true })).toBeVisible();
+
+    await intelligence.getByRole("tab", { name: "Stress tests" }).click();
+    await expect(intelligence.getByText("TSX -5 %", { exact: true })).toBeVisible();
+    await expect(intelligence.getByText("-4.10 %", { exact: true })).toBeVisible();
+
+    expect(fullCalls).toBe(1);
+  });
+
 });
