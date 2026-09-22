@@ -200,9 +200,9 @@ async def test_portfolio_keeps_base_metrics_when_histories_are_unavailable(monke
     assert histories.await_count == 2
     core_call, optional_call = histories.await_args_list
     assert set(core_call.args[0]) == {"RY.TO", "^GSPTSE"}
-    assert core_call.kwargs["deadline_seconds"] == 10.0
-    assert core_call.kwargs["concurrency"] == 8
-    assert core_call.kwargs["attempts"] == 2
+    assert core_call.kwargs["deadline_seconds"] == 5.0
+    assert core_call.kwargs["concurrency"] == 10
+    assert core_call.kwargs["attempts"] == 1
     assert set(optional_call.args[0]) == {"CL=F", "CAD=X"}
     assert optional_call.kwargs["deadline_seconds"] == 2.0
 
@@ -286,8 +286,8 @@ async def test_portfolio_uses_quote_normalization_for_core_history_and_logs_cove
     ))
 
     assert set(calls[0][0]) == {"RY.TO", "TD.TO", "XIC.TO", "^GSPTSE"}
-    assert calls[0][1]["attempts"] == 2
-    assert calls[0][1]["concurrency"] == 8
+    assert calls[0][1]["attempts"] == 1
+    assert calls[0][1]["concurrency"] == 10
     assert set(calls[1][0]) == {"CL=F", "CAD=X"}
     assert snapshot.risk is not None
     assert snapshot.risk.history_coverage_percent == 100

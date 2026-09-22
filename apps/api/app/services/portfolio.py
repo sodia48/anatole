@@ -255,10 +255,10 @@ class PortfolioService:
 
     # Les historiques quotidiens changent lentement : on peut les réutiliser
     # plusieurs minutes sans figer les cotations de séance.
-    core_history_deadline_seconds = 10.0
+    core_history_deadline_seconds = 5.0
     optional_history_deadline_seconds = 2.0
     driver_deadline_seconds = 1.25
-    history_cache_fresh_seconds = 15 * 60.0
+    history_cache_fresh_seconds = 30 * 60.0
     history_cache_stale_seconds = 24 * 60 * 60.0
     driver_cache_fresh_seconds = 30 * 60.0
     driver_cache_stale_seconds = 24 * 60 * 60.0
@@ -299,8 +299,8 @@ class PortfolioService:
             if optional
             else self.core_history_deadline_seconds
         )
-        concurrency = 2 if optional else 8
-        attempts = 1 if optional else 2
+        concurrency = 2 if optional else 10
+        attempts = 1
         return await cache.get_or_load(
             key,
             lambda: market_data_service.get_history_many_strict(
@@ -401,7 +401,10 @@ class PortfolioService:
             # Canada démarrent ensemble. La série 10 ans ne rajoute donc plus
             # jusqu'à 1.25 s après le reste du calcul.
             quotes, core_histories, optional_histories, driver_result = await asyncio.gather(
-                market_data_service.get_quotes(symbols),
+                market_data_service.get_quotes(
+                    symbols,
+                    deadline_seconds=self.fast_quote_deadline_seconds,
+                ),
                 self._cached_history_batch(
                     core_history_tickers,
                     optional=False,

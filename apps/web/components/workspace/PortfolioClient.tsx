@@ -39,9 +39,11 @@ import styles from "./Workspace.module.css";
 
 const STORAGE_KEY = "anatole:portfolio:v1";
 const SNAPSHOT_CACHE_KEY = "anatole:portfolio:snapshot:v2";
-// Un snapshot ancien reste meilleur qu'un écran vide. Il est toujours
-// signalé comme cache puis remplacé par les nouvelles cotations en arrière-plan.
+const HISTORY_SNAPSHOT_CACHE_KEY = "anatole:portfolio:history:v1";
+// La valorisation reste fraîche 24 h; le dernier historique complet peut être
+// montré jusqu'à 7 jours pendant que le recalcul frais arrive en arrière-plan.
 const SNAPSHOT_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const HISTORY_SNAPSHOT_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const PORTFOLIO_FAST_HEAD_START_MS = 900;
 const MONEY_FORMATTERS = new Map<string, Intl.NumberFormat>();
 
@@ -112,16 +114,20 @@ type CachedPortfolioSnapshot = {
   snapshot: PortfolioSnapshot;
 };
 
-function loadCachedPortfolioSnapshot(positions: PortfolioPositionInput[]): PortfolioSnapshot | null {
+function readPortfolioCache(
+  key: string,
+  positions: PortfolioPositionInput[],
+  maxAgeMs: number,
+): PortfolioSnapshot | null {
   if (typeof window === "undefined" || !positions.length) return null;
   try {
-    const raw = window.localStorage.getItem(SNAPSHOT_CACHE_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const cached = JSON.parse(raw) as CachedPortfolioSnapshot;
     if (
       cached.fingerprint !== positionsFingerprint(positions)
       || !cached.snapshot
-      || Date.now() - Number(cached.saved_at) > SNAPSHOT_CACHE_MAX_AGE_MS
+      || Date.now() - Number(cached.saved_at) > maxAgeMs
     ) {
       return null;
     }
@@ -131,18 +137,89 @@ function loadCachedPortfolioSnapshot(positions: PortfolioPositionInput[]): Portf
   }
 }
 
-function saveCachedPortfolioSnapshot(fingerprint: string, snapshot: PortfolioSnapshot): void {
+function loadCachedPortfolioSnapshot(positions: PortfolioPositionInput[]): PortfolioSnapshot | null {
+  const historical = readPortfolioCache(
+    HISTORY_SNAPSHOT_CACHE_KEY,
+    positions,
+    HISTORY_SNAPSHOT_CACHE_MAX_AGE_MS,
+  );
+  if (historical && hasCompleteHistory(historical)) return historical;
+  return readPortfolioCache(
+    SNAPSHOT_CACHE_KEY,
+    positions,
+    SNAPSHOT_CACHE_MAX_AGE_MS,
+  );
+}
+
+function writePortfolioCache(
+  key: string,
+  fingerprint: string,
+  snapshot: PortfolioSnapshot,
+): void {
   if (typeof window === "undefined") return;
   try {
-    const payload: CachedPortfolioSnapshot = {
+    window.localStorage.setItem(key, JSON.stringify({
       fingerprint,
       saved_at: Date.now(),
       snapshot,
-    };
-    window.localStorage.setItem(SNAPSHOT_CACHE_KEY, JSON.stringify(payload));
+    } satisfies CachedPortfolioSnapshot));
   } catch {
-    // Le portefeuille reste utilisable si le stockage du cache est indisponible.
+    // Le portefeuille reste utilisable si le stockage local est indisponible.
   }
+}
+
+function saveCachedPortfolioSnapshot(fingerprint: string, snapshot: PortfolioSnapshot): void {
+  writePortfolioCache(SNAPSHOT_CACHE_KEY, fingerprint, snapshot);
+}
+
+function saveHistoricalPortfolioSnapshot(fingerprint: string, snapshot: PortfolioSnapshot): void {
+  if (hasCompleteHistory(snapshot)) {
+    writePortfolioCache(HISTORY_SNAPSHOT_CACHE_KEY, fingerprint, snapshot);
+  }
+}
+
+function mergeFastSnapshotWithHistory(
+  fastSnapshot: PortfolioSnapshot,
+  historicalSnapshot: PortfolioSnapshot,
+): PortfolioSnapshot {
+  if (!hasCompleteHistory(historicalSnapshot)) return fastSnapshot;
+
+  const previousPositions = new Map(
+    historicalSnapshot.positions.map((item) => [item.symbol, item]),
+  );
+  const positions = fastSnapshot.positions.map((item) => {
+    const previous = previousPositions.get(item.symbol);
+    return previous ? {
+      ...item,
+      momentum_20d: previous.momentum_20d,
+      rsi_14: previous.rsi_14,
+      relative_volume: previous.relative_volume,
+      trend: previous.trend,
+      score: previous.score,
+    } : item;
+  });
+
+  const risk = fastSnapshot.risk && historicalSnapshot.risk ? {
+    ...historicalSnapshot.risk,
+    concentration_hhi: fastSnapshot.risk.concentration_hhi,
+    top_position_percent: fastSnapshot.risk.top_position_percent,
+    top_three_percent: fastSnapshot.risk.top_three_percent,
+    diversification_score: fastSnapshot.risk.diversification_score,
+  } : historicalSnapshot.risk;
+
+  return {
+    ...fastSnapshot,
+    positions,
+    portfolio_score: historicalSnapshot.portfolio_score,
+    performance: historicalSnapshot.performance,
+    risk,
+    performance_horizons: historicalSnapshot.performance_horizons,
+    contribution_horizons: historicalSnapshot.contribution_horizons,
+    correlation: historicalSnapshot.correlation,
+    stress_tests: historicalSnapshot.stress_tests,
+    risk_reading: historicalSnapshot.risk_reading,
+    methodology: historicalSnapshot.methodology,
+  };
 }
 
 function logPortfolioSnapshot(kind: "fast" | "full", snapshot: PortfolioSnapshot): void {
@@ -393,6 +470,7 @@ export function PortfolioClient() {
       setHistoryError(null);
       try {
         window.localStorage.removeItem(SNAPSHOT_CACHE_KEY);
+        window.localStorage.removeItem(HISTORY_SNAPSHOT_CACHE_KEY);
       } catch {
         // Ignore storage failures.
       }
@@ -423,6 +501,7 @@ export function PortfolioClient() {
     const applyFullSnapshot = (fullSnapshot: PortfolioSnapshot) => {
       logPortfolioSnapshot("full", fullSnapshot);
       applySnapshot(fullSnapshot);
+      saveHistoricalPortfolioSnapshot(targetPositions, fullSnapshot);
       const historyIsUsable = hasCompleteHistory(fullSnapshot);
       if (!historyIsUsable) {
         const message = pick(
@@ -481,9 +560,16 @@ export function PortfolioClient() {
         if (!isCurrentRequest()) return;
         logPortfolioSnapshot("fast", currentSnapshot);
         if (
-          snapshotPositionsRef.current !== targetPositions
-          || !hasCompleteHistory(snapshotRef.current)
+          snapshotPositionsRef.current === targetPositions
+          && hasCompleteHistory(snapshotRef.current)
         ) {
+          applySnapshot(
+            mergeFastSnapshotWithHistory(
+              currentSnapshot,
+              snapshotRef.current as PortfolioSnapshot,
+            ),
+          );
+        } else {
           applySnapshot(currentSnapshot);
         }
       } catch (reason) {
