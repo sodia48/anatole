@@ -9,6 +9,8 @@ from app.schemas.workspace import (
     AssistantResponse,
     DataQualitySnapshot,
     PortfolioAnalyzeRequest,
+    PortfolioPerformanceRequest,
+    PortfolioPerformanceView,
     PortfolioSnapshot,
 )
 from app.services.alerts import alert_service
@@ -16,6 +18,7 @@ from app.services.advisor import advisor_service
 from app.services.assistant import assistant_service
 from app.services.data_quality import data_quality_service
 from app.services.portfolio import portfolio_service
+from app.services.portfolio_performance import portfolio_performance_service
 
 
 router = APIRouter()
@@ -31,6 +34,17 @@ async def portfolio(
     fast: bool = Query(default=False),
 ) -> PortfolioSnapshot:
     return await portfolio_service.analyze(request, fast=fast)
+
+
+@router.post(
+    "/portfolio/performance",
+    response_model=PortfolioPerformanceView,
+    summary="Compare la performance reconstituÃ©e du portefeuille Ã  un benchmark",
+)
+async def portfolio_performance(
+    request: PortfolioPerformanceRequest,
+) -> PortfolioPerformanceView:
+    return await portfolio_performance_service.analyze(request)
 
 
 @router.post(

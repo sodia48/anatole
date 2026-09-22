@@ -25,7 +25,6 @@ import {
 } from "@/lib/api";
 import type {
   PortfolioAllocation,
-  PortfolioPerformancePoint,
   PortfolioPositionInput,
   PortfolioSnapshot,
   SymbolSearchItem,
@@ -44,6 +43,7 @@ import {
   type PortfolioObservationHandle,
 } from "@/lib/portfolio-observatory";
 import { PortfolioIntelligence } from "./PortfolioIntelligence";
+import { PortfolioPerformancePanel } from "./PortfolioPerformancePanel";
 
 import styles from "./Workspace.module.css";
 
@@ -267,92 +267,6 @@ function loadPositions(): PortfolioPositionInput[] {
   } catch {
     return [];
   }
-}
-
-function linePath(
-  values: Array<{ time: number; value: number }>,
-  minValue: number,
-  maxValue: number,
-  width: number,
-  height: number,
-): string {
-  if (!values.length) return "";
-  const left = 46;
-  const right = 18;
-  const top = 18;
-  const bottom = 30;
-  const chartWidth = width - left - right;
-  const chartHeight = height - top - bottom;
-  const minTime = values[0].time;
-  const maxTime = values[values.length - 1].time || minTime + 1;
-  const range = Math.max(maxValue - minValue, 1);
-  return values
-    .map((point, index) => {
-      const x = left + ((point.time - minTime) / Math.max(maxTime - minTime, 1)) * chartWidth;
-      const y = top + (1 - (point.value - minValue) / range) * chartHeight;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-}
-
-function PerformanceChart({
-  points,
-  language,
-  loading,
-  error,
-  onRetry,
-}: {
-  points: PortfolioPerformancePoint[];
-  language: AnatoleLanguage;
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-}) {
-  const width = 980;
-  const height = 330;
-  const portfolio = points.map((point) => ({ time: point.time, value: point.portfolio }));
-  const benchmark = points
-    .filter((point) => point.benchmark !== null)
-    .map((point) => ({ time: point.time, value: point.benchmark as number }));
-  const allValues = [...portfolio, ...benchmark].map((point) => point.value);
-  const minValue = allValues.length ? Math.min(...allValues) : 90;
-  const maxValue = allValues.length ? Math.max(...allValues) : 110;
-  const padding = Math.max((maxValue - minValue) * 0.12, 2);
-  const low = minValue - padding;
-  const high = maxValue + padding;
-  const ticks = Array.from({ length: 5 }, (_, index) => high - ((high - low) / 4) * index);
-
-  if (loading && !points.length) {
-    return <div aria-busy="true" aria-label={pick(language, "Chargement de l’historique", "Loading history")} className={`${styles.chartWrap} ${styles.chartState}`}><div className={styles.skeleton} /></div>;
-  }
-
-  if (!points.length) {
-    return <div className={`${styles.chartWrap} ${styles.chartState}`} role={error ? "alert" : "status"}>
-      <strong>{pick(language, "Historique du portefeuille temporairement indisponible.", "Portfolio history is temporarily unavailable.")}</strong>
-      <button className={styles.secondaryButton} onClick={onRetry} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button>
-    </div>;
-  }
-
-  return (
-    <div>
-      <div className={styles.chartWrap}>
-      <svg className={styles.chart} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={pick(language, "Performance du portefeuille et du TSX Composite", "Portfolio and TSX Composite performance")}>
-        {ticks.map((tick, index) => {
-          const y = 18 + (index / 4) * (height - 48);
-          return (
-            <g key={tick}>
-              <line x1="46" x2={width - 18} y1={y} y2={y} stroke="rgba(75,111,135,.22)" />
-              <text className={styles.chartAxis} x="8" y={y + 4}>{tick.toFixed(0)}</text>
-            </g>
-          );
-        })}
-        <path d={linePath(portfolio, low, high, width, height)} fill="none" stroke="#2d76ff" strokeWidth="3" strokeLinejoin="round" />
-        <path d={linePath(benchmark, low, high, width, height)} fill="none" stroke="#16c79a" strokeWidth="2" strokeDasharray="7 6" strokeLinejoin="round" />
-      </svg>
-      </div>
-      {benchmark.length === 0 ? <div className={styles.chartNotice}>{pick(language, "La courbe du portefeuille reste disponible; l’historique du TSX Composite est temporairement indisponible.", "The portfolio curve remains available; TSX Composite history is temporarily unavailable.")}</div> : error ? <div className={styles.chartNotice}>{error}</div> : null}
-    </div>
-  );
 }
 
 function AllocationCard({ title, items, totalLabel, language }: { title: string; items: PortfolioAllocation[]; totalLabel: string; language: AnatoleLanguage }) {
@@ -906,11 +820,7 @@ export function PortfolioClient() {
           {snapshot ? (
             <>
               <div className={styles.gridTwo}>
-                <section className={`panel ${styles.panel}`}>
-                  <div className={styles.sectionHeading}><div><span className="eyebrow">PERFORMANCE</span><h2>{pick(language, "Portefeuille vs TSX Composite", "Portfolio vs TSX Composite")}</h2><p>{pick(language, "Indice base 100 fondé sur les poids actuels, et non sur les flux historiques réels.", "Base-100 index using current weights rather than actual historical cash flows.")}</p></div></div>
-                  <div className={styles.legend}><span style={{ color: "var(--accent-text)" }}><i /> {pick(language, "Portefeuille", "Portfolio")}</span><span style={{ color: "var(--positive-text)" }}><i /> TSX Composite</span></div>
-                  <PerformanceChart error={historyError} language={language} loading={loading} onRetry={() => void refresh(positions, { fullOnly: true })} points={snapshot.performance} />
-                </section>
+                <PortfolioPerformancePanel language={language} snapshot={snapshot} />
                 <section className={`panel ${styles.panel}`}>
                   <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk?.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk?.risk_level === "Modéré" ? styles.statusMonitoring : snapshot.risk?.risk_level ? styles.statusDegraded : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
                   {snapshot.risk ? <div className={styles.riskGrid}>

@@ -25,6 +25,8 @@ import type {
   AlertSnapshot,
   AssistantResponse,
   DataQualitySnapshot,
+  PortfolioPerformanceRange,
+  PortfolioPerformanceView,
   PortfolioPositionInput,
   PortfolioSnapshot,
   AnatoleScriptValidation,
@@ -751,6 +753,24 @@ export function analyzePortfolio(
     { method: "POST", body: JSON.stringify({ positions, base_currency: "CAD" }) },
     signal,
     60_000,
+    true,
+  );
+}
+
+export function getPortfolioPerformance(
+  positions: Array<{ symbol: string; weight_percent: number }>,
+  benchmark: string,
+  range: PortfolioPerformanceRange,
+  signal?: AbortSignal,
+): Promise<PortfolioPerformanceView> {
+  return apiRequest<PortfolioPerformanceView>(
+    "/api/v1/workspace/portfolio/performance",
+    {
+      method: "POST",
+      body: JSON.stringify({ positions, benchmark, range }),
+    },
+    signal,
+    range === "max" ? 90_000 : 45_000,
     true,
   );
 }
