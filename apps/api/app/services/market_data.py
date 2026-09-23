@@ -366,15 +366,27 @@ class MarketDataService:
             unique,
             deadline_seconds=deadline_seconds,
         )
-        public_by_symbol = {
-            quote.symbol.replace("-", ".").upper(): quote
-            for quote in public_quotes
-        }
+
+        # session_quote_service strips the internal routing prefix:
+        #   US:AAPL -> AAPL
+        #   INTL:BMW.DE -> BMW.DE
+        # The previous code looked the quote back up with the prefixed key,
+        # so a valid foreign quote was fetched and then silently discarded.
+        public_by_symbol: dict[str, Quote] = {}
+        for quote in public_quotes:
+            for raw_key in (quote.ticker, quote.symbol):
+                key = raw_key.strip().upper().replace("-", ".")
+                if key:
+                    public_by_symbol[key] = quote
 
         output: list[Quote] = []
         for ticker in unique:
-            key = ticker.strip().upper().replace("-", ".")
-            quote = public_by_symbol.get(key)
+            normalized = session_quote_service.normalize_ticker(ticker)
+            key = normalized.strip().upper().replace("-", ".")
+            quote = (
+                public_by_symbol.get(key)
+                or public_by_symbol.get(key.removesuffix(".TO"))
+            )
             if quote is not None:
                 output.append(quote)
         return output
