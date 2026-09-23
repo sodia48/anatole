@@ -62,6 +62,7 @@ app/schemas/market.py
 app/schemas/mobile.py
 app/schemas/notifications.py
 app/schemas/paper_trading.py
+app/schemas/province_series.py
 app/schemas/provincial_macro.py
 app/schemas/provincial_statistics.py
 app/schemas/reliability.py
@@ -111,6 +112,7 @@ app/services/portfolio.py
 app/services/portfolio_intelligence.py
 app/services/portfolio_performance.py
 app/services/portfolio_symbols.py
+app/services/province_series.py
 app/services/provincial_essential_policy.py
 app/services/provincial_macro.py
 app/services/provincial_statistical_news.py
@@ -192,6 +194,7 @@ tests/test_portfolio_intelligence.py
 tests/test_portfolio_performance_service.py
 tests/test_portfolio_quote_routing.py
 tests/test_production_baseline.py
+tests/test_province_series_analytics.py
 tests/test_provincial_essential_policy.py
 tests/test_provincial_inflation_vectors.py
 tests/test_provincial_macro.py

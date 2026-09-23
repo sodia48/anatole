@@ -327,7 +327,7 @@ export function PortfolioClient() {
   const [snapshot, setSnapshot] = useState<PortfolioSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [, setHistoryError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [builderOpen, setBuilderOpen] = useState(true);
   const [snapshotFromCache, setSnapshotFromCache] = useState(false);
