@@ -10,6 +10,7 @@ import httpx
 
 from app.schemas.canada_360 import (
     Canada360Metric,
+    Canada360MetricPoint,
     Canada360Province,
     Canada360Snapshot,
     Canada360SourceStatus,
@@ -79,6 +80,13 @@ def _from_statcan(
         official=True,
         derived=False,
         delayed=False,
+        history=[
+            Canada360MetricPoint(
+                period=point.period,
+                value=point.value,
+            )
+            for point in metric.history
+        ],
     )
 
 

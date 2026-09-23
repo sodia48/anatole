@@ -23,7 +23,10 @@ import {
   AnnualGdpContext,
   RecentEconomicPulse,
 } from "./Canada360Freshness";
-import { formatMetricPeriod } from "./canada360-periods";
+import {
+  formatMetricPeriod,
+  metricCadence,
+} from "./canada360-periods";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
 import {
@@ -58,6 +61,10 @@ type Metric = {
   official: boolean;
   derived: boolean;
   delayed: boolean;
+  history?: Array<{
+    period: string;
+    value: number;
+  }>;
 };
 
 type Province = {
@@ -395,6 +402,64 @@ function fallbackMetricLabel(
   return pick(language, label[0], label[1]);
 }
 
+function MiniSparkline({
+  metric,
+  label,
+}: {
+  metric: Metric;
+  label: string;
+}) {
+  const values =
+    metric.history?.filter((point) =>
+      Number.isFinite(point.value),
+    ) ?? [];
+
+  if (values.length < 2) {
+    return (
+      <div
+        className={styles.sparklineEmpty}
+        aria-label={label}
+      />
+    );
+  }
+
+  const width = 96;
+  const height = 28;
+  const min = Math.min(
+    ...values.map((point) => point.value),
+  );
+  const max = Math.max(
+    ...values.map((point) => point.value),
+  );
+  const span = max - min || 1;
+  const coords = values
+    .map((point, index) => {
+      const x =
+        (index / (values.length - 1)) * width;
+      const y =
+        height -
+        ((point.value - min) / span) * height;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      className={styles.sparkline}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={label}
+    >
+      <polyline
+        points={coords}
+        fill="none"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
 function MetricCard({
   metric,
   language,
@@ -472,6 +537,17 @@ function MetricCard({
               : ""}
         </span>
       </div>
+
+      {metric.official && metric.reference_period ? (
+        <div className={styles.metricCadence}>
+          <span>
+            {metricCadence(metric, language)}
+          </span>
+          <small>
+            {formatMetricPeriod(metric, language)}
+          </small>
+        </div>
+      ) : null}
 
       {metric.observed_at ? (
         <small className={styles.publicationDate}>
@@ -765,6 +841,7 @@ export function Canada360Client() {
 
           return [{
             province,
+            metric,
             sortValue: metric.change,
             displayValue:
               metricChange(metric, language) ?? "N/D",
@@ -798,6 +875,7 @@ export function Canada360Client() {
 
           return [{
             province,
+            metric,
             sortValue:
               metric.value / population.value,
             displayValue: perCapitaDisplay(
@@ -815,6 +893,7 @@ export function Canada360Client() {
 
         return [{
           province,
+          metric,
           sortValue: metric.value,
           displayValue: metricValue(
             metric,
@@ -1348,6 +1427,7 @@ export function Canada360Client() {
                 (
                   {
                     province,
+                    metric,
                     displayValue,
                     detail,
                   },
@@ -1382,6 +1462,29 @@ export function Canada360Client() {
                         {displayValue}
                       </strong>
                       <small>{detail}</small>
+                    </span>
+
+                    <span
+                      className={styles.comparatorTrend}
+                    >
+                      <MiniSparkline
+                        metric={metric}
+                        label={pick(
+                          language,
+                          `Tendance ${metric.label} — ${province.name}`,
+                          `${metric.label} trend — ${province.name}`,
+                        )}
+                      />
+                      <small>
+                        {metricCadence(
+                          metric,
+                          language,
+                        )}{" · "}
+                        {formatMetricPeriod(
+                          metric,
+                          language,
+                        ) ?? "N/D"}
+                      </small>
                     </span>
                   </button>
                 ),
@@ -1463,12 +1566,28 @@ export function Canada360Client() {
                               : "N/D"}
                         </span>
                         {metric ? (
-                          <small>
-                            {metricChange(
-                              metric,
-                              language,
-                            ) ?? ""}
-                          </small>
+                          <>
+                            <small>
+                              {metricChange(
+                                metric,
+                                language,
+                              ) ?? ""}
+                            </small>
+                            <small
+                              className={
+                                styles.provinceCadence
+                              }
+                            >
+                              {metricCadence(
+                                metric,
+                                language,
+                              )}{" · "}
+                              {formatMetricPeriod(
+                                metric,
+                                language,
+                              ) ?? "N/D"}
+                            </small>
+                          </>
                         ) : null}
                       </dd>
                     </div>
@@ -1577,15 +1696,31 @@ export function Canada360Client() {
                       </strong>
                     </div>
 
+                    {metric ? (
+                      <MiniSparkline
+                        metric={metric}
+                        label={pick(
+                          language,
+                          `Tendance ${metric.label} — ${selectedProvince.name}`,
+                          `${metric.label} trend — ${selectedProvince.name}`,
+                        )}
+                      />
+                    ) : null}
+
                     <div className={styles.detailMeta}>
                       <span>
                         {metric
-                          ? formatMetricPeriod(metric, language) ??
-                            pick(
+                          ? `${metricCadence(
+                              metric,
+                              language,
+                            )} · ${formatMetricPeriod(
+                              metric,
+                              language,
+                            ) ?? pick(
                               language,
                               "Période N/D",
                               "Period N/A",
-                            )
+                            )}`
                           : pick(
                               language,
                               "Période N/D",

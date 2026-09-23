@@ -937,3 +937,89 @@ a.sourceLink:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Canada 360 — cadence + mini histories */
+.metricCadence {
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.metricCadence span {
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.sparkline {
+  width: 96px;
+  height: 28px;
+  overflow: visible;
+}
+
+.sparkline polyline {
+  stroke: var(--blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparklineEmpty {
+  width: 96px;
+  height: 28px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.comparatorRow {
+  grid-template-columns: auto minmax(0, 1fr) 104px;
+}
+
+.comparatorTrend {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  display: grid;
+  justify-items: end;
+  align-items: center;
+  gap: 3px;
+}
+
+.comparatorTrend small {
+  color: var(--muted);
+  font-size: 7px;
+  white-space: nowrap;
+}
+
+.provinceCadence {
+  opacity: .82;
+  font-size: 7px !important;
+}
+
+.provinceMetricDetail .sparkline,
+.provinceMetricDetail .sparklineEmpty {
+  width: 100%;
+  height: 34px;
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .comparatorRow {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .comparatorTrend {
+    grid-column: 2;
+    grid-row: auto;
+    justify-items: start;
+  }
+
+  .comparatorTrend .sparkline,
+  .comparatorTrend .sparklineEmpty {
+    width: 100%;
+  }
+}

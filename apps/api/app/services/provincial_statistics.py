@@ -15,6 +15,7 @@ import httpx
 
 from app.schemas.provincial_statistics import (
     ProvincialMetric,
+    ProvincialMetricPoint,
     ProvincialProfile,
     ProvincialStatisticsSnapshot,
     ProvincialStatisticsSourceStatus,
@@ -303,7 +304,7 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="1410028703",
         unit_kind="percent",
         change_kind="points",
-        latest_n=2,
+        latest_n=13,
         selectors=_labour_selectors(
             ("unemployment rate", "taux de chomage"),
         ),
@@ -319,7 +320,7 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="1410028703",
         unit_kind="persons",
         change_kind="percent",
-        latest_n=2,
+        latest_n=13,
         selectors=_labour_selectors(("employment", "emploi")),
     ),
     MetricSpec(
@@ -333,7 +334,7 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="1710000901",
         unit_kind="persons",
         change_kind="percent",
-        latest_n=2,
+        latest_n=9,
         selectors=(),
     ),
     MetricSpec(
@@ -347,7 +348,7 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="3610022201",
         unit_kind="currency",
         change_kind="percent",
-        latest_n=2,
+        latest_n=6,
         selectors=(
             _selector(
                 ("estimates", "estimations"),
@@ -427,7 +428,7 @@ METRICS: tuple[MetricSpec, ...] = (
         simple_view_pid="3410015801",
         unit_kind="units",
         change_kind="percent",
-        latest_n=2,
+        latest_n=13,
         selectors=(
             _selector(
                 ("housing starts", "mises en chantier", "type"),
@@ -657,6 +658,58 @@ def _sort_points(points: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(points, key=key)
 
 
+def _history_from_points(
+    points: list[dict[str, Any]],
+    *,
+    limit: int = 12,
+) -> list[ProvincialMetricPoint]:
+    output: list[ProvincialMetricPoint] = []
+    for point in _sort_points(points)[-limit:]:
+        value = _scaled_value(point)
+        period = str(
+            point.get("refPerRaw")
+            or point.get("refPer")
+            or ""
+        ).strip()
+        if value is None or not period:
+            continue
+        output.append(
+            ProvincialMetricPoint(
+                period=period,
+                value=value,
+            )
+        )
+    return output
+
+
+def _inflation_yoy_history(
+    points: list[dict[str, Any]],
+    *,
+    limit: int = 12,
+) -> list[ProvincialMetricPoint]:
+    ordered = _sort_points(points)
+    output: list[ProvincialMetricPoint] = []
+
+    for index in range(12, len(ordered)):
+        current = _scaled_value(ordered[index])
+        year_ago = _scaled_value(ordered[index - 12])
+        period = str(
+            ordered[index].get("refPerRaw")
+            or ordered[index].get("refPer")
+            or ""
+        ).strip()
+        if current is None or year_ago in (None, 0) or not period:
+            continue
+        output.append(
+            ProvincialMetricPoint(
+                period=period,
+                value=(current / year_ago - 1.0) * 100.0,
+            )
+        )
+
+    return output[-limit:]
+
+
 def _change(
     current: float | None,
     previous: float | None,
@@ -806,7 +859,7 @@ def _parse_retail_sales_zip(
 
     for geo, rows in list(by_geo.items()):
         rows.sort(key=lambda item: item[0])
-        by_geo[geo] = rows[-2:]
+        by_geo[geo] = rows[-13:]
 
     return by_geo
 
@@ -897,7 +950,7 @@ class ProvincialStatisticsService:
             requests.append(
                 {
                     "vectorId": vector_id,
-                    "latestN": 14,
+                    "latestN": 25,
                 }
             )
             vector_to_code[vector_id] = code
@@ -992,6 +1045,10 @@ class ProvincialStatisticsService:
                 table_url=table_url,
                 status="available",
                 note="derived_from_official_cpi_index",
+                history=_inflation_yoy_history(
+                    points,
+                    limit=12,
+                ),
             )
 
         if not by_code:
@@ -1101,6 +1158,13 @@ class ProvincialStatisticsService:
                     "Official Statistics Canada CSV table "
                     "20-10-0056-01"
                 ),
+                history=[
+                    ProvincialMetricPoint(
+                        period=period,
+                        value=value,
+                    )
+                    for period, value in rows[-12:]
+                ],
             )
 
         if not by_code:
@@ -1234,6 +1298,10 @@ class ProvincialStatisticsService:
                 table_id=spec.table_id,
                 table_url=table_url,
                 status="available",
+                history=_history_from_points(
+                    points,
+                    limit=12,
+                ),
             )
 
         if not by_code:

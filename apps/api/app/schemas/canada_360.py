@@ -10,6 +10,11 @@ SnapshotStatus = Literal["ok", "partial", "unavailable"]
 SourceStatus = Literal["ok", "partial", "unavailable"]
 
 
+class Canada360MetricPoint(BaseModel):
+    period: str
+    value: float
+
+
 class Canada360Metric(BaseModel):
     key: str
     label: str
@@ -26,6 +31,7 @@ class Canada360Metric(BaseModel):
     official: bool = False
     derived: bool = False
     delayed: bool = False
+    history: list[Canada360MetricPoint] = Field(default_factory=list)
 
 
 class Canada360Province(BaseModel):
