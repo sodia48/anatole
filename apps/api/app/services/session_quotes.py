@@ -40,6 +40,16 @@ class SessionQuoteService:
         value = ticker.strip().upper()
         if not value:
             raise ValueError("Ticker cannot be empty")
+        if value.startswith("US:"):
+            raw = value[3:].strip()
+            if not raw:
+                raise ValueError("US ticker cannot be empty")
+            return raw
+        if value.startswith("INTL:"):
+            raw = value[5:].strip()
+            if not raw:
+                raise ValueError("International ticker cannot be empty")
+            return raw
         if value.startswith("^") or value.endswith(("=F", "=X")):
             return value
         if value.endswith((".TO", ".V", ".CN", ".NE")):

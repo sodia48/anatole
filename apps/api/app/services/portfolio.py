@@ -22,6 +22,8 @@ from app.schemas.workspace import (
 )
 from app.services.market_data import market_data_service
 from app.services.bank_of_canada import bank_of_canada_valet_service
+from app.services.currency_conversion import currency_conversion_service
+from app.services.portfolio_symbols import portfolio_provider_ticker
 from app.services.portfolio_intelligence import (
     build_correlation_matrix,
     build_horizon_results,
@@ -233,7 +235,10 @@ def _allocation(
     values: dict[str, float] = defaultdict(float)
     total = sum(item.market_value for item in positions) or 1.0
     for item in positions:
-        values[str(getattr(item, attribute))] += item.market_value
+        raw_key = getattr(item, attribute)
+        if raw_key is None and attribute == "native_currency":
+            raw_key = item.currency
+        values[str(raw_key)] += item.market_value
     return [
         PortfolioAllocation(
             key=key.casefold().replace(" ", "-"),
@@ -310,6 +315,7 @@ class PortfolioService:
                 concurrency=concurrency,
                 deadline_seconds=deadline,
                 attempts=attempts,
+                exact_symbols=True,
             ),
             fresh_seconds=(
                 self.driver_cache_fresh_seconds
@@ -342,29 +348,44 @@ class PortfolioService:
         currencies: set[str],
         base_currency: str,
     ) -> tuple[dict[str, float | None], list[str]]:
-        rates: dict[str, float | None] = {base_currency: 1.0}
         notes: list[str] = []
-        for currency in sorted(currencies):
+        requested = sorted({
+            value.strip().upper()
+            for value in currencies
+            if value
+        })
+        if base_currency not in requested:
+            requested.append(base_currency)
+
+        cad_rates = await asyncio.gather(
+            *(currency_conversion_service.rate_to_cad(currency) for currency in requested),
+            return_exceptions=True,
+        )
+        to_cad: dict[str, float | None] = {}
+        for currency, result in zip(requested, cad_rates, strict=False):
+            to_cad[currency] = None if isinstance(result, Exception) else result
+
+        base_to_cad = 1.0 if base_currency == "CAD" else to_cad.get(base_currency)
+        if base_to_cad is None or base_to_cad <= 0:
+            return (
+                {currency: (1.0 if currency == base_currency else None) for currency in requested},
+                [f"Conversion vers {base_currency} indisponible."],
+            )
+
+        rates: dict[str, float | None] = {}
+        for currency in requested:
             if currency == base_currency:
+                rates[currency] = 1.0
                 continue
-            if {currency, base_currency} == {"CAD", "USD"}:
-                try:
-                    fx = await market_data_service.get_quote("CAD=X")
-                    if fx.source.startswith("demo") or fx.price <= 0:
-                        raise RuntimeError("Taux public indisponible")
-                    rates["USD"] = fx.price if base_currency == "CAD" else 1.0
-                    rates["CAD"] = 1.0 if base_currency == "CAD" else 1 / fx.price
-                except Exception:  # noqa: BLE001
-                    rates[currency] = None
-                    notes.append(
-                        f"Conversion {currency}/{base_currency} indisponible; "
-                        "la position est exclue des agrégats."
-                    )
-            else:
+            rate_to_cad = to_cad.get(currency)
+            if rate_to_cad is None or rate_to_cad <= 0:
                 rates[currency] = None
                 notes.append(
-                    f"La devise {currency} n'est pas convertie automatiquement."
+                    f"Conversion {currency}/{base_currency} indisponible; "
+                    "la position est exclue des agrégats."
                 )
+                continue
+            rates[currency] = rate_to_cad / base_to_cad
         return rates, notes
 
     async def analyze(
@@ -375,9 +396,13 @@ class PortfolioService:
     ) -> PortfolioSnapshot:
         started_at = monotonic()
         symbols = [item.symbol for item in request.positions]
+        provider_symbols = {
+            item.symbol: portfolio_provider_ticker(item.symbol, item.market)
+            for item in request.positions
+        }
         history_tickers = {
-            symbol: market_data_service.normalize_ticker(symbol)
-            for symbol in symbols
+            symbol: market_data_service.normalize_ticker(provider_symbol)
+            for symbol, provider_symbol in provider_symbols.items()
         }
         benchmark_ticker = market_data_service.normalize_ticker(request.benchmark)
         core_history_tickers = list(dict.fromkeys([
@@ -392,7 +417,7 @@ class PortfolioService:
             # Les cotations terminées dans la fenêtre sont rendues immédiatement;
             # les loaders restants continuent à nourrir le cache partagé.
             quotes = await market_data_service.get_quotes(
-                symbols,
+                list(provider_symbols.values()),
                 deadline_seconds=self.fast_quote_deadline_seconds,
             )
             histories = {}
@@ -402,7 +427,7 @@ class PortfolioService:
             # jusqu'à 1.25 s après le reste du calcul.
             quotes, core_histories, optional_histories, driver_result = await asyncio.gather(
                 market_data_service.get_quotes(
-                    symbols,
+                    list(provider_symbols.values()),
                     deadline_seconds=self.fast_quote_deadline_seconds,
                 ),
                 self._cached_history_batch(
@@ -443,15 +468,43 @@ class PortfolioService:
         quote_by_symbol = {_key(item.symbol): item for item in quotes}
         quote_by_symbol.update({_key(item.ticker): item for item in quotes})
 
-        currencies = {
-            quote_by_symbol[item.symbol].currency
+        position_quotes = {
+            item.symbol: quote_by_symbol.get(_key(history_tickers[item.symbol]))
             for item in request.positions
-            if item.symbol in quote_by_symbol
+        }
+
+        if not fast and request.base_currency == "CAD":
+            conversion_jobs = {
+                item.symbol: currency_conversion_service.candles_to_cad(
+                    history_tickers[item.symbol],
+                    (
+                        position_quotes[item.symbol].native_currency
+                        or position_quotes[item.symbol].currency
+                    ),
+                    histories.get(item.symbol, []),
+                )
+                for item in request.positions
+                if position_quotes.get(item.symbol) is not None
+                and histories.get(item.symbol)
+            }
+            if conversion_jobs:
+                converted = await asyncio.gather(
+                    *conversion_jobs.values(),
+                    return_exceptions=True,
+                )
+                for symbol, result in zip(conversion_jobs, converted, strict=False):
+                    if not isinstance(result, Exception):
+                        histories[symbol] = result
+
+        currencies = {
+            quote.currency
+            for quote in position_quotes.values()
+            if quote is not None
         }
         currencies.update(
             quote.native_currency
-            for quote in quote_by_symbol.values()
-            if quote.native_currency
+            for quote in position_quotes.values()
+            if quote is not None and quote.native_currency
         )
         fx_rates, notes = await self._fx_rates(
             currencies,
@@ -464,7 +517,7 @@ class PortfolioService:
 
         raw_positions: list[dict[str, object]] = []
         for item in request.positions:
-            quote = quote_by_symbol.get(item.symbol)
+            quote = position_quotes.get(item.symbol)
             candles = histories.get(item.symbol, [])
             if quote is None:
                 notes.append(f"Aucune cotation n'a été récupérée pour {item.symbol}.")
@@ -539,11 +592,17 @@ class PortfolioService:
                     ticker=quote.ticker,
                     name=str(raw["name"]),
                     sector=str(raw["sector"]),
+                    market=item.market,
                     currency=quote.currency,
+                    native_currency=quote.native_currency or quote.currency,
+                    native_price=round(
+                        quote.price / quote.fx_rate_to_cad,
+                        4,
+                    ) if quote.fx_rate_to_cad else round(quote.price, 4),
                     quantity=item.quantity,
                     average_cost=item.average_cost,
                     price=round(quote.price, 4),
-                    fx_rate=round(float(raw["fx_rate"]), 6),
+                    fx_rate=round(float(raw["cost_fx_rate"]), 6),
                     cost_basis=round(cost_basis, 2),
                     market_value=round(market_value, 2),
                     unrealized_pnl=round(pnl, 2),
@@ -683,7 +742,7 @@ class PortfolioService:
             portfolio_score=portfolio_score,
             positions=positions,
             sector_allocation=sector_allocation,
-            currency_allocation=_allocation(positions, "currency"),
+            currency_allocation=_allocation(positions, "native_currency"),
             performance=performance,
             risk=PortfolioRisk(
                 volatility_percent=(round(volatility, 2) if volatility is not None else None),

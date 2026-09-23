@@ -1,0 +1,16 @@
+fastapi<1.0,>=0.116
+uvicorn[standard]<1.0,>=0.35
+httpx<1.0,>=0.28
+redis<7.0,>=5.2
+pydantic-settings<3.0,>=2.10
+websockets<16,>=15
+pandas<4.0,>=2.2
+yfinance<2.0,>=1.5.1
+pypdf<7.0,>=5.7
+openpyxl<4.0,>=3.1
+sqlalchemy<3.0,>=2.0
+psycopg[binary]<4.0,>=3.2
+
+[dev]
+pytest<9.0,>=8.4
+pytest-asyncio<2.0,>=1.1

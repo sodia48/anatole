@@ -26,6 +26,7 @@ let fullFingerprint = "";
 function fingerprint(positions: PortfolioPositionInput[]): string {
   return JSON.stringify(positions.map((position) => ({
     symbol: position.symbol,
+    market: position.market ?? "CA",
     quantity: position.quantity,
     average_cost: position.average_cost,
   })));

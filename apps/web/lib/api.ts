@@ -758,7 +758,11 @@ export function analyzePortfolio(
 }
 
 export function getPortfolioPerformance(
-  positions: Array<{ symbol: string; weight_percent: number }>,
+  positions: Array<{
+    symbol: string;
+    weight_percent: number;
+    market?: "CA" | "US" | "INTL";
+  }>,
   benchmark: string,
   range: PortfolioPerformanceRange,
   signal?: AbortSignal,

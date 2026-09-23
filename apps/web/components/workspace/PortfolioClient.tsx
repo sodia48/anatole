@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import type {
   PortfolioAllocation,
+  PortfolioMarket,
   PortfolioPositionInput,
   PortfolioSnapshot,
   SymbolSearchItem,
@@ -113,6 +114,7 @@ function hasCompleteHistory(snapshot: PortfolioSnapshot | null): boolean {
 function positionsFingerprint(positions: PortfolioPositionInput[]): string {
   return JSON.stringify(positions.map((position) => ({
     symbol: position.symbol,
+    market: position.market ?? "CA",
     quantity: position.quantity,
     average_cost: position.average_cost,
   })));
@@ -250,6 +252,17 @@ function visiblePortfolioNotes(snapshot: PortfolioSnapshot): string[] {
   return snapshot.notes.filter((note) => !historyIsUsable || !/couverture historique/i.test(note));
 }
 
+function normalizePortfolioSymbol(value: string, market: PortfolioMarket): string {
+  const clean = value.trim().toUpperCase();
+  return market === "CA" ? clean.replace(/\.TO$/, "") : clean;
+}
+
+function portfolioMarketLabel(market: PortfolioMarket, language: AnatoleLanguage): string {
+  if (market === "US") return pick(language, "États-Unis", "United States");
+  if (market === "INTL") return pick(language, "International", "International");
+  return pick(language, "Canada", "Canada");
+}
+
 function loadPositions(): PortfolioPositionInput[] {
   if (typeof window === "undefined") return [];
   try {
@@ -307,6 +320,7 @@ export function PortfolioClient() {
   const refreshControllerRef = useRef<AbortController | null>(null);
   const [positions, setPositions] = useState<PortfolioPositionInput[]>([]);
   const [symbol, setSymbol] = useState("");
+  const [market, setMarket] = useState<PortfolioMarket>("CA");
   const [quantity, setQuantity] = useState("10");
   const [averageCost, setAverageCost] = useState("");
   const [suggestions, setSuggestions] = useState<SymbolSearchItem[]>([]);
@@ -406,7 +420,7 @@ export function PortfolioClient() {
   }, [hydrated, positions]);
 
   useEffect(() => {
-    if (!symbol.trim()) {
+    if (market !== "CA" || !symbol.trim()) {
       const timer = window.setTimeout(() => setSuggestions([]), 0);
       return () => window.clearTimeout(timer);
     }
@@ -423,7 +437,7 @@ export function PortfolioClient() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [symbol]);
+  }, [market, symbol]);
 
   const refresh = async (
     current = positions,
@@ -625,18 +639,47 @@ export function PortfolioClient() {
   }, [hydrated, positions]);
 
   const addPosition = () => {
-    const clean = symbol.trim().toUpperCase().replace(/\.TO$/, "");
+    const clean = normalizePortfolioSymbol(symbol, market);
     const qty = Number(quantity);
     const cost = Number(averageCost || 0);
     if (!clean || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(cost) || cost < 0) {
       setError(pick(language, "Entre un symbole, une quantité positive et un coût moyen valide.", "Enter a symbol, a positive quantity, and a valid average cost."));
       return;
     }
-    if (positions.some((item) => item.symbol === clean)) {
-      setError(pick(language, `${clean} est déjà dans le portefeuille.`, `${clean} is already in the portfolio.`));
+    if (positions.some(
+      (item) =>
+        item.symbol === clean
+        && (item.market ?? "CA") === market,
+    )) {
+      setError(pick(
+        language,
+        `${clean} est déjà dans ce marché.`,
+        `${clean} is already in this market.`,
+      ));
       return;
     }
-    setPositions((current) => [...current, { symbol: clean, quantity: qty, average_cost: cost }]);
+    const nextPositions = [
+      ...positions,
+      { symbol: clean, quantity: qty, average_cost: cost, market },
+    ];
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(nextPositions),
+      );
+    } catch {
+      // La position reste en mémoire même si le stockage navigateur échoue.
+    }
+    try {
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(nextPositions),
+      );
+    } catch {
+      // La position reste en mémoire même si le stockage navigateur échoue.
+    }
+    setPositions(nextPositions);
+    void refresh(nextPositions);
     setSymbol("");
     setQuantity("10");
     setAverageCost("");
@@ -660,7 +703,10 @@ export function PortfolioClient() {
   };
 
   const exportCsv = () => {
-    const rows = ["symbol,quantity,average_cost", ...positions.map((item) => `${item.symbol},${item.quantity},${item.average_cost}`)];
+    const rows = [
+      "symbol,market,quantity,average_cost",
+      ...positions.map((item) => `${item.symbol},${item.market ?? "CA"},${item.quantity},${item.average_cost}`),
+    ];
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -676,14 +722,21 @@ export function PortfolioClient() {
     reader.onload = () => {
       const lines = String(reader.result ?? "").split(/\r?\n/).slice(1);
       const parsed = lines.flatMap((line) => {
-        const [rawSymbol, rawQuantity, rawCost] = line.split(",");
-        const clean = rawSymbol?.trim().toUpperCase().replace(/\.TO$/, "");
+        const parts = line.split(",");
+        const rawSymbol = parts[0];
+        const hasMarket = ["CA", "US", "INTL"].includes(String(parts[1] ?? "").trim().toUpperCase());
+        const parsedMarket = (hasMarket ? String(parts[1]).trim().toUpperCase() : "CA") as PortfolioMarket;
+        const rawQuantity = parts[hasMarket ? 2 : 1];
+        const rawCost = parts[hasMarket ? 3 : 2];
+        const clean = normalizePortfolioSymbol(rawSymbol ?? "", parsedMarket);
         const qty = Number(rawQuantity);
         const cost = Number(rawCost);
-        return clean && qty > 0 && cost >= 0 ? [{ symbol: clean, quantity: qty, average_cost: cost }] : [];
+        return clean && qty > 0 && cost >= 0
+          ? [{ symbol: clean, market: parsedMarket, quantity: qty, average_cost: cost }]
+          : [];
       });
       if (parsed.length) setPositions(parsed.slice(0, 30));
-      else setError(pick(language, "Le CSV doit contenir les colonnes symbol, quantity et average_cost.", "The CSV must contain symbol, quantity, and average_cost columns."));
+      else setError(pick(language, "Le CSV doit contenir symbol, quantity, average_cost et peut inclure market (CA, US, INTL).", "The CSV must contain symbol, quantity, average_cost and may include market (CA, US, INTL)."));
     };
     reader.readAsText(file);
   };
@@ -760,11 +813,20 @@ export function PortfolioClient() {
             <input ref={importedRef} aria-label={pick(language, "Importer un portefeuille CSV", "Import a CSV portfolio")} hidden type="file" accept=".csv,text/csv" onChange={(event) => importCsv(event.target.files?.[0])} />
           </div>
         </div>
-        {builderOpen ? <div className={styles.formGrid}>
+        {builderOpen ? <div className={`${styles.formGrid} ${styles.portfolioGlobalForm}`}>
+          <div className={styles.field}>
+            <label htmlFor="portfolio-market">{pick(language, "Marché", "Market")}</label>
+            <select id="portfolio-market" value={market} onChange={(event) => { setMarket(event.target.value as PortfolioMarket); setSymbol(""); setSuggestions([]); }}>
+              <option value="CA">{pick(language, "Canada (TSX/TSXV)", "Canada (TSX/TSXV)")}</option>
+              <option value="US">{pick(language, "États-Unis (NYSE/Nasdaq)", "United States (NYSE/Nasdaq)")}</option>
+              <option value="INTL">{pick(language, "International", "International")}</option>
+            </select>
+          </div>
           <div className={styles.searchField}>
             <label htmlFor="portfolio-symbol">{pick(language, "Symbole ou entreprise", "Symbol or company")}</label>
             <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
             {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
+            {market !== "CA" ? <small className={styles.marketHint}>{market === "US" ? pick(language, "Entre le ticker américain exact, par ex. AAPL ou BRK-B.", "Enter the exact U.S. ticker, e.g. AAPL or BRK-B.") : pick(language, "Entre le ticker Yahoo avec suffixe de place, par ex. BMW.DE, 7203.T, AIR.PA ou NESN.SW.", "Enter the Yahoo ticker with exchange suffix, e.g. BMW.DE, 7203.T, AIR.PA or NESN.SW.")}</small> : null}
           </div>
           <div className={styles.field}><label htmlFor="portfolio-quantity">{pick(language, "Quantité", "Quantity")}</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
           <div className={styles.field}><label htmlFor="portfolio-average-cost">{pick(language, "Coût moyen", "Average cost")}</label><input id="portfolio-average-cost" inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0.00" /></div>
@@ -800,10 +862,10 @@ export function PortfolioClient() {
                   {positions.map((position, index) => {
                     const result = snapshotBySymbol.get(position.symbol);
                     return <tr key={position.symbol}>
-                      <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
+                      <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{portfolioMarketLabel(position.market ?? "CA", language)} · {result?.native_currency ?? result?.currency ?? "—"} · {result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
                       <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
                       <td data-label={pick(language, "Coût moyen", "Average cost")}><input aria-label={pick(language, `Coût moyen de ${position.symbol}`, `${position.symbol} average cost`)} style={{ width: 96, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
-                      <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.price, result.currency, language) : pendingValue}</td>
+                      <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.native_price ?? result.price, result.native_currency ?? result.currency, language) : pendingValue}</td>
                       <td data-label={pick(language, "Valeur", "Value")}>{result ? money(result.market_value, snapshot?.base_currency, language) : pendingValue}</td>
                       <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : pendingValue}</td>
                       <td data-label={pick(language, "P&L latent", "Unrealized P&L")} className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency, language)} · ${percent(result.unrealized_pnl_percent)}` : pendingValue}</td>
