@@ -101,6 +101,7 @@ class Canada360Service:
         self._lock = asyncio.Lock()
         self._province_warm_tasks: dict[str, asyncio.Task[None]] = {}
         self._macro_warm_tasks: dict[str, asyncio.Task[None]] = {}
+        self._snapshot_refresh_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def _load_macro(
         self,
@@ -328,7 +329,7 @@ class Canada360Service:
                 await provincial_statistics_service.get_snapshot(
                     region="all",
                     lang=lang,
-                    force=True,
+                    force=False,
                 )
                 # Le premier snapshot Canada 360 peut contenir les 10 cartes
                 # vides pendant le cold start. Dès que le cache provincial est
@@ -574,6 +575,35 @@ class Canada360Service:
             ),
         )
 
+    def _schedule_snapshot_refresh(self, lang: str) -> None:
+        current = self._snapshot_refresh_tasks.get(lang)
+        if current is not None and not current.done():
+            return
+
+        async def refresh() -> None:
+            started = monotonic()
+            try:
+                async with self._lock:
+                    snapshot = await self._build(lang)
+                    self._cache[lang] = (monotonic(), snapshot)
+                    if snapshot.status != "unavailable":
+                        self._last_good[lang] = snapshot
+                logger.info(
+                    "canada360_background_refresh_success lang=%s duration_ms=%.1f",
+                    lang,
+                    (monotonic() - started) * 1000,
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "canada360_background_refresh_failed lang=%s error=%s",
+                    lang,
+                    type(exc).__name__,
+                )
+
+        self._snapshot_refresh_tasks[lang] = asyncio.create_task(refresh())
+
     async def get_snapshot(
         self,
         lang: str | None = "fr",
@@ -583,12 +613,18 @@ class Canada360Service:
         language = _lang(lang)
         now = monotonic()
         cached = self._cache.get(language)
-        if (
-            not force
-            and cached is not None
-            and now - cached[0] < cached[1].refresh_after_seconds
-        ):
+
+        if not force and cached is not None:
+            if now - cached[0] < cached[1].refresh_after_seconds:
+                return cached[1]
+            self._schedule_snapshot_refresh(language)
             return cached[1]
+
+        if not force and cached is None:
+            previous = self._last_good.get(language)
+            if previous is not None:
+                self._schedule_snapshot_refresh(language)
+                return previous
 
         async with self._lock:
             now = monotonic()
@@ -599,7 +635,6 @@ class Canada360Service:
                 and now - cached[0] < cached[1].refresh_after_seconds
             ):
                 return cached[1]
-
             try:
                 snapshot = await self._build(language)
             except asyncio.CancelledError:
@@ -610,20 +645,12 @@ class Canada360Service:
                     return previous.model_copy(
                         update={
                             "status": "partial",
-                            "issues": list(
-                                dict.fromkeys(
-                                    [
-                                        *previous.issues,
-                                        f"Canada360: {type(exc).__name__}",
-                                    ]
-                                )
-                            ),
+                            "issues": list(dict.fromkeys([*previous.issues, f"Canada360: {type(exc).__name__}"])),
                             "generated_at": datetime.now(UTC),
                             "refresh_after_seconds": int(self.partial_seconds),
                         }
                     )
                 raise
-
             self._cache[language] = (monotonic(), snapshot)
             if snapshot.status != "unavailable":
                 self._last_good[language] = snapshot

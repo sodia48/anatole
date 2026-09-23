@@ -231,7 +231,7 @@ def test_canada360_exposes_four_core_metrics_for_all_provinces(
 
 
 @pytest.mark.asyncio
-async def test_provincial_snapshot_does_not_fan_out_wds_tables(
+async def test_provincial_snapshot_bounds_wds_table_fanout(
     monkeypatch,
 ) -> None:
     service = ProvincialStatisticsService()
@@ -252,4 +252,5 @@ async def test_provincial_snapshot_does_not_fan_out_wds_tables(
 
     await service._build("QC", "fr")
 
-    assert maximum_active == 1
+    assert maximum_active == service.metric_concurrency == 2
+    assert maximum_active < len(METRICS)
