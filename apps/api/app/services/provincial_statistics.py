@@ -859,7 +859,7 @@ def _parse_retail_sales_zip(
 
     for geo, rows in list(by_geo.items()):
         rows.sort(key=lambda item: item[0])
-        by_geo[geo] = rows[-13:]
+        by_geo[geo] = rows[-61:]
 
     return by_geo
 

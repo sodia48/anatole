@@ -28,6 +28,7 @@ import {
   metricCadence,
 } from "./canada360-periods";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { ProvinceSeriesExplorer } from "./ProvinceSeriesExplorer";
 import { pick } from "@/lib/i18n";
 import {
   readLastGoodJson,
@@ -1773,6 +1774,16 @@ export function Canada360Client() {
                 );
               })}
             </div>
+
+            <ProvinceSeriesExplorer
+              provinceCode={selectedProvince.code}
+              provinceName={selectedProvince.name}
+              language={language}
+              metrics={selectedProvince.metrics.map((metric) => ({
+                key: metric.key,
+                label: metric.label,
+              }))}
+            />
           </section>
         ) : null}
       </section>
