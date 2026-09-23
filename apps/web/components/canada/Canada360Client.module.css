@@ -174,6 +174,13 @@
   color: var(--red);
 }
 
+.publicationDate {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
 .sourceLink {
   display: inline-block;
   margin-top: 9px;
@@ -750,6 +757,40 @@ a.sourceLink:hover {
   align-items: flex-end;
   justify-content: space-between;
   gap: 18px;
+  flex-wrap: wrap;
+}
+
+.comparisonModes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.comparisonModes button {
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.comparisonModes button[aria-selected="true"] {
+  color: var(--blue);
+  border-color: color-mix(
+    in srgb,
+    var(--blue) 55%,
+    var(--border)
+  );
+  background: color-mix(
+    in srgb,
+    var(--blue) 8%,
+    var(--panel-2)
+  );
 }
 
 .comparatorHeader h3 {
