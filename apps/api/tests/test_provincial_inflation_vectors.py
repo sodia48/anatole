@@ -60,7 +60,7 @@ async def test_inflation_maps_by_vector_id_not_response_order(
 
     async def fake_post(_client, method, body):
         assert method == "getDataFromVectorsAndLatestNPeriods"
-        assert all(item["latestN"] == 14 for item in body)
+        assert all(item["latestN"] == 25 for item in body)
         return [
             response(
                 CPI_ALL_ITEMS_VECTOR_BY_CODE["ON"],

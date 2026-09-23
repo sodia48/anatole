@@ -142,6 +142,7 @@ tests/test_assistant_integrity.py
 tests/test_calendar_language.py
 tests/test_canada360_statcan_resilience.py
 tests/test_canada_360.py
+tests/test_canada_360_instant.py
 tests/test_canada_360_province_hydration.py
 tests/test_canadian_market_recovery.py
 tests/test_cockpit.py
@@ -189,6 +190,7 @@ tests/test_portfolio_global_positions.py
 tests/test_portfolio_history_integrity.py
 tests/test_portfolio_intelligence.py
 tests/test_portfolio_performance_service.py
+tests/test_portfolio_quote_routing.py
 tests/test_production_baseline.py
 tests/test_provincial_essential_policy.py
 tests/test_provincial_inflation_vectors.py

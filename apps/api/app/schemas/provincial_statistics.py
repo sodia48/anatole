@@ -6,6 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class ProvincialMetricPoint(BaseModel):
+    period: str
+    value: float
+
+
 class ProvincialMetric(BaseModel):
     key: str
     label: str
@@ -22,6 +27,7 @@ class ProvincialMetric(BaseModel):
     table_url: str
     status: Literal["available", "unavailable"] = "available"
     note: str | None = None
+    history: list[ProvincialMetricPoint] = Field(default_factory=list)
 
 
 class ProvincialProfile(BaseModel):
