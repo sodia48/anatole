@@ -237,6 +237,11 @@ type ComparisonMetricKey =
   | "housing_starts"
   | "population";
 
+type ComparisonMode =
+  | "level"
+  | "change"
+  | "per_capita";
+
 const COMPARISON_METRIC_KEYS: ComparisonMetricKey[] = [
   "real_gdp",
   "unemployment_rate",
@@ -289,6 +294,21 @@ function comparisonLabel(
   language: "fr" | "en",
 ): string {
   return fallbackMetricLabel(key, language);
+}
+
+function perCapitaDisplay(
+  value: number,
+  population: number,
+  language: "fr" | "en",
+): string {
+  const locale =
+    language === "fr" ? "fr-CA" : "en-CA";
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "CAD",
+    maximumFractionDigits: 0,
+  }).format(value / population);
 }
 
 function provinceMetric(
@@ -448,6 +468,20 @@ function MetricCard({
         </span>
       </div>
 
+      {metric.observed_at ? (
+        <small className={styles.publicationDate}>
+          {pick(language, "Publie", "Published")}{" "}
+          {new Date(metric.observed_at).toLocaleDateString(
+            language === "fr" ? "fr-CA" : "en-CA",
+            {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            },
+          )}
+        </small>
+      ) : null}
+
       {metric.source_url ? (
         <a
           className={styles.sourceLink}
@@ -482,6 +516,8 @@ export function Canada360Client() {
     useState<string | null>(null);
   const [comparisonMetricKey, setComparisonMetricKey] =
     useState<ComparisonMetricKey>("real_gdp");
+  const [comparisonMode, setComparisonMode] =
+    useState<ComparisonMode>("level");
   const provinceHydrationAttempts = useRef(0);
 
   const load = useCallback(
@@ -705,18 +741,96 @@ export function Canada360Client() {
           province,
           comparisonMetricKey,
         );
-        return metric?.value !== null &&
-          metric?.value !== undefined &&
-          Number.isFinite(metric.value)
-          ? [{ province, metric }]
-          : [];
+
+        if (
+          metric?.value === null ||
+          metric?.value === undefined ||
+          !Number.isFinite(metric.value)
+        ) {
+          return [];
+        }
+
+        if (comparisonMode === "change") {
+          if (
+            metric.change === null ||
+            !Number.isFinite(metric.change)
+          ) {
+            return [];
+          }
+
+          return [{
+            province,
+            sortValue: metric.change,
+            displayValue:
+              metricChange(metric, language) ?? "N/D",
+            detail:
+              metric.reference_period ?? "",
+          }];
+        }
+
+        if (comparisonMode === "per_capita") {
+          if (
+            ![
+              "real_gdp",
+              "retail_sales",
+            ].includes(comparisonMetricKey)
+          ) {
+            return [];
+          }
+
+          const population = provinceMetric(
+            province,
+            "population",
+          );
+
+          if (
+            population?.value === null ||
+            population?.value === undefined ||
+            population.value <= 0
+          ) {
+            return [];
+          }
+
+          return [{
+            province,
+            sortValue:
+              metric.value / population.value,
+            displayValue: perCapitaDisplay(
+              metric.value,
+              population.value,
+              language,
+            ),
+            detail: pick(
+              language,
+              "Par habitant · population la plus recente",
+              "Per capita · latest population",
+            ),
+          }];
+        }
+
+        return [{
+          province,
+          sortValue: metric.value,
+          displayValue: metricValue(
+            metric,
+            language,
+          ),
+          detail:
+            metricChange(metric, language) ??
+            metric.reference_period ??
+            "",
+        }];
       })
       .sort(
         (left, right) =>
-          (right.metric.value ?? 0) -
-          (left.metric.value ?? 0),
+          right.sortValue - left.sortValue,
       );
-  }, [comparisonMetricKey, snapshot]);
+  }, [
+    comparisonMetricKey,
+    comparisonMode,
+    language,
+    snapshot,
+  ]);
 
   if (loading && !snapshot) {
     return (
@@ -1125,6 +1239,55 @@ export function Canada360Client() {
               </p>
             </div>
 
+            <div
+              className={styles.comparisonModes}
+              role="tablist"
+              aria-label={pick(
+                language,
+                "Mode de comparaison",
+                "Comparison mode",
+              )}
+            >
+              {(
+                [
+                  ["level", "Niveau", "Level"],
+                  ["change", "Variation", "Change"],
+                  [
+                    "per_capita",
+                    "Par habitant",
+                    "Per capita",
+                  ],
+                ] as const
+              ).map(([value, fr, en]) => (
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={
+                    comparisonMode === value
+                  }
+                  key={value}
+                  onClick={() => {
+                    setComparisonMode(value);
+                    if (
+                      value === "per_capita" &&
+                      ![
+                        "real_gdp",
+                        "retail_sales",
+                      ].includes(
+                        comparisonMetricKey,
+                      )
+                    ) {
+                      setComparisonMetricKey(
+                        "real_gdp",
+                      );
+                    }
+                  }}
+                >
+                  {pick(language, fr, en)}
+                </button>
+              ))}
+            </div>
+
             <label className={styles.comparatorControl}>
               <span>
                 {pick(
@@ -1164,7 +1327,14 @@ export function Canada360Client() {
           <div className={styles.comparatorRows}>
             {provinceComparison.length ? (
               provinceComparison.map(
-                ({ province, metric }, index) => (
+                (
+                  {
+                    province,
+                    displayValue,
+                    detail,
+                  },
+                  index,
+                ) => (
                   <button
                     type="button"
                     className={styles.comparatorRow}
@@ -1191,19 +1361,9 @@ export function Canada360Client() {
                       className={styles.comparatorValue}
                     >
                       <strong>
-                        {metricValue(
-                          metric,
-                          language,
-                        )}
+                        {displayValue}
                       </strong>
-                      <small>
-                        {metricChange(
-                          metric,
-                          language,
-                        ) ??
-                          metric.reference_period ??
-                          ""}
-                      </small>
+                      <small>{detail}</small>
                     </span>
                   </button>
                 ),
