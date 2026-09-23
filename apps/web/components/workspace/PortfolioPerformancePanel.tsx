@@ -446,6 +446,7 @@ export function PortfolioPerformancePanel({
       const result = await getPortfolioPerformance(
         snapshot.positions.map((item) => ({
           symbol: item.symbol,
+          market: item.market ?? "CA",
           weight_percent: item.weight_percent,
         })),
         normalized,

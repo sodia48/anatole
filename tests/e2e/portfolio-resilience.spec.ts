@@ -422,6 +422,97 @@ test.describe("Portfolio progressive degradation", () => {
     await expect(page.getByText("MAX : depuis 1998", { exact: true })).toBeVisible();
   });
 
+  test("adds a U.S. position with explicit market metadata", async ({ page }) => {
+    const submitted: Array<Record<string, unknown>> = [];
+
+    await page.addInitScript(() => {
+      localStorage.removeItem("anatole:portfolio:v1");
+      localStorage.removeItem("anatole:portfolio:snapshot:v2");
+      localStorage.removeItem("anatole:portfolio:history:v1");
+      localStorage.setItem("anatole.appearance-choice.v1", "1");
+    });
+
+    // This test is about Portfolio. Prevent account hydration from racing
+    // the local portfolio while we verify a newly-added foreign position.
+    await page.route("**/api/account/me", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({ detail: "Connexion requise." }),
+      });
+    });
+
+    await page.route("**/api/anatole/api/v1/workspace/portfolio**", async (route) => {
+      const request = route.request();
+      const requestUrl = new URL(request.url());
+
+      if (requestUrl.pathname.endsWith("/portfolio/performance")) {
+        await route.fallback();
+        return;
+      }
+
+      if (request.method() === "POST") {
+        try {
+          submitted.push(request.postDataJSON() as Record<string, unknown>);
+        } catch {
+          // Ignore malformed bodies; the assertion below validates the real payload.
+        }
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(snapshot()),
+      });
+    });
+
+    await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByLabel(/Marché|Market/)).toBeVisible();
+    await page.getByLabel(/Marché|Market/).selectOption("US");
+    await page.getByLabel(/Symbole ou entreprise|Symbol or company/).fill("AAPL");
+    await page.getByLabel(/Quantité|Quantity/).fill("3");
+    await page.getByLabel(/Coût moyen|Average cost/).fill("190");
+
+    await page.getByRole("button", { name: /Ajouter|Add/, exact: true }).click();
+
+    const persisted = await page.evaluate(() => {
+      const raw = localStorage.getItem("anatole:portfolio:v1");
+      if (!raw) return false;
+      try {
+        const positions = JSON.parse(raw) as Array<Record<string, unknown>>;
+        return positions.some(
+          (item) =>
+            item.symbol === "AAPL"
+            && item.market === "US"
+            && item.quantity === 3
+            && item.average_cost === 190,
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    expect(persisted).toBe(true);
+
+    await expect.poll(
+      () =>
+        submitted.some((body) => {
+          const positions = body.positions as Array<Record<string, unknown>> | undefined;
+          return Boolean(
+            positions?.some(
+              (item) =>
+                item.symbol === "AAPL"
+                && item.market === "US"
+                && item.quantity === 3
+                && item.average_cost === 190,
+            ),
+          );
+        }),
+      { timeout: 15_000 },
+    ).toBe(true);
+  });
+
   test("shows advanced portfolio intelligence without extra network calls when switching tabs", async ({ page }) => {
     let fullCalls = 0;
     await page.addInitScript((saved) => {

@@ -87,11 +87,12 @@ function portfolio(value: unknown): PortfolioPositionInput[] {
     if (!raw || typeof raw !== "object") continue;
     const item = raw as Partial<PortfolioPositionInput>;
     const symbol = String(item.symbol ?? "").trim().toUpperCase().replace(/\.TO$/, "");
+    const market = item.market === "US" || item.market === "INTL" ? item.market : "CA";
     const quantity = Number(item.quantity);
     const averageCost = Number(item.average_cost);
     if (!symbol || seen.has(symbol) || quantity <= 0 || averageCost < 0) continue;
     seen.add(symbol);
-    output.push({ symbol, quantity, average_cost: averageCost });
+    output.push({ symbol, quantity, average_cost: averageCost, market });
   }
   return output.slice(0, 30);
 }
@@ -295,13 +296,17 @@ export function readLocalWorkspace(): LocalWorkspaceSnapshot {
   };
 }
 
+function portfolioIdentity(item: PortfolioPositionInput): string {
+  return `${item.market ?? "CA"}:${item.symbol}`;
+}
+
 function mergeBySymbol(
   remote: PortfolioPositionInput[],
   local: PortfolioPositionInput[],
 ): PortfolioPositionInput[] {
   const values = new Map<string, PortfolioPositionInput>();
-  for (const item of remote) values.set(item.symbol, item);
-  for (const item of local) values.set(item.symbol, item);
+  for (const item of remote) values.set(portfolioIdentity(item), item);
+  for (const item of local) values.set(portfolioIdentity(item), item);
   return [...values.values()].slice(0, 30);
 }
 

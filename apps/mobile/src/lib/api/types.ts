@@ -75,7 +75,8 @@ export type AccountUser = {
   is_admin: boolean;
 };
 
-export type PortfolioPositionInput = { symbol: string; quantity: number; average_cost: number };
+export type PortfolioMarket = "CA" | "US" | "INTL";
+export type PortfolioPositionInput = { symbol: string; quantity: number; average_cost: number; market?: PortfolioMarket };
 export type AlertRule = {
   id: string;
   symbol: string;
@@ -264,7 +265,7 @@ export type PortfolioHorizonContribution = { symbol: string; contribution_percen
 export type PortfolioContributionResult = { horizon: PortfolioHorizon["horizon"]; items: PortfolioHorizonContribution[]; coverage: PortfolioCoverage; methodology: PortfolioHorizon["methodology"] };
 export type PortfolioCorrelation = { symbols: string[]; values: (number | null)[][]; observations: number[][]; average_correlation: number | null; highest_pair: [string, string, number] | null; lowest_pair: [string, string, number] | null; minimum_observations: number };
 export type PortfolioStressTest = { key: "tsx" | "wti" | "cad_usd" | "canada_10y"; label: string; shock: number; shock_unit: "percent" | "basis_points"; estimated_portfolio_change_percent: number | null; coverage: PortfolioCoverage; methodology: string };
-export type PortfolioPositionSnapshot = PortfolioPositionInput & { symbol: string; ticker: string; name: string; sector: string; currency?: string; price: number; market_value: number; unrealized_pnl: number; unrealized_pnl_percent: number | null; day_pnl?: number; day_change_percent: number; weight_percent: number; momentum_20d?: number | null; rsi_14?: number | null; relative_volume?: number | null; score?: number | null; source?: string; delayed?: boolean };
+export type PortfolioPositionSnapshot = PortfolioPositionInput & { symbol: string; ticker: string; name: string; sector: string; market?: PortfolioMarket; currency?: string; native_currency?: string | null; native_price?: number | null; price: number; market_value: number; unrealized_pnl: number; unrealized_pnl_percent: number | null; day_pnl?: number; day_change_percent: number; weight_percent: number; momentum_20d?: number | null; rsi_14?: number | null; relative_volume?: number | null; score?: number | null; source?: string; delayed?: boolean };
 export type PortfolioSnapshot = { base_currency?: string; total_market_value: number; total_day_pnl: number; total_day_change_percent: number; total_unrealized_pnl: number; total_unrealized_pnl_percent?: number | null; portfolio_score?: number | null; sector_allocation: PortfolioAllocation[]; currency_allocation?: PortfolioAllocation[]; positions: PortfolioPositionSnapshot[]; risk?: PortfolioRisk | null; contributors?: PortfolioContributor[]; detractors?: PortfolioContributor[]; performance_horizons?: PortfolioHorizon[]; contribution_horizons?: PortfolioContributionResult[]; correlation?: PortfolioCorrelation | null; stress_tests?: PortfolioStressTest[]; risk_reading?: string[]; methodology?: string; notes?: string[]; generated_at?: string; refresh_after_seconds?: number };
 export type AlertEvaluation = { id: string; symbol: string; status: string; message: string; current_value?: number | null; triggered: boolean; name?: string; metric_label?: string; unit?: string; source?: string | null; event_type?: AlertRule["event_type"]; event_fingerprint?: string | null; event_value?: string | null; evaluated_at?: string; last_triggered_at?: string | null };
 export type AlertSnapshot = { items: AlertEvaluation[]; triggered_count: number; monitored_count: number; unavailable_count: number; generated_at?: string; refresh_after_seconds?: number };

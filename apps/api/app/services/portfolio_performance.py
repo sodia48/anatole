@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 from app.core.resilience import AsyncStaleCache
@@ -10,6 +11,8 @@ from app.schemas.workspace import (
     PortfolioPerformanceView,
 )
 from app.services.market_data import market_data_service
+from app.services.currency_conversion import currency_conversion_service
+from app.services.portfolio_symbols import portfolio_provider_ticker
 
 
 _RANGE_LABELS = {
@@ -93,7 +96,7 @@ def _downsample(
 class PortfolioPerformanceService:
     def __init__(self) -> None:
         self._cache: AsyncStaleCache[
-            tuple[str, str, tuple[tuple[str, float], ...]],
+            tuple[str, str, tuple[tuple[str, str, float], ...]],
             PortfolioPerformanceView,
         ] = AsyncStaleCache(
             max_entries=256,
@@ -109,12 +112,16 @@ class PortfolioPerformanceService:
             item.symbol: item.weight_percent / total_weight
             for item in request.positions
         }
+        markets = {
+            item.symbol: item.market
+            for item in request.positions
+        }
         key = (
             request.range,
             request.benchmark,
             tuple(
                 sorted(
-                    (symbol, round(weight, 4))
+                    (symbol, markets[symbol], round(weight, 4))
                     for symbol, weight in weights.items()
                 )
             ),
@@ -122,7 +129,7 @@ class PortfolioPerformanceService:
 
         return await self._cache.get_or_load(
             key,
-            lambda: self._load(request, weights),
+            lambda: self._load(request, weights, markets),
             fresh_seconds=10 * 60,
             stale_seconds=2 * 60 * 60,
         )
@@ -131,11 +138,16 @@ class PortfolioPerformanceService:
         self,
         request: PortfolioPerformanceRequest,
         weights: dict[str, float],
+        markets: dict[str, str],
     ) -> PortfolioPerformanceView:
         now = datetime.now(UTC)
-        normalized = {
-            symbol: market_data_service.normalize_ticker(symbol)
+        provider_symbols = {
+            symbol: portfolio_provider_ticker(symbol, markets[symbol])
             for symbol in weights
+        }
+        normalized = {
+            symbol: market_data_service.normalize_ticker(provider_symbol)
+            for symbol, provider_symbol in provider_symbols.items()
         }
         benchmark_ticker = market_data_service.normalize_ticker(request.benchmark)
         tickers = list(
@@ -145,18 +157,50 @@ class PortfolioPerformanceService:
             ])
         )
 
-        histories = await market_data_service.get_history_many_strict(
-            tickers,
-            range_=_PROVIDER_RANGES[request.range],
-            interval="1d",
-            concurrency=10,
-            deadline_seconds=(
-                12.0
-                if request.range in {"5y", "10y", "max"}
-                else 8.0
+        quotes, histories = await asyncio.gather(
+            market_data_service.get_quotes(
+                list(provider_symbols.values()),
+                deadline_seconds=4.0,
             ),
-            attempts=1,
+            market_data_service.get_history_many_strict(
+                tickers,
+                range_=_PROVIDER_RANGES[request.range],
+                interval="1d",
+                concurrency=10,
+                deadline_seconds=(
+                    12.0
+                    if request.range in {"5y", "10y", "max"}
+                    else 8.0
+                ),
+                attempts=1,
+                exact_symbols=True,
+            ),
         )
+
+        quote_by_ticker = {
+            quote.ticker.strip().upper(): quote
+            for quote in quotes
+        }
+        conversion_jobs = {
+            symbol: currency_conversion_service.candles_to_cad(
+                ticker,
+                (
+                    quote_by_ticker[ticker].native_currency
+                    or quote_by_ticker[ticker].currency
+                ),
+                histories.get(ticker, []),
+            )
+            for symbol, ticker in normalized.items()
+            if ticker in quote_by_ticker and histories.get(ticker)
+        }
+        if conversion_jobs:
+            converted = await asyncio.gather(
+                *conversion_jobs.values(),
+                return_exceptions=True,
+            )
+            for symbol, result in zip(conversion_jobs, converted, strict=False):
+                if not isinstance(result, Exception):
+                    histories[normalized[symbol]] = result
 
         cutoff = _cutoff(request.range, now)
         return_maps = {

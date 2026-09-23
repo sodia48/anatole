@@ -632,10 +632,13 @@ export type {
   TerminalSectorRotation,
 } from "@anatole/shared";
 
+export type PortfolioMarket = "CA" | "US" | "INTL";
+
 export type PortfolioPositionInput = {
   symbol: string;
   quantity: number;
   average_cost: number;
+  market?: PortfolioMarket;
 };
 
 export type PortfolioPositionSnapshot = {
@@ -643,7 +646,10 @@ export type PortfolioPositionSnapshot = {
   ticker: string;
   name: string;
   sector: string;
+  market?: PortfolioMarket;
   currency: string;
+  native_currency?: string | null;
+  native_price?: number | null;
   quantity: number;
   average_cost: number;
   price: number;

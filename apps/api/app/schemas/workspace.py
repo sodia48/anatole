@@ -6,17 +6,21 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+PortfolioMarket = Literal["CA", "US", "INTL"]
+
+
 class PortfolioPositionInput(BaseModel):
     symbol: str
     quantity: float = Field(gt=0, le=1_000_000_000)
     average_cost: float = Field(ge=0, le=10_000_000)
+    market: PortfolioMarket = "CA"
 
     @field_validator("symbol")
     @classmethod
     def normalize_symbol(cls, value: str) -> str:
         symbol = value.strip().upper().removesuffix(".TO")
-        if not symbol or len(symbol) > 15:
-            raise ValueError("Le symbole doit contenir de 1 à 15 caractères.")
+        if not symbol or len(symbol) > 24:
+            raise ValueError("Le symbole doit contenir de 1 à 24 caractères.")
         return symbol
 
 
@@ -53,7 +57,10 @@ class PortfolioPositionSnapshot(BaseModel):
     ticker: str
     name: str
     sector: str
+    market: PortfolioMarket = "CA"
     currency: str
+    native_currency: str | None = None
+    native_price: float | None = None
     quantity: float
     average_cost: float
     price: float
@@ -101,12 +108,13 @@ PortfolioPerformanceRange = Literal["1w", "1m", "3m", "ytd", "1y", "5y", "10y", 
 class PortfolioPerformanceWeight(BaseModel):
     symbol: str
     weight_percent: float = Field(gt=0, le=100)
+    market: PortfolioMarket = "CA"
 
     @field_validator("symbol")
     @classmethod
     def normalize_symbol(cls, value: str) -> str:
         symbol = value.strip().upper().removesuffix(".TO")
-        if not symbol or len(symbol) > 15:
+        if not symbol or len(symbol) > 24:
             raise ValueError("Symbole de portefeuille invalide.")
         return symbol
 
