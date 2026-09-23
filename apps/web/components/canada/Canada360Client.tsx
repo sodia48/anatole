@@ -19,6 +19,11 @@ import {
 } from "react";
 
 import styles from "./Canada360Client.module.css";
+import {
+  AnnualGdpContext,
+  RecentEconomicPulse,
+} from "./Canada360Freshness";
+import { formatMetricPeriod } from "./canada360-periods";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
 import {
@@ -442,7 +447,7 @@ function MetricCard({
           </strong>
         ) : (
           <span>
-            {metric.reference_period ??
+            {formatMetricPeriod(metric, language) ??
               pick(
                 language,
                 "Dernière donnée",
@@ -764,7 +769,7 @@ export function Canada360Client() {
             displayValue:
               metricChange(metric, language) ?? "N/D",
             detail:
-              metric.reference_period ?? "",
+              formatMetricPeriod(metric, language) ?? "",
           }];
         }
 
@@ -815,10 +820,12 @@ export function Canada360Client() {
             metric,
             language,
           ),
-          detail:
-            metricChange(metric, language) ??
-            metric.reference_period ??
-            "",
+          detail: [
+            metricChange(metric, language),
+            formatMetricPeriod(metric, language),
+          ]
+            .filter(Boolean)
+            .join(" · "),
         }];
       })
       .sort(
@@ -1028,7 +1035,7 @@ export function Canada360Client() {
                   )}
                 </span>
                 <em>
-                  {metric.reference_period ??
+                  {formatMetricPeriod(metric, language) ??
                     pick(
                       language,
                       "Dernière période disponible",
@@ -1077,6 +1084,11 @@ export function Canada360Client() {
           </div>
         </div>
       </section>
+
+      <RecentEconomicPulse
+        metrics={snapshot.macro}
+        language={language}
+      />
 
       <section className={styles.section}>
         <div className={styles.heading}>
@@ -1324,6 +1336,12 @@ export function Canada360Client() {
             </label>
           </div>
 
+          <AnnualGdpContext
+            provinces={snapshot.provinces}
+            language={language}
+            visible={comparisonMetricKey === "real_gdp"}
+          />
+
           <div className={styles.comparatorRows}>
             {provinceComparison.length ? (
               provinceComparison.map(
@@ -1561,12 +1579,18 @@ export function Canada360Client() {
 
                     <div className={styles.detailMeta}>
                       <span>
-                        {metric?.reference_period ??
-                          pick(
-                            language,
-                            "Période N/D",
-                            "Period N/A",
-                          )}
+                        {metric
+                          ? formatMetricPeriod(metric, language) ??
+                            pick(
+                              language,
+                              "Période N/D",
+                              "Period N/A",
+                            )
+                          : pick(
+                              language,
+                              "Période N/D",
+                              "Period N/A",
+                            )}
                       </span>
                       <span>
                         {metric
