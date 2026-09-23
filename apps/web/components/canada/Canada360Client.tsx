@@ -221,6 +221,76 @@ const PROVINCE_DETAIL_KEYS = [
   "population",
 ] as const;
 
+const NATIONAL_SIGNAL_KEYS = [
+  "real_gdp",
+  "inflation_yoy",
+  "unemployment_rate",
+  "tsx_composite",
+] as const;
+
+type ComparisonMetricKey =
+  | "real_gdp"
+  | "unemployment_rate"
+  | "inflation_yoy"
+  | "employment"
+  | "retail_sales"
+  | "housing_starts"
+  | "population";
+
+const COMPARISON_METRIC_KEYS: ComparisonMetricKey[] = [
+  "real_gdp",
+  "unemployment_rate",
+  "inflation_yoy",
+  "employment",
+  "retail_sales",
+  "housing_starts",
+  "population",
+];
+
+function signalDirection(
+  metric: Metric,
+  language: "fr" | "en",
+): string {
+  if (
+    metric.change === null ||
+    !Number.isFinite(metric.change)
+  ) {
+    return pick(
+      language,
+      "Dernière observation disponible",
+      "Latest available observation",
+    );
+  }
+
+  const change = metricChange(metric, language);
+  if (metric.change > 0) {
+    return pick(
+      language,
+      `En hausse ${change ?? ""}`,
+      `Up ${change ?? ""}`,
+    );
+  }
+  if (metric.change < 0) {
+    return pick(
+      language,
+      `En baisse ${change ?? ""}`,
+      `Down ${change ?? ""}`,
+    );
+  }
+  return pick(
+    language,
+    "Stable sur la dernière observation",
+    "Flat on the latest observation",
+  );
+}
+
+function comparisonLabel(
+  key: ComparisonMetricKey,
+  language: "fr" | "en",
+): string {
+  return fallbackMetricLabel(key, language);
+}
+
 function provinceMetric(
   province: Province,
   key: string,
@@ -410,6 +480,8 @@ export function Canada360Client() {
     useState(false);
   const [selectedProvinceCode, setSelectedProvinceCode] =
     useState<string | null>(null);
+  const [comparisonMetricKey, setComparisonMetricKey] =
+    useState<ComparisonMetricKey>("real_gdp");
   const provinceHydrationAttempts = useRef(0);
 
   const load = useCallback(
@@ -575,6 +647,77 @@ export function Canada360Client() {
     [selectedProvinceCode, snapshot],
   );
 
+  const nationalSignals = useMemo(() => {
+    if (!snapshot) return [];
+
+    const allMetrics = [
+      ...snapshot.macro,
+      ...snapshot.rates,
+      ...snapshot.markets,
+    ];
+    const byKey = new Map(
+      allMetrics.map((metric) => [
+        metric.key,
+        metric,
+      ]),
+    );
+
+    return NATIONAL_SIGNAL_KEYS.flatMap((key) => {
+      const metric = byKey.get(key);
+      return metric && metric.value !== null
+        ? [metric]
+        : [];
+    });
+  }, [snapshot]);
+
+  const provincialCoverage = useMemo(() => {
+    if (!snapshot?.provinces.length) {
+      return { available: 0, expected: 0, percent: 0 };
+    }
+    const expected =
+      snapshot.provinces.length *
+      PROVINCE_DETAIL_KEYS.length;
+    const available = snapshot.provinces.reduce(
+      (total, province) =>
+        total +
+        PROVINCE_DETAIL_KEYS.filter(
+          (key) =>
+            provinceMetric(province, key)?.value !==
+            null,
+        ).length,
+      0,
+    );
+    return {
+      available,
+      expected,
+      percent: expected
+        ? Math.round((available / expected) * 100)
+        : 0,
+    };
+  }, [snapshot]);
+
+  const provinceComparison = useMemo(() => {
+    if (!snapshot) return [];
+
+    return snapshot.provinces
+      .flatMap((province) => {
+        const metric = provinceMetric(
+          province,
+          comparisonMetricKey,
+        );
+        return metric?.value !== null &&
+          metric?.value !== undefined &&
+          Number.isFinite(metric.value)
+          ? [{ province, metric }]
+          : [];
+      })
+      .sort(
+        (left, right) =>
+          (right.metric.value ?? 0) -
+          (left.metric.value ?? 0),
+      );
+  }, [comparisonMetricKey, snapshot]);
+
   if (loading && !snapshot) {
     return (
       <main className={styles.page}>
@@ -722,6 +865,105 @@ export function Canada360Client() {
         </div>
       ) : null}
 
+      <section className={`panel ${styles.pulsePanel}`}>
+        <div className={styles.heading}>
+          <div>
+            <div className="eyebrow">
+              {pick(
+                language,
+                "LECTURE RAPIDE",
+                "QUICK READ",
+              )}
+            </div>
+            <h2>
+              {pick(
+                language,
+                "Ce qui change au Canada",
+                "What is changing in Canada",
+              )}
+            </h2>
+          </div>
+          <Activity size={20} />
+        </div>
+
+        <div className={styles.pulseGrid}>
+          {nationalSignals.length ? (
+            nationalSignals.map((metric) => (
+              <article
+                className={styles.pulseCard}
+                key={metric.key}
+              >
+                <small>{metric.label}</small>
+                <strong>
+                  {metricValue(metric, language)}
+                </strong>
+                <span
+                  className={
+                    metric.change !== null &&
+                    metric.change > 0
+                      ? styles.positive
+                      : metric.change !== null &&
+                          metric.change < 0
+                        ? styles.negative
+                        : undefined
+                  }
+                >
+                  {signalDirection(
+                    metric,
+                    language,
+                  )}
+                </span>
+                <em>
+                  {metric.reference_period ??
+                    pick(
+                      language,
+                      "Dernière période disponible",
+                      "Latest available period",
+                    )}
+                </em>
+              </article>
+            ))
+          ) : (
+            <div className={styles.emptyInline}>
+              {pick(
+                language,
+                "Les signaux nationaux se complètent en arrière-plan.",
+                "National signals are completing in the background.",
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.coverageBar}>
+          <div>
+            <span>
+              {pick(
+                language,
+                "Couverture provinciale",
+                "Provincial coverage",
+              )}
+            </span>
+            <strong>
+              {provincialCoverage.percent} %
+            </strong>
+          </div>
+          <div
+            className={styles.coverageTrack}
+            aria-label={pick(
+              language,
+              "Couverture des données provinciales",
+              "Provincial data coverage",
+            )}
+          >
+            <span
+              style={{
+                width: `${provincialCoverage.percent}%`,
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
       <section className={styles.section}>
         <div className={styles.heading}>
           <div>
@@ -856,6 +1098,127 @@ export function Canada360Client() {
             "Select a province to open its 360° profile. Cards prioritize real GDP, unemployment, inflation and population.",
           )}
         </p>
+
+        <section className={`panel ${styles.comparator}`}>
+          <div className={styles.comparatorHeader}>
+            <div>
+              <div className="eyebrow">
+                {pick(
+                  language,
+                  "COMPARATEUR",
+                  "COMPARATOR",
+                )}
+              </div>
+              <h3>
+                {pick(
+                  language,
+                  "Comparer les provinces",
+                  "Compare provinces",
+                )}
+              </h3>
+              <p>
+                {pick(
+                  language,
+                  "Tri descriptif par niveau de l’indicateur sélectionné — ce n’est pas un classement de performance.",
+                  "Descriptive sorting by the selected indicator level — not a performance ranking.",
+                )}
+              </p>
+            </div>
+
+            <label className={styles.comparatorControl}>
+              <span>
+                {pick(
+                  language,
+                  "Indicateur",
+                  "Indicator",
+                )}
+              </span>
+              <select
+                aria-label={pick(
+                  language,
+                  "Indicateur provincial à comparer",
+                  "Provincial indicator to compare",
+                )}
+                value={comparisonMetricKey}
+                onChange={(event) =>
+                  setComparisonMetricKey(
+                    event.target
+                      .value as ComparisonMetricKey,
+                  )
+                }
+              >
+                {COMPARISON_METRIC_KEYS.map(
+                  (key) => (
+                    <option key={key} value={key}>
+                      {comparisonLabel(
+                        key,
+                        language,
+                      )}
+                    </option>
+                  ),
+                )}
+              </select>
+            </label>
+          </div>
+
+          <div className={styles.comparatorRows}>
+            {provinceComparison.length ? (
+              provinceComparison.map(
+                ({ province, metric }, index) => (
+                  <button
+                    type="button"
+                    className={styles.comparatorRow}
+                    data-testid={`province-comparator-${province.code}`}
+                    key={`${comparisonMetricKey}-${province.code}`}
+                    onClick={() =>
+                      setSelectedProvinceCode(
+                        province.code,
+                      )
+                    }
+                  >
+                    <span
+                      className={styles.comparatorRank}
+                    >
+                      {index + 1}
+                    </span>
+                    <span
+                      className={styles.comparatorProvince}
+                    >
+                      <strong>{province.code}</strong>
+                      <small>{province.name}</small>
+                    </span>
+                    <span
+                      className={styles.comparatorValue}
+                    >
+                      <strong>
+                        {metricValue(
+                          metric,
+                          language,
+                        )}
+                      </strong>
+                      <small>
+                        {metricChange(
+                          metric,
+                          language,
+                        ) ??
+                          metric.reference_period ??
+                          ""}
+                      </small>
+                    </span>
+                  </button>
+                ),
+              )
+            ) : (
+              <div className={styles.emptyInline}>
+                {pick(
+                  language,
+                  "Cet indicateur provincial est encore en cours de récupération.",
+                  "This provincial indicator is still being retrieved.",
+                )}
+              </div>
+            )}
+          </div>
+        </section>
 
         <div className={styles.provinceGrid}>
           {snapshot.provinces.map((province) => (
