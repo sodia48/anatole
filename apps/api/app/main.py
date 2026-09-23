@@ -21,12 +21,14 @@ from app.core.telemetry import performance_monitor, reliability_monitor
 from app.core.version import ANATOLE_VERSION
 from app.services.accounts import account_service
 from app.services.calendar import calendar_service
+from app.services.canada_360 import canada_360_service
 from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
 from app.services.news import news_service
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
 from app.services.psychology import psychology_service
+from app.services.provincial_statistics import provincial_statistics_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -76,7 +78,10 @@ async def _warm_public_snapshots_once() -> None:
 
     await asyncio.sleep(0.75)
 
-    await _warm_source("cockpit:composite", cockpit_service.get_composite())
+    await asyncio.gather(
+        _warm_source("cockpit:composite", cockpit_service.get_composite()),
+        _warm_source("canada360:fr", canada_360_service.get_snapshot("fr")),
+    )
 
     await asyncio.sleep(0.35)
 
@@ -84,6 +89,9 @@ async def _warm_public_snapshots_once() -> None:
         _warm_source("news:en", news_service.get_snapshot("en")),
         _warm_source("calendar:en", calendar_service.get_snapshot("en")),
     )
+
+    await asyncio.sleep(0.35)
+    await _warm_source("canada360:en", canada_360_service.get_snapshot("en"))
 
 
 async def _maintain_public_hotset() -> None:
@@ -98,6 +106,7 @@ async def _maintain_public_hotset() -> None:
         "tsx60": now + 20.0,
         "psychology": now + 60.0,
         "composite": now + 100.0,
+        "canada360": now + 120.0,
         "discovery": now + 120.0,
     }
     last_level: str | None = None
@@ -146,6 +155,15 @@ async def _maintain_public_hotset() -> None:
                 )
             )
             next_due["composite"] = now + policy.composite_seconds
+
+        if now >= next_due["canada360"]:
+            tasks.extend(
+                [
+                    _warm_source("canada360:fr", canada_360_service.get_snapshot("fr")),
+                    _warm_source("canada360:en", canada_360_service.get_snapshot("en")),
+                ]
+            )
+            next_due["canada360"] = now + policy.discovery_seconds
 
         if now >= next_due["discovery"]:
             tasks.extend(

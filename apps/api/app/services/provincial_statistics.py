@@ -813,6 +813,8 @@ def _parse_retail_sales_zip(
 
 
 class ProvincialStatisticsService:
+    metric_concurrency = 2
+
     def __init__(self) -> None:
         self._metadata_cache: dict[int, _CachedMetadata] = {}
         self._cache: dict[tuple[str, str], tuple[float, ProvincialStatisticsSnapshot]] = {}
@@ -1271,20 +1273,20 @@ class ProvincialStatisticsService:
             headers=headers,
             follow_redirects=True,
         ) as client:
-            # WDS is reliable for these small grouped coordinate requests, but
-            # intermittently times out when all tables perform metadata and
-            # data POSTs at once.  Province 360 warms in the background, so
-            # favour a complete official snapshot over an unnecessary fan-out.
-            results = []
-            for spec in METRICS:
-                results.append(
-                    await self._metric_for_provinces(
+            semaphore = asyncio.Semaphore(self.metric_concurrency)
+
+            async def load_metric(spec: MetricSpec):
+                async with semaphore:
+                    return await self._metric_for_provinces(
                         client,
                         spec,
                         selected,
                         lang,
                     )
-                )
+
+            results = await asyncio.gather(
+                *(load_metric(spec) for spec in METRICS)
+            )
 
         for metrics, issue in results:
             if issue:

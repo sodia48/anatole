@@ -21,7 +21,10 @@ import {
 import styles from "./Canada360Client.module.css";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
-import { resilientFetch } from "@/lib/resilient-fetch";
+import {
+  readLastGoodJson,
+  resilientFetch,
+} from "@/lib/resilient-fetch";
 
 type Freshness =
   | "live"
@@ -80,6 +83,12 @@ type Snapshot = {
   generated_at: string;
   refresh_after_seconds: number;
 };
+
+const CANADA360_STALE_TTL_MS = 6 * 60 * 60 * 1000;
+
+function canada360Url(language: "fr" | "en"): string {
+  return `/api/anatole/api/v1/canada/overview?lang=${language}`;
+}
 
 function compactNumber(
   value: number,
@@ -408,26 +417,35 @@ export function Canada360Client() {
       signal?: AbortSignal,
       force = false,
     ) => {
+      const baseUrl = canada360Url(language);
       if (force) {
         setRefreshing(true);
       } else {
-        setLoading(true);
+        const cached = readLastGoodJson<Snapshot>(
+          baseUrl,
+          CANADA360_STALE_TTL_MS,
+        );
+        if (cached?.language === language) {
+          setSnapshot((current) =>
+            current?.language === language ? current : cached,
+          );
+          setClientStale(true);
+          setLoading(false);
+        } else {
+          setLoading(true);
+        }
       }
 
       try {
-        const params = new URLSearchParams({
-          lang: language,
-        });
-        if (force) params.set("refresh", "true");
-
+        const requestUrl = force ? `${baseUrl}&refresh=true` : baseUrl;
         const response = await resilientFetch(
-          `/api/anatole/api/v1/canada/overview?${params.toString()}`,
+          requestUrl,
           {
             signal,
-            timeoutMs: 8_500,
+            timeoutMs: 6_500,
             retries: 0,
             allowStale: true,
-            staleTtlMs: 30 * 60 * 1000,
+            staleTtlMs: CANADA360_STALE_TTL_MS,
             headers: {
               Accept: "application/json",
             },
@@ -525,7 +543,7 @@ export function Canada360Client() {
 
     const timer = window.setTimeout(() => {
       provinceHydrationAttempts.current += 1;
-      void load(controller.signal, true);
+      void load(controller.signal, false);
     }, delayMs);
 
     return () => {

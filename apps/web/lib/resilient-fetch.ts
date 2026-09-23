@@ -116,6 +116,7 @@ const PERSISTENT_PUBLIC_CACHE_PREFIXES = [
   "/api/anatole/api/v1/discovery/screener",
   "/api/anatole/api/v1/discovery/ipo",
   "/api/anatole/api/v1/discovery/insiders",
+  "/api/anatole/api/v1/canada/overview",
   "/api/anatole/api/v1/analysis/terminal",
   "/api/anatole/api/v1/stocks/",
 ];
