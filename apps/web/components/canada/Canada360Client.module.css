@@ -663,3 +663,236 @@ a.sourceLink:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Canada 360 2.0 — analytical layer, computed entirely from the snapshot. */
+.pulsePanel {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.pulseGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pulseCard {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-2);
+}
+
+.pulseCard small,
+.pulseCard em {
+  color: var(--muted);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.pulseCard strong {
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+
+.pulseCard span {
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.coverageBar {
+  display: grid;
+  gap: 7px;
+}
+
+.coverageBar > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.coverageBar strong {
+  color: var(--text);
+}
+
+.coverageTrack {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.coverageTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+  transition: width 240ms ease;
+}
+
+.comparator {
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.comparatorHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.comparatorHeader h3 {
+  margin: 4px 0 5px;
+  font-size: 18px;
+}
+
+.comparatorHeader p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.comparatorControl {
+  min-width: 220px;
+  display: grid;
+  gap: 6px;
+}
+
+.comparatorControl span {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.comparatorControl select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.comparatorRows {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.comparatorRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.comparatorRow:hover {
+  border-color: color-mix(in srgb, var(--blue) 50%, var(--border));
+}
+
+.comparatorRank {
+  grid-row: 1 / span 2;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.comparatorProvince,
+.comparatorValue {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.comparatorProvince strong,
+.comparatorValue strong {
+  font-size: 11px;
+}
+
+.comparatorProvince small,
+.comparatorValue small {
+  color: var(--muted);
+  font-size: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comparatorValue {
+  grid-column: 2;
+}
+
+.emptyInline {
+  grid-column: 1 / -1;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.provinceGrid,
+.provinceDetail,
+.quality {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 520px;
+}
+
+@media (max-width: 1280px) {
+  .pulseGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .comparatorRows {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .comparatorHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .comparatorControl {
+    min-width: 0;
+  }
+
+  .comparatorRows {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .pulseGrid,
+  .comparatorRows {
+    grid-template-columns: 1fr;
+  }
+}
