@@ -1378,6 +1378,24 @@
   line-height: 1.65;
 }
 
+.guideHeroActions {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-wrap: wrap;
+}
+
+.guideHeroActions a {
+  text-decoration: none;
+}
+
+.guideHeroHint {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .guideHeroStatus {
   min-width: 180px;
   display: grid;
