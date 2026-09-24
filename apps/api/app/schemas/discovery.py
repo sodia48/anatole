@@ -65,6 +65,35 @@ class NewsSnapshot(BaseModel):
     refresh_after_seconds: int = 900
 
 
+class NewsBriefRequest(BaseModel):
+    title: str
+    summary: str = ""
+    url: str
+    source: str
+    category: str
+    region: str = "Canada"
+    language: Literal["fr", "en"] = "fr"
+
+
+class NewsBriefFigure(BaseModel):
+    value: str
+    context: str
+
+
+class NewsBriefResponse(BaseModel):
+    title: str
+    summary: str
+    key_figures: list[NewsBriefFigure] = Field(default_factory=list)
+    changes: list[str] = Field(default_factory=list)
+    why_it_matters: str
+    watch: list[str] = Field(default_factory=list)
+    source_url: str
+    source_name: str
+    source_mode: Literal["official_page", "feed_summary"]
+    source_note: str
+    generated_at: datetime
+
+
 class EconomicEvent(BaseModel):
     id: str
     title: str

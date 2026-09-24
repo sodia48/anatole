@@ -4,6 +4,8 @@ from app.schemas.discovery import (
     CalendarSnapshot,
     EarningsCalendarSnapshot,
     EtfDirectorySnapshot,
+    NewsBriefRequest,
+    NewsBriefResponse,
     NewsSnapshot,
     PsychologySnapshot,
     ScreenerSnapshot,
@@ -12,6 +14,7 @@ from app.services.calendar import calendar_service
 from app.services.earnings_calendar import earnings_calendar_service
 from app.services.etf import etf_service
 from app.services.news import news_service
+from app.services.news_brief import news_brief_service
 from app.services.psychology import psychology_service
 from app.services.screener import screener_service
 
@@ -46,6 +49,13 @@ async def news(
     return await news_service.get_snapshot(
         lang
     )
+
+
+@router.post("/news/brief", response_model=NewsBriefResponse)
+async def news_brief(
+    request: NewsBriefRequest,
+) -> NewsBriefResponse:
+    return await news_brief_service.get_brief(request)
 
 
 @router.get("/calendar", response_model=CalendarSnapshot)

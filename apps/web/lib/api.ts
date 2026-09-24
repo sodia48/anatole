@@ -11,6 +11,8 @@ import type {
   FocusSnapshot,
   FocusFundamentalOverlaySnapshot,
   HealthStatus,
+  NewsBriefRequest,
+  NewsBriefResponse,
   NewsSnapshot,
   PsychologySnapshot,
   ReliabilitySnapshot,
@@ -462,6 +464,22 @@ export function getNewsSnapshot(
     {},
     signal,
     30_000,
+  );
+}
+
+export function getNewsBrief(
+  request: NewsBriefRequest,
+  signal?: AbortSignal,
+): Promise<NewsBriefResponse> {
+  return apiRequest<NewsBriefResponse>(
+    "/api/v1/discovery/news/brief",
+    {
+      method: "POST",
+      body: JSON.stringify(request),
+    },
+    signal,
+    12_000,
+    true,
   );
 }
 
