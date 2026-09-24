@@ -210,6 +210,90 @@ def _why(theme: str, language: str) -> str:
     return (fr if language == "fr" else en)[theme]
 
 
+def _stock_theme(title: str, summary: str) -> str:
+    value = f"{title} {summary}".casefold()
+    groups = (
+        ("earnings", ("earnings", "revenue", "profit", "loss", "eps", "guidance", "quarter", "results", "revenus", "bénéfice", "résultats", "prévisions")),
+        ("ma", ("acquire", "acquisition", "merger", "takeover", "bid", "fusion", "acquérir")),
+        ("contract", ("contract", "order", "agreement", "partnership", "joint venture", "launch", "contrat", "commande", "accord", "partenariat", "coentreprise", "lancement")),
+        ("financing", ("financing", "offering", "debt", "credit facility", "buyback", "dividend", "financement", "émission", "dette", "rachat", "dividende")),
+        ("regulatory", ("regulator", "lawsuit", "court", "settlement", "investigation", "approval", "recall", "tribunal", "poursuite", "enquête", "approbation", "rappel")),
+        ("analyst", ("upgrade", "downgrade", "price target", "rating", "analyst", "objectif de cours", "analyste")),
+        ("operations", ("production", "shipment", "mine", "plant", "capacity", "operations", "livraison", "usine", "capacité", "exploitation")),
+    )
+    for theme, words in groups:
+        if any(word in value for word in words):
+            return theme
+    return "general"
+
+
+def _stock_why(theme: str, language: str, company: str | None, ticker: str | None) -> str:
+    subject = (company or ticker or ("l’entreprise" if language == "fr" else "the company")).strip()
+    fr = {
+        "earnings": f"Pour {subject}, cette nouvelle touche directement la trajectoire des revenus, des marges, du bénéfice et/ou des prévisions. Il faut comparer les chiffres publiés avec la période précédente et les attentes déjà intégrées par le marché.",
+        "ma": f"Pour {subject}, une acquisition ou une fusion peut modifier la taille du groupe, son financement, ses synergies attendues et son profil de risque. Les modalités, le prix payé et le calendrier d’intégration comptent davantage que le titre seul.",
+        "contract": f"Pour {subject}, un contrat, partenariat ou lancement peut améliorer la visibilité sur les revenus futurs ou renforcer une activité stratégique. Sa matérialité dépend de sa valeur, de sa durée et de son poids par rapport aux revenus du groupe.",
+        "financing": f"Pour {subject}, une opération de financement peut modifier la liquidité, l’endettement, le coût du capital ou la dilution. Il faut distinguer le financement de croissance d’un besoin de trésorerie.",
+        "regulatory": f"Pour {subject}, un développement réglementaire ou juridique peut influencer les coûts, le calendrier commercial et l’exécution. L’impact dépend de la décision finale, des montants en jeu et des activités concernées.",
+        "analyst": f"Cette nouvelle reflète surtout une lecture externe de {subject}; elle ne modifie pas à elle seule les fondamentaux. Les hypothèses derrière l’objectif de cours ou la recommandation sont plus informatives que la notation isolée.",
+        "operations": f"Pour {subject}, cette mise à jour opérationnelle renseigne sur l’exécution, les volumes, la capacité ou les coûts. Sa portée se juge en la comparant aux objectifs précédents.",
+        "general": f"Cette nouvelle apporte un élément de contexte sur {subject}. Pour mesurer sa portée réelle, il faut la relier aux revenus, aux marges, au bilan, aux prévisions ou à l’exécution plutôt que d’interpréter le titre isolément.",
+    }
+    en = {
+        "earnings": f"For {subject}, this update directly affects the revenue, margin, earnings and/or guidance path. Compare the reported figures with the prior period and with expectations already reflected in the market.",
+        "ma": f"For {subject}, an acquisition or merger can change scale, financing needs, expected synergies and risk. Deal terms, purchase price and integration timing matter more than the headline alone.",
+        "contract": f"For {subject}, a contract, partnership or launch can improve future-revenue visibility or strengthen a strategic business. Materiality depends on value, duration and size relative to company revenue.",
+        "financing": f"For {subject}, financing can change liquidity, leverage, cost of capital or dilution. Distinguish growth funding from financing used to cover a cash need.",
+        "regulatory": f"For {subject}, a regulatory or legal development can affect costs, commercial timing and execution. The impact depends on the final decision, amounts at stake and businesses involved.",
+        "analyst": f"This mainly reflects an external view of {subject}; it does not by itself change fundamentals. The assumptions behind the target or rating are more informative than the rating change alone.",
+        "operations": f"For {subject}, this operational update provides evidence on execution, volumes, capacity or costs. Judge its importance against prior targets.",
+        "general": f"This adds context on {subject}. Assess significance by connecting it to revenue, margins, the balance sheet, guidance or operating execution rather than the headline alone.",
+    }
+    return (fr if language == "fr" else en)[theme]
+
+
+def _stock_watch(theme: str, language: str) -> list[str]:
+    fr = {
+        "earnings": ["Les prochains résultats, la guidance et toute révision des attentes de revenus ou de marges.", "La performance des principaux segments et la conversion des bénéfices en flux de trésorerie."],
+        "ma": ["Les conditions de clôture, le financement et le calendrier d’intégration.", "Les synergies annoncées, les coûts d’intégration et les autorisations réglementaires."],
+        "contract": ["La valeur, la durée et le calendrier de reconnaissance des revenus.", "Les commandes additionnelles, nouveaux clients ou jalons de déploiement."],
+        "financing": ["Le coût du financement, le nombre de titres émis et l’effet sur la dette nette ou la dilution.", "L’utilisation des fonds et l’effet sur la liquidité."],
+        "regulatory": ["La prochaine décision, audience ou échéance réglementaire.", "Les provisions, amendes, restrictions ou changements opérationnels éventuels."],
+        "analyst": ["Les hypothèses de bénéfices, croissance et multiples derrière l’objectif de cours.", "La confirmation ou non de ces hypothèses dans les prochains résultats."],
+        "operations": ["Les prochains volumes, coûts unitaires, taux d’utilisation ou jalons opérationnels.", "La confirmation des objectifs annuels et les écarts par rapport au plan."],
+        "general": ["Les prochains résultats ou communiqués officiels permettant de quantifier l’effet annoncé.", "La persistance de l’effet au-delà d’une seule séance ou d’un seul titre de presse."],
+    }
+    en = {
+        "earnings": ["The next results, guidance and revisions to revenue or margin expectations.", "Performance across major segments and the conversion of earnings into cash flow."],
+        "ma": ["Closing conditions, financing and the integration timeline.", "Announced synergies, integration costs and regulatory approvals."],
+        "contract": ["Contract value, duration and the schedule for recognizing revenue.", "Follow-on orders, new customers or deployment milestones."],
+        "financing": ["Financing cost, shares issued and the effect on net debt or dilution.", "Use of proceeds and the effect on liquidity."],
+        "regulatory": ["The next ruling, hearing or regulatory deadline.", "Any provisions, fines, restrictions or operating changes."],
+        "analyst": ["Earnings, growth and valuation assumptions behind the target.", "Whether upcoming results confirm or challenge those assumptions."],
+        "operations": ["Next volume, unit-cost, utilization or operating milestone updates.", "Confirmation of annual targets and any variance from plan."],
+        "general": ["The next company results or official releases that quantify the announced effect.", "Whether the effect persists beyond one trading session or one headline."],
+    }
+    return (fr if language == "fr" else en)[theme]
+
+
+def _stock_changes(sentences: list[str]) -> list[str]:
+    markers = (
+        "increase", "decrease", "rose", "fell", "grew", "declined", "jump", "surge",
+        "drop", "beat", "miss", "raise", "cut", "record", "guidance", "revenue",
+        "profit", "loss", "acquir", "contract", "order", "launch", "hausse", "baisse",
+        "augment", "diminu", "progress", "recul", "bond", "prévision", "revenu",
+        "bénéfice", "perte", "acqui", "contrat", "commande", "lancement",
+    )
+    output: list[str] = []
+    for sentence in sentences:
+        low = sentence.casefold()
+        if any(marker in low for marker in markers) and sentence not in output:
+            output.append(sentence)
+        if len(output) >= 3:
+            break
+    return output
+
+
 def _watch(theme: str, language: str) -> list[str]:
     fr = {
         "inflation": ["La prochaine lecture mensuelle et les révisions de la donnée actuelle.", "La diffusion ou le recul des pressions de prix entre les composantes."],
@@ -283,26 +367,47 @@ class NewsBriefService:
         sentences = _sentences(blocks)
         if len(sentences) < 2 and request.summary:
             sentences = _sentences([request.summary, *blocks])
-        theme = _theme(request.category, request.title)
-        if request.language == "fr":
-            note = (
-                "Faits extraits de la publication officielle. La section « Lecture Anatole » est une mise en contexte analytique, distincte de la source."
-                if source_mode == "official_page" else
-                "La page officielle n’a pas pu être extraite; les faits proviennent du résumé officiel déjà reçu par Anatole. La « Lecture Anatole » reste distincte."
-            )
+        if request.context == "stock":
+            theme = _stock_theme(request.title, request.summary)
+            changes = _stock_changes(sentences)
+            why_it_matters = _stock_why(theme, request.language, request.company, request.ticker)
+            watch = _stock_watch(theme, request.language)
+            if request.language == "fr":
+                note = (
+                    "Faits extraits de la page source. La « Lecture Anatole » est distincte du contenu de l’éditeur."
+                    if source_mode == "official_page" else
+                    "La page de l’éditeur n’a pas été extraite; les faits proviennent du titre et du résumé déjà reçus par Anatole. La « Lecture Anatole » est distincte de la source."
+                )
+            else:
+                note = (
+                    "Facts extracted from the source page. The ‘Anatole read’ is separate from publisher content."
+                    if source_mode == "official_page" else
+                    "The publisher page was not extracted; facts come from the title and summary already received by Anatole. The ‘Anatole read’ is separate from the source."
+                )
         else:
-            note = (
-                "Facts extracted from the official publication. The ‘Anatole read’ is analytical context and is separate from the source."
-                if source_mode == "official_page" else
-                "The official page could not be extracted; the facts come from the official summary already received by Anatole. The ‘Anatole read’ remains separate."
-            )
+            theme = _theme(request.category, request.title)
+            changes = _changes(sentences)
+            why_it_matters = _why(theme, request.language)
+            watch = _watch(theme, request.language)
+            if request.language == "fr":
+                note = (
+                    "Faits extraits de la publication officielle. La section « Lecture Anatole » est une mise en contexte analytique, distincte de la source."
+                    if source_mode == "official_page" else
+                    "La page officielle n’a pas pu être extraite; les faits proviennent du résumé officiel déjà reçu par Anatole. La « Lecture Anatole » reste distincte."
+                )
+            else:
+                note = (
+                    "Facts extracted from the official publication. The ‘Anatole read’ is analytical context and is separate from the source."
+                    if source_mode == "official_page" else
+                    "The official page could not be extracted; the facts come from the official summary already received by Anatole. The ‘Anatole read’ remains separate."
+                )
         return NewsBriefResponse(
             title=request.title,
             summary=_summary(sentences, request.title, fallback),
             key_figures=_figures(sentences),
-            changes=_changes(sentences),
-            why_it_matters=_why(theme, request.language),
-            watch=_watch(theme, request.language),
+            changes=changes,
+            why_it_matters=why_it_matters,
+            watch=watch,
             source_url=request.url,
             source_name=request.source,
             source_mode=source_mode,
@@ -324,7 +429,10 @@ class NewsBriefService:
         return self.build_from_text(request, article_text, source_mode=source_mode)
 
     async def get_brief(self, request: NewsBriefRequest) -> NewsBriefResponse:
-        key = f"{request.language}|{request.url}|{request.title}"
+        key = (
+            f"{request.context}|{request.language}|{request.ticker or ''}|"
+            f"{request.company or ''}|{request.url}|{request.title}"
+        )
         return await self._cache.get_or_load(
             key,
             lambda: self._load(request),

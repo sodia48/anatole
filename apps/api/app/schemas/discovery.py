@@ -73,6 +73,9 @@ class NewsBriefRequest(BaseModel):
     category: str
     region: str = "Canada"
     language: Literal["fr", "en"] = "fr"
+    context: Literal["macro", "stock"] = "macro"
+    ticker: str | None = None
+    company: str | None = None
 
 
 class NewsBriefFigure(BaseModel):
