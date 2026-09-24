@@ -198,7 +198,7 @@ export function OptionsScreen() {
                     <Text style={styles.metric}>Bid {number(item.bid)}</Text>
                     <Text style={styles.metric}>Ask {number(item.ask)}</Text>
                     <Text style={styles.metric}>Last {number(item.last)}</Text>
-                    <Text style={styles.metric}>Vol {integer(item.volume)}</Text>
+                    <Text style={styles.metric}>{pick("Vol séance", "Session vol.")} {integer(item.volume)}</Text>
                     <Text style={styles.metric}>OI {integer(item.open_interest)}</Text>
                     <Text style={styles.metric}>
                       IV {item.implied_volatility == null ? "N/D" : `${number(item.implied_volatility, 1)}%`}
@@ -210,8 +210,8 @@ export function OptionsScreen() {
               <Text style={styles.empty}>
                 {market === "commodities"
                   ? pick(
-                      "Aucune chaîne. Configure BARCHART_API_KEY sur Render avec les permissions de marché nécessaires.",
-                      "No chain. Configure BARCHART_API_KEY on Render with the required market permissions.",
+                      "Aucune chaîne publique exploitable pour cette racine. Les marchés CME utilisent automatiquement le Daily Bulletin public; certaines racines ICE peuvent encore nécessiter une source autorisée.",
+                      "No usable public chain for this root. CME markets automatically use the public Daily Bulletin; some ICE roots may still require an authorized source.",
                     )
                   : pick(
                       "Aucune chaîne disponible pour ce symbole à cet instant.",

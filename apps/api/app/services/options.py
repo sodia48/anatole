@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.data_hub import shared_data_hub
 from app.core.resilience import shared_http_client
 from app.services.bank_of_canada import bank_of_canada_valet_service
+from app.services.public_commodity_options import public_commodity_options_service
 from app.schemas.options import (
     OptionAnalytics,
     OptionChainSnapshot,
@@ -701,12 +702,14 @@ def _analytics(
 
 class OptionsService:
     def __init__(self) -> None:
+        # v3 invalide les snapshots antérieurs qui contenaient encore du
+        # mojibake UTF-8 et des statuts de source dupliqués.
         self._universe_cache = shared_data_hub.cache(
-            "options-universe",
+            "options-universe-v3",
             max_entries=8,
         )
         self._chain_cache = shared_data_hub.cache(
-            "options-chain",
+            "options-chain-v3",
             max_entries=400,
         )
 
@@ -778,8 +781,9 @@ class OptionsService:
             status = "available"
         else:
             detail = (
-                f"{len(items)} racines majeures disponibles pour la navigation. "
-                "Ajouter BARCHART_API_KEY sur Render pour charger les chaînes de futures options."
+                f"{len(items)} racines majeures disponibles. Barchart est optionnel : "
+                "Anatole utilise aussi les Daily Bulletins publics CME/CBOT/NYMEX/COMEX "
+                "sans clé API, et les métadonnées publiques ICE lorsqu'elles existent."
             )
             status = "partial"
         return items, OptionSourceStatus(
@@ -1039,60 +1043,84 @@ class OptionsService:
         expiration: str | None,
         contract: str | None,
     ) -> tuple[list[OptionContract], list[str], list[OptionSourceStatus]]:
-        if not settings.barchart_api_key:
-            return [], [], [
-                OptionSourceStatus(
-                    source="Barchart OnDemand",
-                    status="unavailable",
-                    detail=(
-                        "BARCHART_API_KEY manque. La navigation reste active, mais aucune "
-                        "chaîne de futures options n'est simulée."
-                    ),
-                )
-            ]
+        statuses: list[OptionSourceStatus] = []
 
-        params: dict[str, str] = {
-            "apikey": settings.barchart_api_key,
-            "root": root,
-            "fields": "bid,bidSize,ask,askSize,premium,openInterest",
-        }
-        if contract:
-            params["contract"] = contract
-        try:
-            payload = await shared_http_client.get_json(
-                f"{_BARCHART_BASE}/getFuturesOptions.json",
-                attempts=1,
-                params=params,
-            )
-            results = payload.get("results") or []
-            contracts = [
-                parsed
-                for raw in results
-                if isinstance(raw, dict)
-                for parsed in [_barchart_contract(raw, market="commodities", fallback_underlying=root)]
-                if parsed is not None
-            ]
-            expirations = sorted({item.expiration for item in contracts})
-            if expiration:
-                contracts = [item for item in contracts if item.expiration == expiration]
-            status = OptionSourceStatus(
-                source="Barchart OnDemand",
-                status="available" if contracts else "partial",
-                detail=(
-                    f"{len(contracts)} contrats de futures options."
-                    if contracts
-                    else "Aucun contrat renvoyé pour cette racine/échéance avec les permissions actuelles."
-                ),
-            )
-            return contracts, expirations, [status]
-        except Exception as error:  # noqa: BLE001
-            return [], [], [
+        # Barchart reste un enrichissement facultatif. S'il est configuré et
+        # renvoie une chaîne, on la privilégie pour l'intraday et les champs
+        # additionnels. Son absence ne vide plus la section matières premières.
+        if settings.barchart_api_key:
+            params: dict[str, str] = {
+                "apikey": settings.barchart_api_key,
+                "root": root,
+                "fields": "bid,bidSize,ask,askSize,premium,openInterest",
+            }
+            if contract:
+                params["contract"] = contract
+            try:
+                payload = await shared_http_client.get_json(
+                    f"{_BARCHART_BASE}/getFuturesOptions.json",
+                    attempts=1,
+                    params=params,
+                )
+                results = payload.get("results") or []
+                provider_contracts = [
+                    parsed
+                    for raw in results
+                    if isinstance(raw, dict)
+                    for parsed in [
+                        _barchart_contract(
+                            raw,
+                            market="commodities",
+                            fallback_underlying=root,
+                        )
+                    ]
+                    if parsed is not None
+                ]
+                provider_expirations = sorted(
+                    {item.expiration for item in provider_contracts}
+                )
+                if expiration:
+                    provider_contracts = [
+                        item for item in provider_contracts
+                        if item.expiration == expiration
+                    ]
+                if provider_contracts:
+                    return provider_contracts, provider_expirations, [
+                        OptionSourceStatus(
+                            source="Barchart OnDemand",
+                            status="available",
+                            detail=f"{len(provider_contracts)} contrats fournisseur.",
+                        )
+                    ]
+                statuses.append(
+                    OptionSourceStatus(
+                        source="Barchart OnDemand",
+                        status="partial",
+                        detail="Aucun contrat fournisseur pour cette racine/échéance; fallback public tenté.",
+                    )
+                )
+            except Exception as error:  # noqa: BLE001
+                statuses.append(
+                    OptionSourceStatus(
+                        source="Barchart OnDemand",
+                        status="unavailable",
+                        detail=f"Fournisseur indisponible ({type(error).__name__}); fallback public tenté.",
+                    )
+                )
+        else:
+            statuses.append(
                 OptionSourceStatus(
                     source="Barchart OnDemand",
-                    status="unavailable",
-                    detail=f"Futures options indisponibles ({type(error).__name__}).",
+                    status="partial",
+                    detail="Clé non configurée; fournisseur facultatif. Le fallback public des bourses est utilisé.",
                 )
-            ]
+            )
+
+        public_contracts, public_expirations, public_status = (
+            await public_commodity_options_service.chain(root, expiration)
+        )
+        statuses.append(public_status)
+        return public_contracts, public_expirations, statuses
 
     async def chain(
         self,
