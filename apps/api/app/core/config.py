@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     redis_singleflight_wait_seconds: float = Field(default=1.5, ge=0.0, le=10.0)
     redis_singleflight_poll_seconds: float = Field(default=0.05, ge=0.01, le=1.0)
     finnhub_api_key: str = ""
+    barchart_api_key: str = ""
     sec_user_agent: str = "Anatole contact@anatole.app"
     company_network_build_concurrency: int = Field(
         default=1,
