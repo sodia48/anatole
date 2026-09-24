@@ -143,6 +143,16 @@ async function storeLastGood(response: Response, url: string, id: string): Promi
   try {
     const body = await response.clone().text();
     if (!body || body.length > MAX_CACHE_BODY_LENGTH) return;
+
+    try {
+      const payload = JSON.parse(body) as { status?: unknown };
+      if (payload && typeof payload === "object" && (payload.status === "loading" || payload.status === "unavailable")) {
+        return;
+      }
+    } catch {
+      // malformed JSON is ignored by the optional last-good cache
+    }
+
     const cached: CachedResponse = {
       body,
       contentType,

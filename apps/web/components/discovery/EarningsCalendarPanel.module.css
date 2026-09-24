@@ -123,6 +123,17 @@
   background: transparent;
 }
 
+.refreshRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.refreshRow button {
+  width: auto;
+  min-width: 118px;
+  min-height: 38px;
+}
+
 .groups {
   display: grid;
   gap: 18px;

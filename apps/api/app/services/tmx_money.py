@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import math
 from typing import Any
 
@@ -40,6 +41,14 @@ query getQuoteBySymbol($symbol: String, $locale: String) {
     returnOnAssets
     totalDebtToEquity
     website
+  }
+}
+"""
+
+_EARNINGS_QUERY = """
+query getEarningsForSymbol($symbol: String!) {
+  getEarningsForSymbol(symbol: $symbol) {
+    events { date type quarter }
   }
 }
 """
@@ -147,6 +156,10 @@ class TMXMoneyService:
             "tmx-money-company",
             max_entries=3000,
         )
+        self._earnings_cache = shared_data_hub.cache(
+            "tmx-money-earnings",
+            max_entries=1500,
+        )
 
     async def _load_company(self, symbol: str) -> dict[str, Any]:
         response = await shared_http_client.request(
@@ -182,6 +195,74 @@ class TMXMoneyService:
 
     async def get_summary(self, symbol: str) -> dict[str, Any]:
         return company_to_summary(await self.get_company(symbol))
+
+    async def _load_earnings(self, symbol: str) -> dict[str, Any]:
+        response = await shared_http_client.request(
+            "POST",
+            TMX_MONEY_GRAPHQL_URL,
+            json={"query": _EARNINGS_QUERY, "variables": {"symbol": _tmx_symbol(symbol)}},
+            headers={
+                "Content-Type": "application/json",
+                "Origin": "https://money.tmx.com",
+                "Referer": "https://money.tmx.com/",
+                "User-Agent": "Mozilla/5.0 Anatole/1.0",
+                "locale": "en",
+            },
+            attempts=2,
+        )
+        payload = response.json()
+        if not isinstance(payload, dict) or payload.get("errors"):
+            raise RuntimeError("TMX Money earnings data unavailable")
+        data = payload.get("data", {}).get("getEarningsForSymbol")
+        if not isinstance(data, dict):
+            raise RuntimeError("TMX Money earnings result is empty")
+        return data
+
+    async def get_earnings(self, symbol: str) -> dict[str, Any]:
+        key = _tmx_symbol(symbol)
+        return await self._earnings_cache.get_or_load(
+            key,
+            lambda: self._load_earnings(symbol),
+            fresh_seconds=900,
+            stale_seconds=86_400,
+        )
+
+    async def get_earnings_many(
+        self,
+        symbols: list[str],
+        *,
+        concurrency: int = 6,
+        deadline_seconds: float = 18.0,
+    ) -> tuple[dict[str, dict[str, Any]], int]:
+        unique = list(dict.fromkeys(symbols))
+        if not unique:
+            return {}, 0
+        semaphore = asyncio.Semaphore(max(1, concurrency))
+        output: dict[str, dict[str, Any]] = {}
+        failed = 0
+
+        async def load(symbol: str) -> tuple[str, dict[str, Any] | None, bool]:
+            async with semaphore:
+                try:
+                    return symbol, await self.get_earnings(symbol), False
+                except Exception:
+                    return symbol, None, True
+
+        tasks = [asyncio.create_task(load(symbol)) for symbol in unique]
+        done, pending = await asyncio.wait(tasks, timeout=max(0.5, deadline_seconds))
+        for task in pending:
+            task.cancel()
+        for task in done:
+            if task.cancelled():
+                failed += 1
+                continue
+            symbol, value, errored = task.result()
+            if errored or value is None:
+                failed += 1
+            else:
+                output[symbol] = value
+        failed += len(pending)
+        return output, failed
 
 
 tmx_money_service = TMXMoneyService()

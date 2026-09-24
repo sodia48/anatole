@@ -6,9 +6,11 @@ from fastapi.testclient import TestClient
 from app.core.config import settings
 from app.main import app
 from app.services.earnings_calendar import (
+    TORONTO,
     EarningsCalendarService,
     EarningsConstituent,
 )
+from app.services.tmx_money import tmx_money_service
 
 
 def test_events_only_keep_future_constituent_dates() -> None:
@@ -183,3 +185,41 @@ def test_earnings_calendar_route_returns_honest_demo_snapshot(
     assert payload["universe"] == "S&P/TSX 60"
     assert payload["constituent_count"] == 60
     assert payload["events"] == []
+
+
+def test_quote_batches_degrade_partially_instead_of_crashing(monkeypatch) -> None:
+    service = EarningsCalendarService()
+    service.batch_size = 2
+
+    async def credentials():
+        return "crumb"
+
+    async def batch(symbols, _crumb):
+        if symbols[0] == "RY.TO":
+            return [{"symbol": "RY.TO"}]
+        raise RuntimeError("rate limited")
+
+    monkeypatch.setattr(service, "_credentials", credentials)
+    monkeypatch.setattr(service, "_fetch_batch", batch)
+    rows, failures, crumb = asyncio.run(service._fetch_quotes(["RY.TO", "TD.TO", "BNS.TO", "ENB.TO"]))
+    assert crumb == "crumb"
+    assert rows == [{"symbol": "RY.TO"}]
+    assert failures == 1
+
+
+def test_tmx_fallback_supplies_future_dates(monkeypatch) -> None:
+    service = EarningsCalendarService()
+    now = datetime(2026, 9, 23, 14, tzinfo=UTC)
+
+    async def earnings_many(_symbols, **_kwargs):
+        return {"RY": {"events": [{"date": "2026-10-02", "type": "After Market Close", "quarter": "Q3"}]}}, 0
+
+    monkeypatch.setattr(tmx_money_service, "get_earnings_many", earnings_many)
+    events, failures = asyncio.run(service._tmx_fallback_events([
+        EarningsConstituent("RY", "Royal Bank of Canada", "Financials", 10.0, "TSX")
+    ], now=now))
+    assert failures == 0
+    assert len(events) == 1
+    assert events[0].ticker == "RY"
+    assert events[0].source == "TMX Money earnings calendar"
+    assert events[0].starts_at.astimezone(TORONTO).date().isoformat() == "2026-10-02"

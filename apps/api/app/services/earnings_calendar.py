@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import math
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time as dt_time, timedelta
 from typing import Any, Literal
 from time import monotonic
 from zoneinfo import ZoneInfo
 
 from app.core.config import settings
+from app.core.distributed_cache import redis_snapshot_store
 from app.core.resilience import AsyncStaleCache
 from app.schemas.discovery import (
     EarningsCalendarEvent,
@@ -17,6 +18,7 @@ from app.schemas.discovery import (
 )
 from app.services.session_quotes import session_quote_service
 from app.services.yahoo_public import yahoo_public_service
+from app.services.tmx_money import tmx_money_service
 from app.services.canadian_equity_directory import canadian_equity_directory_service
 from app.services.tsx60 import TSX60, TSX60_AS_OF, TSX60_SOURCE
 from app.services.tsx_composite_universe import (
@@ -57,9 +59,11 @@ class EarningsCalendarService:
     reliable issuer-confirmation flag. No date is inferred from prior quarters.
     """
 
-    batch_size = 50
+    batch_size = 40
+    quote_concurrency = 4
+    tmx_fallback_limit = 80
     refresh_after_seconds = 900
-    stale_seconds = 86_400
+    stale_seconds = 172_800
 
     def __init__(self) -> None:
         self._refresh_tasks: dict[str, asyncio.Task[None]] = {}
@@ -75,6 +79,7 @@ class EarningsCalendarService:
             str,
             tuple[EarningsConsensus, ...],
         ] = AsyncStaleCache(max_entries=512)
+        self._persistent = redis_snapshot_store.namespace("earnings-calendar-v2")
 
     @staticmethod
     def _tsx60_constituents() -> list[EarningsConstituent]:
@@ -177,14 +182,17 @@ class EarningsCalendarService:
         symbols: list[str],
     ) -> tuple[list[dict[str, Any]], int, str]:
         crumb = await self._credentials()
-        batches = [
-            symbols[index : index + self.batch_size]
-            for index in range(0, len(symbols), self.batch_size)
-        ]
-        results = await asyncio.gather(
-            *(self._fetch_batch(batch, crumb) for batch in batches),
-            return_exceptions=True,
-        )
+        batches = [symbols[i : i + self.batch_size] for i in range(0, len(symbols), self.batch_size)]
+        semaphore = asyncio.Semaphore(self.quote_concurrency)
+
+        async def fetch(batch: list[str]) -> list[dict[str, Any]] | Exception:
+            async with semaphore:
+                try:
+                    return await self._fetch_batch(batch, crumb)
+                except Exception as exc:  # noqa: BLE001
+                    return exc
+
+        results = await asyncio.gather(*(fetch(batch) for batch in batches))
         rows: list[dict[str, Any]] = []
         failed = 0
         for result in results:
@@ -192,9 +200,102 @@ class EarningsCalendarService:
                 failed += 1
             else:
                 rows.extend(result)
-        if not rows and failed:
-            raise RuntimeError("Yahoo earnings batches unavailable")
         return rows, failed, crumb
+
+    @staticmethod
+    def _merge_quote_rows(base: list[dict[str, Any]], updates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        merged: dict[str, dict[str, Any]] = {}
+        for row in [*base, *updates]:
+            symbol = str(row.get("symbol") or "").upper()
+            if not symbol:
+                continue
+            clean = {key: value for key, value in row.items() if value is not None}
+            merged[symbol] = {**merged.get(symbol, {}), **clean}
+        return list(merged.values())
+
+    @staticmethod
+    def _tmx_event_datetime(raw: Any, event_type: Any) -> datetime | None:
+        if not isinstance(raw, str) or len(raw) < 10:
+            return None
+        try:
+            day = date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+        kind = str(event_type or "").lower()
+        clock = dt_time(8, 0) if "before" in kind or "pre" in kind else dt_time(16, 30) if "after" in kind or "post" in kind else dt_time(12, 0)
+        return datetime.combine(day, clock, tzinfo=TORONTO).astimezone(UTC)
+
+    async def _tmx_fallback_events(
+        self,
+        constituents: list[EarningsConstituent],
+        *,
+        now: datetime,
+    ) -> tuple[list[EarningsCalendarEvent], int]:
+        selected = constituents[: self.tmx_fallback_limit]
+        payloads, failed = await tmx_money_service.get_earnings_many(
+            [item.ticker for item in selected], concurrency=6, deadline_seconds=18.0
+        )
+        today = now.astimezone(TORONTO).date()
+        limit = today + timedelta(days=180)
+        output: list[EarningsCalendarEvent] = []
+        seen: set[tuple[str, date]] = set()
+        for constituent in selected:
+            payload = payloads.get(constituent.ticker)
+            rows = payload.get("events") if isinstance(payload, dict) else None
+            if not isinstance(rows, list):
+                continue
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                starts_at = self._tmx_event_datetime(row.get("date"), row.get("type"))
+                if starts_at is None:
+                    continue
+                local_date = starts_at.astimezone(TORONTO).date()
+                if local_date < today or local_date > limit:
+                    continue
+                symbol = session_quote_service.normalize_ticker(constituent.ticker)
+                key = (symbol, local_date)
+                if key in seen:
+                    continue
+                seen.add(key)
+                output.append(EarningsCalendarEvent(
+                    ticker=constituent.ticker.upper(), symbol=symbol, company=constituent.name,
+                    sector=constituent.sector, exchange=constituent.exchange or "TSX",
+                    weight=constituent.weight, starts_at=starts_at, window_start=starts_at,
+                    window_end=starts_at, time_is_estimated=True,
+                    source="TMX Money earnings calendar", url="https://money.tmx.com/earnings",
+                ))
+        return sorted(output, key=lambda item: (item.starts_at, item.ticker)), failed
+
+    async def _restore_persistent(self, universe: Universe) -> EarningsCalendarSnapshot | None:
+        try:
+            entry = await self._persistent.read(universe)
+        except Exception:
+            return None
+        if entry is None or entry.age_seconds > self.stale_seconds:
+            return None
+        try:
+            snapshot = EarningsCalendarSnapshot.model_validate(entry.value)
+        except Exception:
+            return None
+        today = datetime.now(UTC).astimezone(TORONTO).date()
+        events = [event for event in snapshot.events if event.starts_at.astimezone(TORONTO).date() >= today]
+        if not events:
+            return None
+        restored = snapshot.model_copy(update={
+            "events": events, "companies_with_dates": len(events), "stale": True,
+            "refresh_in_progress": False, "refresh_after_seconds": 0,
+        })
+        self._cache.store(universe, restored)
+        return restored
+
+    async def _persist(self, universe: Universe, snapshot: EarningsCalendarSnapshot) -> None:
+        if not snapshot.events or snapshot.status in {"unavailable", "loading"}:
+            return
+        try:
+            await self._persistent.write(universe, snapshot, ttl_seconds=self.stale_seconds)
+        except Exception:
+            pass
 
     @staticmethod
     def _number(value: Any) -> float | None:
@@ -436,6 +537,7 @@ class EarningsCalendarService:
 
     async def _load(self, universe: Universe) -> EarningsCalendarSnapshot:
         demo_mode = settings.market_data_provider.strip().lower() == "demo"
+        directory = None
         if universe == "canada":
             directory = None if demo_mode else self.directory.peek()
             if not demo_mode:
@@ -508,23 +610,57 @@ class EarningsCalendarService:
                 refresh_after_seconds=self.refresh_after_seconds,
             )
 
-        symbols = [
-            session_quote_service.normalize_ticker(item.ticker)
-            for item in constituents
-        ]
-        if universe == "canada" and directory and monotonic() - directory.fetched_at < 60:
-            # The just-finished scan already contains published upstream quote fields.
-            # Reuse them once; a long-lived identity cache never makes quotes fresh.
-            rows, quote_failures, crumb = directory.rows, 0, ""
-        else:
-            rows, quote_failures, crumb = await self._fetch_quotes(symbols)
-        failed_batches = (failed_batches if universe == "canada" else 0) + quote_failures
+        symbols = [session_quote_service.normalize_ticker(item.ticker) for item in constituents]
         now = datetime.now(UTC)
-        events = self._events(rows, constituents, now=now)
+        directory_rows = list(directory.rows) if universe == "canada" and directory else []
+        rows = directory_rows
+        quote_failures = 0
+        crumb = ""
+        quote_attempted = False
+        events = self._events(directory_rows, constituents, now=now) if directory_rows else []
+
+        if not events:
+            quote_attempted = True
+            try:
+                fresh_rows, quote_failures, crumb = await self._fetch_quotes(symbols)
+            except Exception:
+                fresh_rows = []
+                quote_failures = max(1, math.ceil(max(1, len(symbols)) / self.batch_size))
+            rows = self._merge_quote_rows(directory_rows, fresh_rows)
+            events = self._events(rows, constituents, now=now)
+
+        tmx_attempted = False
+        tmx_failures = 0
+        if not events:
+            tmx_attempted = True
+            tmx_constituents = self._tsx60_constituents() if universe == "canada" else constituents[: self.tmx_fallback_limit]
+            try:
+                tmx_events, tmx_failures = await self._tmx_fallback_events(tmx_constituents, now=now)
+            except Exception:
+                tmx_events, tmx_failures = [], len(tmx_constituents)
+            if tmx_events:
+                by_key = {(event.symbol, event.starts_at.astimezone(TORONTO).date()): event for event in events}
+                by_key.update({(event.symbol, event.starts_at.astimezone(TORONTO).date()): event for event in tmx_events})
+                events = sorted(by_key.values(), key=lambda item: (item.starts_at, item.ticker))
+
+        failed_batches = (failed_batches if universe == "canada" else 0) + quote_failures + tmx_failures
+        source_statuses = [universe_status]
+        if quote_attempted:
+            source_statuses.append(FeedStatus(
+                source="Yahoo Finance public quote calendar",
+                status="partial" if quote_failures else "ok",
+                detail=f"{len(events)} upcoming dates; {quote_failures} failed quote batches",
+            ))
+        if tmx_attempted:
+            source_statuses.append(FeedStatus(
+                source="TMX Money earnings calendar",
+                status="ok" if events and not tmx_failures else "partial" if events else "unavailable",
+                detail=f"{len(events)} upcoming dates after TMX fallback; {tmx_failures} unavailable symbol requests",
+            ))
         preliminary = EarningsCalendarSnapshot(
             universe=universe_label, universe_as_of=universe_as_of,
             constituent_count=len(constituents), companies_with_dates=len(events),
-            events=events, source_statuses=[universe_status], generated_at=now,
+            events=events, source_statuses=source_statuses, generated_at=now,
             status="partial", refresh_in_progress=True, refresh_after_seconds=5,
         )
         previous = self._cache.peek(universe, max_age_seconds=self.stale_seconds)
@@ -568,7 +704,7 @@ class EarningsCalendarService:
             if current is None or current.generated_at != snapshot.generated_at:
                 return
             directory_pending = universe == "canada" and self.directory.peek() is None
-            self._cache.store(universe, snapshot.model_copy(update={
+            enriched = snapshot.model_copy(update={
                 "events": self._with_consensus(snapshot.events, consensus),
                 "status": "partial" if failed or failed_batches or any(s.status != "ok" for s in snapshot.source_statuses) else "available",
                 "refresh_in_progress": directory_pending,
@@ -576,7 +712,9 @@ class EarningsCalendarService:
                 "source_statuses": [*snapshot.source_statuses, FeedStatus(
                     source="Yahoo Finance earnings consensus", status="partial" if failed else "ok",
                     detail=f"{failed} unavailable consensus requests")],
-            }))
+            })
+            self._cache.store(universe, enriched)
+            await self._persist(universe, enriched)
         except Exception:
             if self._cache.peek(universe) is snapshot:
                 self._cache.store(universe, snapshot.model_copy(update={"refresh_in_progress": False, "stale": True}))
@@ -594,6 +732,7 @@ class EarningsCalendarService:
             async with asyncio.timeout(150):
                 snapshot = await self._load(universe)
             self._cache.store(universe, snapshot)
+            await self._persist(universe, snapshot)
             # Expand the cold warm-up independently of consensus; never block dates.
             if universe == "canada" and "temporaire" in snapshot.universe:
                 directory_task = self.directory.ensure_refresh()
@@ -601,6 +740,7 @@ class EarningsCalendarService:
                 if directory:
                     snapshot = await self._load(universe)
                     self._cache.store(universe, snapshot)
+                    await self._persist(universe, snapshot)
                 else:
                     current = self._cache.peek(universe)
                     if current:
@@ -630,6 +770,8 @@ class EarningsCalendarService:
         universe: str = "canada",
     ) -> EarningsCalendarSnapshot:
         normalized = self.normalize_universe(universe)
+        if self._cache.peek(normalized, max_age_seconds=self.stale_seconds) is None:
+            await self._restore_persistent(normalized)
         cached = self._cache.peek(normalized, max_age_seconds=self.refresh_after_seconds)
         task = self._refresh_tasks.get(normalized)
         consensus_task = self._consensus_tasks.get(normalized)

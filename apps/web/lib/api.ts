@@ -481,16 +481,25 @@ export function getCalendarSnapshot(
   );
 }
 
-export function getEarningsCalendarSnapshot(
+export async function getEarningsCalendarSnapshot(
   universe: "canada" | "composite" | "tsx60" = "canada",
   signal?: AbortSignal,
 ): Promise<EarningsCalendarSnapshot> {
-  return apiRequest<EarningsCalendarSnapshot>(
-    `/api/v1/discovery/earnings-calendar?universe=${universe}`,
-    {},
-    signal,
-    35_000,
+  const path = `/api/v1/discovery/earnings-calendar?universe=${universe}`;
+  const previous = readLastGoodJson<EarningsCalendarSnapshot>(
+    `${apiBaseUrl()}${path}`,
+    48 * 60 * 60_000,
   );
+  const snapshot = await apiRequest<EarningsCalendarSnapshot>(path, {}, signal, 35_000);
+  const previousUsable = previous !== null && previous.status !== "loading" && previous.status !== "unavailable" && previous.events.length > 0;
+  if (previousUsable && (snapshot.status === "loading" || snapshot.status === "unavailable")) {
+    return {
+      ...previous,
+      stale: true,
+      refresh_in_progress: snapshot.refresh_in_progress || snapshot.status === "loading",
+    };
+  }
+  return snapshot;
 }
 
 export function getPsychologySnapshot(
