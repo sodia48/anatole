@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from datetime import UTC, datetime
 from html import unescape
@@ -10,6 +11,7 @@ from typing import Any
 from app.core.config import settings
 from app.core.data_hub import shared_data_hub
 from app.core.resilience import shared_http_client
+from app.services.bank_of_canada import bank_of_canada_valet_service
 from app.schemas.options import (
     OptionAnalytics,
     OptionChainSnapshot,
@@ -107,7 +109,7 @@ def _number(value: Any) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     text = _clean(str(value)).replace(",", "")
-    if not text or text.lower() in {"n/a", "na", "null", "none", "-", "--", "?"}:
+    if not text or text.lower() in {"n/a", "na", "null", "none", "-", "--", "—"}:
         return None
     try:
         return float(text)
@@ -198,7 +200,7 @@ def _parse_mx_universe(html: str) -> list[OptionUniverseItem]:
                 name=name,
                 market="tsx",
                 category=_category(name),
-                exchange="Montr?al Exchange",
+                exchange="Montréal Exchange",
                 provider_symbol=option_symbol,
                 source_url=_MX_OPTIONS_URL,
             )
@@ -238,14 +240,14 @@ def _parse_mx_chain(
             side="call",
             strike=strike,
             expiration=expiry,
-            exchange="Montr?al Exchange",
+            exchange="Montréal Exchange",
             bid=_number(row[1]),
             ask=_number(row[2]),
             last=_number(row[3]),
             change=_number(row[4]),
             volume=_integer(row[6]),
             open_interest=_integer(row[5]),
-            source="Montr?al Exchange",
+            source="Montréal Exchange",
             delayed=True,
         )
         put = OptionContract(
@@ -255,14 +257,14 @@ def _parse_mx_chain(
             side="put",
             strike=strike,
             expiration=expiry,
-            exchange="Montr?al Exchange",
+            exchange="Montréal Exchange",
             bid=_number(row[8]),
             ask=_number(row[9]),
             last=_number(row[10]),
             change=_number(row[11]),
             volume=_integer(row[13]),
             open_interest=_integer(row[12]),
-            source="Montr?al Exchange",
+            source="Montréal Exchange",
             delayed=True,
         )
         contracts.extend((call, put))
@@ -357,6 +359,288 @@ def _yahoo_contract(
     )
 
 
+
+def _normal_cdf(value: float) -> float:
+    return 0.5 * (1.0 + math.erf(value / math.sqrt(2.0)))
+
+
+def _normal_pdf(value: float) -> float:
+    return math.exp(-0.5 * value * value) / math.sqrt(2.0 * math.pi)
+
+
+def _option_mark(contract: OptionContract) -> float | None:
+    bid = contract.bid
+    ask = contract.ask
+    if (
+        bid is not None
+        and ask is not None
+        and bid >= 0
+        and ask >= bid
+        and ask > 0
+    ):
+        return (bid + ask) / 2.0
+    if contract.last is not None and contract.last > 0:
+        return contract.last
+    return None
+
+
+def _black_scholes_price(
+    *,
+    spot: float,
+    strike: float,
+    years: float,
+    rate: float,
+    sigma: float,
+    side: str,
+) -> float:
+    root_t = math.sqrt(years)
+    d1 = (
+        math.log(spot / strike)
+        + (rate + 0.5 * sigma * sigma) * years
+    ) / (sigma * root_t)
+    d2 = d1 - sigma * root_t
+    discounted_strike = strike * math.exp(-rate * years)
+    if side == "call":
+        return spot * _normal_cdf(d1) - discounted_strike * _normal_cdf(d2)
+    return discounted_strike * _normal_cdf(-d2) - spot * _normal_cdf(-d1)
+
+
+def _implied_volatility(
+    *,
+    price: float,
+    spot: float,
+    strike: float,
+    years: float,
+    rate: float,
+    side: str,
+) -> float | None:
+    if min(price, spot, strike, years) <= 0:
+        return None
+
+    intrinsic_floor = (
+        max(0.0, spot - strike * math.exp(-rate * years))
+        if side == "call"
+        else max(0.0, strike * math.exp(-rate * years) - spot)
+    )
+    if price + 1e-8 < intrinsic_floor:
+        return None
+
+    low = 0.005
+    high = 5.0
+    low_price = _black_scholes_price(
+        spot=spot,
+        strike=strike,
+        years=years,
+        rate=rate,
+        sigma=low,
+        side=side,
+    )
+    high_price = _black_scholes_price(
+        spot=spot,
+        strike=strike,
+        years=years,
+        rate=rate,
+        sigma=high,
+        side=side,
+    )
+    if price < low_price - 1e-8 or price > high_price + 1e-8:
+        return None
+
+    for _ in range(72):
+        mid = (low + high) / 2.0
+        modeled = _black_scholes_price(
+            spot=spot,
+            strike=strike,
+            years=years,
+            rate=rate,
+            sigma=mid,
+            side=side,
+        )
+        if modeled > price:
+            high = mid
+        else:
+            low = mid
+    return (low + high) / 2.0
+
+
+def _apply_black_scholes_metrics(
+    contracts: list[OptionContract],
+    *,
+    underlying_price: float | None,
+    risk_free_rate: float,
+) -> int:
+    if underlying_price is None or underlying_price <= 0:
+        return 0
+
+    today = datetime.now(UTC).date()
+    enriched = 0
+
+    for contract in contracts:
+        try:
+            expiry = datetime.strptime(contract.expiration, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+
+        days = (expiry - today).days
+        if days < 0 or contract.strike <= 0:
+            continue
+        years = max((days + 0.5) / 365.0, 1.0 / 365.0)
+        sigma = (
+            contract.implied_volatility / 100.0
+            if contract.implied_volatility is not None
+            else None
+        )
+
+        if sigma is None or sigma <= 0:
+            mark = _option_mark(contract)
+            if mark is None:
+                continue
+            sigma = _implied_volatility(
+                price=mark,
+                spot=underlying_price,
+                strike=contract.strike,
+                years=years,
+                rate=risk_free_rate,
+                side=contract.side,
+            )
+            if sigma is None:
+                continue
+            contract.implied_volatility = round(sigma * 100.0, 4)
+
+        root_t = math.sqrt(years)
+        d1 = (
+            math.log(underlying_price / contract.strike)
+            + (risk_free_rate + 0.5 * sigma * sigma) * years
+        ) / (sigma * root_t)
+        d2 = d1 - sigma * root_t
+        pdf = _normal_pdf(d1)
+
+        if contract.delta is None:
+            contract.delta = round(
+                _normal_cdf(d1)
+                if contract.side == "call"
+                else _normal_cdf(d1) - 1.0,
+                6,
+            )
+        if contract.gamma is None:
+            contract.gamma = round(
+                pdf / (underlying_price * sigma * root_t),
+                8,
+            )
+        if contract.vega is None:
+            contract.vega = round(
+                underlying_price * pdf * root_t / 100.0,
+                6,
+            )
+        if contract.theta is None:
+            common = -(
+                underlying_price * pdf * sigma
+            ) / (2.0 * root_t)
+            discounted = (
+                risk_free_rate
+                * contract.strike
+                * math.exp(-risk_free_rate * years)
+            )
+            annual_theta = (
+                common - discounted * _normal_cdf(d2)
+                if contract.side == "call"
+                else common + discounted * _normal_cdf(-d2)
+            )
+            contract.theta = round(annual_theta / 365.0, 6)
+        if contract.in_the_money is None:
+            contract.in_the_money = (
+                underlying_price > contract.strike
+                if contract.side == "call"
+                else underlying_price < contract.strike
+            )
+        enriched += 1
+
+    return enriched
+
+
+def _merge_provider_metrics(
+    official: list[OptionContract],
+    provider: list[OptionContract],
+) -> int:
+    lookup = {
+        (
+            item.expiration,
+            round(item.strike, 6),
+            item.side,
+        ): item
+        for item in provider
+    }
+    enriched = 0
+    for contract in official:
+        match = lookup.get(
+            (
+                contract.expiration,
+                round(contract.strike, 6),
+                contract.side,
+            )
+        )
+        if match is None:
+            continue
+        before = (
+            contract.implied_volatility,
+            contract.delta,
+            contract.gamma,
+            contract.theta,
+            contract.vega,
+        )
+        for field in (
+            "implied_volatility",
+            "delta",
+            "gamma",
+            "theta",
+            "vega",
+            "percent_change",
+        ):
+            value = getattr(match, field)
+            if getattr(contract, field) is None and value is not None:
+                setattr(contract, field, value)
+        after = (
+            contract.implied_volatility,
+            contract.delta,
+            contract.gamma,
+            contract.theta,
+            contract.vega,
+        )
+        if after != before:
+            enriched += 1
+    return enriched
+
+
+async def _risk_free_rate() -> tuple[float, OptionSourceStatus]:
+    try:
+        yields = await bank_of_canada_valet_service.yields()
+        observations = yields.get("V39051") or []
+        if observations:
+            percent = float(observations[-1][1])
+            rate = max(-0.01, min(percent / 100.0, 0.25))
+            return rate, OptionSourceStatus(
+                source="Banque du Canada + Anatole Analytics",
+                status="available",
+                detail=(
+                    f"Taux 2 ans Canada {percent:.3f}% utilisé comme proxy sans risque "
+                    "pour les estimations Black-Scholes."
+                ),
+            )
+    except Exception:  # noqa: BLE001
+        pass
+
+    fallback_percent = 2.5
+    return fallback_percent / 100.0, OptionSourceStatus(
+        source="Anatole Analytics",
+        status="partial",
+        detail=(
+            f"Taux de repli {fallback_percent:.2f}% utilisé pour les estimations "
+            "Black-Scholes; la série Banque du Canada était indisponible."
+        ),
+    )
+
+
+
 def _analytics(
     contracts: list[OptionContract],
     underlying_price: float | None,
@@ -438,9 +722,9 @@ class OptionsService:
                 items = _parse_mx_universe(response.text)
                 if items:
                     return items, OptionSourceStatus(
-                        source="Montr?al Exchange",
+                        source="Montréal Exchange",
                         status="available",
-                        detail=f"{len(items)} classes d'options officielles index?es.",
+                        detail=f"{len(items)} classes d'options officielles indexées.",
                     )
                 raise RuntimeError("Aucune classe d'options extraite de la page officielle.")
             except Exception as error:  # noqa: BLE001
@@ -450,14 +734,14 @@ class OptionsService:
                         name=name,
                         market="tsx",
                         category="Equity / ETF",
-                        exchange="Montr?al Exchange",
+                        exchange="Montréal Exchange",
                         provider_symbol=symbol,
                         source_url=_MX_OPTIONS_URL,
                     )
                     for symbol, name in _TSX_FALLBACK
                 ]
                 return fallback, OptionSourceStatus(
-                    source="Montr?al Exchange",
+                    source="Montréal Exchange",
                     status="partial",
                     detail=(
                         "La liste officielle est temporairement inaccessible; "
@@ -488,14 +772,14 @@ class OptionsService:
         ]
         if settings.barchart_api_key:
             detail = (
-                f"{len(items)} racines majeures pr?charg?es; toute autre racine de futures "
-                "support?e par Barchart peut ?tre saisie manuellement."
+                f"{len(items)} racines majeures préchargées; toute autre racine de futures "
+                "supportée par Barchart peut être saisie manuellement."
             )
             status = "available"
         else:
             detail = (
                 f"{len(items)} racines majeures disponibles pour la navigation. "
-                "Ajouter BARCHART_API_KEY sur Render pour charger les cha?nes de futures options."
+                "Ajouter BARCHART_API_KEY sur Render pour charger les chaînes de futures options."
             )
             status = "partial"
         return items, OptionSourceStatus(
@@ -507,7 +791,7 @@ class OptionsService:
     async def universe(self, market: str) -> OptionUniverseSnapshot:
         normalized = market.strip().lower()
         if normalized not in {"tsx", "commodities", "all"}:
-            raise ValueError("market doit ?tre 'tsx', 'commodities' ou 'all'.")
+            raise ValueError("market doit être 'tsx', 'commodities' ou 'all'.")
 
         items: list[OptionUniverseItem] = []
         statuses: list[OptionSourceStatus] = []
@@ -538,7 +822,7 @@ class OptionsService:
             name=normalized,
             market="tsx",
             category="Canadian option",
-            exchange="Montr?al Exchange",
+            exchange="Montréal Exchange",
             provider_symbol=normalized,
             source_url=_MX_OPTIONS_URL,
         )
@@ -561,13 +845,13 @@ class OptionsService:
                 provider_symbol=item.provider_symbol,
             )
             if not contracts:
-                raise RuntimeError("Cha?ne vide dans la page de cotes MX.")
+                raise RuntimeError("Chaîne vide dans la page de cotes MX.")
             return (
                 contracts,
                 expirations,
                 underlying_price,
                 OptionSourceStatus(
-                    source="Montr?al Exchange",
+                    source="Montréal Exchange",
                     status="available",
                     detail=f"{len(contracts)} contrats extraits de la cote officielle.",
                 ),
@@ -578,7 +862,7 @@ class OptionsService:
                 [],
                 None,
                 OptionSourceStatus(
-                    source="Montr?al Exchange",
+                    source="Montréal Exchange",
                     status="unavailable",
                     detail=f"Cote officielle indisponible ({type(error).__name__}).",
                 ),
@@ -593,7 +877,7 @@ class OptionsService:
             return [], [], OptionSourceStatus(
                 source="Barchart OnDemand",
                 status="partial",
-                detail="BARCHART_API_KEY non configur?e; enrichissement IV/Greeks d?sactiv?.",
+                detail="BARCHART_API_KEY non configurée; enrichissement IV/Greeks désactivé.",
             )
 
         last_error: Exception | None = None
@@ -628,7 +912,7 @@ class OptionsService:
                     return contracts, expirations, OptionSourceStatus(
                         source="Barchart OnDemand",
                         status="available",
-                        detail=f"{len(contracts)} contrats avec m?triques fournisseur.",
+                        detail=f"{len(contracts)} contrats avec métriques fournisseur.",
                     )
             except Exception as error:  # noqa: BLE001
                 last_error = error
@@ -637,7 +921,7 @@ class OptionsService:
             source="Barchart OnDemand",
             status="unavailable",
             detail=(
-                "Aucune cha?ne canadienne exploitable renvoy?e"
+                "Aucune chaîne canadienne exploitable renvoyée"
                 + (f" ({type(last_error).__name__})." if last_error else ".")
             ),
         )
@@ -711,6 +995,29 @@ class OptionsService:
                 filtered = [contract for contract in mx_contracts if contract.expiration == expiration]
                 if filtered:
                     mx_contracts = filtered
+
+            barchart_contracts, _, barchart_status = await self._load_barchart_equity(
+                item, expiration
+            )
+            statuses.append(barchart_status)
+            provider_enriched = _merge_provider_metrics(
+                mx_contracts,
+                barchart_contracts,
+            )
+
+            risk_free_rate, model_status = await _risk_free_rate()
+            modeled = _apply_black_scholes_metrics(
+                mx_contracts,
+                underlying_price=underlying_price,
+                risk_free_rate=risk_free_rate,
+            )
+            model_status.detail = (
+                f"{model_status.detail} {provider_enriched} contrats enrichis par "
+                f"Barchart et {modeled} contrats évalués/complétés par Anatole. "
+                "Les IV/Greeks calculés sont des estimations de modèle, pas des "
+                "valeurs publiées par la Bourse de Montréal."
+            )
+            statuses.append(model_status)
             return mx_contracts, mx_expirations, underlying_price, statuses
 
         barchart_contracts, barchart_expirations, barchart_status = await self._load_barchart_equity(
@@ -739,7 +1046,7 @@ class OptionsService:
                     status="unavailable",
                     detail=(
                         "BARCHART_API_KEY manque. La navigation reste active, mais aucune "
-                        "cha?ne de futures options n'est simul?e."
+                        "chaîne de futures options n'est simulée."
                     ),
                 )
             ]
@@ -774,7 +1081,7 @@ class OptionsService:
                 detail=(
                     f"{len(contracts)} contrats de futures options."
                     if contracts
-                    else "Aucun contrat renvoy? pour cette racine/?ch?ance avec les permissions actuelles."
+                    else "Aucun contrat renvoyé pour cette racine/échéance avec les permissions actuelles."
                 ),
             )
             return contracts, expirations, [status]
@@ -798,11 +1105,11 @@ class OptionsService:
         normalized_market = market.strip().lower()
         normalized_symbol = symbol.strip().upper()
         if normalized_market not in {"tsx", "commodities"}:
-            raise ValueError("market doit ?tre 'tsx' ou 'commodities'.")
+            raise ValueError("market doit être 'tsx' ou 'commodities'.")
         if not re.fullmatch(r"[A-Z0-9.^-]{1,16}", normalized_symbol):
             raise ValueError("Symbole d'option invalide.")
         if expiration and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", expiration):
-            raise ValueError("expiration doit ?tre au format YYYY-MM-DD.")
+            raise ValueError("expiration doit être au format YYYY-MM-DD.")
         if contract and not re.fullmatch(r"[A-Z0-9.^|-]{1,32}", contract.upper()):
             raise ValueError("Contrat de futures invalide.")
 

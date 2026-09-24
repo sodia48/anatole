@@ -30,7 +30,7 @@ from app.api.routes import (
 
 api_router = APIRouter()
 
-# Sant? de l'API
+# Santé de l'API
 api_router.include_router(health.router)
 
 # Cotations, historiques, Focus et profils
@@ -40,7 +40,7 @@ api_router.include_router(
     tags=["stocks"],
 )
 
-# Fondamentaux, r?sultats et consensus analystes
+# Fondamentaux, résultats et consensus analystes
 api_router.include_router(
     fundamentals.router,
     prefix="/api/v1/stocks",
@@ -54,7 +54,7 @@ api_router.include_router(
     tags=["market"],
 )
 
-# Canada 360 ? vue int?gr?e ?conomie, taux, devise, march? et provinces
+# Canada 360 — vue intégrée économie, taux, devise, marché et provinces
 api_router.include_router(
     canada_360.router,
     prefix="/api/v1/canada",
@@ -68,15 +68,15 @@ api_router.include_router(
     tags=["search"],
 )
 
-# Screener, actualit?s, calendrier, r?pertoire ETF et psychologie
+# Screener, actualités, calendrier, répertoire ETF et psychologie
 api_router.include_router(
     discovery.router,
     prefix="/api/v1/discovery",
     tags=["discovery"],
 )
 
-# Calendrier et fil macro strictement provinciaux. Les routes d?clarent
-# seulement leur suffixe afin de ne pas doubler le pr?fixe discovery.
+# Calendrier et fil macro strictement provinciaux. Les routes déclarent
+# seulement leur suffixe afin de ne pas doubler le préfixe discovery.
 api_router.include_router(
     provincial_macro.router,
     prefix="/api/v1/discovery",
@@ -90,21 +90,21 @@ api_router.include_router(
     tags=["provincial-statistics"],
 )
 
-# Participations et historique d?taill? des ETF
+# Participations et historique détaillé des ETF
 api_router.include_router(
     etf_holdings.router,
     prefix="/api/v1/discovery/etfs",
     tags=["etf-holdings"],
 )
 
-# IPO et transactions d'initi?s
+# IPO et transactions d'initiés
 api_router.include_router(
     ipo_insiders.router,
     prefix="/api/v1/discovery",
     tags=["ipo-insiders"],
 )
 
-# R?seau ?conomique sourc? des entreprises Focus
+# Réseau économique sourcé des entreprises Focus
 api_router.include_router(
     company_network.router,
     prefix="/api/v1/discovery",
@@ -119,7 +119,7 @@ api_router.include_router(
 )
 
 
-# Options canadiennes et options sur contrats ? terme de mati?res premi?res
+# Options canadiennes et options sur contrats à terme de matières premières
 api_router.include_router(
     options.router,
     prefix="/api/v1/options",
@@ -141,7 +141,7 @@ api_router.include_router(
 )
 
 
-# Portefeuille, alertes, assistant et observabilit? des donn?es
+# Portefeuille, alertes, assistant et observabilité des données
 api_router.include_router(
     workspace.router,
     prefix="/api/v1/workspace",
@@ -157,35 +157,35 @@ api_router.include_router(
     tags=["account"],
 )
 
-# Console priv?e de pilotage de la b?ta
+# Console privée de pilotage de la bêta
 api_router.include_router(
     admin.router,
     prefix="/api/v1/admin",
     tags=["admin"],
 )
 
-# Centre de notifications et r?sum?s programm?s
+# Centre de notifications et résumés programmés
 api_router.include_router(
     notifications.router,
     prefix="/api/v1/notifications",
     tags=["notifications"],
 )
 
-# Appareils iOS et Android associ?s au compte pour les notifications push
+# Appareils iOS et Android associés au compte pour les notifications push
 api_router.include_router(
     mobile.router,
     prefix="/api/v1/account",
     tags=["mobile"],
 )
 
-# Compte de simulation Focus Pro; aucun courtier r?el n?est activ?
+# Compte de simulation Focus Pro; aucun courtier réel n’est activé
 api_router.include_router(
     paper_trading.router,
     prefix="/api/v1/paper",
     tags=["paper-trading"],
 )
 
-# Observabilit?, incidents clients et signalements b?ta
+# Observabilité, incidents clients et signalements bêta
 api_router.include_router(
     reliability.router,
     prefix="/api/v1/reliability",

@@ -145,7 +145,7 @@ export function OptionsClient() {
           setError(
             reason instanceof Error
               ? reason.message
-              : pick(language, "Cha?ne d'options indisponible.", "Options chain unavailable."),
+              : pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."),
           );
         }
       })
@@ -220,13 +220,13 @@ export function OptionsClient() {
       <header className={`panel ${styles.hero}`}>
         <div>
           <span className="eyebrow">
-            {pick(language, "D?RIV?S ? OPTIONS", "DERIVATIVES ? OPTIONS")}
+            {pick(language, "DÉRIVÉS · OPTIONS", "DERIVATIVES · OPTIONS")}
           </span>
           <h1>{pick(language, "Options", "Options")}</h1>
           <p>
             {pick(
               language,
-              "Calls, puts, ?ch?ances, volumes, int?r?t ouvert et m?triques de cha?ne pour les classes canadiennes et les options sur contrats ? terme de mati?res premi?res.",
+              "Calls, puts, échéances, volumes, intérêt ouvert et métriques de chaîne pour les classes canadiennes et les options sur contrats à terme de matières premières.",
               "Calls, puts, expiries, volume, open interest and chain metrics for Canadian listed classes and commodity futures options.",
             )}
           </p>
@@ -244,14 +244,14 @@ export function OptionsClient() {
             className={market === "tsx" ? styles.activeTab : undefined}
             onClick={() => changeMarket("tsx")}
           >
-            {pick(language, "Canada ? Montr?al", "Canada ? Montr?al")}
+            {pick(language, "Canada · Montréal", "Canada · Montréal")}
           </button>
           <button
             type="button"
             className={market === "commodities" ? styles.activeTab : undefined}
             onClick={() => changeMarket("commodities")}
           >
-            {pick(language, "Mati?res premi?res", "Commodities")}
+            {pick(language, "Matières premières", "Commodities")}
           </button>
         </div>
 
@@ -264,7 +264,7 @@ export function OptionsClient() {
                 <input
                   value={draftSymbol}
                   onChange={(event) => setDraftSymbol(event.target.value)}
-                  placeholder={market === "tsx" ? "RY, TD, XIU?" : "GC, CL, ZC?"}
+                  placeholder={market === "tsx" ? "RY, TD, XIU…" : "GC, CL, ZC…"}
                 />
                 <button type="submit">{pick(language, "Charger", "Load")}</button>
               </div>
@@ -272,7 +272,7 @@ export function OptionsClient() {
           </form>
 
           <label className={styles.selectControl}>
-            <span>{pick(language, "Cat?gorie", "Category")}</span>
+            <span>{pick(language, "Catégorie", "Category")}</span>
             <select value={category} onChange={(event) => setCategory(event.target.value)}>
               {categories.map((item) => (
                 <option key={item} value={item}>
@@ -283,7 +283,7 @@ export function OptionsClient() {
           </label>
 
           <label className={styles.selectControl}>
-            <span>{pick(language, "?ch?ance", "Expiry")}</span>
+            <span>{pick(language, "Échéance", "Expiry")}</span>
             <select
               value={expiration}
               onChange={(event) => {
@@ -325,7 +325,7 @@ export function OptionsClient() {
 
         <div className={styles.shortcuts}>
           {loadingUniverse ? (
-            <span>{pick(language, "Chargement de l'univers?", "Loading universe?")}</span>
+            <span>{pick(language, "Chargement de l'univers…", "Loading universe…")}</span>
           ) : (
             universeItems.slice(0, 80).map((item) => (
               <button
@@ -348,40 +348,40 @@ export function OptionsClient() {
       <section className={styles.metrics}>
         <article className="panel">
           <span>{pick(language, "Contrats", "Contracts")}</span>
-          <strong>{analytics ? integer(analytics.contract_count) : "?"}</strong>
-          <small>{chain ? `${chain.name} ? ${chain.exchange}` : symbol}</small>
+          <strong>{analytics ? integer(analytics.contract_count) : "—"}</strong>
+          <small>{chain ? `${chain.name} · ${chain.exchange}` : symbol}</small>
         </article>
         <article className="panel">
-          <span>Put / Call ? {pick(language, "volume", "volume")}</span>
+          <span>Put / Call · {pick(language, "volume", "volume")}</span>
           <strong>{ratio(analytics?.put_call_volume_ratio)}</strong>
           <small>
             {analytics
               ? `${integer(analytics.put_volume)} P / ${integer(analytics.call_volume)} C`
-              : "?"}
+              : "—"}
           </small>
         </article>
         <article className="panel">
-          <span>Put / Call ? OI</span>
+          <span>Put / Call · OI</span>
           <strong>{ratio(analytics?.put_call_open_interest_ratio)}</strong>
           <small>
             {analytics
               ? `${integer(analytics.put_open_interest)} P / ${integer(analytics.call_open_interest)} C`
-              : "?"}
+              : "—"}
           </small>
         </article>
         <article className="panel">
-          <span>{pick(language, "Volatilit? implicite ATM", "ATM implied volatility")}</span>
+          <span>{pick(language, "Volatilité implicite ATM", "ATM implied volatility")}</span>
           <strong>
             {analytics?.atm_implied_volatility == null
               ? "N/D"
               : `${value(analytics.atm_implied_volatility, 1)} %`}
           </strong>
-          <small>{pick(language, "Selon les champs fournis par la source", "When supplied by the provider")}</small>
+          <small>{pick(language, "Fournisseur si disponible, sinon estimation Anatole", "Provider when available, otherwise Anatole estimate")}</small>
         </article>
         <article className="panel">
-          <span>{pick(language, "Max pain estim?", "Estimated max pain")}</span>
+          <span>{pick(language, "Max pain estimé", "Estimated max pain")}</span>
           <strong>{value(analytics?.max_pain_estimate)}</strong>
-          <small>{pick(language, "Calcul descriptif ? partir de l'OI", "Descriptive calculation from OI")}</small>
+          <small>{pick(language, "Calcul descriptif à partir de l'OI", "Descriptive calculation from OI")}</small>
         </article>
       </section>
 
@@ -392,12 +392,12 @@ export function OptionsClient() {
             {market === "tsx"
               ? pick(
                   language,
-                  "La Bourse de Montr?al est la source officielle prioritaire. Barchart puis Yahoo ne servent que de replis lorsque n?cessaire.",
-                  "Montr?al Exchange is the primary official source. Barchart and then Yahoo are only fallbacks when needed.",
+                  "La Bourse de Montréal reste la source officielle pour les prix, volumes et intérêts ouverts. Anatole utilise Barchart lorsqu’il est disponible puis calcule les IV/Greeks manquants avec une estimation Black-Scholes clairement signalée.",
+                  "Montréal Exchange remains the official source for prices, volume and open interest. Anatole uses Barchart when available, then fills missing IV/Greeks with a clearly disclosed Black-Scholes estimate.",
                 )
               : pick(
                   language,
-                  "Les cha?nes de mati?res premi?res utilisent Barchart OnDemand. Toute racine de futures support?e peut ?tre saisie, m?me si elle n'est pas dans les raccourcis.",
+                  "Les chaînes de matières premières utilisent Barchart OnDemand. Toute racine de futures supportée peut être saisie, même si elle n'est pas dans les raccourcis.",
                   "Commodity chains use Barchart OnDemand. Any supported futures root can be entered even when it is not shown as a shortcut.",
                 )}
           </p>
@@ -413,7 +413,7 @@ export function OptionsClient() {
         <div className={styles.chainHeader}>
           <div>
             <span className="eyebrow">{market === "tsx" ? "MX" : "COMMODITIES"}</span>
-            <h2>{chain ? `${chain.symbol} ? ${chain.name}` : symbol}</h2>
+            <h2>{chain ? `${chain.symbol} · ${chain.name}` : symbol}</h2>
             <p>
               {chain?.underlying_price != null
                 ? `${pick(language, "Sous-jacent", "Underlying")}: ${value(chain.underlying_price)}`
@@ -422,33 +422,33 @@ export function OptionsClient() {
           </div>
           <div className={styles.chainMeta}>
             <strong>{contracts.length.toLocaleString("fr-CA")}</strong>
-            <span>{pick(language, "lignes affich?es", "rows shown")}</span>
+            <span>{pick(language, "lignes affichées", "rows shown")}</span>
           </div>
         </div>
 
         {loadingChain && !chain ? (
           <div className={styles.empty}>
-            {pick(language, "Chargement de la cha?ne?", "Loading option chain?")}
+            {pick(language, "Chargement de la chaîne…", "Loading option chain…")}
           </div>
         ) : contracts.length ? (
           <div className={styles.tableWrap}>
             <table>
               <thead>
                 <tr>
-                  <th>{pick(language, "?ch?ance", "Expiry")}</th>
+                  <th>{pick(language, "Échéance", "Expiry")}</th>
                   <th>Type</th>
                   <th>Strike</th>
                   <th>Bid</th>
                   <th>Ask</th>
                   <th>Last</th>
-                  <th>? prix</th>
+                  <th>Δ prix</th>
                   <th>Vol.</th>
                   <th>OI</th>
-                  <th>IV</th>
-                  <th>Delta</th>
-                  <th>Gamma</th>
-                  <th>Theta</th>
-                  <th>Vega</th>
+                  <th>IV*</th>
+                  <th>Delta*</th>
+                  <th>Gamma*</th>
+                  <th>Theta*</th>
+                  <th>Vega*</th>
                 </tr>
               </thead>
               <tbody>
@@ -460,17 +460,17 @@ export function OptionsClient() {
           </div>
         ) : (
           <div className={styles.empty}>
-            <strong>{pick(language, "Aucune cha?ne exploitable pour l'instant.", "No usable chain yet.")}</strong>
+            <strong>{pick(language, "Aucune chaîne exploitable pour l'instant.", "No usable chain yet.")}</strong>
             <span>
               {market === "commodities"
                 ? pick(
                     language,
-                    "Pour les mati?res premi?res, configure BARCHART_API_KEY dans Render avec les permissions de march? n?cessaires. Anatole n'invente jamais une cha?ne quand le fournisseur est absent.",
+                    "Pour les matières premières, configure BARCHART_API_KEY dans Render avec les permissions de marché nécessaires. Anatole n'invente jamais une chaîne quand le fournisseur est absent.",
                     "For commodities, configure BARCHART_API_KEY in Render with the required market permissions. Anatole never fabricates a chain when the provider is unavailable.",
                   )
                 : pick(
                     language,
-                    "La classe peut ?tre admissible sur MX sans que le fournisseur de repli dispose de la cha?ne ? cet instant.",
+                    "La classe peut être admissible sur MX sans que le fournisseur de repli dispose de la chaîne à cet instant.",
                     "A class may be listed on MX even when a fallback provider has no chain at that moment.",
                   )}
             </span>
@@ -481,8 +481,8 @@ export function OptionsClient() {
       <p className={styles.disclaimer}>
         {pick(
           language,
-          "Donn?es descriptives seulement. Les options comportent un risque important; les cotes peuvent ?tre diff?r?es ou partielles selon la source et les permissions.",
-          "Descriptive data only. Options involve substantial risk; quotes may be delayed or partial depending on source and permissions.",
+          "* IV et Greeks : données fournisseur lorsqu’elles existent; sinon estimations Anatole Black-Scholes à partir des prix affichés et d’un proxy de taux sans risque. Données descriptives seulement; les cotes peuvent être différées ou partielles.",
+          "* IV and Greeks: provider data when available; otherwise Anatole Black-Scholes estimates from displayed prices and a risk-free-rate proxy. Descriptive data only; quotes may be delayed or partial.",
         )}
       </p>
     </main>

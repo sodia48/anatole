@@ -165,7 +165,7 @@ async function proxy(
   } catch (error) {
     const detail =
       error instanceof Error && error.name === "AbortError"
-        ? "D?lai d?pass? lors de la r?cup?ration des donn?es Anatole."
+        ? "Délai dépassé lors de la récupération des données Anatole."
         : "Le service Anatole est temporairement indisponible.";
 
     return NextResponse.json(
