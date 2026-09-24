@@ -150,17 +150,22 @@ def parse_cme_bulletin_text(
             expiration = None
             continue
 
+        # Contract-month lines such as "OCT26 LV CATTLE CALL (...)" can
+        # contain CALL/PUT text. Resolve the month before the generic
+        # "other option header" guard, otherwise a valid contract month is
+        # mistaken for a new product heading and the following strike rows
+        # are discarded.
+        month_match = _MONTH_RE.match(line.upper())
+        if active_side and month_match:
+            expiration = _month_end(month_match.group(0))
+            continue
+
         if active_side and _looks_like_other_option_header(line):
             active_side = None
             expiration = None
             continue
 
         if not active_side:
-            continue
-
-        month_match = _MONTH_RE.match(line.upper())
-        if month_match:
-            expiration = _month_end(month_match.group(0))
             continue
 
         if expiration is None:
