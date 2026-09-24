@@ -451,6 +451,15 @@ export function AssistantClient() {
           <p>
             {pick(language, "Tu définis ton objectif, ta marge financière et ton confort face au risque. Anatole organise les informations et teste des scénarios, sans te dire quoi acheter ou vendre.", "Define your goal, financial capacity, and comfort with risk. Anatole organizes the information and tests scenarios without telling you what to buy or sell.")}
           </p>
+          <div className={styles.guideHeroActions}>
+            <Link href="/assistant/magasiner" className={styles.primaryButton}>
+              <WalletCards size={16} />
+              {pick(language, "Magasiner des produits financiers", "Shop financial products")}
+            </Link>
+            <span className={styles.guideHeroHint}>
+              {pick(language, "Comparer frais, taux et protections avec des sources officielles.", "Compare fees, rates and coverage with official sources.")}
+            </span>
+          </div>
         </div>
         <div className={styles.guideHeroStatus}>
           <strong>{step}/4</strong>
