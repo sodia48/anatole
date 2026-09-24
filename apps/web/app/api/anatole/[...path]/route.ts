@@ -24,6 +24,7 @@ function publicCacheTtl(pathname: string): number {
   if (pathname.includes("/api/v1/market/cockpit")) return 10;
   if (pathname.includes("/api/v1/discovery/psychology")) return 30;
   if (pathname.includes("/api/v1/analysis/terminal")) return 45;
+  if (pathname.includes("/api/v1/options/")) return 20;
   if (pathname.includes("/api/v1/discovery/screener")) return 60;
   if (pathname.includes("/api/v1/stocks/")) return 60;
   if (pathname.includes("/api/v1/discovery/news")) return 120;
@@ -164,7 +165,7 @@ async function proxy(
   } catch (error) {
     const detail =
       error instanceof Error && error.name === "AbortError"
-        ? "Délai dépassé lors de la récupération des données Anatole."
+        ? "D?lai d?pass? lors de la r?cup?ration des donn?es Anatole."
         : "Le service Anatole est temporairement indisponible.";
 
     return NextResponse.json(
