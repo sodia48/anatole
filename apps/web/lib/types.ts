@@ -364,6 +364,35 @@ export type NewsSnapshot = {
   refresh_after_seconds: number;
 };
 
+export type NewsBriefRequest = {
+  title: string;
+  summary: string;
+  url: string;
+  source: string;
+  category: string;
+  region: string;
+  language: "fr" | "en";
+};
+
+export type NewsBriefFigure = {
+  value: string;
+  context: string;
+};
+
+export type NewsBriefResponse = {
+  title: string;
+  summary: string;
+  key_figures: NewsBriefFigure[];
+  changes: string[];
+  why_it_matters: string;
+  watch: string[];
+  source_url: string;
+  source_name: string;
+  source_mode: "official_page" | "feed_summary";
+  source_note: string;
+  generated_at: string;
+};
+
 export type EconomicEvent = {
   id: string;
   title: string;
