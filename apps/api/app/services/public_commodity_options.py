@@ -89,7 +89,7 @@ _ROW_RE = re.compile(
     r"^(?P<strike>-?\d+(?:\.\d+)?)\s+.*?\s+"
     r"(?P<settle>\d+(?:\.\d+)?)\s+"
     r"(?:(?P<sign>[+-])\s+(?P<change>\d+(?:\.\d+)?)|UNCH|NEW)\s+"
-    r"(?P<delta>-?(?:\d+\.\d+|\.\d+))\s+(?P<rest>.+)$"
+    r"(?P<delta>-?(?:\d+\.\d+|\.\d+)|----)\s*(?P<rest>.*)$"
 )
 _OI_RE = re.compile(r"\b(?P<oi>\d[\d,]*)\s+(?:UNCH|[+-]\s+\d[\d,]*)\b")
 _INTEGER_RE = re.compile(r"(?<![\d.])\d[\d,]*(?![\d.])")
@@ -147,14 +147,19 @@ def parse_cme_bulletin_text(
         side = _source_side(line, config)
         if side:
             active_side = side
-            expiration = None
+            # Some CME reports put the month on the same line as the CALL/PUT
+            # heading (for example livestock). Preserve it instead of
+            # discarding the contract month when switching sides.
+            month_match = _MONTH_RE.search(line.upper())
+            expiration = (
+                _month_end(month_match.group(0))
+                if month_match
+                else None
+            )
             continue
 
-        # Contract-month lines such as "OCT26 LV CATTLE CALL (...)" can
-        # contain CALL/PUT text. Resolve the month before the generic
-        # "other option header" guard, otherwise a valid contract month is
-        # mistaken for a new product heading and the following strike rows
-        # are discarded.
+        # Other reports put the month on the following line (for example
+        # "OG CALL COMEX GOLD OPTIONS" then "OCT26").
         month_match = _MONTH_RE.match(line.upper())
         if active_side and month_match:
             expiration = _month_end(month_match.group(0))
@@ -177,7 +182,8 @@ def parse_cme_bulletin_text(
 
         strike = float(row.group("strike")) / config.strike_divisor
         settle = float(row.group("settle"))
-        delta = float(row.group("delta"))
+        raw_delta = row.group("delta")
+        delta = None if raw_delta == "----" else float(raw_delta)
         rest = row.group("rest")
 
         oi_matches = list(_OI_RE.finditer(rest))
@@ -233,7 +239,31 @@ def parse_cme_bulletin_text(
 
 def _extract_pdf_text(content: bytes) -> str:
     reader = PdfReader(io.BytesIO(content))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+    layout_parts: list[str] = []
+    plain_parts: list[str] = []
+
+    for page in reader.pages:
+        # CME bulletins are dense fixed-width tables. pypdf's default text
+        # mode can interleave columns and destroy a strike row. Layout mode
+        # keeps horizontal positioning much closer to the rendered PDF.
+        try:
+            layout = page.extract_text(
+                extraction_mode="layout",
+                layout_mode_space_vertically=False,
+            )
+        except (TypeError, ValueError):
+            layout = ""
+        if layout:
+            layout_parts.append(layout)
+
+        # Keep plain extraction as a second pass. The parser deduplicates
+        # contracts, so combining both representations gives us a resilient
+        # fallback when one extraction mode mangles a particular page.
+        plain = page.extract_text() or ""
+        if plain:
+            plain_parts.append(plain)
+
+    return "\n".join(layout_parts + plain_parts)
 
 
 def _ice_expirations(html: str) -> list[str]:
@@ -308,7 +338,10 @@ class PublicCommodityOptionsService:
         return [], [], OptionSourceStatus(
             source="CME Group public EOD",
             status="unavailable",
-            detail="Daily Bulletin public reçu sans chaîne exploitable pour cette racine.",
+            detail=(
+                "Daily Bulletin public reçu, mais aucune ligne strike/prix n'a "
+                "survécu au parsing. Le format PDF a probablement changé."
+            ),
         )
 
     async def _ice_metadata(

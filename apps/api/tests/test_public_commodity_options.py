@@ -54,3 +54,48 @@ def test_ice_expiry_metadata_parsing() -> None:
     <tr><td>Dec26</td><td>1/3/2025</td><td>11/13/2026</td></tr>
     """
     assert _ice_expirations(html) == ["2026-10-09", "2026-11-13"]
+
+
+def test_parse_real_cme_gold_monthly_rows() -> None:
+    config = CmePublicConfig(
+        urls=("https://example.invalid/metals.pdf",),
+        exchange="COMEX",
+        header_phrases=("GOLD OPTIONS",),
+        exclude_phrases=("MICRO", "WEEKLY"),
+        strike_divisor=1.0,
+    )
+    text = """
+OG CALL COMEX GOLD OPTIONS
+OCT26
+4250 42.70 42.70 123.60B/37.90A 123.60B/37.90A ---- 42.70 - 53.50 .8280 ---- ---- 3 ---- 431 - 1
+4255 ---- ---- 118.70B/34.30A 118.70B/34.30A ---- 38.90 - 52.70 .7931 ---- ---- ---- ---- 56 UNCH
+"""
+    contracts = parse_cme_bulletin_text(text, root="GC", config=config)
+    assert len(contracts) == 2
+    first = contracts[0]
+    assert first.strike == 4250.0
+    assert first.last == 42.70
+    assert first.volume == 3
+    assert first.open_interest == 431
+    assert first.delta == 0.828
+
+
+def test_parse_cme_row_when_delta_is_missing() -> None:
+    config = CmePublicConfig(
+        urls=("https://example.invalid/metals.pdf",),
+        exchange="COMEX",
+        header_phrases=("GOLD OPTIONS",),
+        exclude_phrases=("MICRO", "WEEKLY"),
+        strike_divisor=1.0,
+    )
+    text = """
+OG PUT COMEX GOLD OPTIONS
+OCT26
+1000 ---- ---- ---- ----/0.10A ---- 0.10 UNCH ---- ---- ---- ---- ---- 1 UNCH
+"""
+    contracts = parse_cme_bulletin_text(text, root="GC", config=config)
+    assert len(contracts) == 1
+    assert contracts[0].strike == 1000.0
+    assert contracts[0].volume == 0
+    assert contracts[0].open_interest == 1
+    assert contracts[0].delta is None
