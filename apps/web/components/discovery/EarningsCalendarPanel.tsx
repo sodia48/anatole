@@ -222,7 +222,11 @@ export function EarningsCalendarPanel({
         </label>
       </section>
 
-      <button type="button" className="button-secondary" disabled={refreshing} onClick={() => setRevision((value) => value + 1)}>{pick(language, "Actualiser", "Refresh")}</button>
+      <div className={styles.refreshRow}>
+        <button type="button" className="button-secondary" disabled={refreshing} onClick={() => setRevision((value) => value + 1)}>
+          {refreshing ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}
+        </button>
+      </div>
       {error ? <div className="cockpit-warning" role="status">{error} {data?.events.length ? pick(language, "Dernières données disponibles.", "Last available data.") : ""}</div> : null}
       {data?.stale ? <p role="status">{pick(language, "Dernières données disponibles.", "Last available data.")}</p> : null}
       {data?.refresh_in_progress ? <p role="status">{pick(language, "Synchronisation des dates et estimations…", "Synchronizing dates and estimates…")}</p> : null}
