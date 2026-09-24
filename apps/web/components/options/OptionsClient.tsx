@@ -43,6 +43,35 @@ function ratio(number: number | null | undefined): string {
     : number.toFixed(2);
 }
 
+const STATUS_WEIGHT: Record<OptionSourceStatus["status"], number> = {
+  available: 0,
+  partial: 1,
+  unavailable: 2,
+};
+
+function mergeSourceStatuses(items: OptionSourceStatus[]): OptionSourceStatus[] {
+  const merged = new Map<string, OptionSourceStatus>();
+  for (const item of items) {
+    const previous = merged.get(item.source);
+    if (!previous) {
+      merged.set(item.source, { ...item });
+      continue;
+    }
+    const details = [previous.detail, item.detail]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .filter((value, index, values) => values.indexOf(value) === index);
+    merged.set(item.source, {
+      source: item.source,
+      status:
+        STATUS_WEIGHT[item.status] > STATUS_WEIGHT[previous.status]
+          ? item.status
+          : previous.status,
+      detail: details.join(" · ") || null,
+    });
+  }
+  return [...merged.values()];
+}
+
 function Status({ item }: { item: OptionSourceStatus }) {
   return (
     <div className={styles.status}>
@@ -173,10 +202,11 @@ export function OptionsClient() {
   }, [chain, side]);
 
   const statuses = useMemo(
-    () => [
-      ...(universe?.source_statuses ?? []),
-      ...(chain?.source_statuses ?? []),
-    ],
+    () =>
+      mergeSourceStatuses([
+        ...(universe?.source_statuses ?? []),
+        ...(chain?.source_statuses ?? []),
+      ]),
     [chain, universe],
   );
 
@@ -352,7 +382,7 @@ export function OptionsClient() {
           <small>{chain ? `${chain.name} · ${chain.exchange}` : symbol}</small>
         </article>
         <article className="panel">
-          <span>Put / Call · {pick(language, "volume", "volume")}</span>
+          <span>Put / Call · {pick(language, "volume séance", "session volume")}</span>
           <strong>{ratio(analytics?.put_call_volume_ratio)}</strong>
           <small>
             {analytics
@@ -397,8 +427,8 @@ export function OptionsClient() {
                 )
               : pick(
                   language,
-                  "Les chaînes de matières premières utilisent Barchart OnDemand. Toute racine de futures supportée peut être saisie, même si elle n'est pas dans les raccourcis.",
-                  "Commodity chains use Barchart OnDemand. Any supported futures root can be entered even when it is not shown as a shortcut.",
+                  "Anatole utilise d'abord Barchart s'il est configuré, sinon les Daily Bulletins publics CME/CBOT/NYMEX/COMEX sans clé API. Pour ICE, les échéances publiques sont récupérées lorsque disponibles; une chaîne strike/prix complète peut encore nécessiter une source autorisée.",
+                  "Anatole uses Barchart first when configured, otherwise public CME/CBOT/NYMEX/COMEX Daily Bulletins with no API key. For ICE, public expiries are retrieved when available; a full strike/price chain may still require an authorized source.",
                 )}
           </p>
         </div>
@@ -442,8 +472,10 @@ export function OptionsClient() {
                   <th>Ask</th>
                   <th>Last</th>
                   <th>Δ prix</th>
-                  <th>Vol.</th>
-                  <th>OI</th>
+                  <th title={pick(language, "Contrats négociés pendant la séance. Un volume de 0 avec un OI positif est normal.", "Contracts traded during the session. Zero volume with positive OI is normal.")}>
+                    {pick(language, "Vol. séance", "Session vol.")}
+                  </th>
+                  <th title={pick(language, "Intérêt ouvert : contrats toujours ouverts.", "Open interest: contracts still open.")}>OI</th>
                   <th>IV*</th>
                   <th>Delta*</th>
                   <th>Gamma*</th>
@@ -465,8 +497,8 @@ export function OptionsClient() {
               {market === "commodities"
                 ? pick(
                     language,
-                    "Pour les matières premières, configure BARCHART_API_KEY dans Render avec les permissions de marché nécessaires. Anatole n'invente jamais une chaîne quand le fournisseur est absent.",
-                    "For commodities, configure BARCHART_API_KEY in Render with the required market permissions. Anatole never fabricates a chain when the provider is unavailable.",
+                    "Aucune chaîne strike/prix publique exploitable n'a été trouvée pour cette racine. Les racines CME utilisent automatiquement le Daily Bulletin public; certaines racines ICE peuvent encore nécessiter une source autorisée.",
+                    "No usable public strike/price chain was found for this root. CME roots automatically use the public Daily Bulletin; some ICE roots may still require an authorized source.",
                   )
                 : pick(
                     language,
@@ -481,8 +513,8 @@ export function OptionsClient() {
       <p className={styles.disclaimer}>
         {pick(
           language,
-          "* IV et Greeks : données fournisseur lorsqu’elles existent; sinon estimations Anatole Black-Scholes à partir des prix affichés et d’un proxy de taux sans risque. Données descriptives seulement; les cotes peuvent être différées ou partielles.",
-          "* IV and Greeks: provider data when available; otherwise Anatole Black-Scholes estimates from displayed prices and a risk-free-rate proxy. Descriptive data only; quotes may be delayed or partial.",
+          "* Volume séance = contrats négociés pendant la séance; OI = contrats encore ouverts. Un volume nul avec OI positif est normal. IV/Greeks : données fournisseur lorsqu’elles existent; sinon estimations Anatole. Les fallbacks CME publics sont EOD et donc différés.",
+          "* Session volume = contracts traded during the session; OI = contracts still open. Zero volume with positive OI is normal. IV/Greeks: provider data when available; otherwise Anatole estimates. Public CME fallbacks are EOD and therefore delayed.",
         )}
       </p>
     </main>
