@@ -69,11 +69,11 @@ const groups: Array<{
   items: NavItem[];
 }> = [
   {
-    label: "March?s",
+    label: "Marchés",
     items: [
       {
         href: "/aujourdhui",
-        label: "Aujourd?hui",
+        label: "Aujourd’hui",
         icon: LayoutDashboard,
         available: true,
       },
@@ -97,7 +97,7 @@ const groups: Array<{
       },
       {
         href: "/actualites",
-        label: "Actualit?s",
+        label: "Actualités",
         icon: Newspaper,
         available: true,
       },
@@ -191,7 +191,7 @@ const groups: Array<{
       },
       {
         href: "/parametres",
-        label: "Compte & param?tres",
+        label: "Compte & paramètres",
         icon: Settings2,
         available: true,
       },
@@ -213,7 +213,7 @@ const groups: Array<{
     items: [
       {
         href: "/admin",
-        label: "Console b?ta",
+        label: "Console bêta",
         icon: ShieldCheck,
         available: true,
         adminOnly: true,
@@ -427,7 +427,7 @@ export function AppSidebar({
               href: `/comparateur?symbols=${encodeURIComponent(
                 comparisonSymbols.join(","),
               )}`,
-              label: pick(language, `Comparer ${comparisonSymbols.join(" ? ")}`, `Compare ${comparisonSymbols.join(" ? ")}`),
+              label: pick(language, `Comparer ${comparisonSymbols.join(" · ")}`, `Compare ${comparisonSymbols.join(" · ")}`),
               description: pick(language, "Ouvrir le Comparateur", "Open Comparator"),
               icon: GitCompareArrows,
             },
@@ -482,7 +482,7 @@ export function AppSidebar({
           String(next),
         );
       } catch {
-        // La navigation reste utilisable si le stockage est bloqu?.
+        // La navigation reste utilisable si le stockage est bloqué.
       }
 
       return next;
@@ -753,7 +753,7 @@ export function AppSidebar({
                 ref={searchInputRef}
                 type="search"
                 value={searchQuery}
-                placeholder={pick(language, "Ex. RY, SHOP, ETF, Psychologie?", "E.g. RY, SHOP, ETF, Psychology?")}
+                placeholder={pick(language, "Ex. RY, SHOP, ETF, Psychologie…", "E.g. RY, SHOP, ETF, Psychology…")}
                 autoComplete="off"
                 spellCheck={false}
                 onChange={(event: ReactChangeEvent<HTMLInputElement>) =>
@@ -767,7 +767,7 @@ export function AppSidebar({
             <div
               className={guardStyles.searchResults}
               role="listbox"
-              aria-label={pick(language, "R?sultats de recherche", "Search results")}
+              aria-label={pick(language, "Résultats de recherche", "Search results")}
             >
               {searchResults.length ? (
                 searchResults.map((result, index) => {
@@ -812,7 +812,7 @@ export function AppSidebar({
                         }
                         aria-hidden="true"
                       >
-                        ?
+                        →
                       </span>
                     </button>
                   );
@@ -821,7 +821,7 @@ export function AppSidebar({
                 <p className={guardStyles.searchEmpty}>
                   {pick(
                     language,
-                    "Aucun r?sultat. Saisis un symbole TSX, par exemple RY ou SHOP.",
+                    "Aucun résultat. Saisis un symbole TSX, par exemple RY ou SHOP.",
                     "No result. Enter a TSX symbol, for example RY or SHOP.",
                   )}
                 </p>
@@ -831,8 +831,8 @@ export function AppSidebar({
             <p className={guardStyles.searchHelp}>
               {pick(
                 language,
-                "?? pour naviguer ? Entr?e pour ouvrir ? Ctrl/? K pour rechercher",
-                "?? to navigate ? Enter to open ? Ctrl/? K to search",
+                "↑↓ pour naviguer · Entrée pour ouvrir · Ctrl/⌘ K pour rechercher",
+                "↑↓ to navigate · Enter to open · Ctrl/⌘ K to search",
               )}
             </p>
           </section>
@@ -860,7 +860,7 @@ export function AppSidebar({
             <span className="brand-mark">A</span>
             <span>
               <strong>anatole</strong>
-              <small>{pick(language, "Intelligence de march?", "Market intelligence")}</small>
+              <small>{pick(language, "Intelligence de marché", "Market intelligence")}</small>
             </span>
           </Link>
 
@@ -896,14 +896,14 @@ export function AppSidebar({
           className="desktop-sidebar-edge-toggle"
           aria-label={
             sidebarCollapsed
-              ? pick(language, "D?plier la navigation", "Expand navigation")
+              ? pick(language, "Déplier la navigation", "Expand navigation")
               : pick(language, "Replier la navigation", "Collapse navigation")
           }
           aria-controls="anatole-sidebar"
           aria-pressed={sidebarCollapsed}
           title={
             sidebarCollapsed
-              ? pick(language, "D?plier le menu", "Expand menu")
+              ? pick(language, "Déplier le menu", "Expand menu")
               : pick(language, "Replier le menu", "Collapse menu")
           }
           onClick={toggleDesktopSidebar}
@@ -924,7 +924,7 @@ export function AppSidebar({
         >
           <Search size={17} />
           <span>{pick(language, "Rechercher", "Search")}</span>
-          <kbd>?K</kbd>
+          <kbd>⌘K</kbd>
         </button>
 
         <Link
@@ -936,14 +936,14 @@ export function AppSidebar({
           onClick={() => setDrawerOpen(false)}
           title={
             sidebarCollapsed
-              ? pick(language, "Compte & param?tres", "Account & settings")
+              ? pick(language, "Compte & paramètres", "Account & settings")
               : undefined
           }
         >
           <UserRound size={19} />
           <span>
-            <strong>{pick(language, "Compte & param?tres", "Account & settings")}</strong>
-            <small>{pick(language, "Compte ? pr?f?rences ? donn?es", "Account ? preferences ? data")}</small>
+            <strong>{pick(language, "Compte & paramètres", "Account & settings")}</strong>
+            <small>{pick(language, "Compte · préférences · données", "Account · preferences · data")}</small>
           </span>
         </Link>
 
@@ -1008,7 +1008,7 @@ export function AppSidebar({
                     <Icon size={18} />
                     <span>{item.label}</span>
                     {!item.available ? (
-                      <em>{pick(language, "Bient?t", "Soon")}</em>
+                      <em>{pick(language, "Bientôt", "Soon")}</em>
                     ) : null}
                   </Link>
                 );
@@ -1027,13 +1027,13 @@ export function AppSidebar({
           <Link href="/roadmap">
             Anatole {ANATOLE_VERSION_LABEL}
           </Link>
-          <span>{pick(language, "Centre de contr?le ? synchronisation active", "Control center ? synchronization active")}</span>
+          <span>{pick(language, "Centre de contrôle · synchronisation active", "Control center · synchronization active")}</span>
         </div>
       </aside>
 
       <nav
         className={`mobile-bottom-nav ${guardStyles.mobileBottomNav}`}
-        aria-label={pick(language, "Acc?s rapide Anatole", "Anatole quick access")}
+        aria-label={pick(language, "Accès rapide Anatole", "Anatole quick access")}
       >
         <Link
           href="/aujourdhui"
@@ -1041,7 +1041,7 @@ export function AppSidebar({
           aria-current={pathname === "/aujourdhui" ? "page" : undefined}
         >
           <LayoutDashboard size={20} />
-          <span>{pick(language, "Aujourd?hui", "Today")}</span>
+          <span>{pick(language, "Aujourd’hui", "Today")}</span>
         </Link>
         <Link
           href="/cockpit"

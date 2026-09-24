@@ -77,10 +77,10 @@ export function OptionsScreen() {
       }}
     >
       <ScreenHeader
-        eyebrow={pick("D?RIV?S ? OPTIONS", "DERIVATIVES ? OPTIONS")}
+        eyebrow={pick("DÉRIVÉS · OPTIONS", "DERIVATIVES · OPTIONS")}
         title={pick("Options", "Options")}
         subtitle={pick(
-          "Cha?nes canadiennes et options sur contrats ? terme de mati?res premi?res.",
+          "Chaînes canadiennes et options sur contrats à terme de matières premières.",
           "Canadian chains and commodity futures options.",
         )}
       />
@@ -91,7 +91,7 @@ export function OptionsScreen() {
           style={[styles.segmentButton, market === "tsx" && styles.segmentActive]}
         >
           <Text style={[styles.segmentText, market === "tsx" && styles.segmentTextActive]}>
-            Canada ? MX
+            Canada · MX
           </Text>
         </Pressable>
         <Pressable
@@ -99,7 +99,7 @@ export function OptionsScreen() {
           style={[styles.segmentButton, market === "commodities" && styles.segmentActive]}
         >
           <Text style={[styles.segmentText, market === "commodities" && styles.segmentTextActive]}>
-            {pick("Mati?res", "Commodities")}
+            {pick("Matières", "Commodities")}
           </Text>
         </Pressable>
       </View>
@@ -111,9 +111,9 @@ export function OptionsScreen() {
           autoCapitalize="characters"
           autoCorrect={false}
           onChangeText={setDraft}
-          placeholder={market === "tsx" ? "RY, TD, XIU?" : "GC, CL, ZC?"}
+          placeholder={market === "tsx" ? "RY, TD, XIU…" : "GC, CL, ZC…"}
         />
-        <Button label={pick("Charger la cha?ne", "Load chain")} onPress={applySymbol} />
+        <Button label={pick("Charger la chaîne", "Load chain")} onPress={applySymbol} />
         <QueryState
           loading={universe.isLoading}
           error={universe.error}
@@ -152,11 +152,11 @@ export function OptionsScreen() {
               <Text style={styles.kpiValue}>{integer(analytics?.contract_count)}</Text>
             </Card>
             <Card>
-              <Text style={styles.kpiLabel}>Put / Call ? Vol.</Text>
+              <Text style={styles.kpiLabel}>Put / Call · Vol.</Text>
               <Text style={styles.kpiValue}>{number(analytics?.put_call_volume_ratio)}</Text>
             </Card>
             <Card>
-              <Text style={styles.kpiLabel}>Put / Call ? OI</Text>
+              <Text style={styles.kpiLabel}>Put / Call · OI</Text>
               <Text style={styles.kpiValue}>{number(analytics?.put_call_open_interest_ratio)}</Text>
             </Card>
             <Card>
@@ -169,7 +169,7 @@ export function OptionsScreen() {
             </Card>
           </View>
 
-          <Card title={`${chain.data.symbol} ? ${chain.data.name}`}>
+          <Card title={`${chain.data.symbol} · ${chain.data.name}`}>
             <View style={styles.sideRow}>
               {(["both", "call", "put"] as const).map((item) => (
                 <Pressable
@@ -210,11 +210,11 @@ export function OptionsScreen() {
               <Text style={styles.empty}>
                 {market === "commodities"
                   ? pick(
-                      "Aucune cha?ne. Configure BARCHART_API_KEY sur Render avec les permissions de march? n?cessaires.",
+                      "Aucune chaîne. Configure BARCHART_API_KEY sur Render avec les permissions de marché nécessaires.",
                       "No chain. Configure BARCHART_API_KEY on Render with the required market permissions.",
                     )
                   : pick(
-                      "Aucune cha?ne disponible pour ce symbole ? cet instant.",
+                      "Aucune chaîne disponible pour ce symbole à cet instant.",
                       "No chain is available for this symbol right now.",
                     )}
               </Text>
@@ -246,8 +246,8 @@ export function OptionsScreen() {
 
       <Text style={styles.disclaimer}>
         {pick(
-          "Donn?es descriptives, parfois diff?r?es. Aucune cha?ne n'est simul?e lorsqu'une source est indisponible.",
-          "Descriptive, sometimes delayed data. No chain is simulated when a source is unavailable.",
+          "IV et Greeks proviennent du fournisseur lorsqu'ils existent; sinon Anatole peut les estimer par Black-Scholes à partir des prix observés. Données descriptives et parfois différées.",
+          "IV and Greeks come from the provider when available; otherwise Anatole may estimate them with Black-Scholes from observed prices. Descriptive and sometimes delayed data.",
         )}
       </Text>
     </Screen>
