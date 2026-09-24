@@ -13,6 +13,7 @@ import {
 } from "react";
 
 import styles from "./ProvinceSeriesExplorer.module.css";
+import { ProvinceSeriesInteractiveChart } from "./ProvinceSeriesInteractiveChart";
 import { pick } from "@/lib/i18n";
 import { resilientFetch } from "@/lib/resilient-fetch";
 
@@ -119,122 +120,6 @@ function cadence(
     );
   }
   return pick(language, "Mensuel", "Monthly");
-}
-
-function Chart({
-  series,
-  language,
-}: {
-  series: Snap;
-  language: Lang;
-}) {
-  if (series.history.length < 2) return null;
-
-  const allValues = [
-    ...series.history.map((point) => point.value),
-    ...series.forecasts.map((point) => point.value),
-  ];
-  const min = Math.min(...allValues);
-  const max = Math.max(...allValues);
-  const span = max - min || 1;
-  const width = 760;
-  const height = 220;
-  const plotHeight = 174;
-  const historyWidth = width * 0.72;
-
-  const historyCoordinates = series.history.map(
-    (point, index) => ({
-      x:
-        (index / (series.history.length - 1)) *
-        historyWidth,
-      y:
-        18 +
-        (1 - (point.value - min) / span) *
-          plotHeight,
-    }),
-  );
-
-  const last =
-    historyCoordinates[
-      historyCoordinates.length - 1
-    ];
-
-  const forecastCoordinates =
-    series.forecasts.map((point, index) => ({
-      x:
-        historyWidth +
-        ((index + 1) / series.forecasts.length) *
-          (width - historyWidth),
-      y:
-        18 +
-        (1 - (point.value - min) / span) *
-          plotHeight,
-    }));
-
-  return (
-    <div className={styles.chartWrap}>
-      <div className={styles.legend}>
-        {pick(
-          language,
-          "Historique",
-          "History",
-        )}{" "}
-        ·{" "}
-        {pick(
-          language,
-          "Projection Anatole",
-          "Anatole projection",
-        )}
-      </div>
-
-      <svg
-        className={styles.chart}
-        viewBox={`0 0 ${width} ${height}`}
-        role="img"
-        aria-label={`${series.metric_label} — ${series.province_name}`}
-      >
-        <polyline
-          points={historyCoordinates
-            .map(
-              (point) =>
-                `${point.x},${point.y}`,
-            )
-            .join(" ")}
-          className={styles.history}
-        />
-        {forecastCoordinates.length ? (
-          <polyline
-            points={[
-              `${last.x},${last.y}`,
-              ...forecastCoordinates.map(
-                (point) =>
-                  `${point.x},${point.y}`,
-              ),
-            ].join(" ")}
-            className={styles.forecast}
-          />
-        ) : null}
-      </svg>
-
-      <div className={styles.chartFoot}>
-        <span>{series.history[0].period}</span>
-        <strong>
-          {val(
-            series.history.at(-1)?.value ?? 0,
-            series.unit,
-            language,
-          )}
-        </strong>
-        <span>
-          {pick(
-            language,
-            "+5 ans",
-            "+5 years",
-          )}
-        </span>
-      </div>
-    </div>
-  );
 }
 
 export function ProvinceSeriesExplorer({
@@ -403,8 +288,8 @@ export function ProvinceSeriesExplorer({
           <p>
             {pick(
               language,
-              "Choisissez un indicateur pour voir cinq ans d’historique, les variations sur 1, 3 et 5 ans et une projection à 1, 3 et 5 ans.",
-              "Choose an indicator to see five years of history, 1/3/5-year changes and 1/3/5-year projections.",
+              "Choisissez un indicateur pour explorer cinq ans d’historique. Le graphique est zoomable et déplaçable, avec les années sur l’axe horizontal et les valeurs sur l’axe vertical.",
+              "Choose an indicator to explore five years of history. The chart supports zoom and pan, with time on the horizontal axis and values on the vertical axis.",
             )}
           </p>
         </div>
@@ -467,7 +352,7 @@ export function ProvinceSeriesExplorer({
             </a>
           </div>
 
-          <Chart
+          <ProvinceSeriesInteractiveChart
             series={series}
             language={language}
           />
