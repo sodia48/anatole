@@ -245,3 +245,56 @@ test("Anatole Conseil expose le plan vivant, le laboratoire et le lien Magasiner
   await expect(page).toHaveURL(/\/assistant\/magasiner\?category=mortgage/);
   await expect(page.getByTestId("shopping-question-province")).toBeVisible();
 });
+
+
+test("Anatole Conseil V3 bascule vers le cockpit, manipule la trajectoire et enregistre un scénario", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2030",
+        horizon_years: 4,
+        target_amount: 75000,
+        current_savings: 26000,
+        monthly_contribution: 650,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByText(/Ton plan, en un coup d’œil|Your plan at a glance/i)).toBeVisible();
+  await expect(page.getByTestId("advisor-primary-plan")).toContainText(/26.*000|26,000/i);
+
+  await page.getByTestId("advisor-tab-scenarios").click();
+  await expect(page.getByTestId("advisor-trajectory-chart")).toBeVisible();
+
+  const monthly = page.getByTestId("advisor-monthly-delta");
+  await monthly.fill("300");
+
+  const lab = page.getByTestId("advisor-scenario-lab");
+  await lab.getByPlaceholder(/Nom du scénario|Scenario name/i).fill("Accéléré");
+  await lab.getByRole("button", { name: /Enregistrer|Save/i }).click();
+  await expect(lab).toContainText("Accéléré");
+
+  await page.getByRole("button", { name: /Jumeau financier|Financial twin/i }).click();
+  const twin = page.getByTestId("advisor-financial-twin");
+  await expect(twin).toBeVisible();
+  await twin.getByLabel(/Revenu mensuel net|Net monthly income/i).fill("5200");
+  await expect(twin).toContainText(/Flux mensuel disponible|Available monthly flow/i);
+});
+
+test("Anatole Conseil V3 garde le questionnaire pour un nouveau profil", async ({ page }) => {
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(/Qu’est-ce que tu veux accomplir|What do you want to achieve/i)).toBeVisible();
+  await expect(page.getByRole("navigation", { name: /Étapes du plan|Plan steps/i })).toBeVisible();
+});
