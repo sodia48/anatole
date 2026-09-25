@@ -242,15 +242,6 @@ const EMPTY_FINANCIAL_OS: FinancialOsState = {
   forecastMonths: 24,
 };
 
-const EMPTY_STATE: WorkspaceState = {
-  twin: EMPTY_TWIN,
-  events: [],
-  calendar: [],
-  history: [],
-  goals: [],
-  financialOs: EMPTY_FINANCIAL_OS,
-};
-
 function rawWorkspace(): Record<string, unknown> {
   if (typeof window === "undefined") return {};
   try {
@@ -661,51 +652,79 @@ export function AdvisorV4Layer({
 
   const forecast = useMemo(() => {
     const months = os.forecastMonths;
-    const startCash =
-      household.cash ??
-      profile.liquid_reserve ??
-      0;
-    let balance = startCash;
+    const startCash = household.cash ?? profile.liquid_reserve ?? 0;
+
     return Array.from({ length: months + 1 }, (_, index) => {
-      if (index === 0) return balance;
-      let monthly = baseMonthlyMargin ?? 0;
+      if (index === 0) return startCash;
 
-      for (const event of os.events) {
-        if (index === event.monthOffset) {
-          balance -= nonNegative(event.oneTimeCost);
-        }
-        if (index >= event.monthOffset) {
-          monthly += finite(event.monthlyIncomeDelta);
-          monthly -= nonNegative(event.recurringMonthlyCost);
-        }
-      }
+      const recurringCashFlow = Array.from(
+        { length: index },
+        (_, monthOffset) => monthOffset + 1,
+      ).reduce((total, monthIndex) => {
+        const eventMonthly = os.events.reduce(
+          (sum, event) =>
+            monthIndex >= event.monthOffset
+              ? sum +
+                finite(event.monthlyIncomeDelta) -
+                nonNegative(event.recurringMonthlyCost)
+              : sum,
+          0,
+        );
+        const legacyMonthly = state.events.reduce(
+          (sum, event) =>
+            monthIndex >= event.monthOffset
+              ? sum - nonNegative(event.recurringMonthly)
+              : sum,
+          0,
+        );
+        const decisionMonthly =
+          monthIndex >= os.decision.startMonth
+            ? finite(os.decision.monthlyIncomeDelta) -
+              nonNegative(os.decision.monthlyCost)
+            : 0;
 
-      for (const legacyEvent of state.events) {
-        if (index === legacyEvent.monthOffset) {
-          balance -= nonNegative(legacyEvent.amount);
-        }
-        if (index >= legacyEvent.monthOffset) {
-          monthly -= nonNegative(legacyEvent.recurringMonthly);
-        }
-      }
+        return (
+          total +
+          (baseMonthlyMargin ?? 0) +
+          eventMonthly +
+          legacyMonthly +
+          decisionMonthly
+        );
+      }, 0);
 
-      for (const item of state.calendar) {
+      const eventOneTime = os.events.reduce(
+        (sum, event) =>
+          event.monthOffset > 0 && event.monthOffset <= index
+            ? sum + nonNegative(event.oneTimeCost)
+            : sum,
+        0,
+      );
+      const legacyOneTime = state.events.reduce(
+        (sum, event) =>
+          event.monthOffset > 0 && event.monthOffset <= index
+            ? sum + nonNegative(event.amount)
+            : sum,
+        0,
+      );
+      const calendarOneTime = state.calendar.reduce((sum, item) => {
         const offset = monthsUntilDate(item.date);
-        if (offset != null && index === offset) {
-          balance -= nonNegative(item.amount);
-        }
-      }
+        return offset != null && offset > 0 && offset <= index
+          ? sum + nonNegative(item.amount)
+          : sum;
+      }, 0);
+      const decisionOneTime =
+        os.decision.startMonth > 0 && os.decision.startMonth <= index
+          ? nonNegative(os.decision.oneTimeCost)
+          : 0;
 
-      if (index === os.decision.startMonth) {
-        balance -= nonNegative(os.decision.oneTimeCost);
-      }
-      if (index >= os.decision.startMonth) {
-        monthly += finite(os.decision.monthlyIncomeDelta);
-        monthly -= nonNegative(os.decision.monthlyCost);
-      }
-
-      balance += monthly;
-      return balance;
+      return (
+        startCash +
+        recurringCashFlow -
+        eventOneTime -
+        legacyOneTime -
+        calendarOneTime -
+        decisionOneTime
+      );
     });
   }, [
     baseMonthlyMargin,
