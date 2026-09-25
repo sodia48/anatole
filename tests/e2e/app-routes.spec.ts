@@ -426,3 +426,42 @@ test("Anatole Conseil adapte l'échelle de trajectoire quand la cible est très 
     /Cible réelle|Actual target/i,
   );
 });
+
+test("Anatole Conseil ne trace plus une cible hors échelle comme un faux plafond", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Objectif long terme",
+        horizon_years: 30,
+        target_amount: 500000,
+        current_savings: 200000,
+        monthly_contribution: 0,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-tab-scenarios").click();
+
+  await expect(page.getByTestId("advisor-target-offscale")).toBeVisible();
+  await expect(page.getByTestId("advisor-target-path")).toHaveCount(0);
+
+  const yAxis = page.getByTestId("advisor-trajectory-y-axis");
+  await expect(yAxis.locator("span")).toHaveCount(5);
+  await expect(yAxis).not.toContainText(/500\s*000/);
+
+  const overflow = await page
+    .getByTestId("advisor-trajectory-svg")
+    .evaluate((element) => getComputedStyle(element).overflow);
+  expect(overflow).toBe("hidden");
+});

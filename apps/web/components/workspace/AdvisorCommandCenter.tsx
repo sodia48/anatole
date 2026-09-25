@@ -397,20 +397,24 @@ function adaptiveFocus(
   };
 }
 
-function pathFor(
+function pathForRange(
   values: number[],
   width: number,
   height: number,
+  minValue: number,
   maxValue: number,
 ): string {
   if (!values.length) return "";
+  const span = Math.max(1, maxValue - minValue);
+
   return values
     .map((value, index) => {
       const x =
         values.length === 1
           ? 0
           : (index / (values.length - 1)) * width;
-      const y = height - (Math.max(0, value) / maxValue) * height;
+      const clamped = Math.max(minValue, Math.min(maxValue, value));
+      const y = height - ((clamped - minValue) / span) * height;
       return `${index === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`;
     })
     .join(" ");
@@ -456,32 +460,40 @@ function TrajectoryChart({
     return target * (1 + inflation / 100) ** years;
   });
 
-  const trajectoryPeak = Math.max(
-    1,
-    currentSavings,
-    ...baselineValues,
-    ...scenarioValues,
-  );
+  const trajectoryValues = [...baselineValues, ...scenarioValues];
+  const trajectoryMin = Math.min(currentSavings, ...trajectoryValues);
+  const trajectoryPeak = Math.max(1, currentSavings, ...trajectoryValues);
   const targetPeak = Math.max(0, ...targetValues);
-  const targetOffScale =
-    targetPeak > 0 && targetPeak > trajectoryPeak * 2.25;
-
-  const niceScaleMax = (value: number): number => {
-    const safeValue = Math.max(1, value);
-    const exponent = 10 ** Math.floor(Math.log10(safeValue));
-    const fraction = safeValue / exponent;
-    const steps = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
-    const step = steps.find((candidate) => candidate >= fraction) ?? 10;
-    return step * exponent;
-  };
-
-  const maxValue = niceScaleMax(
-    targetOffScale
-      ? trajectoryPeak * 1.18
-      : Math.max(trajectoryPeak, targetPeak) * 1.08,
+  const trajectorySpan = Math.max(1, trajectoryPeak - trajectoryMin);
+  const offScaleThreshold = Math.max(
+    trajectoryPeak * 1.75,
+    trajectoryPeak + trajectorySpan * 1.25,
   );
-  const plottedTargetValues = targetValues.map((value) =>
-    Math.min(value, maxValue),
+  const targetOffScale = targetPeak > 0 && targetPeak > offScaleThreshold;
+
+  const visibleValues = targetOffScale
+    ? trajectoryValues
+    : [...trajectoryValues, ...targetValues];
+  const rawMin = Math.min(...visibleValues);
+  const rawMax = Math.max(1, ...visibleValues);
+  const rawSpan = Math.max(1, rawMax - rawMin);
+  const padding =
+    rawSpan <= Math.max(1, Math.abs(rawMax)) * 0.08
+      ? Math.max(1_000, Math.abs(rawMax) * 0.08)
+      : rawSpan * 0.08;
+  const includeZero =
+    rawMin <= 0 ||
+    rawMin <= Math.max(1, rawMax) * 0.15;
+
+  const minValue = includeZero
+    ? 0
+    : Math.max(0, rawMin - padding);
+  const maxValue = Math.max(
+    minValue + 1,
+    rawMax + padding,
+  );
+  const yTicks = Array.from({ length: 5 }, (_, index) =>
+    maxValue - ((maxValue - minValue) * index) / 4,
   );
 
   const width = 760;
@@ -515,9 +527,15 @@ function TrajectoryChart({
     hoverIndex == null
       ? width
       : (hoverIndex / Math.max(1, monthPoints.length - 1)) * width;
+  const hoverScenario = Math.max(
+    minValue,
+    Math.min(maxValue, activeScenario),
+  );
   const hoverScenarioY =
     height -
-    (Math.min(activeScenario, maxValue) / Math.max(1, maxValue)) * height;
+    ((hoverScenario - minValue) /
+      Math.max(1, maxValue - minValue)) *
+      height;
 
   return (
     <div className={styles.chartShell} data-testid="advisor-trajectory-chart">
@@ -530,16 +548,22 @@ function TrajectoryChart({
           <i className={styles.legendScenario} />
           {pick(language, "Scénario", "Scenario")}
         </span>
-        <span>
-          <i className={styles.legendTarget} />
-          {pick(language, "Cible", "Target")}
-        </span>
+        {!targetOffScale ? (
+          <span>
+            <i className={styles.legendTarget} />
+            {pick(language, "Cible", "Target")}
+          </span>
+        ) : null}
         {targetOffScale ? (
-          <span data-testid="advisor-target-offscale">
+          <span
+            className={styles.offScaleLegend}
+            data-testid="advisor-target-offscale"
+          >
+            ↑{" "}
             {pick(
               language,
-              `Cible hors échelle (${formatMoney(targetPeak, currency, language)})`,
-              `Target off scale (${formatMoney(targetPeak, currency, language)})`,
+              `Cible ${formatMoney(targetPeak, currency, language)} hors échelle — non tracée`,
+              `Target ${formatMoney(targetPeak, currency, language)} off scale — not plotted`,
             )}
           </span>
         ) : null}
@@ -547,13 +571,14 @@ function TrajectoryChart({
 
       <div className={styles.chartCanvas}>
         <div className={styles.yAxis} data-testid="advisor-trajectory-y-axis">
-          <span>{formatMoney(maxValue, currency, language)}</span>
-          <span>{formatMoney(maxValue * 0.75, currency, language)}</span>
-          <span>{formatMoney(maxValue * 0.5, currency, language)}</span>
-          <span>{formatMoney(maxValue * 0.25, currency, language)}</span>
-          <span>0</span>
+          {yTicks.map((value, index) => (
+            <span key={`${index}-${value.toFixed(2)}`}>
+              {formatMoney(value, currency, language)}
+            </span>
+          ))}
         </div>
         <svg
+          data-testid="advisor-trajectory-svg"
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={pick(
@@ -581,16 +606,37 @@ function TrajectoryChart({
               className={styles.gridLine}
             />
           ))}
+          {!targetOffScale ? (
+            <path
+              data-testid="advisor-target-path"
+              d={pathForRange(
+                targetValues,
+                width,
+                height,
+                minValue,
+                maxValue,
+              )}
+              className={styles.targetPath}
+            />
+          ) : null}
           <path
-            d={pathFor(plottedTargetValues, width, height, maxValue)}
-            className={styles.targetPath}
-          />
-          <path
-            d={pathFor(baselineValues, width, height, maxValue)}
+            d={pathForRange(
+              baselineValues,
+              width,
+              height,
+              minValue,
+              maxValue,
+            )}
             className={styles.baselinePath}
           />
           <path
-            d={pathFor(scenarioValues, width, height, maxValue)}
+            d={pathForRange(
+              scenarioValues,
+              width,
+              height,
+              minValue,
+              maxValue,
+            )}
             className={styles.scenarioPath}
           />
           {hoverMonth != null ? (
