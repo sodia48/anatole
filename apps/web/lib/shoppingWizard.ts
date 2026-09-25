@@ -2,7 +2,6 @@ import {
   DEFAULT_SHOPPING_PROFILE,
   SHOPPING_SOURCES,
   type ShoppingCategoryId,
-  type ShoppingPriority,
   type ShoppingProfile,
 } from "@/lib/shopping";
 
@@ -158,6 +157,37 @@ const QUESTIONS: Record<ShoppingCategoryId, ShoppingQuestion[]> = {
         { value: "travel", labelFr: "Voyage et points", labelEn: "Travel and points" },
         { value: "low_fee", labelFr: "Le moins de frais possible", labelEn: "Lowest fees possible" },
         { value: "insurance", labelFr: "Assurances et avantages", labelEn: "Insurance and perks" },
+      ],
+    },
+    {
+      id: "spend_focus",
+      type: "choice",
+      promptFr: "Où dépenses-tu le plus avec ta carte ?",
+      promptEn: "Where do you spend the most on your card?",
+      helperFr: "Anatole utilise cette réponse pour faire remonter les cartes qui bonifient réellement tes dépenses dominantes.",
+      helperEn: "Anatole uses this to surface cards that actually reward your dominant spending category.",
+      options: [
+        { value: "grocery", labelFr: "Épicerie", labelEn: "Groceries" },
+        { value: "dining", labelFr: "Restaurants / livraison", labelEn: "Dining / delivery" },
+        { value: "gas", labelFr: "Essence / recharge", labelEn: "Gas / EV charging" },
+        { value: "transit", labelFr: "Transport / déplacements", labelEn: "Transit / commuting" },
+        { value: "bills", labelFr: "Factures récurrentes", labelEn: "Recurring bills" },
+        { value: "travel", labelFr: "Voyage", labelEn: "Travel" },
+        { value: "everyday", labelFr: "Un peu de tout", labelEn: "A bit of everything" },
+      ],
+    },
+    {
+      id: "ecosystem",
+      type: "choice",
+      promptFr: "Utilises-tu déjà beaucoup l’un de ces écosystèmes ?",
+      promptEn: "Do you already use one of these ecosystems heavily?",
+      helperFr: "Certaines cartes prennent beaucoup plus de valeur si tu utilises déjà leurs partenaires.",
+      helperEn: "Some cards become much more valuable when you already use their partner ecosystem.",
+      options: [
+        { value: "rogers", labelFr: "Rogers / Fido / Shaw / Comwave", labelEn: "Rogers / Fido / Shaw / Comwave" },
+        { value: "pc", labelFr: "PC Optimum / Loblaw / Pharmaprix", labelEn: "PC Optimum / Loblaw / Shoppers" },
+        { value: "scene", labelFr: "Scene+ / Sobeys / IGA / Cineplex", labelEn: "Scene+ / Sobeys / IGA / Cineplex" },
+        { value: "none", labelFr: "Aucun en particulier", labelEn: "None in particular" },
       ],
     },
     {

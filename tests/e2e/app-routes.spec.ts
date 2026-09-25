@@ -101,3 +101,96 @@ test("Anatole Magasiner garde le bouton Continuer visible", async ({ page }) => 
     page.getByText(/combien dépenses-tu par mois|how much do you spend on a card each month/i),
   ).toBeVisible();
 });
+
+
+test("Anatole Magasiner affiche des produits reels apres le questionnaire carte", async ({ page }) => {
+  await page.goto("/assistant/magasiner", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", {
+    name: /Cartes de crédit|Credit cards/i,
+  }).click();
+
+  const next = async () => {
+    const button = page.getByTestId("shopping-continue");
+    await expect(button).toBeVisible();
+    await expect(button).toBeEnabled();
+    await button.click();
+  };
+
+  await page.getByTestId("shopping-question-province").getByRole("combobox").selectOption("QC");
+  await next();
+  await page.getByTestId("shopping-question-monthly_spend").getByRole("spinbutton").fill("2000");
+  await next();
+  await page.getByTestId("shopping-question-balance_behavior").getByRole("button", {
+    name: /Ça m’arrive de reporter un solde|I sometimes carry a balance/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-carried_balance").getByRole("spinbutton").fill("500");
+  await next();
+  await page.getByTestId("shopping-question-reward_goal").getByRole("button", {
+    name: /Assurances et avantages|Insurance and perks/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-spend_focus").getByRole("button", {
+    name: /Épicerie|Groceries/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-ecosystem").getByRole("button", {
+    name: /Aucun en particulier|None in particular/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-fee_comfort").getByRole("button", {
+    name: /Plus si les avantages valent la peine|More if the perks are worth it/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-travel_frequency").getByRole("button", {
+    name: /Rarement|Rarely/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-income_band").getByRole("button", {
+    name: /Moins de 60 000|Under \$60,000/i,
+  }).click();
+  await next();
+
+  const grid = page.getByTestId("shopping-product-grid-credit_card");
+  await expect(grid).toBeVisible();
+  await expect(grid).toContainText(/RBC|TD|CIBC|Desjardins|Tangerine|MBNA/i);
+});
+
+test("Anatole Magasiner affiche des comptes bancaires reels apres le questionnaire", async ({ page }) => {
+  await page.goto("/assistant/magasiner", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: /Bancaire|Banking/i }).click();
+
+  const next = async () => {
+    const button = page.getByTestId("shopping-continue");
+    await expect(button).toBeEnabled();
+    await button.click();
+  };
+
+  await page.getByTestId("shopping-question-province").getByRole("combobox").selectOption("QC");
+  await next();
+  await page.getByTestId("shopping-question-banking_goal").getByRole("button", {
+    name: /Compte de tous les jours|Everyday account/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-monthly_transactions").getByRole("spinbutton").fill("30");
+  await next();
+  await page.getByTestId("shopping-question-average_balance").getByRole("spinbutton").fill("2000");
+  await next();
+  await page.getByTestId("shopping-question-branch_need").getByRole("button", {
+    name: /Non|No/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-fee_tolerance").getByRole("button", {
+    name: /Je veux 0|I want \$0/i,
+  }).click();
+  await next();
+  await page.getByTestId("shopping-question-special_status").getByRole("button", {
+    name: /Aucun|None/i,
+  }).click();
+  await next();
+
+  const grid = page.getByTestId("shopping-product-grid-banking");
+  await expect(grid).toBeVisible();
+  await expect(grid).toContainText(/Tangerine|Simplii|TD|Scotiabank|BMO|Desjardins/i);
+});
