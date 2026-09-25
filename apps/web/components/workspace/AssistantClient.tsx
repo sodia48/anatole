@@ -377,7 +377,6 @@ export function AssistantClient() {
     try {
       const snapshot = await getAdvisorPlan(profile, portfolio);
       setPlan(snapshot);
-      setJourneyMode(false);
     } catch {
       setPlanError(
         pick(language, "Le plan est temporairement indisponible.", "The plan is temporarily unavailable."),
