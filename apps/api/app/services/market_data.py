@@ -71,7 +71,26 @@ class DemoProvider:
             if interval == "1mo"
             else timedelta(days=1)
         )
-        current = datetime.now(UTC) - step * count
+        # Anchor demo candles to the interval boundary instead of using a
+        # separate datetime.now() value for every symbol. Comparisons load
+        # several demo histories concurrently; crossing a second boundary used
+        # to shift otherwise identical time axes by one second and made the
+        # compare endpoint nondeterministic.
+        now = datetime.now(UTC)
+        if intraday:
+            bucket_seconds = intraday_minutes[interval] * 60
+            anchor_timestamp = (
+                int(now.timestamp()) // bucket_seconds
+            ) * bucket_seconds
+            anchor = datetime.fromtimestamp(anchor_timestamp, UTC)
+        else:
+            anchor = now.replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+        current = anchor - step * count
         price = 45 + self._seed(symbol) % 120
         output: list[Candle] = []
 
