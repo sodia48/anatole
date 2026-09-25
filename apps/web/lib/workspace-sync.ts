@@ -26,6 +26,7 @@ export type SyncedWorkspaceData = {
   alerts: AlertRule[];
   preferences: SyncedPreferences;
   advisor_profile: AdvisorProfile | null;
+  advisor_workspace: Record<string, unknown>;
   cockpit_universe: "tsx60" | "composite" | "tsxv";
   comparator_symbols: string[];
   focus_layouts: FocusLayout[];
@@ -44,6 +45,7 @@ const KEYS = {
   alerts: "anatole:alerts:v1",
   preferences: "anatole.preferences.v0.4",
   advisor_profile: "anatole:advisor-profile:v1",
+  advisor_workspace: "anatole:advisor-workspace:v4",
   cockpit_universe: "anatole-cockpit-universe",
   comparator_symbols: "anatole:comparison-symbols:v1",
   focus_layouts: "anatole:focus-layouts:v1",
@@ -251,6 +253,7 @@ export function emptyWorkspace(): SyncedWorkspaceData {
     alerts: [],
     preferences: DEFAULT_PREFERENCES,
     advisor_profile: null,
+    advisor_workspace: {},
     cockpit_universe: "tsx60",
     comparator_symbols: [],
     focus_layouts: [],
@@ -284,6 +287,7 @@ export function readLocalWorkspace(): LocalWorkspaceSnapshot {
       alerts: alerts(parseJson(raw.alerts, [])),
       preferences: preferences(parseJson(raw.preferences, DEFAULT_PREFERENCES)),
       advisor_profile: parseJson<AdvisorProfile | null>(raw.advisor_profile, null),
+      advisor_workspace: parseJson<Record<string, unknown>>(raw.advisor_workspace, {}),
       cockpit_universe: universe,
       comparator_symbols: symbols(parseJson(raw.comparator_symbols, []), 5),
       focus_layouts: focusLayouts(parseJson(raw.focus_layouts, [])),
@@ -333,6 +337,9 @@ export function mergeWorkspace(
     advisor_profile: local.present.advisor_profile
       ? local.data.advisor_profile
       : remote.advisor_profile,
+    advisor_workspace: local.present.advisor_workspace
+      ? local.data.advisor_workspace
+      : remote.advisor_workspace ?? {},
     cockpit_universe: local.present.cockpit_universe
       ? local.data.cockpit_universe
       : remote.cockpit_universe,
@@ -381,6 +388,7 @@ export function writeLocalWorkspace(data: SyncedWorkspaceData): void {
   } else {
     window.localStorage.removeItem(KEYS.advisor_profile);
   }
+  window.localStorage.setItem(KEYS.advisor_workspace, JSON.stringify(data.advisor_workspace ?? {}));
   window.localStorage.setItem(KEYS.cockpit_universe, data.cockpit_universe);
   window.localStorage.setItem(KEYS.comparator_symbols, JSON.stringify(data.comparator_symbols));
   window.localStorage.setItem(KEYS.focus_layouts, JSON.stringify((data.focus_layouts ?? []).slice(0, 10)));
