@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { pick } from "@/lib/i18n";
 import {
@@ -124,10 +124,10 @@ export function ShoppingProductRecommendations({
 
   const filters = FILTERS[category];
   const active = filters.find((item) => item.id === filter);
-  const filtered = useMemo(() => {
-    if (!active?.tag) return matches;
-    return matches.filter((item) => item.product.tags.includes(active.tag as string));
-  }, [active?.tag, matches]);
+  const activeTag = active?.tag;
+  const filtered = activeTag
+    ? matches.filter((item) => item.product.tags.includes(activeTag))
+    : matches;
   const visible = showAll ? filtered : filtered.slice(0, 9);
   const compared = compareIds
     .map((id) => matches.find((item) => item.product.name === id))

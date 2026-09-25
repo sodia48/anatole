@@ -2,7 +2,6 @@ import {
   DEFAULT_SHOPPING_PROFILE,
   SHOPPING_SOURCES,
   type ShoppingCategoryId,
-  type ShoppingPriority,
   type ShoppingProfile,
 } from "@/lib/shopping";
 
