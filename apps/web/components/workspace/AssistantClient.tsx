@@ -38,6 +38,7 @@ import type {
 } from "@/lib/types";
 
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
+import { AdvisorCommandCenter } from "@/components/workspace/AdvisorCommandCenter";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
@@ -195,12 +196,6 @@ function formatMoney(value: number | null, currency: string, language: AnatoleLa
   }).format(value);
 }
 
-function scoreLabel(score: number, language: AnatoleLanguage): string {
-  if (score >= 75) return pick(language, "Base solide", "Solid foundation");
-  if (score >= 50) return pick(language, "Plan en construction", "Plan in progress");
-  return pick(language, "Bases à renforcer", "Foundation to strengthen");
-}
-
 function capacityLabel(value: AdvisorPlan["capacity_profile"] | undefined, language: AnatoleLanguage): string {
   if (value === "Dynamique") return pick(language, "Bonne marge face aux variations", "Strong capacity for fluctuations");
   if (value === "Équilibrée") return pick(language, "Marge moyenne face aux variations", "Moderate capacity for fluctuations");
@@ -325,23 +320,29 @@ export function AssistantClient() {
     });
   }, [messages, loading]);
 
-  const profileProgress = useMemo(() => {
-    const fields = [
-      profile.goal_type,
-      profile.horizon_years,
-      profile.target_amount,
-      profile.current_savings,
-      profile.monthly_contribution,
-      profile.essential_monthly_expenses,
-      profile.liquid_reserve,
-      profile.high_interest_debt,
-      profile.income_stability,
-      profile.liquidity_need,
-      profile.loss_comfort,
-    ];
-    const completed = fields.filter((value) => value !== null).length;
-    return Math.round((completed / fields.length) * 100);
-  }, [profile]);
+  const requiresMarketRisk =
+    profile.goal_type === "retirement" ||
+    profile.goal_type === "wealth" ||
+    (profile.horizon_years ?? 0) >= 5;
+
+  const adaptiveProgressFields = [
+    profile.goal_type,
+    profile.horizon_years,
+    profile.target_amount,
+    profile.current_savings,
+    profile.monthly_contribution,
+    profile.essential_monthly_expenses,
+    profile.liquid_reserve,
+    profile.high_interest_debt,
+    profile.income_stability,
+    profile.liquidity_need,
+    ...(requiresMarketRisk ? [profile.loss_comfort] : []),
+  ];
+  const profileProgress = Math.round(
+    (adaptiveProgressFields.filter((value) => value !== null).length /
+      adaptiveProgressFields.length) *
+      100,
+  );
 
   const goalLabel = useMemo(
     () => advisorText(GOALS.find((item) => item.value === profile.goal_type)?.label ?? "Objectif non défini", language),
@@ -446,10 +447,14 @@ export function AssistantClient() {
     <main className={styles.page}>
       <section className={`panel ${styles.guideHero}`}>
         <div>
-          <span className="eyebrow">ANATOLE {pick(language, "CONSEIL · PARCOURS GUIDÉ", "ADVICE · GUIDED JOURNEY")}</span>
-          <h1>{pick(language, "Construis ton plan en 4 étapes", "Build your plan in 4 steps")}</h1>
+          <span className="eyebrow">ANATOLE {pick(language, "CONSEIL · PLAN VIVANT", "ADVICE · LIVING PLAN")}</span>
+          <h1>{pick(language, "Ton plan financier, vivant.", "Your living financial plan.")}</h1>
           <p>
-            {pick(language, "Tu définis ton objectif, ta marge financière et ton confort face au risque. Anatole organise les informations et teste des scénarios, sans te dire quoi acheter ou vendre.", "Define your goal, financial capacity, and comfort with risk. Anatole organizes the information and tests scenarios without telling you what to buy or sell.")}
+            {pick(
+              language,
+              "Un diagnostic adaptatif, des scénarios manipulables et une timeline qui évoluent pendant que tu précises ta situation.",
+              "An adaptive diagnostic, interactive scenarios and a timeline that evolve as you clarify your situation.",
+            )}
           </p>
           <div className={styles.guideHeroActions}>
             <Link href="/assistant/magasiner" className={styles.primaryButton}>
@@ -462,9 +467,9 @@ export function AssistantClient() {
           </div>
         </div>
         <div className={styles.guideHeroStatus}>
-          <strong>{step}/4</strong>
-          <span>{advisorText(STEPS[step - 1].label, language)}</span>
-          <small>{profileProgress}% {pick(language, "du profil rempli", "of profile completed")}</small>
+          <strong>{profileProgress}%</strong>
+          <span>{pick(language, "profil utile", "useful profile")}</span>
+          <small>{advisorText(STEPS[step - 1].label, language)}</small>
         </div>
       </section>
 
@@ -502,6 +507,16 @@ export function AssistantClient() {
           );
         })}
       </nav>
+
+      <AdvisorCommandCenter
+        profile={profile}
+        plan={plan}
+        profileProgress={profileProgress}
+        goalLabel={goalLabel}
+        language={language}
+        step={step}
+        portfolioCount={portfolio.length}
+      />
 
       <div className={styles.guideShell}>
         <section className={`panel ${styles.guidePanel}`} id="profil">
@@ -720,25 +735,50 @@ export function AssistantClient() {
                 </div>
               </div>
 
-              <div className={styles.questionBlock}>
-                <div>
-                  <strong>{pick(language, "Comment vivrais-tu une baisse temporaire de 20 % ?", "How would you experience a temporary 20% decline?")}</strong>
-                  <span>{pick(language, "Cette question mesure ton confort déclaré, pas ta capacité financière réelle.", "This question measures stated comfort, not actual financial capacity.")}</span>
+              {requiresMarketRisk ? (
+                <div className={styles.questionBlock}>
+                  <div>
+                    <strong>{pick(language, "Comment vivrais-tu une baisse temporaire de 20 % ?", "How would you experience a temporary 20% decline?")}</strong>
+                    <span>{pick(language, "Cette question mesure ton confort déclaré, pas ta capacité financière réelle.", "This question measures stated comfort, not actual financial capacity.")}</span>
+                  </div>
+                  <div className={styles.choiceGridCompact}>
+                    {LOSS_CHOICES.map((choice) => (
+                      <button
+                        type="button"
+                        key={choice.value}
+                        className={`${styles.choiceCard} ${profile.loss_comfort === choice.value ? styles.choiceCardActive : ""}`}
+                        onClick={() => updateProfile("loss_comfort", choice.value)}
+                      >
+                        <strong>{advisorText(choice.label, language)}</strong>
+                        <span>{advisorText(choice.detail, language)}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className={styles.choiceGridCompact}>
-                  {LOSS_CHOICES.map((choice) => (
-                    <button
-                      type="button"
-                      key={choice.value}
-                      className={`${styles.choiceCard} ${profile.loss_comfort === choice.value ? styles.choiceCardActive : ""}`}
-                      onClick={() => updateProfile("loss_comfort", choice.value)}
-                    >
-                      <strong>{advisorText(choice.label, language)}</strong>
-                      <span>{advisorText(choice.detail, language)}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              ) : (
+                <details className={styles.resultDetails}>
+                  <summary>{pick(language, "Question optionnelle · confort face aux variations de marché", "Optional question · comfort with market fluctuations")}</summary>
+                  <div className={styles.questionBlock}>
+                    <div>
+                      <strong>{pick(language, "Si une partie de cet argent variait temporairement de 20 %, comment le vivrais-tu ?", "If part of this money temporarily fluctuated by 20%, how would you feel?")}</strong>
+                      <span>{pick(language, "Pour cet objectif et cet horizon, Anatole privilégie d’abord la liquidité. Cette réponse reste disponible si elle est pertinente pour toi.", "For this goal and horizon, Anatole prioritizes liquidity first. This question remains available if relevant to you.")}</span>
+                    </div>
+                    <div className={styles.choiceGridCompact}>
+                      {LOSS_CHOICES.map((choice) => (
+                        <button
+                          type="button"
+                          key={choice.value}
+                          className={`${styles.choiceCard} ${profile.loss_comfort === choice.value ? styles.choiceCardActive : ""}`}
+                          onClick={() => updateProfile("loss_comfort", choice.value)}
+                        >
+                          <strong>{advisorText(choice.label, language)}</strong>
+                          <span>{advisorText(choice.detail, language)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </details>
+              )}
 
               <div className={styles.questionBlock}>
                 <div>
@@ -794,13 +834,18 @@ export function AssistantClient() {
                 <>
                   <section className={styles.resultIntro}>
                     <div className={styles.resultScore}>
-                      <strong>{Math.round(plan.readiness_score)}</strong>
-                      <span>/100</span>
+                      <Sparkles size={28} />
                     </div>
                     <div>
-                      <span className="eyebrow">{pick(language, "SCORE DE PRÉPARATION", "READINESS SCORE")}</span>
-                      <h3>{scoreLabel(plan.readiness_score, language)}</h3>
-                      <p>{language === "fr" ? plan.summary : `Your profile is ${plan.profile_completeness}% complete and the readiness score is ${plan.readiness_score.toFixed(0)}/100. The scenarios are illustrative, do not predict returns, and do not recommend any investment.`}</p>
+                      <span className="eyebrow">{pick(language, "SYNTHÈSE DU PLAN", "PLAN SUMMARY")}</span>
+                      <h3>{pick(language, "Ce que les données montrent maintenant", "What the data shows now")}</h3>
+                      <p>
+                        {pick(
+                          language,
+                          `Le profil de calcul est rempli à ${Math.round(plan.profile_completeness)} %. Anatole détaille séparément la liquidité, la capacité, la dette, la progression et les scénarios plutôt que de réduire le plan à une note unique.`,
+                          `The calculation profile is ${Math.round(plan.profile_completeness)}% complete. Anatole separates liquidity, capacity, debt, progress and scenarios rather than reducing the plan to one score.`,
+                        )}
+                      </p>
                     </div>
                   </section>
 
@@ -822,8 +867,8 @@ export function AssistantClient() {
                     </article>
                     <article>
                       <span>{pick(language, "Portefeuille", "Portfolio")}</span>
-                      <strong>{plan.portfolio_score !== null ? `${Math.round(plan.portfolio_score)}/100` : pick(language, "Non connecté", "Not connected")}</strong>
-                      <small>{riskLevelLabel(plan.portfolio_risk_level, language) ?? pick(language, `${portfolio.length} position${portfolio.length > 1 ? "s" : ""} locale${portfolio.length > 1 ? "s" : ""}`, `${portfolio.length} local position${portfolio.length === 1 ? "" : "s"}`)}</small>
+                      <strong>{riskLevelLabel(plan.portfolio_risk_level, language) ?? pick(language, "Non connecté", "Not connected")}</strong>
+                      <small>{pick(language, `${portfolio.length} position${portfolio.length > 1 ? "s" : ""} reliée${portfolio.length > 1 ? "s" : ""}`, `${portfolio.length} linked position${portfolio.length === 1 ? "" : "s"}`)}</small>
                     </article>
                   </div>
 
@@ -1040,14 +1085,6 @@ export function AssistantClient() {
             {step === 2 ? <p>{pick(language, "Tu indiques les ressources et les contraintes réelles. Cela évite de construire un plan qui utiliserait de l’argent nécessaire à court terme.", "Enter real resources and constraints. This avoids building a plan that uses money needed in the short term.")}</p> : null}
             {step === 3 ? <p>{pick(language, "Tu décris ta réaction probable face aux variations. Le plan doit être financièrement possible et émotionnellement supportable.", "Describe your likely reaction to fluctuations. The plan should be financially possible and emotionally sustainable.")}</p> : null}
             {step === 4 ? <p>{pick(language, "Tu lis d’abord les prochaines étapes, puis les scénarios. Les détails techniques restent disponibles sans encombrer l’écran.", "Review the next steps first, then the scenarios. Technical details remain available without cluttering the screen.")}</p> : null}
-          </section>
-
-          <section className={`panel ${styles.helpCard}`}>
-            <span className="eyebrow">{pick(language, "RÉSUMÉ ACTUEL", "CURRENT SUMMARY")}</span>
-            <div className={styles.contextRow}><span>{pick(language, "Objectif", "Goal")}</span><strong>{goalLabel}</strong></div>
-            <div className={styles.contextRow}><span>{pick(language, "Montant visé", "Target amount")}</span><strong>{formatMoney(profile.target_amount, profile.currency, language)}</strong></div>
-            <div className={styles.contextRow}><span>Horizon</span><strong>{profile.horizon_years ? pick(language, `${profile.horizon_years} an${profile.horizon_years > 1 ? "s" : ""}`, `${profile.horizon_years} year${profile.horizon_years === 1 ? "" : "s"}`) : pick(language, "Non défini", "Not defined")}</strong></div>
-            <div className={styles.contextRow}><span>{pick(language, "Profil rempli", "Profile completed")}</span><strong>{profileProgress} %</strong></div>
           </section>
 
           <section className={`panel ${styles.helpCard}`}>

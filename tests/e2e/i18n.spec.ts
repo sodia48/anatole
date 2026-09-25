@@ -17,7 +17,7 @@ const ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["/portefeuille", /^Portfolio$/],
   ["/alertes", /^Alerts$/],
   ["/notifications", /Sign in to view your notifications/],
-  ["/assistant", /Build your plan in 4 steps/],
+  ["/assistant", /Your living financial plan\./],
   ["/compte", /Account & settings/],
   ["/parametres", /Account & settings/],
   ["/qualite", /Data & reliability/],

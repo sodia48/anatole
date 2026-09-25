@@ -194,3 +194,54 @@ test("Anatole Magasiner affiche des comptes bancaires reels apres le questionnai
   await expect(grid).toBeVisible();
   await expect(grid).toContainText(/Tangerine|Simplii|TD|Scotiabank|BMO|Desjardins/i);
 });
+
+
+test("Anatole Conseil expose le plan vivant, le laboratoire et le lien Magasiner contextuel", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Première propriété",
+        horizon_years: 4,
+        target_amount: 75000,
+        current_savings: 26000,
+        monthly_contribution: 650,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  const command = page.getByTestId("advisor-command-center");
+  await expect(command).toBeVisible();
+  await expect(command).toContainText(/Ton plan se met à jour|Your plan updates/i);
+  await expect(command).toContainText(/Parcours propriété|Home-buying path/i);
+
+  await page.getByTestId("advisor-tab-scenarios").click();
+  const lab = page.getByTestId("advisor-scenario-lab");
+  await expect(lab).toBeVisible();
+  await expect(lab).toContainText(/Valeur projetée|Projected value/i);
+
+  const monthlySlider = page.getByTestId("advisor-monthly-delta");
+  await monthlySlider.fill("300");
+
+  await page.getByRole("button", { name: /Vue d’ensemble|Overview/i }).click();
+  const contextual = page.getByTestId("advisor-contextual-shopping");
+  await expect(contextual).toHaveAttribute(
+    "href",
+    "/assistant/magasiner?category=mortgage",
+  );
+
+  await contextual.click();
+  await expect(page).toHaveURL(/\/assistant\/magasiner\?category=mortgage/);
+  await expect(page.getByTestId("shopping-question-province")).toBeVisible();
+});
