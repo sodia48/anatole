@@ -5,3 +5,6 @@
   .chartCanvas{height:220px;grid-template-columns:58px minmax(0,1fr)}
   .xAxis,.chartReadout{margin-left:58px}
 }
+/* Anatole Conseil V6 - trajectory domain and clipping */
+.chartCanvas svg{overflow:hidden}
+.offScaleLegend{padding:3px 7px;border:1px solid color-mix(in srgb,var(--blue) 28%,var(--border));border-radius:999px;background:color-mix(in srgb,var(--blue) 5%,var(--panel));color:var(--text)!important;font-weight:800}
