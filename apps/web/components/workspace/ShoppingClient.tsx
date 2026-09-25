@@ -26,7 +26,9 @@ import {
   useState,
 } from "react";
 
+import { ShoppingProductRecommendations } from "@/components/workspace/ShoppingProductRecommendations";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { recommendShoppingProducts } from "@/lib/shoppingProductCatalog";
 import { localeFor, pick } from "@/lib/i18n";
 import {
   SHOPPING_CATEGORIES,
@@ -231,6 +233,14 @@ export function ShoppingClient() {
     [answers, category],
   );
 
+  const productMatches = useMemo(
+    () =>
+      category
+        ? recommendShoppingProducts(category, answers)
+        : [],
+    [answers, category],
+  );
+
   const verifiedOffers = useMemo(() => {
     if (!category || !profile) return [];
     return evaluateShoppingOffers(
@@ -323,7 +333,7 @@ export function ShoppingClient() {
           <Sparkles size={22} />
           <strong>
             {stage === "results"
-              ? `${suggestions[0]?.matchScore ?? "—"}%`
+              ? `${productMatches[0]?.matchScore ?? suggestions[0]?.matchScore ?? "—"}%`
               : "Q&A"}
           </strong>
           <span>
@@ -461,7 +471,10 @@ export function ShoppingClient() {
             </div>
           </aside>
 
-          <div className={styles.questionPanel}>
+          <div
+            className={styles.questionPanel}
+            data-testid={`shopping-question-${currentQuestion.id}`}
+          >
             <div className={styles.questionNumber}>
               {String(questionIndex + 1).padStart(2, "0")}
             </div>
@@ -598,6 +611,30 @@ export function ShoppingClient() {
             })}
           </div>
 
+          {productMatches.length ? (
+            <ShoppingProductRecommendations
+              category={category}
+              language={language}
+              matches={productMatches}
+            />
+          ) : null}
+
+          <div className={styles.stageHeading}>
+            <span>↳</span>
+            <div>
+              <h2>
+                {pick(language, "Lecture Anatole de ton profil", "Anatole's read of your profile")}
+              </h2>
+              <p>
+                {pick(
+                  language,
+                  "Les produits ci-dessus sont concrets. Les cartes ci-dessous expliquent la logique de produit qui a conduit au classement.",
+                  "The products above are concrete. The cards below explain the product logic that drove the ranking.",
+                )}
+              </p>
+            </div>
+          </div>
+
           <div className={styles.suggestionGrid}>
             {suggestions.slice(0, 3).map((suggestion, index) => {
               const source = suggestion.sourceIds
@@ -703,7 +740,7 @@ export function ShoppingClient() {
             })}
           </div>
 
-          {verifiedOffers.length ? (
+          {productMatches.length ? null : verifiedOffers.length ? (
             <section className={styles.verifiedSection}>
               <div className={styles.stageHeading}>
                 <span>+</span>
