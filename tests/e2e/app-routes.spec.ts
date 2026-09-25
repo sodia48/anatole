@@ -77,3 +77,27 @@ for (const route of routes) {
     expect(consoleErrors, `${route} console errors`).toEqual([]);
   });
 }
+
+
+test("Anatole Magasiner garde le bouton Continuer visible", async ({ page }) => {
+  await page.goto("/assistant/magasiner", { waitUntil: "domcontentloaded" });
+
+  const creditCard = page.getByRole("button", {
+    name: /Cartes de crédit|Credit cards/i,
+  });
+  await expect(creditCard).toBeVisible();
+  await creditCard.click();
+
+  const province = page.getByRole("combobox").first();
+  await expect(province).toBeVisible();
+  await province.selectOption("QC");
+
+  const continueButton = page.getByTestId("shopping-continue");
+  await expect(continueButton).toBeVisible();
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+
+  await expect(
+    page.getByText(/combien dépenses-tu par mois|how much do you spend on a card each month/i),
+  ).toBeVisible();
+});

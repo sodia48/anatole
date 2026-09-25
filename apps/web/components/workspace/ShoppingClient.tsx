@@ -507,6 +507,7 @@ export function ShoppingClient() {
               </button>
               <button
                 type="button"
+                data-testid="shopping-continue"
                 className={styles.primaryButton}
                 disabled={!questionAnswered(currentQuestion, answers)}
                 onClick={next}

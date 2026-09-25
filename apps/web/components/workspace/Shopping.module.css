@@ -481,7 +481,8 @@
 .quizActions {
   position: relative;
   z-index: 1;
-  max-width: 1000px;
+  width: min(620px, 100%);
+  max-width: 100%;
   padding-top: 6px;
   display: flex;
   align-items: center;
@@ -506,10 +507,12 @@
 }
 
 .primaryButton {
+  min-width: 132px;
   padding: 0 15px;
-  border: 0;
-  background: linear-gradient(135deg, var(--blue), var(--accent));
+  border: 1px solid color-mix(in srgb, var(--blue) 72%, var(--border));
+  background: linear-gradient(135deg, var(--blue), var(--interactive));
   color: var(--on-primary);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--blue) 18%, transparent);
 }
 
 .primaryButton:disabled {
