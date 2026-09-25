@@ -89,6 +89,7 @@ function fullyPresent(data: SyncedWorkspaceData) {
       alerts: true,
       preferences: true,
       advisor_profile: true,
+      advisor_workspace: true,
       cockpit_universe: true,
       comparator_symbols: true,
       focus_layouts: true,

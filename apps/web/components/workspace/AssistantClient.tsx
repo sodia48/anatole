@@ -39,6 +39,7 @@ import type {
 
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { AdvisorCommandCenter } from "@/components/workspace/AdvisorCommandCenter";
+import { AdvisorV4Layer } from "@/components/workspace/AdvisorV4Layer";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
@@ -532,6 +533,20 @@ export function AssistantClient() {
         })}
       </nav>
       ) : null}
+
+      <AdvisorV4Layer
+        profile={profile}
+        goalLabel={goalLabel}
+        language={language}
+        portfolioCount={portfolio.length}
+        dashboardMode={!journeyMode}
+        onApplyProfile={(nextProfile) => {
+          setProfile(nextProfile);
+          setPlan(null);
+          setStep(1);
+          setJourneyMode(false);
+        }}
+      />
 
       <AdvisorCommandCenter
         profile={profile}

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -299,6 +299,7 @@ class SyncedWorkspaceData(BaseModel):
     alerts: list[AlertRule] = Field(default_factory=list, max_length=50)
     preferences: SyncedPreferences = Field(default_factory=SyncedPreferences)
     advisor_profile: AdvisorProfile | None = None
+    advisor_workspace: dict[str, Any] = Field(default_factory=dict)
     cockpit_universe: Literal["tsx60", "composite", "tsxv"] = "tsx60"
     comparator_symbols: list[str] = Field(default_factory=list, max_length=5)
     focus_layouts: list[FocusLayout] = Field(default_factory=list, max_length=10)

@@ -298,3 +298,46 @@ test("Anatole Conseil V3 garde le questionnaire pour un nouveau profil", async (
   await expect(page.getByText(/Qu’est-ce que tu veux accomplir|What do you want to achieve/i)).toBeVisible();
   await expect(page.getByRole("navigation", { name: /Étapes du plan|Plan steps/i })).toBeVisible();
 });
+
+
+test("Anatole Conseil V4 ajoute Decision Lab et bilan synchronisable", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2030",
+        horizon_years: 4,
+        target_amount: 75000,
+        current_savings: 26000,
+        monthly_contribution: 650,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  const v4 = page.getByTestId("advisor-v4-layer");
+  await expect(v4).toBeVisible();
+  await expect(v4).toContainText(/V4/);
+
+  await page.getByTestId("advisor-decision-input").fill(
+    "Et si j’achetais une maison à 550000 $ dans 3 ans ?",
+  );
+  await expect(page.getByTestId("advisor-decision-preview")).toContainText(
+    /Projet immobilier|Home purchase/i,
+  );
+
+  await v4.getByRole("button", { name: /Bilan Anatole|Anatole Balance/i }).click();
+  const balance = page.getByTestId("advisor-v4-balance");
+  await expect(balance).toBeVisible();
+  await balance.getByLabel(/Revenu mensuel net|Net monthly income/i).fill("5200");
+  await expect(v4).toContainText(/Flux mensuel libre|Monthly free cash flow/i);
+});
