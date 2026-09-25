@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -198,10 +199,19 @@ function QuestionView({
 export function ShoppingClient() {
   const { preferences } = usePreferences();
   const language = preferences.language;
+  const searchParams = useSearchParams();
+  const requestedCategory = searchParams.get("category");
+  const deepLinkedCategory = SHOPPING_CATEGORIES.some(
+    (item) => item.id === requestedCategory,
+  )
+    ? (requestedCategory as ShoppingCategoryId)
+    : null;
 
-  const [stage, setStage] = useState<Stage>("category");
+  const [stage, setStage] = useState<Stage>(
+    deepLinkedCategory ? "quiz" : "category",
+  );
   const [category, setCategory] =
-    useState<ShoppingCategoryId | null>(null);
+    useState<ShoppingCategoryId | null>(deepLinkedCategory);
   const [answers, setAnswers] = useState<ShoppingAnswers>({});
   const [questionIndex, setQuestionIndex] = useState(0);
 

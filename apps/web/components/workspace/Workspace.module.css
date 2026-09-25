@@ -1336,8 +1336,8 @@
 
 /* Anatole Conseil v0.7.2 — parcours guidé simple -------------------------- */
 .guideHero {
-  min-height: 150px;
-  padding: 24px 26px;
+  min-height: 118px;
+  padding: 18px 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1364,8 +1364,8 @@
 }
 
 .guideHero h1 {
-  margin: 7px 0 9px;
-  font-size: clamp(34px, 4.6vw, 56px);
+  margin: 6px 0 7px;
+  font-size: clamp(28px, 3.2vw, 44px);
   line-height: 1;
   letter-spacing: -0.045em;
 }
@@ -1374,7 +1374,7 @@
   max-width: 900px;
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.65;
 }
 
@@ -1406,7 +1406,7 @@
 
 .guideHeroStatus strong {
   color: var(--light-accent, #8eb8ff);
-  font-size: 45px;
+  font-size: 34px;
   line-height: 1;
 }
 
@@ -1459,7 +1459,7 @@
 }
 
 .guideStepper {
-  padding: 10px;
+  padding: 7px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
@@ -1467,8 +1467,8 @@
 
 .guideStep {
   min-width: 0;
-  min-height: 62px;
-  padding: 10px 12px;
+  min-height: 52px;
+  padding: 8px 10px;
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 10px;
@@ -1535,7 +1535,7 @@
 
 .guideShell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 260px;
   gap: 16px;
   align-items: start;
 }
