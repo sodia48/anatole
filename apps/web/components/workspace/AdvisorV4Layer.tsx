@@ -179,8 +179,8 @@ export function AdvisorV4Layer({
 }) {
   const [state, setState] = useState<V4State>(readState);
   const [decision, setDecision] = useState("");
-  const [preview, setPreview] = useState<Omit<LifeEvent, "id"> | null>(null);
   const [showBalance, setShowBalance] = useState(false);
+  const preview = decision.trim() ? parseDecision(decision, language) : null;
 
   const currency = profile.currency;
   const current = safe(profile.current_savings);
@@ -256,7 +256,6 @@ export function AdvisorV4Layer({
       events: [...state.events, { ...preview, id: `event-${Date.now()}` }].slice(-12),
     });
     setDecision("");
-    setPreview(null);
   };
 
   const addCalendarItem = () => {
@@ -365,9 +364,7 @@ export function AdvisorV4Layer({
             data-testid="advisor-decision-input"
             value={decision}
             onChange={(event) => {
-              const value = event.target.value;
-              setDecision(value);
-              setPreview(value.trim() ? parseDecision(value, language) : null);
+              setDecision(event.target.value);
             }}
             placeholder={pick(language, "Décris une décision financière…", "Describe a financial decision…")}
           />
