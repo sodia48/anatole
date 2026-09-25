@@ -205,9 +205,12 @@ export function AdvisorV4Layer({
 
   useEffect(() => {
     if (!profile.goal_type || profile.current_savings == null) return;
+
     const today = new Date().toISOString().slice(0, 10);
     const nextSnapshot = { date: today, savings: current, target, monthly };
-    const last = state.history[state.history.length - 1];
+    const stored = readState();
+    const last = stored.history[stored.history.length - 1];
+
     if (
       last?.date === today &&
       last.savings === current &&
@@ -216,20 +219,26 @@ export function AdvisorV4Layer({
     ) {
       return;
     }
-    const next = {
-      ...state,
+
+    persist({
+      ...stored,
       history: [
-        ...state.history.filter((item) => item.date !== today),
+        ...stored.history.filter((item) => item.date !== today),
         nextSnapshot,
       ].slice(-36),
-    };
-    setState(next);
-    persist(next);
-  }, [current, monthly, profile.current_savings, profile.goal_type, state, target]);
+    });
+  }, [current, monthly, profile.current_savings, profile.goal_type, target]);
 
   const update = (next: V4State) => {
     setState(next);
-    persist(next);
+
+    // The visit snapshot is written by the effect above as external workspace
+    // state. Preserve that latest persisted history while editing V4 locally.
+    const stored = readState();
+    persist({
+      ...next,
+      history: stored.history,
+    });
   };
 
   const updateTwin = (key: keyof Twin, raw: string) => {
