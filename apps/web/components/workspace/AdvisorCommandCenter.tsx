@@ -1277,6 +1277,7 @@ export function AdvisorCommandCenter({
               <div
                 className={styles.progressTrack}
                 role="progressbar"
+                aria-label={pick(language, "Progression vers lâ€™objectif", "Progress toward goal")}
                 aria-valuenow={Math.round(progress)}
                 aria-valuemin={0}
                 aria-valuemax={100}
