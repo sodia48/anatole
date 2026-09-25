@@ -341,3 +341,88 @@ test("Anatole Conseil V4 ajoute Decision Lab et bilan synchronisable", async ({ 
   await balance.getByLabel(/Revenu mensuel net|Net monthly income/i).fill("5200");
   await expect(v4).toContainText(/Flux mensuel libre|Monthly free cash flow/i);
 });
+test("Anatole Conseil V5 expose les dix modules financiers", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2030",
+        horizon_years: 4,
+        target_amount: 75000,
+        current_savings: 26000,
+        monthly_contribution: 650,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  const suite = page.getByTestId("advisor-v4-layer");
+  await expect(suite).toBeVisible();
+  await expect(suite).toHaveAttribute("data-version", "5");
+  await expect(suite).toContainText(/V5/);
+  await expect(suite).toContainText(/V4/);
+
+  const tabs = page.getByTestId("advisor-v5-tabs").getByRole("button");
+  await expect(tabs).toHaveCount(10);
+
+  await page.getByTestId("advisor-v5-tab-tax").click();
+  const tax = page.getByTestId("advisor-v5-tax");
+  await expect(tax).toContainText(/CELI|TFSA/);
+  await expect(tax).toContainText(/REER|RRSP/);
+  await expect(tax).toContainText(/CELIAPP|FHSA/);
+  await expect(tax).toContainText(/REEE|RESP/);
+
+  await page.getByTestId("advisor-v5-tab-mortgage").click();
+  await expect(page.getByTestId("advisor-v5-mortgage")).toContainText(
+    /Capital hypothécaire|Mortgage principal/i,
+  );
+
+  await page.getByTestId("advisor-v5-tab-quality").click();
+  await expect(page.getByTestId("advisor-v5-quality")).toContainText(
+    /D’où vient chaque chiffre|Where does each number come from/i,
+  );
+});
+
+test("Anatole Conseil adapte l'échelle de trajectoire quand la cible est très éloignée", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "wealth",
+        goal_name: "Capital long terme",
+        horizon_years: 30,
+        target_amount: 1000000,
+        current_savings: 200000,
+        monthly_contribution: 0,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-tab-scenarios").click();
+
+  await expect(page.getByTestId("advisor-target-offscale")).toBeVisible();
+  const yAxis = await page.getByTestId("advisor-trajectory-y-axis").innerText();
+  expect(yAxis).not.toMatch(/1\s*000\s*000/);
+  await expect(page.getByTestId("advisor-trajectory-chart")).toContainText(
+    /Cible réelle|Actual target/i,
+  );
+});

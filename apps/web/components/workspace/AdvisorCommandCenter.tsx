@@ -439,10 +439,11 @@ function TrajectoryChart({
 }) {
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
   const safeMonths = Math.max(1, months);
-  const samples = Math.min(72, Math.max(12, safeMonths));
+  const samples = Math.min(120, Math.max(24, safeMonths));
   const monthPoints = Array.from({ length: samples + 1 }, (_, index) =>
     Math.round((index / samples) * safeMonths),
   );
+
   const baselineValues = monthPoints.map((month) =>
     futureValue(currentSavings, monthlyContribution, month, 0),
   );
@@ -454,14 +455,37 @@ function TrajectoryChart({
     const years = month / 12;
     return target * (1 + inflation / 100) ** years;
   });
-  const maxValue = Math.max(
+
+  const trajectoryPeak = Math.max(
     1,
+    currentSavings,
     ...baselineValues,
     ...scenarioValues,
-    ...targetValues,
   );
+  const targetPeak = Math.max(0, ...targetValues);
+  const targetOffScale =
+    targetPeak > 0 && targetPeak > trajectoryPeak * 2.25;
+
+  const niceScaleMax = (value: number): number => {
+    const safeValue = Math.max(1, value);
+    const exponent = 10 ** Math.floor(Math.log10(safeValue));
+    const fraction = safeValue / exponent;
+    const steps = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 7.5, 10];
+    const step = steps.find((candidate) => candidate >= fraction) ?? 10;
+    return step * exponent;
+  };
+
+  const maxValue = niceScaleMax(
+    targetOffScale
+      ? trajectoryPeak * 1.18
+      : Math.max(trajectoryPeak, targetPeak) * 1.08,
+  );
+  const plottedTargetValues = targetValues.map((value) =>
+    Math.min(value, maxValue),
+  );
+
   const width = 760;
-  const height = 230;
+  const height = 270;
   const hoverIndex =
     hoverMonth == null
       ? null
@@ -491,19 +515,42 @@ function TrajectoryChart({
     hoverIndex == null
       ? width
       : (hoverIndex / Math.max(1, monthPoints.length - 1)) * width;
+  const hoverScenarioY =
+    height -
+    (Math.min(activeScenario, maxValue) / Math.max(1, maxValue)) * height;
 
   return (
     <div className={styles.chartShell} data-testid="advisor-trajectory-chart">
       <div className={styles.chartLegend}>
-        <span><i className={styles.legendBaseline} />{pick(language, "Trajectoire actuelle", "Current trajectory")}</span>
-        <span><i className={styles.legendScenario} />{pick(language, "Scénario", "Scenario")}</span>
-        <span><i className={styles.legendTarget} />{pick(language, "Cible", "Target")}</span>
+        <span>
+          <i className={styles.legendBaseline} />
+          {pick(language, "Trajectoire actuelle", "Current trajectory")}
+        </span>
+        <span>
+          <i className={styles.legendScenario} />
+          {pick(language, "Scénario", "Scenario")}
+        </span>
+        <span>
+          <i className={styles.legendTarget} />
+          {pick(language, "Cible", "Target")}
+        </span>
+        {targetOffScale ? (
+          <span data-testid="advisor-target-offscale">
+            {pick(
+              language,
+              `Cible hors échelle (${formatMoney(targetPeak, currency, language)})`,
+              `Target off scale (${formatMoney(targetPeak, currency, language)})`,
+            )}
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.chartCanvas}>
-        <div className={styles.yAxis}>
+        <div className={styles.yAxis} data-testid="advisor-trajectory-y-axis">
           <span>{formatMoney(maxValue, currency, language)}</span>
-          <span>{formatMoney(maxValue / 2, currency, language)}</span>
+          <span>{formatMoney(maxValue * 0.75, currency, language)}</span>
+          <span>{formatMoney(maxValue * 0.5, currency, language)}</span>
+          <span>{formatMoney(maxValue * 0.25, currency, language)}</span>
           <span>0</span>
         </div>
         <svg
@@ -524,18 +571,40 @@ function TrajectoryChart({
           }}
           onPointerLeave={() => setHoverMonth(null)}
         >
-          <line x1="0" y1="0" x2={width} y2="0" className={styles.gridLine} />
-          <line x1="0" y1={height / 2} x2={width} y2={height / 2} className={styles.gridLine} />
-          <line x1="0" y1={height} x2={width} y2={height} className={styles.gridLine} />
-          <path d={pathFor(targetValues, width, height, maxValue)} className={styles.targetPath} />
-          <path d={pathFor(baselineValues, width, height, maxValue)} className={styles.baselinePath} />
-          <path d={pathFor(scenarioValues, width, height, maxValue)} className={styles.scenarioPath} />
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1="0"
+              y1={height * ratio}
+              x2={width}
+              y2={height * ratio}
+              className={styles.gridLine}
+            />
+          ))}
+          <path
+            d={pathFor(plottedTargetValues, width, height, maxValue)}
+            className={styles.targetPath}
+          />
+          <path
+            d={pathFor(baselineValues, width, height, maxValue)}
+            className={styles.baselinePath}
+          />
+          <path
+            d={pathFor(scenarioValues, width, height, maxValue)}
+            className={styles.scenarioPath}
+          />
           {hoverMonth != null ? (
             <>
-              <line x1={hoverX} y1="0" x2={hoverX} y2={height} className={styles.hoverLine} />
+              <line
+                x1={hoverX}
+                y1="0"
+                x2={hoverX}
+                y2={height}
+                className={styles.hoverLine}
+              />
               <circle
                 cx={hoverX}
-                cy={height - (activeScenario / maxValue) * height}
+                cy={hoverScenarioY}
                 r="5"
                 className={styles.hoverDot}
               />
@@ -546,7 +615,9 @@ function TrajectoryChart({
 
       <div className={styles.xAxis}>
         <span>{pick(language, "Aujourd’hui", "Today")}</span>
-        <span>{monthLabel(Math.round(safeMonths / 2), language)}</span>
+        <span>{monthLabel(Math.round(safeMonths * 0.25), language)}</span>
+        <span>{monthLabel(Math.round(safeMonths * 0.5), language)}</span>
+        <span>{monthLabel(Math.round(safeMonths * 0.75), language)}</span>
         <span>{monthLabel(safeMonths, language)}</span>
       </div>
 
@@ -561,7 +632,7 @@ function TrajectoryChart({
           <b>{formatMoney(activeScenario, currency, language)}</b>
         </span>
         <span>
-          {pick(language, "Cible", "Target")}{" "}
+          {pick(language, "Cible réelle", "Actual target")}{" "}
           <b>{formatMoney(activeTarget, currency, language)}</b>
         </span>
       </div>
