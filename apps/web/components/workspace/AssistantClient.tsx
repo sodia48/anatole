@@ -534,19 +534,21 @@ export function AssistantClient() {
       </nav>
       ) : null}
 
-      <AdvisorV4Layer
-        profile={profile}
-        goalLabel={goalLabel}
-        language={language}
-        portfolioCount={portfolio.length}
-        dashboardMode={!journeyMode}
-        onApplyProfile={(nextProfile) => {
-          setProfile(nextProfile);
-          setPlan(null);
-          setStep(1);
-          setJourneyMode(false);
-        }}
-      />
+      {hydrated ? (
+        <AdvisorV4Layer
+          profile={profile}
+          goalLabel={goalLabel}
+          language={language}
+          portfolioCount={portfolio.length}
+          dashboardMode={!journeyMode}
+          onApplyProfile={(nextProfile) => {
+            setProfile(nextProfile);
+            setPlan(null);
+            setStep(1);
+            setJourneyMode(false);
+          }}
+        />
+      ) : null}
 
       <AdvisorCommandCenter
         profile={profile}
