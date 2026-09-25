@@ -288,12 +288,20 @@ export function AssistantClient() {
   const [planError, setPlanError] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [journeyMode, setJourneyMode] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const loadedProfile = loadProfile();
       setPortfolio(loadPortfolio());
-      setProfile(loadProfile());
+      setProfile(loadedProfile);
+      const established =
+        loadedProfile.goal_type !== null &&
+        loadedProfile.target_amount !== null &&
+        loadedProfile.horizon_years !== null &&
+        loadedProfile.current_savings !== null;
+      setJourneyMode(!established);
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -447,14 +455,29 @@ export function AssistantClient() {
     <main className={styles.page}>
       <section className={`panel ${styles.guideHero}`}>
         <div>
-          <span className="eyebrow">ANATOLE {pick(language, "CONSEIL · PLAN VIVANT", "ADVICE · LIVING PLAN")}</span>
-          <h1>{pick(language, "Ton plan financier, vivant.", "Your living financial plan.")}</h1>
+          <span className="eyebrow">
+            ANATOLE{" "}
+            {journeyMode
+              ? pick(language, "CONSEIL · PLAN VIVANT", "ADVICE · LIVING PLAN")
+              : pick(language, "CONSEIL · COCKPIT PERSONNEL", "ADVICE · PERSONAL COCKPIT")}
+          </span>
+          <h1>
+            {journeyMode
+              ? pick(language, "Ton plan financier, vivant.", "Your living financial plan.")
+              : pick(language, "Ton plan, en un coup d’œil.", "Your plan at a glance.")}
+          </h1>
           <p>
-            {pick(
-              language,
-              "Un diagnostic adaptatif, des scénarios manipulables et une timeline qui évoluent pendant que tu précises ta situation.",
-              "An adaptive diagnostic, interactive scenarios and a timeline that evolve as you clarify your situation.",
-            )}
+            {journeyMode
+              ? pick(
+                  language,
+                  "Un diagnostic adaptatif, des scénarios manipulables et une timeline qui évoluent pendant que tu précises ta situation.",
+                  "An adaptive diagnostic, interactive scenarios and a timeline that evolve as you clarify your situation.",
+                )
+              : pick(
+                  language,
+                  "Ta progression, tes scénarios, tes jalons et les informations qui comptent le plus sont réunis ici.",
+                  "Your progress, scenarios, milestones and most important inputs are brought together here.",
+                )}
           </p>
           <div className={styles.guideHeroActions}>
             <Link href="/assistant/magasiner" className={styles.primaryButton}>
@@ -486,6 +509,7 @@ export function AssistantClient() {
         </div>
       </section>
 
+      {journeyMode ? (
       <nav className={`panel ${styles.guideStepper}`} aria-label={pick(language, "Étapes du plan", "Plan steps")}>
         {STEPS.map((item) => {
           const active = item.number === step;
@@ -507,6 +531,7 @@ export function AssistantClient() {
           );
         })}
       </nav>
+      ) : null}
 
       <AdvisorCommandCenter
         profile={profile}
@@ -516,8 +541,30 @@ export function AssistantClient() {
         language={language}
         step={step}
         portfolioCount={portfolio.length}
+        dashboardMode={!journeyMode}
+        onEditProfile={() => {
+          setStep(1);
+          setJourneyMode(true);
+        }}
+        onNewGoal={() => {
+          setProfile(EMPTY_PROFILE);
+          setPlan(null);
+          setStep(1);
+          setJourneyMode(true);
+        }}
+        onApplyProfile={(nextProfile) => {
+          setProfile(nextProfile);
+          setPlan(null);
+          setStep(1);
+          setJourneyMode(false);
+        }}
+        onOpenAnalysis={() => {
+          setStep(4);
+          setJourneyMode(true);
+        }}
       />
 
+      {journeyMode ? (
       <div className={styles.guideShell}>
         <section className={`panel ${styles.guidePanel}`} id="profil">
           {step === 1 ? (
@@ -1096,6 +1143,7 @@ export function AssistantClient() {
           </section>
         </aside>
       </div>
+      ) : null}
     </main>
   );
 }
