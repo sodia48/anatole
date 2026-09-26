@@ -40,6 +40,7 @@ import type {
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { AdvisorCommandCenter } from "@/components/workspace/AdvisorCommandCenter";
 import { AdvisorV4Layer } from "@/components/workspace/AdvisorV4Layer";
+import { AdvisorV8Layer } from "@/components/workspace/AdvisorV8Layer";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
@@ -532,6 +533,15 @@ export function AssistantClient() {
           );
         })}
       </nav>
+      ) : null}
+
+      {hydrated && !journeyMode ? (
+        <AdvisorV8Layer
+          profile={profile}
+          goalLabel={goalLabel}
+          language={language}
+          portfolioCount={portfolio.length}
+        />
       ) : null}
 
       {hydrated ? (

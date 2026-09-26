@@ -543,3 +543,150 @@ test("Anatole Conseil V7 sépare le scénario quand les hypothèses changent", a
   await page.getByTestId("advisor-monthly-delta").fill("300");
   await expect(page.getByTestId("advisor-scenario-path")).toHaveCount(1);
 });
+
+test("Anatole Conseil V8 relie les 20 modules du Financial Command Deck", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2030",
+        horizon_years: 8,
+        target_amount: 180000,
+        current_savings: 50000,
+        monthly_contribution: 500,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: "medium",
+        experience: "intermediate"
+      }),
+    );
+    window.localStorage.setItem(
+      "anatole:advisor-workspace:v4",
+      JSON.stringify({
+        financialOs: {
+          household: {
+            userIncome: 5200,
+            partnerIncome: 0,
+            dependants: 0,
+            cash: 18000,
+            investments: 42000,
+            property: 0,
+            vehicles: 12000,
+            otherAssets: 0,
+            essentialExpenses: 2200,
+            discretionaryExpenses: 650,
+            housingCosts: 1200,
+            insuranceCosts: 180,
+            otherFixedCosts: 120
+          },
+          debts: [
+            { id: "card", label: "Carte", balance: 4200, annualRate: 19.99, monthlyPayment: 250 }
+          ],
+          goals: [
+            { id: "home", label: "Maison", target: 180000, current: 50000, monthly: 500, horizonMonths: 96 },
+            { id: "reserve", label: "Réserve", target: 18000, current: 9000, monthly: 200, horizonMonths: 24 }
+          ],
+          tax: {
+            tfsa: { room: 15000, planned: 5000 },
+            rrsp: { room: 12000, planned: 3000 },
+            fhsa: { room: 8000, planned: 8000 },
+            resp: { room: null, planned: null }
+          },
+          mortgage: {
+            purchasePrice: 550000,
+            downPayment: 110000,
+            annualRate: 4.5,
+            amortizationYears: 25,
+            renewalRate: 5.5
+          },
+          events: [
+            { id: "move", label: "Déménagement", monthOffset: 12, oneTimeCost: 3500, recurringMonthlyCost: 0, monthlyIncomeDelta: 0 }
+          ],
+          forecastMonths: 24
+        }
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  const v8 = page.getByTestId("advisor-v8-layer");
+  await expect(v8).toBeVisible();
+  await expect(v8).toHaveAttribute("data-feature-count", "20");
+  await expect(v8).toContainText(/FINANCIAL COMMAND DECK/i);
+
+  for (const key of ["today", "goals", "scenarios", "decisions", "products"] as const) {
+    await page.getByTestId(`advisor-v8-tab-${key}`).click();
+    await expect(page.getByTestId(`advisor-v8-${key}`)).toBeVisible();
+    await expect(page.getByTestId(`advisor-v8-${key}`).locator("[data-module]")).toHaveCount(4);
+  }
+
+  await page.getByTestId("advisor-v8-tab-scenarios").click();
+  await expect(page.getByTestId("advisor-v8-scenarios")).toContainText(/PROBABILITY LAB/i);
+  await expect(page.getByTestId("advisor-v8-scenarios")).toContainText(/STRESS LAB/i);
+
+  await page.getByTestId("advisor-v8-tab-decisions").click();
+  await expect(page.getByTestId("advisor-v8-decisions")).toContainText(/DEBT CENTER/i);
+  await expect(page.getByTestId("advisor-v8-decisions")).toContainText(/CANADA TAX LENS/i);
+
+  await page.getByTestId("advisor-v8-tab-products").click();
+  await expect(v8.getByRole("link", { name: /Ouvrir Magasiner|Open Shop/i })).toHaveAttribute(
+    "href",
+    "/assistant/magasiner",
+  );
+  await expect(v8.getByRole("button", { name: /Exporter le dossier JSON|Export JSON dossier/i })).toBeVisible();
+});
+
+test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "wealth",
+        goal_name: "Capital long terme",
+        horizon_years: 12,
+        target_amount: 300000,
+        current_savings: 70000,
+        monthly_contribution: 900,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 12000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: "medium",
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v8-tab-scenarios").click();
+
+  const returnInput = page.getByLabel(
+    /Rendement moyen hypothétique|Assumed average return/i,
+  );
+  const volatilityInput = page.getByLabel(
+    /Volatilité hypothétique|Assumed volatility/i,
+  );
+
+  await returnInput.fill("6.5");
+  await volatilityInput.fill("12.5");
+  await expect(returnInput).toHaveValue("6.5");
+  await expect(volatilityInput).toHaveValue("12.5");
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v8-tab-scenarios").click();
+
+  await expect(
+    page.getByLabel(/Rendement moyen hypothétique|Assumed average return/i),
+  ).toHaveValue("6.5");
+  await expect(
+    page.getByLabel(/Volatilité hypothétique|Assumed volatility/i),
+  ).toHaveValue("12.5");
+});
