@@ -315,6 +315,136 @@
   line-height: 1.72;
 }
 
+
+.briefHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--reader-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+}
+
+.briefLoading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--reader-border);
+  border-radius: 10px;
+  background: var(--reader-surface);
+}
+
+.briefLoading div,
+.provenance,
+.briefLead,
+.briefSection,
+.briefInsight {
+  display: grid;
+  gap: 8px;
+}
+
+.briefLoading strong,
+.provenance strong,
+.briefSection header strong {
+  color: var(--reader-text);
+}
+
+.briefLoading span,
+.provenance span,
+.briefSection li,
+.briefInsight small {
+  color: var(--reader-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.briefSpinner {
+  flex: 0 0 auto;
+  color: var(--reader-accent);
+  animation: brief-spin 900ms linear infinite;
+}
+
+.provenance {
+  padding: 11px 13px;
+  border-left: 3px solid var(--reader-accent);
+  background: var(--reader-surface);
+}
+
+.briefLead,
+.briefInsight {
+  padding: 16px;
+  border: 1px solid var(--reader-border);
+  border-radius: 10px;
+  background: var(--reader-surface);
+}
+
+.briefLead > span,
+.briefInsight > div span {
+  color: var(--reader-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.briefLead p,
+.briefInsight p {
+  margin: 0;
+  color: var(--reader-text);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.briefSection header,
+.briefInsight > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--reader-accent);
+}
+
+.briefSection ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 7px;
+}
+
+.briefFigures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.briefFigures article {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--reader-border);
+  border-radius: 9px;
+  background: var(--reader-surface);
+}
+
+.briefFigures article strong {
+  color: var(--reader-text);
+  font-size: 17px;
+}
+
+.briefFigures article span {
+  color: var(--reader-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.briefInsight {
+  background: color-mix(in srgb, var(--reader-accent) 8%, var(--reader-surface));
+}
+
+@keyframes brief-spin {
+  to { transform: rotate(360deg); }
+}
+
 .unavailable {
   display: grid;
   gap: 7px;
@@ -377,6 +507,10 @@
   .article h2 {
     max-width: none;
     font-size: clamp(22px, 7vw, 29px);
+  }
+
+  .briefFigures {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
