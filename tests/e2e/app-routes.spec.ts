@@ -506,8 +506,10 @@ test("Anatole Conseil V7 transforme la trajectoire en Trajectory Lab", async ({ 
 
   await page.getByTestId("advisor-trajectory-mode-percent").click();
   await expect(page.getByTestId("advisor-trajectory-y-axis")).toContainText(
-    /100%/,
+    /%/,
   );
+  await expect(page.getByTestId("advisor-target-path")).toHaveCount(1);
+  await expect(chart).toContainText(/Objectif = 100%|Target = 100%/i);
   await expect(chart).toContainText(/Cible réelle|Actual target/i);
 });
 
