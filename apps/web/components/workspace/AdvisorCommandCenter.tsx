@@ -420,6 +420,18 @@ function pathForRange(
     .join(" ");
 }
 
+function areaForRange(
+  values: number[],
+  width: number,
+  height: number,
+  minValue: number,
+  maxValue: number,
+): string {
+  if (!values.length) return "";
+  const line = pathForRange(values, width, height, minValue, maxValue);
+  return `${line} L${width.toFixed(2)} ${height.toFixed(2)} L0 ${height.toFixed(2)} Z`;
+}
+
 function TrajectoryChart({
   currentSavings,
   monthlyContribution,
@@ -442,6 +454,11 @@ function TrajectoryChart({
   language: AnatoleLanguage;
 }) {
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
+  const [scaleMode, setScaleMode] =
+    useState<"auto" | "zero" | "target">("auto");
+  const [viewMode, setViewMode] =
+    useState<"amount" | "percent">("amount");
+
   const safeMonths = Math.max(1, months);
   const samples = Math.min(120, Math.max(24, safeMonths));
   const monthPoints = Array.from({ length: samples + 1 }, (_, index) =>
@@ -460,44 +477,138 @@ function TrajectoryChart({
     return target * (1 + inflation / 100) ** years;
   });
 
-  const trajectoryValues = [...baselineValues, ...scenarioValues];
-  const trajectoryMin = Math.min(currentSavings, ...trajectoryValues);
-  const trajectoryPeak = Math.max(1, currentSavings, ...trajectoryValues);
-  const targetPeak = Math.max(0, ...targetValues);
-  const trajectorySpan = Math.max(1, trajectoryPeak - trajectoryMin);
-  const offScaleThreshold = Math.max(
-    trajectoryPeak * 1.75,
-    trajectoryPeak + trajectorySpan * 1.25,
+  const hasTarget = target > 0;
+  const targetPeak = hasTarget ? Math.max(target, ...targetValues) : 0;
+  const comparisonTarget = Math.max(1, targetPeak);
+  const scenarioDistinct = scenarioValues.some(
+    (value, index) =>
+      Math.abs(value - baselineValues[index]) >
+      Math.max(1, comparisonTarget * 0.002),
   );
-  const targetOffScale = targetPeak > 0 && targetPeak > offScaleThreshold;
+  const projectedValue =
+    scenarioValues[scenarioValues.length - 1] ?? currentSavings;
+  const currentProgress = hasTarget
+    ? (currentSavings / comparisonTarget) * 100
+    : 0;
+  const projectedProgress = hasTarget
+    ? (projectedValue / comparisonTarget) * 100
+    : 0;
+  const gapValue = hasTarget
+    ? Math.max(0, comparisonTarget - projectedValue)
+    : null;
 
-  const visibleValues = targetOffScale
-    ? trajectoryValues
-    : [...trajectoryValues, ...targetValues];
+  const requiredMonthlyValue = hasTarget
+    ? requiredMonthly(
+        currentSavings,
+        comparisonTarget,
+        safeMonths,
+        annualReturn,
+      )
+    : null;
+  const monthlyGap =
+    requiredMonthlyValue == null
+      ? null
+      : Math.max(0, requiredMonthlyValue - scenarioMonthly);
+  const estimatedTargetMonth = hasTarget
+    ? monthsToTarget(
+        currentSavings,
+        Math.max(0, scenarioMonthly),
+        comparisonTarget,
+        annualReturn,
+      )
+    : null;
+
+  const baselinePercent = baselineValues.map((value) =>
+    hasTarget ? (value / comparisonTarget) * 100 : 0,
+  );
+  const scenarioPercent = scenarioValues.map((value) =>
+    hasTarget ? (value / comparisonTarget) * 100 : 0,
+  );
+  const targetPercent = monthPoints.map(() => 100);
+
+  const displayBaseline =
+    viewMode === "percent" ? baselinePercent : baselineValues;
+  const displayScenario =
+    viewMode === "percent" ? scenarioPercent : scenarioValues;
+  const displayTarget =
+    viewMode === "percent" ? targetPercent : targetValues;
+  const trajectoryValues = scenarioDistinct
+    ? [...displayBaseline, ...displayScenario]
+    : [...displayBaseline];
+
+  const trajectoryMin = Math.min(...trajectoryValues);
+  const trajectoryMax = Math.max(1, ...trajectoryValues);
+  const targetDisplayPeak = Math.max(0, ...displayTarget);
+  const trajectorySpan = Math.max(1, trajectoryMax - trajectoryMin);
+  const targetOffScale =
+    hasTarget &&
+    viewMode === "amount" &&
+    targetDisplayPeak >
+      Math.max(
+        trajectoryMax * 1.75,
+        trajectoryMax + trajectorySpan * 1.25,
+      );
+
+  const visibleValues =
+    viewMode === "percent"
+      ? [...trajectoryValues, ...displayTarget]
+      : scaleMode === "target"
+        ? [...trajectoryValues, ...displayTarget]
+        : scaleMode === "zero"
+          ? [
+              ...trajectoryValues,
+              ...(targetOffScale ? [] : displayTarget),
+              0,
+            ]
+          : [
+              ...trajectoryValues,
+              ...(targetOffScale ? [] : displayTarget),
+            ];
+
   const rawMin = Math.min(...visibleValues);
   const rawMax = Math.max(1, ...visibleValues);
   const rawSpan = Math.max(1, rawMax - rawMin);
-  const padding =
-    rawSpan <= Math.max(1, Math.abs(rawMax)) * 0.08
-      ? Math.max(1_000, Math.abs(rawMax) * 0.08)
-      : rawSpan * 0.08;
-  const includeZero =
-    rawMin <= 0 ||
-    rawMin <= Math.max(1, rawMax) * 0.15;
-
-  const minValue = includeZero
-    ? 0
-    : Math.max(0, rawMin - padding);
-  const maxValue = Math.max(
-    minValue + 1,
-    rawMax + padding,
+  const padding = Math.max(
+    viewMode === "percent" ? 2 : 1,
+    rawSpan * 0.08,
   );
+
+  const range =
+    viewMode === "percent"
+      ? {
+          min: 0,
+          max: Math.max(110, rawMax + 5),
+        }
+      : scaleMode === "target"
+        ? {
+            min: 0,
+            max: Math.max(
+              rawMax + padding,
+              targetDisplayPeak + padding,
+            ),
+          }
+        : scaleMode === "zero"
+          ? {
+              min: 0,
+              max: Math.max(rawMax + padding, 1),
+            }
+          : {
+              min:
+                rawMin <= 0 ||
+                rawMin <= Math.max(1, rawMax) * 0.15
+                  ? 0
+                  : Math.max(0, rawMin - padding),
+              max: Math.max(rawMax + padding, 1),
+            };
+
+  const minValue = range.min;
+  const maxValue = Math.max(range.max, minValue + 1);
   const yTicks = Array.from({ length: 5 }, (_, index) =>
     maxValue - ((maxValue - minValue) * index) / 4,
   );
 
   const width = 760;
-  const height = 270;
+  const height = 220;
   const hoverIndex =
     hoverMonth == null
       ? null
@@ -509,6 +620,7 @@ function TrajectoryChart({
               : best,
           0,
         );
+
   const activeMonth =
     hoverIndex == null ? safeMonths : monthPoints[hoverIndex];
   const activeBaseline =
@@ -523,60 +635,398 @@ function TrajectoryChart({
     hoverIndex == null
       ? targetValues[targetValues.length - 1]
       : targetValues[hoverIndex];
+  const activeGap = hasTarget
+    ? Math.max(0, activeTarget - activeScenario)
+    : null;
+
   const hoverX =
     hoverIndex == null
       ? width
-      : (hoverIndex / Math.max(1, monthPoints.length - 1)) * width;
-  const hoverScenario = Math.max(
+      : (hoverIndex / Math.max(1, monthPoints.length - 1)) *
+        width;
+  const hoverScenarioValue =
+    hoverIndex == null
+      ? displayScenario[displayScenario.length - 1]
+      : displayScenario[hoverIndex];
+  const hoverScenarioClamped = Math.max(
     minValue,
-    Math.min(maxValue, activeScenario),
+    Math.min(maxValue, hoverScenarioValue),
   );
   const hoverScenarioY =
     height -
-    ((hoverScenario - minValue) /
+    ((hoverScenarioClamped - minValue) /
       Math.max(1, maxValue - minValue)) *
       height;
 
+  const milestones = [0.25, 0.5, 0.75, 1].map((ratio) => {
+    const amount = comparisonTarget * ratio;
+    const reachedIndex = hasTarget
+      ? scenarioValues.findIndex((value) => value >= amount)
+      : -1;
+    return {
+      ratio,
+      amount,
+      reachedMonth:
+        reachedIndex >= 0 ? monthPoints[reachedIndex] : null,
+    };
+  });
+
+  const formatAxis = (value: number) =>
+    viewMode === "percent"
+      ? `${Math.round(value)}%`
+      : formatMoney(value, currency, language);
+
+  const showTargetPath =
+    hasTarget &&
+    (
+      viewMode === "percent" ||
+      scaleMode === "target" ||
+      !targetOffScale
+    );
+
   return (
-    <div className={styles.chartShell} data-testid="advisor-trajectory-chart">
+    <div
+      className={`${styles.chartShell} ${styles.trajectoryLab}`}
+      data-testid="advisor-trajectory-chart"
+    >
+      <div className={styles.trajectoryTopbar}>
+        <div className={styles.trajectoryIntro}>
+          <span>
+            {pick(language, "TRAJECTOIRE LAB", "TRAJECTORY LAB")}
+          </span>
+          <strong>
+            {pick(
+              language,
+              "Lis le plan, l’écart et le rythme.",
+              "Read the plan, the gap and the pace.",
+            )}
+          </strong>
+          <small>
+            {pick(
+              language,
+              "Passe d’une simple courbe à une lecture orientée décision.",
+              "Move from a simple line to a decision-oriented view.",
+            )}
+          </small>
+        </div>
+
+        <div className={styles.trajectoryControls}>
+          <div
+            className={styles.segmentedControl}
+            aria-label={pick(
+              language,
+              "Mode d’affichage",
+              "Display mode",
+            )}
+          >
+            <button
+              type="button"
+              data-testid="advisor-trajectory-mode-amount"
+              className={
+                viewMode === "amount" ? styles.activeSegment : undefined
+              }
+              onClick={() => setViewMode("amount")}
+            >
+              {pick(language, "Montant", "Amount")}
+            </button>
+            <button
+              type="button"
+              data-testid="advisor-trajectory-mode-percent"
+              className={
+                viewMode === "percent" ? styles.activeSegment : undefined
+              }
+              disabled={!hasTarget}
+              onClick={() => setViewMode("percent")}
+            >
+              {pick(language, "% objectif", "% target")}
+            </button>
+          </div>
+
+          <div
+            className={styles.segmentedControl}
+            aria-label={pick(
+              language,
+              "Échelle du graphique",
+              "Chart scale",
+            )}
+          >
+            <button
+              type="button"
+              data-testid="advisor-trajectory-scale-auto"
+              className={
+                scaleMode === "auto" ? styles.activeSegment : undefined
+              }
+              onClick={() => setScaleMode("auto")}
+            >
+              Auto
+            </button>
+            <button
+              type="button"
+              data-testid="advisor-trajectory-scale-zero"
+              className={
+                scaleMode === "zero" ? styles.activeSegment : undefined
+              }
+              onClick={() => setScaleMode("zero")}
+            >
+              {pick(language, "Depuis 0", "From 0")}
+            </button>
+            <button
+              type="button"
+              data-testid="advisor-trajectory-scale-target"
+              className={
+                scaleMode === "target"
+                  ? styles.activeSegment
+                  : undefined
+              }
+              disabled={!hasTarget}
+              onClick={() => {
+                setViewMode("amount");
+                setScaleMode("target");
+              }}
+            >
+              {pick(language, "Voir la cible", "See target")}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        className={styles.trajectoryKpis}
+        data-testid="advisor-trajectory-summary"
+      >
+        <article>
+          <span>{pick(language, "Valeur projetée", "Projected value")}</span>
+          <strong>
+            {formatMoney(projectedValue, currency, language)}
+          </strong>
+          <small>
+            {pick(
+              language,
+              "Selon le scénario affiché",
+              "Under the displayed scenario",
+            )}
+          </small>
+        </article>
+
+        <article>
+          <span>{pick(language, "Objectif", "Target")}</span>
+          <strong>
+            {hasTarget
+              ? formatMoney(comparisonTarget, currency, language)
+              : pick(language, "N/D", "N/A")}
+          </strong>
+          <small>
+            {pick(
+              language,
+              "Cible finale, ajustée selon les hypothèses",
+              "Final target under the assumptions",
+            )}
+          </small>
+        </article>
+
+        <article>
+          <span>{pick(language, "Écart à combler", "Gap to close")}</span>
+          <strong
+            className={
+              gapValue === 0
+                ? styles.positiveValue
+                : styles.negativeValue
+            }
+          >
+            {gapValue == null
+              ? pick(language, "N/D", "N/A")
+              : gapValue === 0
+                ? pick(language, "Objectif atteint", "Target reached")
+                : formatMoney(gapValue, currency, language)}
+          </strong>
+          <small>
+            {pick(
+              language,
+              "Scénario projeté vs cible",
+              "Projected scenario vs target",
+            )}
+          </small>
+        </article>
+
+        <article>
+          <span>{pick(language, "Progression", "Progress")}</span>
+          <strong>
+            {hasTarget
+              ? `${Math.round(projectedProgress)}%`
+              : pick(language, "N/D", "N/A")}
+          </strong>
+          <small>
+            {hasTarget
+              ? pick(
+                  language,
+                  `Aujourd’hui ${Math.round(currentProgress)}%`,
+                  `Today ${Math.round(currentProgress)}%`,
+                )
+              : pick(
+                  language,
+                  "Ajoute une cible pour mesurer la progression",
+                  "Add a target to measure progress",
+                )}
+          </small>
+        </article>
+      </div>
+
+      <div className={styles.trajectoryPace}>
+        <article>
+          <span>
+            {pick(
+              language,
+              "Contribution actuelle",
+              "Current contribution",
+            )}
+          </span>
+          <strong>
+            {formatMoney(scenarioMonthly, currency, language)}
+            <small>/mois</small>
+          </strong>
+        </article>
+        <article>
+          <span>
+            {pick(
+              language,
+              "Contribution requise",
+              "Required contribution",
+            )}
+          </span>
+          <strong>
+            {formatMoney(
+              requiredMonthlyValue,
+              currency,
+              language,
+            )}
+            {requiredMonthlyValue != null ? <small>/mois</small> : null}
+          </strong>
+        </article>
+        <article>
+          <span>
+            {pick(language, "Écart mensuel", "Monthly gap")}
+          </span>
+          <strong>
+            {formatMoney(monthlyGap, currency, language)}
+            {monthlyGap != null ? <small>/mois</small> : null}
+          </strong>
+        </article>
+        <article>
+          <span>
+            {pick(
+              language,
+              "Atteinte estimée",
+              "Estimated achievement",
+            )}
+          </span>
+          <strong>
+            {hasTarget
+              ? monthLabel(estimatedTargetMonth, language)
+              : pick(language, "N/D", "N/A")}
+          </strong>
+        </article>
+      </div>
+
+      {hasTarget ? (
+        <div className={styles.trajectoryMilestones}>
+          {milestones.map((milestone) => (
+            <div key={milestone.ratio}>
+              <strong>{Math.round(milestone.ratio * 100)}%</strong>
+              <span>
+                {formatMoney(
+                  milestone.amount,
+                  currency,
+                  language,
+                )}
+              </span>
+              <small>
+                {milestone.reachedMonth == null
+                  ? pick(language, "Non atteint", "Not reached")
+                  : monthLabel(
+                      milestone.reachedMonth,
+                      language,
+                    )}
+              </small>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {targetOffScale &&
+      scaleMode !== "target" &&
+      viewMode === "amount" ? (
+        <div
+          className={styles.offScaleBanner}
+          data-testid="advisor-target-offscale"
+        >
+          <div>
+            <strong>
+              {pick(
+                language,
+                "La cible est hors échelle dans la vue compacte.",
+                "The target is off scale in compact view.",
+              )}
+            </strong>
+            <span>
+              {pick(
+                language,
+                "Anatole protège la lisibilité de la trajectoire. Utilise « Voir la cible » ou « % objectif » pour la remettre dans le contexte.",
+                "Anatole preserves trajectory readability. Use “See target” or “% target” to restore the full context.",
+              )}
+            </span>
+          </div>
+          <b>
+            {formatMoney(targetDisplayPeak, currency, language)}
+          </b>
+        </div>
+      ) : null}
+
       <div className={styles.chartLegend}>
         <span>
           <i className={styles.legendBaseline} />
-          {pick(language, "Trajectoire actuelle", "Current trajectory")}
+          {pick(
+            language,
+            "Trajectoire actuelle",
+            "Current trajectory",
+          )}
         </span>
-        <span>
-          <i className={styles.legendScenario} />
-          {pick(language, "Scénario", "Scenario")}
-        </span>
-        {!targetOffScale ? (
+        {scenarioDistinct ? (
           <span>
-            <i className={styles.legendTarget} />
-            {pick(language, "Cible", "Target")}
+            <i className={styles.legendScenario} />
+            {pick(language, "Scénario", "Scenario")}
           </span>
-        ) : null}
-        {targetOffScale ? (
-          <span
-            className={styles.offScaleLegend}
-            data-testid="advisor-target-offscale"
-          >
-            ↑{" "}
+        ) : (
+          <span>
+            <i className={styles.legendScenario} />
             {pick(
               language,
-              `Cible ${formatMoney(targetPeak, currency, language)} hors échelle — non tracée`,
-              `Target ${formatMoney(targetPeak, currency, language)} off scale — not plotted`,
+              "Scénario identique à l’actuel",
+              "Scenario identical to current",
             )}
+          </span>
+        )}
+        {showTargetPath ? (
+          <span>
+            <i className={styles.legendTarget} />
+            {viewMode === "percent"
+              ? pick(language, "Objectif = 100%", "Target = 100%")
+              : pick(language, "Cible", "Target")}
           </span>
         ) : null}
       </div>
 
       <div className={styles.chartCanvas}>
-        <div className={styles.yAxis} data-testid="advisor-trajectory-y-axis">
+        <div
+          className={styles.yAxis}
+          data-testid="advisor-trajectory-y-axis"
+        >
           {yTicks.map((value, index) => (
             <span key={`${index}-${value.toFixed(2)}`}>
-              {formatMoney(value, currency, language)}
+              {formatAxis(value)}
             </span>
           ))}
         </div>
+
         <svg
           data-testid="advisor-trajectory-svg"
           viewBox={`0 0 ${width} ${height}`}
@@ -587,12 +1037,19 @@ function TrajectoryChart({
             "Interactive financial trajectory",
           )}
           onPointerMove={(event) => {
-            const bounds = event.currentTarget.getBoundingClientRect();
+            const bounds =
+              event.currentTarget.getBoundingClientRect();
             const ratio = Math.max(
               0,
-              Math.min(1, (event.clientX - bounds.left) / bounds.width),
+              Math.min(
+                1,
+                (event.clientX - bounds.left) /
+                  Math.max(1, bounds.width),
+              ),
             );
-            setHoverMonth(Math.round(ratio * safeMonths));
+            setHoverMonth(
+              Math.round(ratio * safeMonths),
+            );
           }}
           onPointerLeave={() => setHoverMonth(null)}
         >
@@ -606,11 +1063,25 @@ function TrajectoryChart({
               className={styles.gridLine}
             />
           ))}
-          {!targetOffScale ? (
+
+          {scenarioDistinct ? (
+            <path
+              d={areaForRange(
+                displayScenario,
+                width,
+                height,
+                minValue,
+                maxValue,
+              )}
+              className={styles.scenarioArea}
+            />
+          ) : null}
+
+          {showTargetPath ? (
             <path
               data-testid="advisor-target-path"
               d={pathForRange(
-                targetValues,
+                displayTarget,
                 width,
                 height,
                 minValue,
@@ -619,9 +1090,11 @@ function TrajectoryChart({
               className={styles.targetPath}
             />
           ) : null}
+
           <path
+            data-testid="advisor-baseline-path"
             d={pathForRange(
-              baselineValues,
+              displayBaseline,
               width,
               height,
               minValue,
@@ -629,16 +1102,43 @@ function TrajectoryChart({
             )}
             className={styles.baselinePath}
           />
-          <path
-            d={pathForRange(
-              scenarioValues,
-              width,
-              height,
-              minValue,
-              maxValue,
-            )}
-            className={styles.scenarioPath}
-          />
+
+          {scenarioDistinct ? (
+            <path
+              data-testid="advisor-scenario-path"
+              d={pathForRange(
+                displayScenario,
+                width,
+                height,
+                minValue,
+                maxValue,
+              )}
+              className={styles.scenarioPath}
+            />
+          ) : null}
+
+          {milestones
+            .filter(
+              (milestone) =>
+                milestone.reachedMonth != null,
+            )
+            .map((milestone) => {
+              const x =
+                ((milestone.reachedMonth ?? 0) /
+                  Math.max(1, safeMonths)) *
+                width;
+              return (
+                <line
+                  key={milestone.ratio}
+                  x1={x}
+                  y1="0"
+                  x2={x}
+                  y2={height}
+                  className={styles.milestoneLine}
+                />
+              );
+            })}
+
           {hoverMonth != null ? (
             <>
               <line
@@ -661,9 +1161,24 @@ function TrajectoryChart({
 
       <div className={styles.xAxis}>
         <span>{pick(language, "Aujourd’hui", "Today")}</span>
-        <span>{monthLabel(Math.round(safeMonths * 0.25), language)}</span>
-        <span>{monthLabel(Math.round(safeMonths * 0.5), language)}</span>
-        <span>{monthLabel(Math.round(safeMonths * 0.75), language)}</span>
+        <span>
+          {monthLabel(
+            Math.round(safeMonths * 0.25),
+            language,
+          )}
+        </span>
+        <span>
+          {monthLabel(
+            Math.round(safeMonths * 0.5),
+            language,
+          )}
+        </span>
+        <span>
+          {monthLabel(
+            Math.round(safeMonths * 0.75),
+            language,
+          )}
+        </span>
         <span>{monthLabel(safeMonths, language)}</span>
       </div>
 
@@ -671,16 +1186,92 @@ function TrajectoryChart({
         <strong>{monthLabel(activeMonth, language)}</strong>
         <span>
           {pick(language, "Actuel", "Current")}{" "}
-          <b>{formatMoney(activeBaseline, currency, language)}</b>
+          <b>
+            {formatMoney(
+              activeBaseline,
+              currency,
+              language,
+            )}
+          </b>
         </span>
         <span>
           {pick(language, "Scénario", "Scenario")}{" "}
-          <b>{formatMoney(activeScenario, currency, language)}</b>
+          <b>
+            {formatMoney(
+              activeScenario,
+              currency,
+              language,
+            )}
+          </b>
         </span>
         <span>
           {pick(language, "Cible réelle", "Actual target")}{" "}
-          <b>{formatMoney(activeTarget, currency, language)}</b>
+          <b>
+            {hasTarget
+              ? formatMoney(
+                  activeTarget,
+                  currency,
+                  language,
+                )
+              : pick(language, "N/D", "N/A")}
+          </b>
         </span>
+        <span>
+          {pick(language, "Écart", "Gap")}{" "}
+          <b>
+            {activeGap == null
+              ? pick(language, "N/D", "N/A")
+              : activeGap === 0
+                ? pick(language, "Atteint", "Met")
+                : formatMoney(
+                    activeGap,
+                    currency,
+                    language,
+                  )}
+          </b>
+        </span>
+      </div>
+
+      <div className={styles.trajectoryNarrative}>
+        {hasTarget
+          ? pick(
+              language,
+              `À tes hypothèses actuelles, la trajectoire se termine à ${formatMoney(
+                projectedValue,
+                currency,
+                language,
+              )}, soit ${Math.round(
+                projectedProgress,
+              )}% de la cible. ${
+                gapValue && gapValue > 0
+                  ? `Il manque ${formatMoney(
+                      gapValue,
+                      currency,
+                      language,
+                    )}.`
+                  : "La cible est atteinte ou dépassée."
+              }`,
+              `Under the current assumptions, the trajectory ends at ${formatMoney(
+                projectedValue,
+                currency,
+                language,
+              )}, or ${Math.round(
+                projectedProgress,
+              )}% of the target. ${
+                gapValue && gapValue > 0
+                  ? `${formatMoney(
+                      gapValue,
+                      currency,
+                      language,
+                    )} remains.`
+                  : "The target is reached or exceeded."
+              }`,
+            )
+          : pick(
+              language,
+              "Ajoute une cible pour obtenir la progression, le gap et le rythme requis.",
+              "Add a target to calculate progress, gap and required pace.",
+            )}
       </div>
     </div>
   );

@@ -465,3 +465,81 @@ test("Anatole Conseil ne trace plus une cible hors échelle comme un faux plafon
     .evaluate((element) => getComputedStyle(element).overflow);
   expect(overflow).toBe("hidden");
 });
+
+test("Anatole Conseil V7 transforme la trajectoire en Trajectory Lab", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Objectif long terme",
+        horizon_years: 30,
+        target_amount: 500000,
+        current_savings: 200000,
+        monthly_contribution: 0,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-tab-scenarios").click();
+
+  const chart = page.getByTestId("advisor-trajectory-chart");
+  await expect(chart).toContainText(/TRAJECTOIRE LAB|TRAJECTORY LAB/i);
+  await expect(page.getByTestId("advisor-trajectory-summary")).toContainText(
+    /Valeur projetée|Projected value/i,
+  );
+  await expect(page.getByTestId("advisor-target-offscale")).toBeVisible();
+  await expect(page.getByTestId("advisor-target-path")).toHaveCount(0);
+  await expect(page.getByTestId("advisor-scenario-path")).toHaveCount(0);
+
+  await page.getByTestId("advisor-trajectory-scale-target").click();
+  await expect(page.getByTestId("advisor-target-path")).toHaveCount(1);
+
+  await page.getByTestId("advisor-trajectory-mode-percent").click();
+  await expect(page.getByTestId("advisor-trajectory-y-axis")).toContainText(
+    /%/,
+  );
+  await expect(page.getByTestId("advisor-target-path")).toHaveCount(1);
+  await expect(chart).toContainText(/Objectif = 100%|Target = 100%/i);
+  await expect(chart).toContainText(/Cible réelle|Actual target/i);
+});
+
+test("Anatole Conseil V7 sépare le scénario quand les hypothèses changent", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2030",
+        horizon_years: 8,
+        target_amount: 180000,
+        current_savings: 50000,
+        monthly_contribution: 500,
+        essential_monthly_expenses: 2600,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: null,
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-tab-scenarios").click();
+
+  await expect(page.getByTestId("advisor-scenario-path")).toHaveCount(0);
+  await page.getByTestId("advisor-monthly-delta").fill("300");
+  await expect(page.getByTestId("advisor-scenario-path")).toHaveCount(1);
+});
