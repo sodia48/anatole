@@ -939,12 +939,14 @@ test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({
 
   const grid = page.getByTestId("institutional-capability-grid");
   const matches = grid.locator("[data-capability-id]");
-  await expect(matches).toHaveCount(1);
+  await expect(matches).toHaveCount(2);
 
-  await matches.first().click();
+  const thesisMonitor = grid.locator('[data-capability-id="14"]');
+  await expect(thesisMonitor).toBeVisible();
+  await thesisMonitor.click();
   const detail = page.getByTestId("institutional-capability-detail");
   await expect(detail).toBeVisible();
-  await expect(detail).toContainText(/Suivi de these|Thesis Monitor/i);
+  await expect(detail).toContainText(/Suivi de th.se|Thesis Monitor/i);
 
   await expect(
     page.getByTestId("institutional-switch-mode"),
