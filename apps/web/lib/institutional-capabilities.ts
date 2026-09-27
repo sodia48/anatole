@@ -38,7 +38,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Stress multi-facteurs sur taux, devises, matières premières, marchés et macro.",
     summaryEn: "Multi-factor stress scenarios across rates, FX, commodities, markets and macro.",
     area: "Portfolio & Risk",
-    href: "/terminal",
+    href: "/institutionnel/risque",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -48,7 +48,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Stress historiques et hypothétiques sur actions, obligations, ETF, FX, options et cash.",
     summaryEn: "Historical and hypothetical stress tests across equities, bonds, ETFs, FX, options and cash.",
     area: "Portfolio & Risk",
-    href: "/terminal",
+    href: "/institutionnel/risque",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -296,7 +296,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Explique les contributions titres, secteurs, facteurs, devises et événements à une baisse.",
     summaryEn: "Explain security, sector, factor, FX and event contributions to a drawdown.",
     area: "Portfolio & Risk",
-    href: "/portefeuille",
+    href: "/institutionnel/risque",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -315,7 +315,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Détecte les concentrations directes et économiques indirectes d'un portefeuille.",
     summaryEn: "Detect direct and indirect economic concentration in a portfolio.",
     area: "Portfolio & Risk",
-    href: "/portefeuille",
+    href: "/institutionnel/risque",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {

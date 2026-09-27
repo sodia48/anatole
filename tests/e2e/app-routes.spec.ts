@@ -24,6 +24,7 @@ const routes = [
   "/ipo-insiders",
   "/institutions",
   "/institutionnel",
+  "/institutionnel/risque",
   "/notifications",
   "/parametres",
   "/portefeuille",
@@ -966,4 +967,25 @@ test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({
   await expect(
     page.getByTestId("institutional-switch-mode"),
   ).toBeVisible();
+});
+test("Anatole Institutional Risk Center rend sans métriques inventées", async ({ page }) => {
+  await page.goto("/institutionnel/risque", { waitUntil: "domcontentloaded" });
+
+  const center = page.getByTestId("institutional-risk-center");
+  await expect(center).toBeVisible();
+
+  const metrics = page.getByTestId("institutional-risk-metrics");
+  await expect(metrics).toBeVisible();
+  await expect(metrics.locator("article")).toHaveCount(8);
+
+  const empty = page.getByTestId("institutional-risk-empty");
+  if (await empty.isVisible().catch(() => false)) {
+    await expect(empty).toContainText(
+      /portefeuille|portfolio/i,
+    );
+  }
+
+  await expect(page.locator("body")).not.toContainText(
+    /Application error|Internal Server Error/i,
+  );
 });
