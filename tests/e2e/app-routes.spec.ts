@@ -922,6 +922,15 @@ test("Le choix Institutionnel ouvre les 70 capacites d'Anatole Institutional", a
   await expect(hub).toBeVisible();
   await expect(hub).toHaveAttribute("data-capability-count", "70");
 
+  const commandCenter = page.getByTestId("institutional-command-center");
+  await expect(commandCenter).toBeVisible();
+  await expect(
+    page.getByTestId("institutional-desk-grid").locator("a"),
+  ).toHaveCount(6);
+  await expect(
+    page.getByTestId("institutional-morning-brief"),
+  ).toBeVisible();
+
   const grid = page.getByTestId("institutional-capability-grid");
   await expect(grid.locator("[data-capability-id]")).toHaveCount(70);
 
