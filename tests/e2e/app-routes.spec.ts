@@ -836,10 +836,13 @@ test("Anatole Conseil V9 importe un CSV bancaire local et détecte les récurren
     buffer: Buffer.from(csv),
   });
 
-  const bank = page.locator('[data-module="01"]');
+  const pulse = page.getByTestId("advisor-v9-pulse");
+  await expect(pulse).toBeVisible();
+
+  const bank = pulse.locator('[data-module="01"]');
   await expect(bank).toContainText(/4 transaction/i);
 
-  const recurring = page.locator('[data-module="04"]');
+  const recurring = pulse.locator('[data-module="04"]');
   await expect(recurring).toContainText(/netflix/i);
 
   const stored = await page.evaluate(() =>
