@@ -934,8 +934,14 @@ test("Le choix Institutionnel ouvre les 70 capacites d'Anatole Institutional", a
 test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({ page }) => {
   await page.goto("/institutionnel", { waitUntil: "domcontentloaded" });
 
+  await page.waitForFunction(() =>
+    window.localStorage.getItem("anatole:persona:v1") === "institutionnel",
+  );
+
   const search = page.getByTestId("institutional-search");
+  await expect(search).toBeVisible();
   await search.fill("Thesis Monitor");
+  await expect(search).toHaveValue("Thesis Monitor");
 
   const grid = page.getByTestId("institutional-capability-grid");
   const matches = grid.locator("[data-capability-id]");
