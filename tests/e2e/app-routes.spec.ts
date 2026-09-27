@@ -23,6 +23,7 @@ const routes = [
   "/ipo",
   "/ipo-insiders",
   "/institutions",
+  "/institutionnel",
   "/notifications",
   "/parametres",
   "/portefeuille",
@@ -892,4 +893,60 @@ test("Anatole Conseil V9 persiste le mode urgence localement", async ({ page }) 
   await expect(page.getByTestId("advisor-v9-layer")).toContainText(
     /MODE URGENCE ACTIF|EMERGENCY MODE ACTIVE/i,
   );
+});
+
+test("Anatole demande le choix Particulier ou Institutionnel a l'ouverture", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const gateway = page.getByTestId("persona-gateway");
+  await expect(gateway).toBeVisible();
+  await expect(page.getByTestId("persona-particulier")).toBeVisible();
+  await expect(page.getByTestId("persona-institutionnel")).toBeVisible();
+
+  await page.getByTestId("persona-particulier").click();
+  await expect(page).toHaveURL(/\/aujourdhui$/);
+
+  const persona = await page.evaluate(() =>
+    window.localStorage.getItem("anatole:persona:v1"),
+  );
+  expect(persona).toBe("particulier");
+});
+
+test("Le choix Institutionnel ouvre les 70 capacites d'Anatole Institutional", async ({ page }) => {
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("persona-institutionnel").click();
+
+  await expect(page).toHaveURL(/\/institutionnel$/);
+
+  const hub = page.getByTestId("institutional-hub");
+  await expect(hub).toBeVisible();
+  await expect(hub).toHaveAttribute("data-capability-count", "70");
+
+  const grid = page.getByTestId("institutional-capability-grid");
+  await expect(grid.locator("[data-capability-id]")).toHaveCount(70);
+
+  const persona = await page.evaluate(() =>
+    window.localStorage.getItem("anatole:persona:v1"),
+  );
+  expect(persona).toBe("institutionnel");
+});
+
+test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({ page }) => {
+  await page.goto("/institutionnel", { waitUntil: "domcontentloaded" });
+
+  const search = page.getByTestId("institutional-search");
+  await search.fill("Thesis Monitor");
+
+  const grid = page.getByTestId("institutional-capability-grid");
+  const matches = grid.locator("[data-capability-id]");
+  await expect(matches).toHaveCount(1);
+
+  await matches.first().click();
+  const detail = page.getByTestId("institutional-capability-detail");
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText(/Suivi de these|Thesis Monitor/i);
+
+  await expect(
+    page.getByTestId("institutional-switch-mode"),
+  ).toBeVisible();
 });

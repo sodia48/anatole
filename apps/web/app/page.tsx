@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { PersonaGateway } from "@/components/onboarding/PersonaGateway";
 
 export default function HomePage() {
-  redirect("/aujourdhui");
+  return <PersonaGateway />;
 }

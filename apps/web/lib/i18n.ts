@@ -36,6 +36,7 @@ const NAV_ENGLISH: Record<string, string> = {
   "Compte & paramètres": "Account & settings",
   "Intelligence": "Intelligence",
   "Anatole Conseil": "Anatole Advisor",
+  "Anatole Institutionnel": "Anatole Institutional",
   "Administration": "Administration",
   "Console bêta": "Beta console",
 };
