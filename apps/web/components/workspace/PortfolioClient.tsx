@@ -312,7 +312,18 @@ function AllocationCard({ title, items, totalLabel, language }: { title: string;
   );
 }
 
-export function PortfolioClient() {
+type PortfolioClientProps = {
+  initialIntelligenceTab?:
+    | "performance"
+    | "contribution"
+    | "risk"
+    | "correlation"
+    | "stress";
+};
+
+export function PortfolioClient({
+  initialIntelligenceTab = "performance",
+}: PortfolioClientProps = {}) {
   const { preferences } = usePreferences();
   const language = preferences.language;
   const searchParams = useSearchParams();
@@ -901,7 +912,11 @@ export function PortfolioClient() {
                 </section>
               </div>
 
-              <PortfolioIntelligence language={language} snapshot={snapshot} />
+              <PortfolioIntelligence
+                initialTab={initialIntelligenceTab}
+                language={language}
+                snapshot={snapshot}
+              />
 
               <div className={styles.gridEqual}>
                 <AllocationCard language={language} title={pick(language, "Répartition sectorielle", "Sector allocation")} items={snapshot.sector_allocation} totalLabel={pick(language, "secteurs", "sectors")} />

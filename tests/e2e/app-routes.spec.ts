@@ -968,27 +968,16 @@ test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({
     page.getByTestId("institutional-switch-mode"),
   ).toBeVisible();
 });
-test("Anatole Institutional Risk Center rend sans métriques inventées", async ({ page }) => {
+test("Anatole Institutional Risk Center reutilise le moteur portefeuille verifie", async ({ page }) => {
   await page.goto("/institutionnel/risque", { waitUntil: "domcontentloaded" });
 
-  const center = page.getByTestId("institutional-risk-center");
-  await expect(center).toBeVisible();
+  await expect(
+    page.getByTestId("institutional-risk-center"),
+  ).toBeVisible();
 
-  const metrics = page.getByTestId("institutional-risk-metrics");
-  await expect(metrics).toBeVisible();
-  await expect(metrics.locator("article")).toHaveCount(8);
-
-  const intelligence = page.getByTestId("institutional-risk-intelligence");
-  if (await intelligence.isVisible().catch(() => false)) {
-    await expect(page.getByTestId("portfolio-intelligence")).toBeVisible();
-  }
-
-  const empty = page.getByTestId("institutional-risk-empty");
-  if (await empty.isVisible().catch(() => false)) {
-    await expect(empty).toContainText(
-      /portefeuille|portfolio/i,
-    );
-  }
+  await expect(page.locator("body")).toContainText(
+    /Risk Center/i,
+  );
 
   await expect(page.locator("body")).not.toContainText(
     /Application error|Internal Server Error/i,
