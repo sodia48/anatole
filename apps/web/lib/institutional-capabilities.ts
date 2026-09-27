@@ -335,7 +335,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Résumé quotidien des changements positions, risques, consensus, macro et événements.",
     summaryEn: "Daily summary of changes in holdings, risk, consensus, macro and events.",
     area: "PM Workflow",
-    href: "/aujourdhui",
+    href: "/institutionnel#command-center",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -345,7 +345,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Synthèse overnight, positions à surveiller, risques du jour et événements clés.",
     summaryEn: "Summarize overnight moves, watch positions, daily risks and key events.",
     area: "PM Workflow",
-    href: "/aujourdhui",
+    href: "/institutionnel#command-center",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {

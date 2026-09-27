@@ -26,6 +26,7 @@ import {
 } from "@/lib/institutional-capabilities";
 import { pick } from "@/lib/i18n";
 
+import { InstitutionalCommandCenter } from "./InstitutionalCommandCenter";
 import styles from "./InstitutionalHub.module.css";
 
 const PERSONA_KEY = "anatole:persona:v1";
@@ -180,6 +181,30 @@ export function InstitutionalHub() {
           </div>
         </div>
       </header>
+
+      <InstitutionalCommandCenter />
+
+      <section className={styles.libraryIntro}>
+        <div>
+          <span className={styles.kicker}>
+            {pick(language, "CAPABILITY LIBRARY", "CAPABILITY LIBRARY")}
+          </span>
+          <h2>
+            {pick(
+              language,
+              "70 capacités, organisées comme une bibliothèque de construction.",
+              "70 capabilities, organized as a build library.",
+            )}
+          </h2>
+        </div>
+        <p>
+          {pick(
+            language,
+            "Le Command Center est le produit opérationnel. La bibliothèque ci-dessous expose les ponts déjà utilisables, les fondations V1 et les intégrations encore nécessaires.",
+            "The Command Center is the operating product. The library below exposes usable bridges, V1 foundations and integrations that are still required.",
+          )}
+        </p>
+      </section>
 
       <section className={styles.truthBar}>
         <ShieldCheck size={18} />

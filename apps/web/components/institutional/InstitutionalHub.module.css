@@ -324,3 +324,33 @@
   .card{min-height:160px}
   .resultMeta{align-items:flex-start;flex-direction:column}
 }
+
+.libraryIntro{
+  padding:8px 2px 0;
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:18px;
+}
+.libraryIntro>div{
+  display:grid;
+  gap:4px;
+}
+.libraryIntro h2{
+  margin:0;
+  font-size:18px;
+  letter-spacing:-.02em;
+}
+.libraryIntro p{
+  max-width:650px;
+  margin:0;
+  color:var(--muted);
+  font-size:8px;
+  line-height:1.5;
+}
+@media(max-width:900px){
+  .libraryIntro{
+    align-items:flex-start;
+    flex-direction:column;
+  }
+}
