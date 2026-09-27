@@ -24,6 +24,7 @@ const routes = [
   "/ipo-insiders",
   "/institutions",
   "/institutionnel",
+  "/institutionnel/risque",
   "/notifications",
   "/parametres",
   "/portefeuille",
@@ -966,4 +967,19 @@ test("Anatole Institutional permet de chercher et ouvrir une capacite", async ({
   await expect(
     page.getByTestId("institutional-switch-mode"),
   ).toBeVisible();
+});
+test("Anatole Institutional Risk Center reutilise le moteur portefeuille verifie", async ({ page }) => {
+  await page.goto("/institutionnel/risque", { waitUntil: "domcontentloaded" });
+
+  await expect(
+    page.getByTestId("institutional-risk-center"),
+  ).toBeVisible();
+
+  await expect(page.locator("body")).toContainText(
+    /Risk Center/i,
+  );
+
+  await expect(page.locator("body")).not.toContainText(
+    /Application error|Internal Server Error/i,
+  );
 });

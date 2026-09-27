@@ -412,7 +412,7 @@ export function InstitutionalCommandCenter() {
             "Les mesures de risque nécessitent un portefeuille.",
             "Risk measures require a portfolio.",
           ),
-      href: "/portefeuille",
+      href: "/institutionnel/risque",
     },
     {
       key: "research",
