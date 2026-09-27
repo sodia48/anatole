@@ -98,7 +98,7 @@ export default async function InstitutionalMacroPage({
           </div>
           <div className={styles.three}>
             <label>Crédit<select name="credit" defaultValue={credit}><option value="up">Se resserre</option><option value="flat">Stable / mixte</option><option value="down">Se détend</option></select></label>
-            <label>CAD<select name="cad" defaultValue={cad}><option value="up">Se renforce</option><option value="flat">Stable / mixte</option><option value="down">S'affaiblit</option></select></label>
+            <label>CAD<select name="cad" defaultValue={cad}><option value="up">Se renforce</option><option value="flat">Stable / mixte</option><option value="down">S&apos;affaiblit</option></select></label>
             <label>Pétrole<select name="oil" defaultValue={oil}><option value="up">Monte</option><option value="flat">Stable / mixte</option><option value="down">Baisse</option></select></label>
           </div>
           <label>Horizon<input name="horizon" defaultValue={horizon} placeholder="3-6 mois, 12 mois..." /></label>
