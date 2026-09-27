@@ -206,6 +206,12 @@ const groups: Array<{
         icon: Bot,
         available: true,
       },
+      {
+        href: "/institutionnel",
+        label: "Anatole Institutionnel",
+        icon: Building2,
+        available: true,
+      },
     ],
   },
   {
@@ -944,6 +950,24 @@ export function AppSidebar({
           <span>
             <strong>{pick(language, "Compte & paramètres", "Account & settings")}</strong>
             <small>{pick(language, "Compte · préférences · données", "Account · preferences · data")}</small>
+          </span>
+        </Link>
+
+        <Link
+          href="/"
+          data-testid="persona-switch-link"
+          className="sidebar-account-shortcut"
+          onClick={() => setDrawerOpen(false)}
+          title={
+            sidebarCollapsed
+              ? pick(language, "Changer de mode", "Switch mode")
+              : undefined
+          }
+        >
+          <Building2 size={19} />
+          <span>
+            <strong>{pick(language, "Changer de mode", "Switch mode")}</strong>
+            <small>{pick(language, "Particulier ou institutionnel", "Individual or institutional")}</small>
           </span>
         </Link>
 
