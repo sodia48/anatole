@@ -446,7 +446,7 @@ export function InstitutionalCommandCenter() {
             `Participation haussière ${marketBreadth.toFixed(0)} %`,
             `Advancing breadth ${marketBreadth.toFixed(0)} %`,
           ),
-      href: "/canada",
+      href: "/institutionnel/macro",
     },
     {
       key: "events",

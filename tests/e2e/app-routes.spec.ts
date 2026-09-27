@@ -27,6 +27,7 @@ const routes = [
   "/institutionnel/comite",
   "/institutionnel/construction",
   "/institutionnel/gouvernance",
+  "/institutionnel/macro",
   "/institutionnel/recherche",
   "/institutionnel/risque",
   "/notifications",
@@ -1116,4 +1117,16 @@ test("Anatole Institutional compare deux scenarios pre-trade sans ordre", async 
   await expect(comparison).toContainText("Scénario A");
   await expect(comparison).toContainText("Scénario B");
   await expect(comparison).toContainText("À revoir");
+});
+test("Anatole Institutional structure un scenario macro hypothetique", async ({ page }) => {
+  await page.goto("/institutionnel/macro", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("institutional-macro-center")).toBeVisible();
+  await page.locator('select[name="growth"]').selectOption("down");
+  await page.locator('select[name="inflation"]').selectOption("up");
+  await page.locator('textarea[name="evidence"]').fill("Validation dans Canada 360 requise.");
+  await page.getByRole("button", { name: "Générer le mémo macro" }).click();
+  const memo = page.getByTestId("institutional-macro-memo");
+  await expect(memo).toBeVisible();
+  await expect(memo).toContainText("Ralentissement inflationniste");
+  await expect(memo).toContainText(/ne constitue pas une prévision/i);
 });
