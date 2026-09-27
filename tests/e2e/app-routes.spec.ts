@@ -690,3 +690,206 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
     page.getByLabel(/Volatilité hypothétique|Assumed volatility/i),
   ).toHaveValue("12.5");
 });
+
+test("Anatole Conseil V9 expose les 35 capacités dans sept espaces", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "home",
+        goal_name: "Maison 2032",
+        horizon_years: 6,
+        target_amount: 180000,
+        current_savings: 52000,
+        monthly_contribution: 800,
+        essential_monthly_expenses: 2400,
+        liquid_reserve: 16000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "medium",
+        loss_comfort: "medium",
+        experience: "intermediate"
+      }),
+    );
+    window.localStorage.setItem(
+      "anatole:advisor-workspace:v4",
+      JSON.stringify({
+        financialOs: {
+          household: {
+            userIncome: 5400,
+            partnerIncome: 0,
+            dependants: 0,
+            cash: 16000,
+            investments: 48000,
+            property: 0,
+            vehicles: 10000,
+            otherAssets: 0,
+            essentialExpenses: 2100,
+            discretionaryExpenses: 650,
+            housingCosts: 1250,
+            insuranceCosts: 170,
+            otherFixedCosts: 130
+          },
+          debts: [
+            {
+              id: "card",
+              label: "Carte",
+              balance: 3500,
+              annualRate: 19.99,
+              monthlyPayment: 250
+            }
+          ],
+          goals: [
+            {
+              id: "home",
+              label: "Maison",
+              target: 180000,
+              current: 52000,
+              monthly: 500,
+              horizonMonths: 72
+            }
+          ],
+          events: [
+            {
+              id: "move",
+              label: "Déménagement",
+              monthOffset: 18,
+              oneTimeCost: 4500,
+              recurringMonthlyCost: 0,
+              monthlyIncomeDelta: 0
+            }
+          ]
+        },
+        v8: {
+          province: "QC",
+          expectedReturn: 5,
+          volatility: 11
+        }
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  const v9 = page.getByTestId("advisor-v9-layer");
+  await expect(v9).toBeVisible();
+  await expect(v9).toHaveAttribute("data-feature-count", "35");
+  await expect(v9).toContainText(/V9 INTELLIGENCE OS/i);
+
+  const spaces = [
+    "pulse",
+    "household",
+    "labs",
+    "intelligence",
+    "decisions",
+    "optimize",
+    "pro",
+  ] as const;
+
+  for (const key of spaces) {
+    await page.getByTestId(`advisor-v9-tab-${key}`).click();
+    const zone = page.getByTestId(`advisor-v9-${key}`);
+    await expect(zone).toBeVisible();
+    await expect(zone.locator("[data-module]")).toHaveCount(5);
+  }
+
+  await expect(page.getByTestId("advisor-v8-layer")).toBeVisible();
+});
+
+test("Anatole Conseil V9 importe un CSV bancaire local et détecte les récurrences", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "reserve",
+        goal_name: "Réserve",
+        horizon_years: 2,
+        target_amount: 25000,
+        current_savings: 9000,
+        monthly_contribution: 500,
+        essential_monthly_expenses: 2200,
+        liquid_reserve: 9000,
+        high_interest_debt: false,
+        income_stability: "high",
+        liquidity_need: "high",
+        loss_comfort: "low",
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+
+  const csv = [
+    "date,description,amount",
+    "2026-05-01,Netflix,-20",
+    "2026-06-01,Netflix,-20",
+    "2026-07-01,Netflix,-20",
+    "2026-07-02,Payroll,3200",
+  ].join("\n");
+
+  await page.getByTestId("advisor-v9-bank-csv").setInputFiles({
+    name: "bank.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(csv),
+  });
+
+  const pulse = page.getByTestId("advisor-v9-pulse");
+  await expect(pulse).toBeVisible();
+
+  const bank = pulse.locator('[data-module="01"]');
+  await expect(bank).toContainText(/4 transaction/i);
+
+  const recurring = pulse.locator('[data-module="04"]');
+  await expect(recurring).toContainText(/netflix/i);
+
+  const stored = await page.evaluate(() =>
+    window.localStorage.getItem("anatole:advisor-v9-local:v1"),
+  );
+  expect(stored).toContain("Netflix");
+
+  const syncedWorkspace = await page.evaluate(() =>
+    window.localStorage.getItem("anatole:advisor-workspace:v4"),
+  );
+  expect(syncedWorkspace ?? "").not.toContain("Netflix");
+});
+
+test("Anatole Conseil V9 persiste le mode urgence localement", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      "anatole:advisor-profile:v1",
+      JSON.stringify({
+        currency: "CAD",
+        goal_type: "wealth",
+        goal_name: "Capital",
+        horizon_years: 10,
+        target_amount: 250000,
+        current_savings: 60000,
+        monthly_contribution: 700,
+        essential_monthly_expenses: 2500,
+        liquid_reserve: 12000,
+        high_interest_debt: false,
+        income_stability: "medium",
+        liquidity_need: "medium",
+        loss_comfort: "medium",
+        experience: "intermediate"
+      }),
+    );
+  });
+
+  await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v9-tab-pro").click();
+
+  const toggle = page.getByTestId("advisor-v9-emergency-toggle");
+  await toggle.check();
+  await expect(toggle).toBeChecked();
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v9-tab-pro").click();
+  await expect(page.getByTestId("advisor-v9-emergency-toggle")).toBeChecked();
+  await expect(page.getByTestId("advisor-v9-layer")).toContainText(
+    /MODE URGENCE ACTIF|EMERGENCY MODE ACTIVE/i,
+  );
+});
