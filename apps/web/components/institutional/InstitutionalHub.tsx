@@ -163,7 +163,11 @@ export function InstitutionalHub() {
               Macro
               <ArrowUpRight size={15} />
             </Link>
-            <Link href="/focus/RY">
+            <Link href="/institutionnel/attribution">
+              Attribution
+              <ArrowUpRight size={15} />
+            </Link>
+            <Link href="/institutionnel/recherche">
               Research
               <ArrowUpRight size={15} />
             </Link>
