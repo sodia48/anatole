@@ -100,6 +100,9 @@ export default async function InstitutionalResearchPage({
         <Link href="/actualites">Actualités →</Link>
         <Link href="/calendrier">Calendrier →</Link>
         <Link href="/assistant">Copilote recherche →</Link>
+        <Link href="/institutionnel/comite">
+          Comité d&apos;investissement →
+        </Link>
       </section>
 
       <div className={styles.layout}>
@@ -321,11 +324,22 @@ export default async function InstitutionalResearchPage({
               La persistance compte/équipe et la détection automatique de rupture
               feront l&apos;objet de la prochaine couche.
             </span>
-            {symbol ? (
-              <Link href={`/focus/${encodeURIComponent(symbol)}`}>
-                Vérifier {symbol} dans Focus →
+            <div>
+              {symbol ? (
+                <Link href={`/focus/${encodeURIComponent(symbol)}`}>
+                  Vérifier {symbol} dans Focus →
+                </Link>
+              ) : null}
+              <Link
+                href={
+                  symbol
+                    ? `/institutionnel/comite?symbol=${encodeURIComponent(symbol)}&thesis=${encodeURIComponent(thesis)}`
+                    : "/institutionnel/comite"
+                }
+              >
+                Préparer le comité →
               </Link>
-            ) : null}
+            </div>
           </footer>
         </section>
       ) : (
