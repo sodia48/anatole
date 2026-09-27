@@ -25,6 +25,7 @@ const routes = [
   "/institutions",
   "/institutionnel",
   "/institutionnel/comite",
+  "/institutionnel/construction",
   "/institutionnel/gouvernance",
   "/institutionnel/recherche",
   "/institutionnel/risque",
@@ -1098,4 +1099,21 @@ test("Anatole Institutional structure un pack de preuve gouvernance", async ({ p
   await expect(page.locator("body")).not.toContainText(
     /Application error|Internal Server Error/i,
   );
+});
+test("Anatole Institutional compare deux scenarios pre-trade sans ordre", async ({ page }) => {
+  await page.goto("/institutionnel/construction", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("institutional-construction-center")).toBeVisible();
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="portfolio_value"]').fill("1000000");
+  await page.locator('input[name="current_weight"]').fill("4");
+  await page.locator('input[name="target_a"]').fill("5");
+  await page.locator('input[name="target_b"]').fill("7");
+  await page.locator('input[name="max_position"]').fill("6");
+  await page.locator('input[name="cost_bps"]').fill("10");
+  await page.getByRole("button", { name: "Comparer les scénarios" }).click();
+  const comparison = page.getByTestId("institutional-pretrade-comparison");
+  await expect(comparison).toBeVisible();
+  await expect(comparison).toContainText("Scénario A");
+  await expect(comparison).toContainText("Scénario B");
+  await expect(comparison).toContainText("À revoir");
 });

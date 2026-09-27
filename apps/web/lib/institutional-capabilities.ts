@@ -251,7 +251,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Teste des allocations sous contraintes de risque, liquidité, concentration et cash.",
     summaryEn: "Test allocations under risk, liquidity, concentration and cash constraints.",
     area: "Construction & Trading",
-    href: "/portefeuille",
+    href: "/institutionnel/construction",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -261,7 +261,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Compare plusieurs rééquilibrages par risque, turnover, coûts et expositions.",
     summaryEn: "Compare rebalancing paths by risk, turnover, costs and exposures.",
     area: "Construction & Trading",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/construction",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 27,
@@ -396,6 +397,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Montre l'impact hypothétique d'une transaction sur concentration, facteurs et liquidité.",
     summaryEn: "Show hypothetical trade impact on concentration, factors and liquidity.",
     area: "Construction & Trading",
+    href: "/institutionnel/construction",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -405,6 +407,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Encode limites de concentration, cash, secteurs, liquidité et autres règles internes.",
     summaryEn: "Encode concentration, cash, sector, liquidity and internal mandate limits.",
     area: "Construction & Trading",
+    href: "/institutionnel/construction",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
