@@ -25,6 +25,7 @@ const routes = [
   "/institutions",
   "/institutionnel",
   "/institutionnel/comite",
+  "/institutionnel/gouvernance",
   "/institutionnel/recherche",
   "/institutionnel/risque",
   "/notifications",
@@ -1055,6 +1056,44 @@ test("Anatole Institutional structure une decision de comite humaine", async ({ 
   await expect(memo).toContainText("RY");
   await expect(memo).toContainText("Décision différée");
   await expect(memo).toContainText(/Motifs consignés/);
+
+  await expect(page.locator("body")).not.toContainText(
+    /Application error|Internal Server Error/i,
+  );
+});
+test("Anatole Institutional structure un pack de preuve gouvernance", async ({ page }) => {
+  await page.goto("/institutionnel/gouvernance", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-governance-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="subject"]').fill("RY");
+  await page.locator('input[name="source"]').fill("TMX");
+  await page.locator('input[name="provider"]').fill("TMX");
+  await page.locator('input[name="model_version"]').fill(
+    "portfolio-risk-v1",
+  );
+  await page.locator('textarea[name="transformation"]').fill(
+    "Transformation documentée par l'équipe.",
+  );
+  await page.locator('textarea[name="limitations"]').fill(
+    "Couverture à vérifier.",
+  );
+
+  await page.getByRole("button", {
+    name: "Générer le pack de preuve",
+  }).click();
+
+  await expect(page).toHaveURL(/subject=RY/);
+
+  const pack = page.getByTestId("institutional-evidence-pack");
+  await expect(pack).toBeVisible();
+  await expect(pack).toContainText("RY");
+  await expect(pack).toContainText("TMX");
+  await expect(pack).toContainText("portfolio-risk-v1");
 
   await expect(page.locator("body")).not.toContainText(
     /Application error|Internal Server Error/i,

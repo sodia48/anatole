@@ -476,7 +476,7 @@ export function InstitutionalCommandCenter() {
             "Qualité et provenance non disponibles.",
             "Quality and provenance unavailable.",
           ),
-      href: "/parametres?section=quality",
+      href: "/institutionnel/gouvernance",
     },
   ];
 

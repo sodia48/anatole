@@ -203,7 +203,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Expose source, date, fournisseur, transformation, fréquence et fraîcheur de chaque donnée.",
     summaryEn: "Expose source, date, provider, transformation, frequency and freshness for each data point.",
     area: "Data & Governance",
-    href: "/qualite",
+    href: "/institutionnel/gouvernance",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -213,7 +213,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Mesure fraîcheur, cohérence, anomalies et données manquantes sans noter l'investissement.",
     summaryEn: "Measure freshness, consistency, anomalies and missing data without scoring the investment.",
     area: "Data & Governance",
-    href: "/qualite",
+    href: "/institutionnel/gouvernance",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -376,7 +376,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Conserve qui a décidé quoi, quand, pourquoi et avec quelles données.",
     summaryEn: "Record who decided what, when, why and with which data.",
     area: "Data & Governance",
-    href: "/institutionnel/comite",
+    href: "/institutionnel/gouvernance",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -386,7 +386,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Versionne modèles, hypothèses, calculs et sorties utilisées dans une décision.",
     summaryEn: "Version models, assumptions, calculations and outputs used in decisions.",
     area: "Data & Governance",
-    href: "/institutionnel/comite",
+    href: "/institutionnel/gouvernance",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -414,6 +414,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Conserve les éléments expliquant pourquoi un signal ou une alerte a été produit.",
     summaryEn: "Retain evidence explaining why a signal or alert was produced.",
     area: "Data & Governance",
+    href: "/institutionnel/gouvernance",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -674,7 +675,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Explique conclusions, sources, hypothèses, transformations et données manquantes.",
     summaryEn: "Explain conclusions, sources, assumptions, transformations and missing data.",
     area: "Data & Governance",
-    href: "/qualite",
+    href: "/institutionnel/gouvernance",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
 ];
