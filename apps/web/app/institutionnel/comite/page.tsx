@@ -110,6 +110,7 @@ export default async function InstitutionalCommitteePage({
       <section className={styles.commandStrip}>
         <Link href="/institutionnel/recherche">Research & Thesis →</Link>
         <Link href="/institutionnel/risque">Risk Center →</Link>
+        <Link href="/institutionnel/construction">Construction / Pre-Trade →</Link>
         <Link href="/portefeuille">Portefeuille →</Link>
         <Link href="/institutionnel/gouvernance">
           Data Governance →

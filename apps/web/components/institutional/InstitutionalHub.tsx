@@ -151,6 +151,10 @@ export function InstitutionalHub() {
               {pick(language, "Portefeuille", "Portfolio")}
               <ArrowUpRight size={15} />
             </Link>
+            <Link href="/institutionnel/construction">
+              {pick(language, "Construction", "Construction")}
+              <ArrowUpRight size={15} />
+            </Link>
             <Link href="/terminal">
               Terminal Pro
               <ArrowUpRight size={15} />
