@@ -159,7 +159,7 @@ export function InstitutionalHub() {
               Terminal Pro
               <ArrowUpRight size={15} />
             </Link>
-            <Link href="/canada">
+            <Link href="/institutionnel/macro">
               Macro
               <ArrowUpRight size={15} />
             </Link>

@@ -96,7 +96,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Relie taux, inflation, crédit et croissance aux secteurs puis aux positions.",
     summaryEn: "Link rates, inflation, credit and growth to sectors and portfolio holdings.",
     area: "Macro & Regimes",
-    href: "/canada",
+    href: "/institutionnel/macro",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -106,7 +106,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Classe les environnements de croissance, inflation, liquidité, taux et crédit.",
     summaryEn: "Classify growth, inflation, liquidity, rates and credit regimes.",
     area: "Macro & Regimes",
-    href: "/psychologie",
+    href: "/institutionnel/macro",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
