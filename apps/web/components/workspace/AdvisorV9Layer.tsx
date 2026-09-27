@@ -1003,24 +1003,13 @@ export function AdvisorV9Layer({
       ? totalDebt - previousVisit.totalDebt
       : null;
 
-  const monteCarloResult = useMemo(
-    () =>
-      monteCarlo(
-        Math.max(0, finite(currentSavings)),
-        Math.max(0, monthlyContribution),
-        Math.max(1, finite(horizonMonths)),
-        expectedReturn,
-        volatility,
-        target,
-      ),
-    [
-      currentSavings,
-      expectedReturn,
-      horizonMonths,
-      monthlyContribution,
-      target,
-      volatility,
-    ],
+  const monteCarloResult = monteCarlo(
+    Math.max(0, finite(currentSavings)),
+    Math.max(0, monthlyContribution),
+    Math.max(1, finite(horizonMonths)),
+    expectedReturn,
+    volatility,
+    target,
   );
 
   const retirementYears = Math.max(
@@ -1416,6 +1405,25 @@ export function AdvisorV9Layer({
           : "family",
     });
     setNewFamilyName("");
+  };
+
+
+  const saveDecisionSnapshot = () => {
+    const createdAt = new Date().toISOString();
+    updateV9({
+      decisionHistory: [
+        ...v9.decisionHistory,
+        {
+          id: `decision-${createdAt}-${v9.decisionHistory.length}`,
+          label: pick(
+            language,
+            `Snapshot décision · marge ${money(health.monthlyMargin, currency, language)}`,
+            `Decision snapshot · margin ${money(health.monthlyMargin, currency, language)}`,
+          ),
+          createdAt,
+        },
+      ].slice(-60),
+    });
   };
 
   const onCsvImport = async (
@@ -2054,22 +2062,7 @@ export function AdvisorV9Layer({
             <button
               type="button"
               className={styles.action}
-              onClick={() =>
-                updateV9({
-                  decisionHistory: [
-                    ...v9.decisionHistory,
-                    {
-                      id: `decision-${Date.now()}`,
-                      label: pick(
-                        language,
-                        `Snapshot décision · marge ${money(health.monthlyMargin, currency, language)}`,
-                        `Decision snapshot · margin ${money(health.monthlyMargin, currency, language)}`,
-                      ),
-                      createdAt: new Date().toISOString(),
-                    },
-                  ].slice(-60),
-                })
-              }
+              onClick={saveDecisionSnapshot}
             >
               {pick(language, "Enregistrer cette version", "Save this version")}
             </button>
