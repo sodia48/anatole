@@ -506,6 +506,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Analyse chevauchements, facteurs et concentrations entre plusieurs mandats.",
     summaryEn: "Analyze overlaps, factors and concentration across multiple managers.",
     area: "Funds & Multi-Asset",
+    href: "/institutionnel/multi-actifs",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -515,7 +516,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Traverse ETF et fonds pour révéler les expositions finales sous-jacentes.",
     summaryEn: "Look through ETFs and funds to reveal underlying exposures.",
     area: "Funds & Multi-Asset",
-    href: "/etf",
+    href: "/institutionnel/multi-actifs",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -525,7 +526,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Suit composition, spread, tracking, liquidité et overlap institutionnel.",
     summaryEn: "Track composition, spreads, tracking, liquidity and institutional overlap.",
     area: "Funds & Multi-Asset",
-    href: "/etf",
+    href: "/institutionnel/multi-actifs",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -535,6 +536,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Courbe de taux, duration, convexité, spread, maturités et scénarios de taux.",
     summaryEn: "Yield curve, duration, convexity, spreads, maturities and rate scenarios.",
     area: "Funds & Multi-Asset",
+    href: "/institutionnel/multi-actifs",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -544,6 +546,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Analyse maturités, couverture, refinancement, spreads et exposition aux taux.",
     summaryEn: "Analyze maturities, coverage, refinancing, spreads and rate exposure.",
     area: "Funds & Multi-Asset",
+    href: "/institutionnel/multi-actifs",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -553,7 +556,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Greeks, volatilité implicite, skew, expirations et scénarios.",
     summaryEn: "Greeks, implied volatility, skew, expiries and scenarios.",
     area: "Funds & Multi-Asset",
-    href: "/options",
+    href: "/institutionnel/multi-actifs",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -563,7 +566,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Mesure exposition devise et impact de couvertures hypothétiques.",
     summaryEn: "Measure currency exposure and hypothetical hedge impact.",
     area: "Funds & Multi-Asset",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 58,
@@ -572,6 +576,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Relie producteurs, consommateurs et titres sensibles aux matières premières.",
     summaryEn: "Connect producers, consumers and securities sensitive to commodities.",
     area: "Funds & Multi-Asset",
+    href: "/institutionnel/multi-actifs",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -581,6 +586,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Intègre infrastructure, immobilier, énergie et ressources au même moteur de risque.",
     summaryEn: "Bring infrastructure, real estate, energy and resources into one risk engine.",
     area: "Funds & Multi-Asset",
+    href: "/institutionnel/multi-actifs",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
