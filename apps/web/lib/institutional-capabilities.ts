@@ -116,6 +116,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Attribue la performance à la sélection, allocation, devises, facteurs et timing.",
     summaryEn: "Attribute returns to selection, allocation, FX, factors and timing.",
     area: "Portfolio & Risk",
+    href: "/institutionnel/attribution",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -125,7 +126,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Compare le rationnel d'une décision à ce qui s'est réellement produit ensuite.",
     summaryEn: "Compare a decision rationale with what actually happened afterward.",
     area: "Research & Thesis",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/attribution",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 13,
@@ -358,7 +360,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Standardise thèse, valorisation, scénarios, risques, catalyseurs et sources.",
     summaryEn: "Standardize thesis, valuation, scenarios, risks, catalysts and sources.",
     area: "PM Workflow",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/comite",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 37,

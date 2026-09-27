@@ -429,6 +429,9 @@ export default async function InstitutionalCommitteePage({
             <div>
               <Link href="/institutionnel/recherche">Revoir la thèse →</Link>
               <Link href="/institutionnel/risque">Revoir le risque →</Link>
+              <Link href={symbol ? `/institutionnel/attribution?symbol=${encodeURIComponent(symbol)}` : "/institutionnel/attribution"}>
+                Préparer le post-mortem →
+              </Link>
             </div>
           </footer>
         </section>

@@ -24,6 +24,7 @@ const routes = [
   "/ipo-insiders",
   "/institutions",
   "/institutionnel",
+  "/institutionnel/attribution",
   "/institutionnel/comite",
   "/institutionnel/construction",
   "/institutionnel/gouvernance",
@@ -1129,4 +1130,24 @@ test("Anatole Institutional structure un scenario macro hypothetique", async ({ 
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("Ralentissement inflationniste");
   await expect(memo).toContainText(/ne constitue pas une prévision/i);
+});
+test("Anatole Institutional calcule un post-mortem attribution", async ({ page }) => {
+  await page.goto("/institutionnel/attribution", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("institutional-attribution-center")).toBeVisible();
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="portfolio_return"]').fill("8");
+  await page.locator('input[name="benchmark_return"]').fill("5");
+  await page.locator('input[name="allocation_bps"]').fill("50");
+  await page.locator('input[name="selection_bps"]').fill("200");
+  await page.locator('input[name="fx_bps"]').fill("25");
+  await page.locator('input[name="factor_bps"]').fill("10");
+  await page.locator('input[name="timing_bps"]').fill("15");
+  await page.locator('input[name="fees_bps"]').fill("-10");
+  await page.getByRole("button", { name: "Générer la revue" }).click();
+  const memo = page.getByTestId("institutional-attribution-memo");
+  await expect(memo).toBeVisible();
+  await expect(memo).toContainText("+300 bps");
+  await expect(memo).toContainText("+290 bps");
+  await expect(memo).toContainText("+10 bps");
+  await expect(memo).toContainText(/entrées analyste V1/i);
 });
