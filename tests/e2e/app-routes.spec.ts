@@ -24,6 +24,7 @@ const routes = [
   "/ipo-insiders",
   "/institutions",
   "/institutionnel",
+  "/institutionnel/comite",
   "/institutionnel/recherche",
   "/institutionnel/risque",
   "/notifications",
@@ -1012,6 +1013,48 @@ test("Anatole Institutional structure une these sans inventer de donnees", async
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("RY");
   await expect(memo).toContainText(/Croissance des revenus/);
+
+  await expect(page.locator("body")).not.toContainText(
+    /Application error|Internal Server Error/i,
+  );
+});
+test("Anatole Institutional structure une decision de comite humaine", async ({ page }) => {
+  await page.goto("/institutionnel/comite", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-committee-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="analyst"]').fill("Analyste test");
+  await page.locator('input[name="pm"]').fill("PM test");
+  await page.locator('textarea[name="thesis"]').fill(
+    "Thèse soumise au comité pour vérification.",
+  );
+  await page.locator('textarea[name="evidence"]').fill(
+    "Sources et preuves à vérifier dans Anatole.",
+  );
+  await page.locator('textarea[name="risk_review"]').fill(
+    "Risque revu avant toute décision.",
+  );
+  await page.locator('textarea[name="rationale"]').fill(
+    "Motifs consignés par le comité.",
+  );
+  await page.locator('select[name="decision"]').selectOption("hold");
+
+  await page.getByRole("button", {
+    name: "Générer le mémo comité",
+  }).click();
+
+  await expect(page).toHaveURL(/symbol=RY/);
+
+  const memo = page.getByTestId("institutional-committee-memo");
+  await expect(memo).toBeVisible();
+  await expect(memo).toContainText("RY");
+  await expect(memo).toContainText("Décision différée");
+  await expect(memo).toContainText(/Motifs consignés/);
 
   await expect(page.locator("body")).not.toContainText(
     /Application error|Internal Server Error/i,

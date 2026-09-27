@@ -366,7 +366,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Flux analyste → PM → risque → décision → suivi de thèse.",
     summaryEn: "Workflow from analyst to PM to risk to decision and thesis monitoring.",
     area: "PM Workflow",
-    stage: "roadmap" as InstitutionalCapabilityStage,
+    href: "/institutionnel/comite",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 38,
@@ -375,6 +376,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Conserve qui a décidé quoi, quand, pourquoi et avec quelles données.",
     summaryEn: "Record who decided what, when, why and with which data.",
     area: "Data & Governance",
+    href: "/institutionnel/comite",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -384,6 +386,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Versionne modèles, hypothèses, calculs et sorties utilisées dans une décision.",
     summaryEn: "Version models, assumptions, calculations and outputs used in decisions.",
     area: "Data & Governance",
+    href: "/institutionnel/comite",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
