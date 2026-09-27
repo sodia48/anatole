@@ -423,10 +423,10 @@ export function InstitutionalCommandCenter() {
         : pick(language, "N/D", "N/A"),
       detail: pick(
         language,
-        "Actualités sourcées aujourd'hui; le registre de thèses reste une fondation V1.",
-        "Sourced news today; the thesis registry remains a V1 foundation.",
+        "Thèses, catalyseurs, risques et invalidation reliés aux sources Anatole.",
+        "Theses, catalysts, risks and invalidation linked to Anatole sources.",
       ),
-      href: "/actualites",
+      href: "/institutionnel/recherche",
     },
     {
       key: "macro",

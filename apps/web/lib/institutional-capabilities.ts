@@ -134,6 +134,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Conserve thèse, catalyseurs, risques, horizon, prix et conditions d'invalidation.",
     summaryEn: "Store thesis, catalysts, risks, horizon, price and invalidation conditions.",
     area: "Research & Thesis",
+    href: "/institutionnel/recherche",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -143,7 +144,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Surveille automatiquement les variables qui soutiennent chaque thèse d'investissement.",
     summaryEn: "Monitor the variables supporting each investment thesis.",
     area: "Research & Thesis",
-    href: "/focus/RY",
+    href: "/institutionnel/recherche",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -153,6 +154,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Signale lorsqu'une hypothèse critique n'est plus soutenue par les données.",
     summaryEn: "Flag when a critical thesis assumption is no longer supported by data.",
     area: "Research & Thesis",
+    href: "/institutionnel/recherche",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -162,7 +164,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Relie résultats, guidance, M&A, réglementation, contrats et refinancement aux positions.",
     summaryEn: "Link earnings, guidance, M&A, regulation, contracts and refinancing to holdings.",
     area: "Research & Thesis",
-    href: "/actualites",
+    href: "/institutionnel/recherche",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -172,7 +174,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Prépare consensus, surprises, KPI, guidance, révisions et réaction post-résultats.",
     summaryEn: "Prepare consensus, surprises, KPIs, guidance, revisions and post-earnings reaction.",
     area: "Research & Thesis",
-    href: "/calendrier",
+    href: "/institutionnel/recherche",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -182,7 +184,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Assemble filings, résultats, comparables, macro et portefeuille avec sources traçables.",
     summaryEn: "Assemble filings, earnings, peers, macro and portfolio context with traceable sources.",
     area: "Research & Thesis",
-    href: "/assistant",
+    href: "/institutionnel/recherche",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
