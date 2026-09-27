@@ -978,6 +978,11 @@ test("Anatole Institutional Risk Center rend sans métriques inventées", async 
   await expect(metrics).toBeVisible();
   await expect(metrics.locator("article")).toHaveCount(8);
 
+  const intelligence = page.getByTestId("institutional-risk-intelligence");
+  if (await intelligence.isVisible().catch(() => false)) {
+    await expect(page.getByTestId("portfolio-intelligence")).toBeVisible();
+  }
+
   const empty = page.getByTestId("institutional-risk-empty");
   if (await empty.isVisible().catch(() => false)) {
     await expect(empty).toContainText(

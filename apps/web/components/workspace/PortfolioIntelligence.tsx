@@ -406,11 +406,13 @@ function StressView({
 export function PortfolioIntelligence({
   snapshot,
   language,
+  initialTab = "performance",
 }: {
   snapshot: PortfolioSnapshot;
   language: AnatoleLanguage;
+  initialTab?: IntelligenceTab;
 }) {
-  const [tab, setTab] = useState<IntelligenceTab>("performance");
+  const [tab, setTab] = useState<IntelligenceTab>(initialTab);
   const performance = snapshot.performance_horizons ?? [];
   const contributions = snapshot.contribution_horizons ?? [];
   const oneDay = performance.find((item) => item.horizon === "1d");
