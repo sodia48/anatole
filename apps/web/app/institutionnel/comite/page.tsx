@@ -111,6 +111,9 @@ export default async function InstitutionalCommitteePage({
         <Link href="/institutionnel/recherche">Research & Thesis →</Link>
         <Link href="/institutionnel/risque">Risk Center →</Link>
         <Link href="/portefeuille">Portefeuille →</Link>
+        <Link href="/institutionnel/gouvernance">
+          Data Governance →
+        </Link>
         <Link href="/parametres?section=quality">Qualité des données →</Link>
         {symbol ? (
           <Link href={`/focus/${encodeURIComponent(symbol)}`}>
