@@ -24,6 +24,7 @@ const routes = [
   "/ipo-insiders",
   "/institutions",
   "/institutionnel",
+  "/institutionnel/recherche",
   "/institutionnel/risque",
   "/notifications",
   "/parametres",
@@ -978,6 +979,39 @@ test("Anatole Institutional Risk Center reutilise le moteur portefeuille verifie
   await expect(page.locator("body")).toContainText(
     /Risk Center/i,
   );
+
+  await expect(page.locator("body")).not.toContainText(
+    /Application error|Internal Server Error/i,
+  );
+});
+test("Anatole Institutional structure une these sans inventer de donnees", async ({ page }) => {
+  await page.goto("/institutionnel/recherche", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-research-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="horizon"]').fill("12 mois");
+  await page.locator('textarea[name="thesis"]').fill(
+    "Croissance des revenus et discipline de capital à vérifier.",
+  );
+  await page.locator('textarea[name="invalidation"]').fill(
+    "La thèse est invalidée si les hypothèses opérationnelles ne sont plus soutenues.",
+  );
+
+  await page.getByRole("button", {
+    name: "Générer le mémo de thèse",
+  }).click();
+
+  await expect(page).toHaveURL(/symbol=RY/);
+
+  const memo = page.getByTestId("institutional-thesis-memo");
+  await expect(memo).toBeVisible();
+  await expect(memo).toContainText("RY");
+  await expect(memo).toContainText(/Croissance des revenus/);
 
   await expect(page.locator("body")).not.toContainText(
     /Application error|Internal Server Error/i,
