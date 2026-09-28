@@ -37,6 +37,7 @@ const routes = [
   "/institutionnel/multi-actifs",
   "/institutionnel/multi-actifs/fixed-income",
   "/institutionnel/multi-actifs/multi-manager",
+  "/institutionnel/multi-actifs/real-assets",
   "/institutionnel/recherche",
   "/institutionnel/recherche/monitoring",
   "/institutionnel/risque",
@@ -1448,4 +1449,46 @@ test("Anatole Institutional calcule un X-Ray multi-gestionnaires", async ({ page
   await expect(results).toContainText("+0.40");
   await expect(results).toContainText("40.00 %");
   await expect(results).toContainText("Manager A · Manager B");
+});
+test("Anatole Institutional calcule un graphe commodities et actifs reels", async ({ page }) => {
+  await page.goto("/institutionnel/multi-actifs/real-assets", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-real-assets-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="shock_oil"]').fill("10");
+  await page.locator('input[name="shock_inflation"]').fill("2");
+
+  await page.locator('input[name="symbol_1"]').fill("ENB");
+  await page.locator('select[name="category_1"]').selectOption("energy");
+  await page.locator('select[name="role_1"]').selectOption("producer");
+  await page.locator('input[name="weight_1"]').fill("50");
+  await page.locator('input[name="oil_1"]').fill("1.2");
+  await page.locator('input[name="inflation_1"]').fill("0.5");
+
+  await page.locator('input[name="symbol_2"]').fill("AC");
+  await page.locator('select[name="category_2"]').selectOption("infrastructure");
+  await page.locator('select[name="role_2"]').selectOption("consumer");
+  await page.locator('input[name="weight_2"]').fill("50");
+  await page.locator('input[name="oil_2"]').fill("-0.4");
+  await page.locator('input[name="inflation_2"]').fill("1.0");
+
+  await page.getByRole("button", {
+    name: "Calculer les expositions",
+  }).click();
+
+  const results = page.getByTestId(
+    "institutional-real-assets-results",
+  );
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("+0.40");
+  await expect(results).toContainText("+4.00 %");
+  await expect(results).toContainText("+1.50 %");
+  await expect(results).toContainText("+5.50 %");
+  await expect(results).toContainText("ENB");
+  await expect(results).toContainText("AC");
 });
