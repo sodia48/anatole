@@ -587,8 +587,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Relie producteurs, consommateurs et titres sensibles aux matières premières.",
     summaryEn: "Connect producers, consumers and securities sensitive to commodities.",
     area: "Funds & Multi-Asset",
-    href: "/institutionnel/multi-actifs",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs/real-assets",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 59,
@@ -597,8 +597,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Intègre infrastructure, immobilier, énergie et ressources au même moteur de risque.",
     summaryEn: "Bring infrastructure, real estate, energy and resources into one risk engine.",
     area: "Funds & Multi-Asset",
-    href: "/institutionnel/multi-actifs",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs/real-assets",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 60,

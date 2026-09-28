@@ -158,6 +158,7 @@ export default async function InstitutionalMultiAssetPage({
         <Link href="/institutionnel/construction">Construction →</Link>
         <Link href="/institutionnel/multi-actifs/fixed-income">Fixed Income & Credit →</Link>
         <Link href="/institutionnel/multi-actifs/multi-manager">Multi-Manager X-Ray →</Link>
+        <Link href="/institutionnel/multi-actifs/real-assets">Real Assets & Commodities →</Link>
       </nav>
 
       <section className={styles.states}>
@@ -411,8 +412,8 @@ export default async function InstitutionalMultiAssetPage({
 
           <article>
             <b>Commodity / Real Assets</b>
-            <span>Fondation</span>
-            <p>La couche macro peut déjà servir de contexte, sans faux look-through.</p>
+            <span>Bridge V1</span>
+            <p>Expositions, catégories et scénarios sont calculés sur sensibilités saisies.</p>
           </article>
         </div>
       </section>
