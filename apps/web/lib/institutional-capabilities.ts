@@ -450,6 +450,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Vue multi-clients avec événements, échéances, changements et dossiers à revoir.",
     summaryEn: "Multi-client view with events, deadlines, changes and accounts to review.",
     area: "Wealth & Client",
+    href: "/institutionnel/clients",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -459,7 +460,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Prépare automatiquement changements, progrès objectifs, contributions et questions.",
     summaryEn: "Prepare changes, goal progress, contributions and questions for the next review.",
     area: "Wealth & Client",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/clients",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 47,
@@ -478,7 +480,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Produit des vues institutionnelles ou pédagogiques à partir des mêmes données.",
     summaryEn: "Produce institutional or educational views from the same data.",
     area: "Wealth & Client",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/clients",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 49,
@@ -497,6 +500,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Suit gains/pertes latents, lots fiscaux et impact estimatif selon juridiction.",
     summaryEn: "Track unrealized gains/losses, tax lots and estimated jurisdiction-specific impact.",
     area: "Wealth & Client",
+    href: "/institutionnel/clients",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
