@@ -29,6 +29,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Représentation vivante des positions, devises, cash, secteurs, facteurs et dépendances.",
     summaryEn: "Living representation of holdings, FX, cash, sectors, factors and dependencies.",
     area: "Portfolio & Risk",
+    href: "/institutionnel/facteurs",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -58,7 +59,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Décompose les expositions value, growth, momentum, quality, size, taux, inflation et devises.",
     summaryEn: "Decompose value, growth, momentum, quality, size, rates, inflation and FX exposures.",
     area: "Portfolio & Risk",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/facteurs",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 6,
@@ -87,7 +89,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Détecte les risques communs entre titres via fournisseurs, régions, clients ou facteurs.",
     summaryEn: "Detect shared risks across holdings through suppliers, regions, customers or factors.",
     area: "Portfolio & Risk",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/facteurs",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 9,
@@ -283,6 +286,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Repère concentration consensuelle, factor crowding et dépendance à des flux similaires.",
     summaryEn: "Identify consensus crowding, factor crowding and dependence on similar flows.",
     area: "Portfolio & Risk",
+    href: "/institutionnel/facteurs",
     stage: "foundation" as InstitutionalCapabilityStage,
   },
   {
@@ -292,7 +296,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Détecte quand les corrélations changent et réduisent la diversification attendue.",
     summaryEn: "Detect correlation changes that weaken expected diversification.",
     area: "Portfolio & Risk",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/facteurs",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 30,
@@ -311,7 +316,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Mesure la contribution de chaque position au risque total, pas seulement son poids.",
     summaryEn: "Measure each holding's contribution to total risk, not just capital weight.",
     area: "Portfolio & Risk",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/facteurs",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 32,
