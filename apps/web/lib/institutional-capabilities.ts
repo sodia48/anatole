@@ -600,6 +600,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Expose analytics portefeuille, risque, qualité données, signaux et scénarios.",
     summaryEn: "Expose portfolio analytics, risk, data quality, signals and scenarios via API.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -609,6 +610,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Lit les données institutionnelles là où elles résident déjà.",
     summaryEn: "Read institutional data where it already lives.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -618,6 +620,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Connecteurs vers systèmes de gestion d'ordres et portefeuilles institutionnels.",
     summaryEn: "Connect to institutional order and portfolio management systems.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -627,6 +630,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Relie Anatole aux workflows CRM des équipes de gestion de patrimoine.",
     summaryEn: "Connect Anatole with wealth-management CRM workflows.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -636,7 +640,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Connecte SEDAR+, EDGAR, TMX, transcripts et sources propriétaires autorisées.",
     summaryEn: "Connect SEDAR+, EDGAR, TMX, transcripts and authorized proprietary research sources.",
     area: "Enterprise Platform",
-    href: "/focus/RY",
+    href: "/institutionnel/enterprise",
     stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
@@ -646,6 +650,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Authentification entreprise, rôles, groupes et permissions fines.",
     summaryEn: "Enterprise authentication, roles, groups and fine-grained permissions.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -655,6 +660,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Régions de données, chiffrement, politiques de conservation et clés client à terme.",
     summaryEn: "Data regions, encryption, retention policies and customer-managed keys over time.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -664,6 +670,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Trace accès, modifications, exports et actions sensibles.",
     summaryEn: "Track access, changes, exports and sensitive actions.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -673,6 +680,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Isole strictement la recherche interne entre organisations et équipes.",
     summaryEn: "Strictly isolate internal research between organizations and teams.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
@@ -682,6 +690,7 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Utilise politiques, modèles et recherche internes dans un contexte privé par tenant.",
     summaryEn: "Use internal policies, models and research in a tenant-private context.",
     area: "Enterprise Platform",
+    href: "/institutionnel/enterprise",
     stage: "roadmap" as InstitutionalCapabilityStage,
   },
   {
