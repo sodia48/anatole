@@ -34,6 +34,7 @@ const routes = [
   "/institutionnel/gouvernance",
   "/institutionnel/macro",
   "/institutionnel/multi-actifs",
+  "/institutionnel/multi-actifs/fixed-income",
   "/institutionnel/recherche",
   "/institutionnel/recherche/monitoring",
   "/institutionnel/risque",
@@ -1344,4 +1345,26 @@ test("Anatole Institutional calcule une attribution BHB avancee", async ({ page 
   await expect(results).toContainText("+100 bps");
   await expect(results).toContainText("+60 bps");
   await expect(results).toContainText("+40 bps");
+});
+test("Anatole Institutional calcule duration credit et stress obligataire", async ({ page }) => {
+  await page.goto("/institutionnel/multi-actifs/fixed-income", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("institutional-fixed-income-center")).toBeVisible();
+  await page.locator('input[name="y2"]').fill("3.5");
+  await page.locator('input[name="y10"]').fill("4.0");
+  await page.locator('input[name="rate"]').fill("100");
+  await page.locator('input[name="spread_shock"]').fill("50");
+  await page.locator('input[name="issuer_1"]').fill("Bond A");
+  await page.locator('input[name="mv_1"]').fill("1000000");
+  await page.locator('input[name="dur_1"]').fill("4");
+  await page.locator('input[name="conv_1"]').fill("25");
+  await page.locator('input[name="yield_1"]').fill("4.5");
+  await page.locator('input[name="spread_1"]').fill("120");
+  await page.locator('input[name="mat_1"]').fill("1.5");
+  await page.locator('input[name="coverage_1"]').fill("1.8");
+  await page.getByRole("button", { name: "Calculer le scénario" }).click();
+  const r=page.getByTestId("institutional-fixed-income-results");
+  await expect(r).toBeVisible();
+  await expect(r).toContainText("+50 bps");
+  await expect(r).toContainText("-5.72 %");
+  await expect(r).toContainText("Coverage < 2x");
 });
