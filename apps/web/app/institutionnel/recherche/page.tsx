@@ -100,6 +100,15 @@ export default async function InstitutionalResearchPage({
         <Link href="/actualites">Actualités →</Link>
         <Link href="/calendrier">Calendrier →</Link>
         <Link href="/assistant">Copilote recherche →</Link>
+        <Link
+          href={
+            symbol
+              ? `/institutionnel/recherche/monitoring?symbol=${encodeURIComponent(symbol)}`
+              : "/institutionnel/recherche/monitoring"
+          }
+        >
+          Thesis Monitor & Consensus →
+        </Link>
         <Link href="/institutionnel/comite">
           Comité d&apos;investissement →
         </Link>

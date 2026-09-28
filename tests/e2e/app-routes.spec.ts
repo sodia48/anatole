@@ -34,6 +34,7 @@ const routes = [
   "/institutionnel/macro",
   "/institutionnel/multi-actifs",
   "/institutionnel/recherche",
+  "/institutionnel/recherche/monitoring",
   "/institutionnel/risque",
   "/notifications",
   "/parametres",
@@ -1283,4 +1284,39 @@ test("Anatole Institutional calcule facteurs dependances et budget de risque", a
   await expect(results).toContainText("À revoir");
   await expect(page.locator("body")).toContainText("Corrélations en hausse");
   await expect(page.locator("body")).toContainText("cad");
+});
+test("Anatole Institutional detecte un seuil de these et calcule le consensus", async ({ page }) => {
+  await page.goto("/institutionnel/recherche/monitoring", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-thesis-monitor-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="metric_name"]').fill("KPI critique");
+  await page.locator('input[name="threshold"]').fill("100");
+  await page.locator('input[name="current_metric"]').fill("90");
+
+  await page.locator('input[name="prior_consensus"]').fill("10");
+  await page.locator('input[name="current_consensus"]').fill("12");
+  await page.locator('input[name="bull_estimate"]').fill("14");
+  await page.locator('input[name="bear_estimate"]').fill("8");
+  await page.locator('input[name="revisions_up"]').fill("7");
+  await page.locator('input[name="revisions_down"]').fill("3");
+
+  await page.getByRole("button", {
+    name: "Évaluer le snapshot",
+  }).click();
+
+  const results = page.getByTestId(
+    "institutional-thesis-monitor-results",
+  );
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("Seuil d'invalidation franchi");
+  await expect(results).toContainText("+20.0 %");
+  await expect(results).toContainText("+50.0 %");
+  await expect(results).toContainText("+40.0 %");
 });

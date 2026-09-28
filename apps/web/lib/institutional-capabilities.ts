@@ -159,8 +159,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Signale lorsqu'une hypothèse critique n'est plus soutenue par les données.",
     summaryEn: "Flag when a critical thesis assumption is no longer supported by data.",
     area: "Research & Thesis",
-    href: "/institutionnel/recherche",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/recherche/monitoring",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 16,
@@ -228,7 +228,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Suit distribution, dispersion, révisions et divergence bull/bear des estimations.",
     summaryEn: "Track distribution, dispersion, revisions and bull/bear divergence in estimates.",
     area: "Research & Thesis",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/recherche/monitoring",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 23,
