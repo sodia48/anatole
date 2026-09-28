@@ -156,6 +156,7 @@ export default async function InstitutionalMultiAssetPage({
         <Link href="/institutionnel/risque">Risk Center →</Link>
         <Link href="/institutionnel/macro">Macro →</Link>
         <Link href="/institutionnel/construction">Construction →</Link>
+        <Link href="/institutionnel/multi-actifs/fixed-income">Fixed Income & Credit →</Link>
       </nav>
 
       <section className={styles.states}>
@@ -397,14 +398,14 @@ export default async function InstitutionalMultiAssetPage({
 
           <article>
             <b>Fixed Income Workbench</b>
-            <span>Roadmap</span>
-            <p>Courbe, duration, convexité et maturités restent à brancher.</p>
+            <span>Bridge V1</span>
+            <p>Duration, convexité, courbe et scénarios disponibles sur données saisies.</p>
           </article>
 
           <article>
             <b>Credit Intelligence</b>
-            <span>Roadmap</span>
-            <p>Spreads, couverture et refinancement exigent des données crédit.</p>
+            <span>Bridge V1</span>
+            <p>Spread, couverture et refinancement analysés sans données inventées.</p>
           </article>
 
           <article>

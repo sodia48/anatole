@@ -547,8 +547,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Courbe de taux, duration, convexité, spread, maturités et scénarios de taux.",
     summaryEn: "Yield curve, duration, convexity, spreads, maturities and rate scenarios.",
     area: "Funds & Multi-Asset",
-    href: "/institutionnel/multi-actifs",
-    stage: "roadmap" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs/fixed-income",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 55,
@@ -557,8 +557,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Analyse maturités, couverture, refinancement, spreads et exposition aux taux.",
     summaryEn: "Analyze maturities, coverage, refinancing, spreads and rate exposure.",
     area: "Funds & Multi-Asset",
-    href: "/institutionnel/multi-actifs",
-    stage: "roadmap" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs/fixed-income",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 56,
