@@ -119,8 +119,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Attribue la performance à la sélection, allocation, devises, facteurs et timing.",
     summaryEn: "Attribute returns to selection, allocation, FX, factors and timing.",
     area: "Portfolio & Risk",
-    href: "/institutionnel/attribution",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/attribution/avancee",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 12,

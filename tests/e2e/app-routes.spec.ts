@@ -25,6 +25,7 @@ const routes = [
   "/institutions",
   "/institutionnel",
   "/institutionnel/attribution",
+  "/institutionnel/attribution/avancee",
   "/institutionnel/clients",
   "/institutionnel/comite",
   "/institutionnel/construction",
@@ -1319,4 +1320,28 @@ test("Anatole Institutional detecte un seuil de these et calcule le consensus", 
   await expect(results).toContainText("+20.0 %");
   await expect(results).toContainText("+50.0 %");
   await expect(results).toContainText("+40.0 %");
+});
+test("Anatole Institutional calcule une attribution BHB avancee", async ({ page }) => {
+  await page.goto("/institutionnel/attribution/avancee", { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("institutional-advanced-attribution-center")).toBeVisible();
+
+  await page.locator('input[name="label_1"]').fill("Banques");
+  await page.locator('input[name="wp_1"]').fill("60");
+  await page.locator('input[name="wb_1"]').fill("50");
+  await page.locator('input[name="rp_1"]').fill("10");
+  await page.locator('input[name="rb_1"]').fill("8");
+
+  await page.locator('input[name="label_2"]').fill("Industrie");
+  await page.locator('input[name="wp_2"]').fill("40");
+  await page.locator('input[name="wb_2"]').fill("50");
+  await page.locator('input[name="rp_2"]').fill("0");
+  await page.locator('input[name="rb_2"]').fill("2");
+
+  await page.getByRole("button", { name: "Calculer l'attribution" }).click();
+
+  const results = page.getByTestId("institutional-advanced-attribution-results");
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("+100 bps");
+  await expect(results).toContainText("+60 bps");
+  await expect(results).toContainText("+40 bps");
 });

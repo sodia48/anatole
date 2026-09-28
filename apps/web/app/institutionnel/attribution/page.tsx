@@ -63,6 +63,7 @@ export default async function InstitutionalAttributionPage({ searchParams }: { s
       <nav className={styles.nav}>
         <Link href="/portefeuille">Portefeuille →</Link>
         <Link href="/institutionnel/recherche">Research & Thesis →</Link>
+        <Link href="/institutionnel/attribution/avancee">Advanced Attribution →</Link>
         <Link href="/institutionnel/comite">Comité →</Link>
         <Link href="/institutionnel/risque">Risk Center →</Link>
       </nav>
