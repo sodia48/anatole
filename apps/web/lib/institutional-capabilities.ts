@@ -407,8 +407,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Montre l'impact hypothétique d'une transaction sur concentration, facteurs et liquidité.",
     summaryEn: "Show hypothetical trade impact on concentration, factors and liquidity.",
     area: "Construction & Trading",
-    href: "/institutionnel/construction",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/construction/pretrade",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 41,
@@ -417,8 +417,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Encode limites de concentration, cash, secteurs, liquidité et autres règles internes.",
     summaryEn: "Encode concentration, cash, sector, liquidity and internal mandate limits.",
     area: "Construction & Trading",
-    href: "/institutionnel/construction",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/construction/pretrade",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 42,

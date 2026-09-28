@@ -195,13 +195,14 @@ export default async function InstitutionalConstructionPage({
         <Link href="/institutionnel/risque">Risk Center →</Link>
         <Link href="/terminal">Liquidité / Terminal →</Link>
         <Link href="/institutionnel/comite">Comité →</Link>
+        <Link href="/institutionnel/construction/pretrade">Pre-Trade & Mandate →</Link>
       </nav>
 
       <section className={styles.states}>
         <article><b>Construction</b><span>Bridge actif</span></article>
         <article><b>Rééquilibrage</b><span>Bridge V1</span></article>
-        <article><b>Pre-Trade Risk</b><span>Fondation</span></article>
-        <article><b>Mandate Engine</b><span>Fondation</span></article>
+        <article><b>Pre-Trade Risk</b><span>Bridge V1</span></article>
+        <article><b>Mandate Engine</b><span>Bridge V1</span></article>
       </section>
 
       <section className={styles.panel}>
