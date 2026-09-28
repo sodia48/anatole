@@ -29,6 +29,7 @@ const routes = [
   "/institutionnel/construction",
   "/institutionnel/gouvernance",
   "/institutionnel/macro",
+  "/institutionnel/multi-actifs",
   "/institutionnel/recherche",
   "/institutionnel/risque",
   "/notifications",
@@ -1150,4 +1151,31 @@ test("Anatole Institutional calcule un post-mortem attribution", async ({ page }
   await expect(memo).toContainText("+290 bps");
   await expect(memo).toContainText("+10 bps");
   await expect(memo).toContainText(/entrées analyste V1/i);
+});
+test("Anatole Institutional calcule un FX overlay multi-actifs", async ({ page }) => {
+  await page.goto("/institutionnel/multi-actifs", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-multi-asset-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="portfolio_value"]').fill("1000000");
+  await page.locator('input[name="foreign_exposure"]').fill("30");
+  await page.locator('input[name="current_hedge"]').fill("25");
+  await page.locator('input[name="target_hedge"]').fill("50");
+  await page.locator('input[name="cost_bps"]').fill("5");
+
+  await page.getByRole("button", {
+    name: "Calculer le scénario",
+  }).click();
+
+  const results = page.getByTestId("institutional-multi-asset-results");
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("300000 CAD");
+  await expect(results).toContainText("75000 CAD");
+  await expect(results).toContainText("150000 CAD");
+  await expect(results).toContainText("50.0 %");
 });
