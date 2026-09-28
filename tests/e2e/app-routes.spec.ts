@@ -29,6 +29,7 @@ const routes = [
   "/institutionnel/comite",
   "/institutionnel/construction",
   "/institutionnel/enterprise",
+  "/institutionnel/facteurs",
   "/institutionnel/gouvernance",
   "/institutionnel/macro",
   "/institutionnel/multi-actifs",
@@ -1243,4 +1244,43 @@ test("Anatole Institutional construit un readiness pack enterprise", async ({ pa
   await expect(pack).toContainText("INSTITUTION-A");
   await expect(pack).toContainText("SSO OIDC requis");
   await expect(pack).toContainText("Snowflake");
+});
+test("Anatole Institutional calcule facteurs dependances et budget de risque", async ({ page }) => {
+  await page.goto("/institutionnel/facteurs", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-factor-xray-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="risk_cap"]').fill("25");
+  await page.locator('input[name="prior_correlation"]').fill("0.35");
+  await page.locator('input[name="current_correlation"]').fill("0.55");
+
+  await page.locator('input[name="symbol_1"]').fill("RY");
+  await page.locator('input[name="weight_1"]').fill("60");
+  await page.locator('input[name="risk_1"]').fill("30");
+  await page.locator('input[name="value_1"]').fill("1");
+  await page.locator('input[name="dependencies_1"]').fill("CAD, taux");
+
+  await page.locator('input[name="symbol_2"]').fill("TD");
+  await page.locator('input[name="weight_2"]').fill("40");
+  await page.locator('input[name="risk_2"]').fill("20");
+  await page.locator('input[name="value_2"]').fill("-1");
+  await page.locator('input[name="dependencies_2"]').fill("CAD, crédit");
+
+  await page.getByRole("button", {
+    name: "Analyser le snapshot",
+  }).click();
+
+  const results = page.getByTestId(
+    "institutional-factor-xray-results",
+  );
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("+0.20");
+  await expect(results).toContainText("À revoir");
+  await expect(page.locator("body")).toContainText("Corrélations en hausse");
+  await expect(page.locator("body")).toContainText("cad");
 });

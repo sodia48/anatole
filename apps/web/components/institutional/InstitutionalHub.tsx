@@ -179,6 +179,10 @@ export function InstitutionalHub() {
               Enterprise
               <ArrowUpRight size={15} />
             </Link>
+            <Link href="/institutionnel/facteurs">
+              Factor X-Ray
+              <ArrowUpRight size={15} />
+            </Link>
             <Link href="/institutionnel/recherche">
               Research
               <ArrowUpRight size={15} />
