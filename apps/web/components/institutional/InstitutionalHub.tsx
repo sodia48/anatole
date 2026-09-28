@@ -171,6 +171,10 @@ export function InstitutionalHub() {
               Multi-Asset
               <ArrowUpRight size={15} />
             </Link>
+            <Link href="/institutionnel/clients">
+              Client Review
+              <ArrowUpRight size={15} />
+            </Link>
             <Link href="/institutionnel/recherche">
               Research
               <ArrowUpRight size={15} />

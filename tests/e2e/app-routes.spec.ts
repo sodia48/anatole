@@ -25,6 +25,7 @@ const routes = [
   "/institutions",
   "/institutionnel",
   "/institutionnel/attribution",
+  "/institutionnel/clients",
   "/institutionnel/comite",
   "/institutionnel/construction",
   "/institutionnel/gouvernance",
@@ -1178,4 +1179,36 @@ test("Anatole Institutional calcule un FX overlay multi-actifs", async ({ page }
   await expect(results).toContainText("75000 CAD");
   await expect(results).toContainText("150000 CAD");
   await expect(results).toContainText("50.0 %");
+});
+test("Anatole Institutional prepare une revue client sans PII", async ({ page }) => {
+  await page.goto("/institutionnel/clients", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-client-review-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="client_ref"]').fill("CLIENT-042");
+  await page.locator('input[name="horizon"]').fill("10 ans");
+  await page.locator('textarea[name="objective"]').fill(
+    "Croissance à long terme avec besoins de liquidité limités.",
+  );
+  await page.locator('textarea[name="portfolio_changes"]').fill(
+    "Allocation et risque à revoir lors de la prochaine rencontre.",
+  );
+  await page.locator('textarea[name="questions"]').fill(
+    "Confirmer horizon, liquidité et tolérance au risque.",
+  );
+
+  await page.getByRole("button", {
+    name: "Générer le mémo de revue",
+  }).click();
+
+  const memo = page.getByTestId("institutional-client-review-memo");
+
+  await expect(memo).toBeVisible();
+  await expect(memo).toContainText("CLIENT-042");
+  await expect(memo).toContainText("10 ans");
+  await expect(memo).toContainText(/Croissance à long terme/);
 });
