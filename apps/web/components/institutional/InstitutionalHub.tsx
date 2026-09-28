@@ -31,6 +31,89 @@ import styles from "./InstitutionalHub.module.css";
 
 const PERSONA_KEY = "anatole:persona:v1";
 
+const INSTITUTIONAL_WORKSPACES = [
+  {
+    key: "risk",
+    titleFr: "Portefeuille & Risque",
+    titleEn: "Portfolio & Risk",
+    summaryFr:
+      "Cockpit, stress tests, facteurs, concentration, liquidité, drawdown et attribution.",
+    summaryEn:
+      "Cockpit, stress tests, factors, concentration, liquidity, drawdown and attribution.",
+    href: "/institutionnel/risque",
+  },
+  {
+    key: "research",
+    titleFr: "Research & Thesis",
+    titleEn: "Research & Thesis",
+    summaryFr:
+      "Thèses, monitoring, consensus, événements, earnings, comparables et notes de recherche.",
+    summaryEn:
+      "Theses, monitoring, consensus, events, earnings, peers and research notes.",
+    href: "/institutionnel/recherche",
+  },
+  {
+    key: "macro",
+    titleFr: "Macro & Régimes",
+    titleEn: "Macro & Regimes",
+    summaryFr:
+      "Canada, provinces, scénarios macro, transmission économique et régimes.",
+    summaryEn:
+      "Canada, provinces, macro scenarios, economic transmission and regimes.",
+    href: "/institutionnel/macro",
+  },
+  {
+    key: "construction",
+    titleFr: "Construction & Pre-Trade",
+    titleEn: "Construction & Pre-Trade",
+    summaryFr:
+      "Construction de portefeuille, contraintes, mandat, liquidité et contrôles pré-transaction.",
+    summaryEn:
+      "Portfolio construction, constraints, mandate, liquidity and pre-trade controls.",
+    href: "/institutionnel/construction",
+  },
+  {
+    key: "multiasset",
+    titleFr: "Multi-Asset",
+    titleEn: "Multi-Asset",
+    summaryFr:
+      "ETF, multi-manager, revenu fixe, crédit, FX, matières premières et actifs réels.",
+    summaryEn:
+      "ETFs, multi-manager, fixed income, credit, FX, commodities and real assets.",
+    href: "/institutionnel/multi-actifs",
+  },
+  {
+    key: "committee",
+    titleFr: "Comité & Gouvernance",
+    titleEn: "Committee & Governance",
+    summaryFr:
+      "Mémos, décisions humaines, preuves, qualité des données, explicabilité et gouvernance.",
+    summaryEn:
+      "Memos, human decisions, evidence, data quality, explainability and governance.",
+    href: "/institutionnel/comite",
+  },
+  {
+    key: "clients",
+    titleFr: "Clients & Wealth",
+    titleEn: "Clients & Wealth",
+    summaryFr:
+      "Revues clients, reporting, préparation des rencontres et intelligence patrimoine.",
+    summaryEn:
+      "Client reviews, reporting, meeting preparation and wealth intelligence.",
+    href: "/institutionnel/clients",
+  },
+  {
+    key: "enterprise",
+    titleFr: "Enterprise & Admin",
+    titleEn: "Enterprise & Admin",
+    summaryFr:
+      "API, intégrations, sécurité, identité, données privées et readiness institutionnelle.",
+    summaryEn:
+      "APIs, integrations, security, identity, private data and institutional readiness.",
+    href: "/institutionnel/enterprise",
+  },
+] as const;
+
 type StageFilter = "all" | InstitutionalCapabilityStage;
 
 function stageLabel(
@@ -141,52 +224,26 @@ export function InstitutionalHub() {
           <p>
             {pick(
               language,
-              "Un espace institutionnel qui relie portefeuille, risque, recherche, scénarios, clients et gouvernance. Les 70 capacités sont visibles dès maintenant; les statuts distinguent les ponts existants des modules encore à industrialiser.",
-              "An institutional workspace connecting portfolio, risk, research, scenarios, clients and governance. All 70 capabilities are visible now; statuses distinguish existing Anatole bridges from modules that still require industrialization.",
+              "Le produit est maintenant organisé autour d'un Command Center et de huit desks opérationnels. Les 70 capacités restent accessibles comme bibliothèque secondaire, sans transformer chaque idée en une destination séparée.",
+              "The product is now organized around one Command Center and eight operational desks. All 70 capabilities remain accessible as a secondary library without turning every idea into a separate destination.",
             )}
           </p>
 
-          <div className={styles.quickLinks}>
-            <Link href="/portefeuille">
-              {pick(language, "Portefeuille", "Portfolio")}
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/construction">
-              {pick(language, "Construction", "Construction")}
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/terminal">
-              Terminal Pro
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/macro">
-              Macro
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/attribution">
-              Attribution
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/multi-actifs">
-              Multi-Asset
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/clients">
-              Client Review
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/enterprise">
-              Enterprise
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/facteurs">
-              Factor X-Ray
-              <ArrowUpRight size={15} />
-            </Link>
-            <Link href="/institutionnel/recherche">
-              Research
-              <ArrowUpRight size={15} />
-            </Link>
+          <div className={styles.operatingModel}>
+            <span>
+              {pick(
+                language,
+                "9 espaces opérationnels",
+                "9 operating spaces",
+              )}
+            </span>
+            <strong>
+              {pick(
+                language,
+                "Moins de navigation. Plus de profondeur.",
+                "Less navigation. More depth.",
+              )}
+            </strong>
           </div>
         </div>
 
@@ -196,8 +253,14 @@ export function InstitutionalHub() {
             <strong>70</strong>
           </div>
           <div>
-            <span>{pick(language, "DOMAINES", "DOMAINS")}</span>
-            <strong>{INSTITUTIONAL_AREAS.length}</strong>
+            <span>
+              {pick(
+                language,
+                "ESPACES OPÉRATIONNELS",
+                "OPERATING SPACES",
+              )}
+            </span>
+            <strong>9</strong>
           </div>
           <div>
             <span>{pick(language, "PONTS EXISTANTS", "EXISTING BRIDGES")}</span>
@@ -206,7 +269,113 @@ export function InstitutionalHub() {
         </div>
       </header>
 
-      <InstitutionalCommandCenter />
+      <section
+        className={styles.workspaceSection}
+        data-testid="institutional-workspaces"
+      >
+        <header>
+          <div>
+            <span className={styles.kicker}>
+              {pick(
+                language,
+                "OPERATING MODEL",
+                "OPERATING MODEL",
+              )}
+            </span>
+            <h2>
+              {pick(
+                language,
+                "Huit desks. Un seul système.",
+                "Eight desks. One system.",
+              )}
+            </h2>
+          </div>
+          <p>
+            {pick(
+              language,
+              "Les capacités proches sont regroupées dans le même workflow. Le Command Center reste la porte d'entrée quotidienne.",
+              "Related capabilities are grouped inside the same workflow. The Command Center remains the daily entry point.",
+            )}
+          </p>
+        </header>
+
+        <div
+          className={styles.workspaceGrid}
+          data-testid="institutional-workspace-grid"
+        >
+          {INSTITUTIONAL_WORKSPACES.map((workspace) => (
+            <Link
+              key={workspace.key}
+              href={workspace.href}
+              className={styles.workspaceCard}
+              data-workspace={workspace.key}
+            >
+              <div className={styles.workspaceTop}>
+                <span>
+                  {String(
+                    INSTITUTIONAL_WORKSPACES.findIndex(
+                      (item) => item.key === workspace.key,
+                    ) + 1,
+                  ).padStart(2, "0")}
+                </span>
+                <ArrowUpRight size={15} />
+              </div>
+
+              <strong>
+                {pick(
+                  language,
+                  workspace.titleFr,
+                  workspace.titleEn,
+                )}
+              </strong>
+
+              <p>
+                {pick(
+                  language,
+                  workspace.summaryFr,
+                  workspace.summaryEn,
+                )}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <div id="command-center">
+        <InstitutionalCommandCenter />
+      </div>
+
+      <details
+        className={styles.capabilityLibrary}
+        data-testid="institutional-capability-library"
+      >
+        <summary
+          data-testid="institutional-capability-library-toggle"
+        >
+          <span>
+            <strong>
+              {pick(
+                language,
+                "Bibliothèque des 70 capacités",
+                "70-capability library",
+              )}
+            </strong>
+            <small>
+              {pick(
+                language,
+                "Blueprint, recherche et roadmap",
+                "Blueprint, discovery and roadmap",
+              )}
+            </small>
+          </span>
+          <span>
+            {bridgeCount} {pick(language, "ponts", "bridges")} ·
+            {" "}
+            {foundationCount} {pick(language, "fondations", "foundations")} ·
+            {" "}
+            {roadmapCount} {pick(language, "intégrations", "integrations")}
+          </span>
+        </summary>
 
       <section className={styles.libraryIntro}>
         <div>
@@ -216,16 +385,16 @@ export function InstitutionalHub() {
           <h2>
             {pick(
               language,
-              "70 capacités, organisées comme une bibliothèque de construction.",
-              "70 capabilities, organized as a build library.",
+              "La bibliothèque reste disponible, mais n'est plus la navigation principale.",
+              "The library remains available, but it is no longer the primary navigation.",
             )}
           </h2>
         </div>
         <p>
           {pick(
             language,
-            "Le Command Center est le produit opérationnel. La bibliothèque ci-dessous expose les ponts déjà utilisables, les fondations V1 et les intégrations encore nécessaires.",
-            "The Command Center is the operating product. The library below exposes usable bridges, V1 foundations and integrations that are still required.",
+            "Elle sert désormais de blueprint et de roadmap: les fonctions apparentées vivent dans les mêmes desks au lieu de multiplier les écrans.",
+            "It now serves as a blueprint and roadmap: related functions live inside the same desks instead of multiplying screens.",
           )}
         </p>
       </section>
@@ -389,6 +558,7 @@ export function InstitutionalHub() {
           </button>
         ))}
       </div>
+      </details>
 
       {selected ? (
         <div
