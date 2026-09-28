@@ -36,6 +36,7 @@ const routes = [
   "/institutionnel/macro",
   "/institutionnel/multi-actifs",
   "/institutionnel/multi-actifs/fixed-income",
+  "/institutionnel/multi-actifs/multi-manager",
   "/institutionnel/recherche",
   "/institutionnel/recherche/monitoring",
   "/institutionnel/risque",
@@ -1409,4 +1410,42 @@ test("Anatole Institutional evalue un trade contre les contraintes de mandat", a
   await expect(results).toContainText("+3.00 %");
   await expect(results).toContainText("0.20 j");
   await expect(results).toContainText("REVIEW");
+});
+test("Anatole Institutional calcule un X-Ray multi-gestionnaires", async ({ page }) => {
+  await page.goto("/institutionnel/multi-actifs/multi-manager", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-multimanager-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="manager_1"]').fill("Manager A");
+  await page.locator('input[name="allocation_1"]').fill("60");
+  await page.locator('input[name="fee_1"]').fill("50");
+  await page.locator('input[name="value_1"]').fill("1");
+  await page.locator('input[name="quality_1"]').fill("0.5");
+  await page.locator('textarea[name="holdings_1"]').fill("RY:50, TD:50");
+
+  await page.locator('input[name="manager_2"]').fill("Manager B");
+  await page.locator('input[name="allocation_2"]').fill("40");
+  await page.locator('input[name="fee_2"]').fill("70");
+  await page.locator('input[name="value_2"]').fill("-0.5");
+  await page.locator('input[name="quality_2"]').fill("1.5");
+  await page.locator('textarea[name="holdings_2"]').fill("RY:25, ENB:75");
+
+  await page.getByRole("button", {
+    name: "Calculer le X-Ray",
+  }).click();
+
+  const results = page.getByTestId(
+    "institutional-multimanager-results",
+  );
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("58.0 bps");
+  await expect(results).toContainText("1.92");
+  await expect(results).toContainText("+0.40");
+  await expect(results).toContainText("40.00 %");
+  await expect(results).toContainText("Manager A · Manager B");
 });

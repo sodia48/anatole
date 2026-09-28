@@ -517,8 +517,8 @@ export const INSTITUTIONAL_CAPABILITIES: InstitutionalCapability[] = [
     summaryFr: "Analyse chevauchements, facteurs et concentrations entre plusieurs mandats.",
     summaryEn: "Analyze overlaps, factors and concentration across multiple managers.",
     area: "Funds & Multi-Asset",
-    href: "/institutionnel/multi-actifs",
-    stage: "foundation" as InstitutionalCapabilityStage,
+    href: "/institutionnel/multi-actifs/multi-manager",
+    stage: "bridge" as InstitutionalCapabilityStage,
   },
   {
     id: 52,

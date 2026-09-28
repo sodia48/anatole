@@ -157,6 +157,7 @@ export default async function InstitutionalMultiAssetPage({
         <Link href="/institutionnel/macro">Macro →</Link>
         <Link href="/institutionnel/construction">Construction →</Link>
         <Link href="/institutionnel/multi-actifs/fixed-income">Fixed Income & Credit →</Link>
+        <Link href="/institutionnel/multi-actifs/multi-manager">Multi-Manager X-Ray →</Link>
       </nav>
 
       <section className={styles.states}>
@@ -392,8 +393,8 @@ export default async function InstitutionalMultiAssetPage({
         <div className={styles.architecture}>
           <article>
             <b>Multi-manager X-Ray</b>
-            <span>Fondation</span>
-            <p>Requiert plusieurs mandats ou portefeuilles réels.</p>
+            <span>Bridge V1</span>
+            <p>Agrégation, overlap, facteurs et concentration sur mandats saisis.</p>
           </article>
 
           <article>
