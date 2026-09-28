@@ -29,6 +29,7 @@ const routes = [
   "/institutionnel/clients",
   "/institutionnel/comite",
   "/institutionnel/construction",
+  "/institutionnel/construction/pretrade",
   "/institutionnel/enterprise",
   "/institutionnel/facteurs",
   "/institutionnel/gouvernance",
@@ -1367,4 +1368,45 @@ test("Anatole Institutional calcule duration credit et stress obligataire", asyn
   await expect(r).toContainText("+50 bps");
   await expect(r).toContainText("-5.72 %");
   await expect(r).toContainText("Coverage < 2x");
+});
+test("Anatole Institutional evalue un trade contre les contraintes de mandat", async ({ page }) => {
+  await page.goto("/institutionnel/construction/pretrade", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-pretrade-engine"),
+  ).toBeVisible();
+
+  await page.locator('input[name="symbol"]').fill("RY");
+  await page.locator('input[name="portfolio_value"]').fill("1000000");
+  await page.locator('input[name="trade_notional"]').fill("50000");
+  await page.locator('input[name="current_weight"]').fill("4");
+  await page.locator('input[name="current_sector"]').fill("20");
+  await page.locator('input[name="current_cash"]').fill("8");
+
+  await page.locator('input[name="max_position"]').fill("8");
+  await page.locator('input[name="max_sector"]').fill("25");
+  await page.locator('input[name="min_cash"]').fill("3");
+  await page.locator('input[name="max_turnover"]').fill("6");
+  await page.locator('input[name="max_days"]').fill("1");
+
+  await page.locator('input[name="adv_cad"]').fill("250000");
+  await page.locator('input[name="cost_bps"]').fill("8");
+
+  await page.getByRole("button", {
+    name: "Exécuter les contrôles",
+  }).click();
+
+  const results = page.getByTestId(
+    "institutional-pretrade-results",
+  );
+
+  await expect(results).toBeVisible();
+  await expect(results).toContainText("+5.00 %");
+  await expect(results).toContainText("+9.00 %");
+  await expect(results).toContainText("+25.00 %");
+  await expect(results).toContainText("+3.00 %");
+  await expect(results).toContainText("0.20 j");
+  await expect(results).toContainText("REVIEW");
 });
