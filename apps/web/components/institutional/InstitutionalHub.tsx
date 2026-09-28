@@ -175,6 +175,10 @@ export function InstitutionalHub() {
               Client Review
               <ArrowUpRight size={15} />
             </Link>
+            <Link href="/institutionnel/enterprise">
+              Enterprise
+              <ArrowUpRight size={15} />
+            </Link>
             <Link href="/institutionnel/recherche">
               Research
               <ArrowUpRight size={15} />

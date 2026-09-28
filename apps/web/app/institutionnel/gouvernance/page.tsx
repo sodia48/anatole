@@ -116,6 +116,9 @@ export default async function InstitutionalGovernancePage({
         <Link href="/institutionnel/risque">
           Risk Center →
         </Link>
+        <Link href="/institutionnel/enterprise">
+          Enterprise Platform →
+        </Link>
       </section>
 
       <section className={styles.statusGrid}>

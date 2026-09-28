@@ -28,6 +28,7 @@ const routes = [
   "/institutionnel/clients",
   "/institutionnel/comite",
   "/institutionnel/construction",
+  "/institutionnel/enterprise",
   "/institutionnel/gouvernance",
   "/institutionnel/macro",
   "/institutionnel/multi-actifs",
@@ -1211,4 +1212,35 @@ test("Anatole Institutional prepare une revue client sans PII", async ({ page })
   await expect(memo).toContainText("CLIENT-042");
   await expect(memo).toContainText("10 ans");
   await expect(memo).toContainText(/Croissance à long terme/);
+});
+test("Anatole Institutional construit un readiness pack enterprise", async ({ page }) => {
+  await page.goto("/institutionnel/enterprise", {
+    waitUntil: "domcontentloaded",
+  });
+
+  await expect(
+    page.getByTestId("institutional-enterprise-center"),
+  ).toBeVisible();
+
+  await page.locator('input[name="org_alias"]').fill("INSTITUTION-A");
+  await page.locator('input[name="region"]').fill("Canada");
+  await page.locator('select[name="auth"]').selectOption("oidc");
+  await page.locator('select[name="data_plane"]').selectOption("snowflake");
+  await page.locator('input[name="oms_pms"]').fill("PMS cible à intégrer");
+  await page.locator('textarea[name="audit"]').fill(
+    "Journaliser les accès et modifications sensibles.",
+  );
+
+  await page.getByRole("button", {
+    name: "Générer le readiness pack",
+  }).click();
+
+  const pack = page.getByTestId(
+    "institutional-enterprise-readiness-pack",
+  );
+
+  await expect(pack).toBeVisible();
+  await expect(pack).toContainText("INSTITUTION-A");
+  await expect(pack).toContainText("SSO OIDC requis");
+  await expect(pack).toContainText("Snowflake");
 });
