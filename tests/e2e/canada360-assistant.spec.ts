@@ -27,7 +27,7 @@ async function mockOverview(
 }
 
 test(
-  "Canada 360 Assistant répond sans JS client dédié",
+  "Canada 360 Assistant répond directement avant les sources",
   async ({ page }) => {
     await mockOverview(page);
 
@@ -47,7 +47,7 @@ test(
       "Question à Canada 360",
     );
     await input.fill(
-      "Quelles prestations puis-je chercher au Québec ?",
+      "Quelles prestations existent au Québec ?",
     );
     await frame
       .getByRole("button", { name: "Envoyer" })
@@ -56,7 +56,13 @@ test(
     const chat = frame.getByTestId(
       "canada360-assistant-chat",
     );
-    await expect(chat).toContainText(/admissibilité/i);
+
+    await expect(chat).toContainText(/retraite/i);
+    await expect(chat).toContainText(/aide sociale/i);
+    await expect(chat).not.toContainText(/voici les portes d’entrée/i);
+    await expect(chat).toContainText(
+      /Sources gouvernementales utilisées/i,
+    );
 
     await expect(
       chat.getByRole("link", {

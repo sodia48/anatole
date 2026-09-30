@@ -107,7 +107,7 @@ function renderPage({
       );
 
   const links = result?.links?.length
-    ? `<div class="links">${linkMarkup(result.links, language)}</div>`
+    ? `<section class="sources"><div class="sourceHeading">${fr ? "Sources gouvernementales utilisées" : "Government sources used"}</div><div class="links">${linkMarkup(result.links, language)}</div></section>`
     : "";
 
   const source = result?.source_line
@@ -137,8 +137,9 @@ select,input{background:#0c1925;color:#eef5fb;padding:0 11px}
 button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:pointer}
 .chat{display:grid;gap:8px;min-height:150px;padding:10px;border:1px solid #263747;border-radius:12px;background:#091520}
 .message{max-width:92%;padding:10px;border:1px solid #263747;border-radius:11px;background:#0c1925}
-.message.user{justify-self:end;background:#10243a}.message p{margin:5px 0 0;line-height:1.5;font-size:13px}
-.links{display:grid;gap:6px;margin-top:8px}.links a{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;background:#091520}
+.message.user{justify-self:end;background:#10243a}.message p{margin:5px 0 0;line-height:1.55;font-size:13px;white-space:pre-wrap}
+.sources{display:grid;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #263747}.sourceHeading{color:#9aa9b7;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.links{display:grid;gap:6px}.links a{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;background:#091520}
 .links span{color:#79b9ff;font-size:10px}.links strong{font-size:12px}
 footer{color:#9aa9b7;font-size:10px;line-height:1.5}
 @media(max-width:640px){main{padding:10px}header{display:grid}form{grid-template-columns:1fr}.message{max-width:96%}}
