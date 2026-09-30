@@ -544,12 +544,38 @@ export function AssistantClient() {
             language={language}
             portfolioCount={portfolio.length}
           />
-          <AdvisorV8Layer
-            profile={profile}
-            goalLabel={goalLabel}
-            language={language}
-            portfolioCount={portfolio.length}
-          />
+
+          <details
+            className={styles.legacyAdvice}
+            data-testid="advisor-v8-legacy"
+          >
+            <summary>
+              <span>
+                <strong>
+                  {pick(
+                    language,
+                    "Outils V8 avancés",
+                    "Advanced V8 tools",
+                  )}
+                </strong>
+                <small>
+                  {pick(
+                    language,
+                    "Compatibilité temporaire pendant la migration V10",
+                    "Temporary compatibility during the V10 migration",
+                  )}
+                </small>
+              </span>
+              <span>{pick(language, "Afficher", "Show")}</span>
+            </summary>
+
+            <AdvisorV8Layer
+              profile={profile}
+              goalLabel={goalLabel}
+              language={language}
+              portfolioCount={portfolio.length}
+            />
+          </details>
         </>
       ) : null}
 
