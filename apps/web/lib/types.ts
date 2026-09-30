@@ -372,6 +372,9 @@ export type NewsBriefRequest = {
   category: string;
   region: string;
   language: "fr" | "en";
+  context?: "macro" | "stock";
+  ticker?: string | null;
+  company?: string | null;
 };
 
 export type NewsBriefFigure = {
