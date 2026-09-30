@@ -10,6 +10,30 @@ SnapshotStatus = Literal["ok", "partial", "unavailable"]
 SourceStatus = Literal["ok", "partial", "unavailable"]
 
 
+class Canada360AssistantLink(BaseModel):
+    label: str
+    url: str
+    level: Literal["federal", "provincial", "statistics"]
+
+
+class Canada360AssistantRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    lang: Literal["fr", "en"] = "fr"
+    jurisdiction: str = Field(
+        default="CA",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+    )
+    mode: Literal["ask", "compare", "find"] = "ask"
+
+
+class Canada360AssistantResponse(BaseModel):
+    answer: str
+    links: list[Canada360AssistantLink] = Field(default_factory=list)
+    source_line: str | None = None
+    mode: Literal["ask", "compare", "find"]
+    jurisdiction: str
+
+
 class Canada360MetricPoint(BaseModel):
     period: str
     value: float

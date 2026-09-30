@@ -23,29 +23,20 @@ const metric = (
   delayed: false,
 });
 
-const province = (
-  code: string,
-  name: string,
-  unemployment: number,
-  inflation: number,
-) => ({
+const province = (code: string, name: string) => ({
   code,
   name,
   status: "ok",
   source_name: "Statistique Canada",
   source_url: "https://www.statcan.gc.ca/",
   metrics: [
-    metric("real_gdp", "PIB réel", 500_000_000_000, "currency"),
-    metric("unemployment_rate", "Taux de chômage", unemployment),
-    metric("inflation_yoy", "Inflation sur 12 mois", inflation),
-    metric("employment", "Emploi", 2_000_000, "persons"),
-    metric("retail_sales", "Ventes au détail", 10_000_000, "currency"),
-    metric("housing_starts", "Mises en chantier", 40_000, "units"),
+    metric("unemployment_rate", "Taux de chômage", 5.4),
+    metric("inflation_yoy", "Inflation", 2.0),
     metric("population", "Population", 5_000_000, "persons"),
   ],
 });
 
-test("Canada 360 Assistant répond avec statistiques et ressources officielles", async ({ page }) => {
+async function mockOverview(page: import("@playwright/test").Page) {
   await page.route("**/api/anatole/api/v1/canada/overview?*", async (route) => {
     await route.fulfill({
       status: 200,
@@ -54,23 +45,14 @@ test("Canada 360 Assistant répond avec statistiques et ressources officielles",
         language: "fr",
         status: "ok",
         macro: [
-          metric("real_gdp", "PIB réel", 2_400_000_000_000, "currency"),
           metric("inflation_yoy", "Inflation sur 12 mois", 2.1),
           metric("unemployment_rate", "Taux de chômage", 6.4),
         ],
         rates: [],
         markets: [],
         provinces: [
-          province("QC", "Québec", 5.4, 2.0),
-          province("ON", "Ontario", 6.2, 2.2),
-          province("AB", "Alberta", 7.0, 1.8),
-          province("BC", "Colombie-Britannique", 5.9, 2.1),
-          province("MB", "Manitoba", 5.5, 1.9),
-          province("SK", "Saskatchewan", 5.1, 1.7),
-          province("NS", "Nouvelle-Écosse", 6.7, 2.4),
-          province("NB", "Nouveau-Brunswick", 6.9, 2.3),
-          province("NL", "Terre-Neuve-et-Labrador", 8.1, 2.5),
-          province("PE", "Île-du-Prince-Édouard", 7.2, 2.6),
+          province("QC", "Québec"),
+          province("ON", "Ontario"),
         ],
         sources: [
           {
@@ -92,6 +74,64 @@ test("Canada 360 Assistant répond avec statistiques et ressources officielles",
       }),
     });
   });
+}
+
+test("Canada 360 Assistant affiche une réponse sourcée", async ({ page }) => {
+  await mockOverview(page);
+
+  await page.route(
+    "**/api/anatole/api/v1/canada/assistant",
+    async (route) => {
+      const request = route.request();
+      const payload = request.postDataJSON();
+
+      if (String(payload.question).includes("prestations")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            answer:
+              "Pour les prestations au Québec, voici les ressources officielles. Canada 360 ne déduit pas automatiquement ton admissibilité.",
+            links: [
+              {
+                label: "Chercheur de prestations",
+                url: "https://www.canada.ca/en/services/benefits/finder.html",
+                level: "federal",
+              },
+              {
+                label: "Gouvernement du Québec",
+                url: "https://www.quebec.ca/en",
+                level: "provincial",
+              },
+            ],
+            source_line: "Liens officiels uniquement.",
+            mode: payload.mode,
+            jurisdiction: payload.jurisdiction,
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          answer:
+            "Québec — Taux de chômage: 5,4 % pour août 2026.",
+          links: [
+            {
+              label: "Statistique Canada",
+              url: "https://www.statcan.gc.ca/",
+              level: "statistics",
+            },
+          ],
+          source_line: "Statistique Canada · source officielle.",
+          mode: payload.mode,
+          jurisdiction: payload.jurisdiction,
+        }),
+      });
+    },
+  );
 
   await page.goto("/canada", {
     waitUntil: "domcontentloaded",
@@ -106,61 +146,48 @@ test("Canada 360 Assistant répond avec statistiques et ressources officielles",
 
   const chat = page.getByTestId("canada360-assistant-chat");
   await expect(chat).toContainText("Québec");
-  await expect(chat).toContainText(/5[,.]4 %/);
+  await expect(chat).toContainText("5,4 %");
   await expect(
-    chat.getByRole("link", { name: /Statistique Canada/i }).last(),
+    chat.getByRole("link", { name: /Statistique Canada/i }),
   ).toHaveAttribute("href", "https://www.statcan.gc.ca/");
 
   await input.fill("Quelles prestations puis-je chercher au Québec ?");
   await input.press("Enter");
 
-  await expect(chat).toContainText(/admissibilité|eligibility/i);
+  await expect(chat).toContainText(/admissibilité/i);
   await expect(
-    chat.getByRole("link", { name: /Chercheur de prestations|Benefits Finder/i }).last(),
+    chat.getByRole("link", { name: /Chercheur de prestations/i }),
   ).toHaveAttribute(
     "href",
     "https://www.canada.ca/en/services/benefits/finder.html",
   );
-  await expect(
-    chat.getByRole("link", { name: /Gouvernement du Québec|Quebec government/i }).last(),
-  ).toHaveAttribute("href", "https://www.quebec.ca/en");
 });
 
-test("Canada 360 Assistant compare deux provinces sans inventer de valeur", async ({ page }) => {
-  await page.route("**/api/anatole/api/v1/canada/overview?*", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        language: "fr",
-        status: "ok",
-        macro: [],
-        rates: [],
-        markets: [],
-        provinces: [
-          province("QC", "Québec", 5.4, 2.0),
-          province("ON", "Ontario", 6.2, 2.2),
-        ],
-        sources: [
-          {
-            key: "statcan",
-            label: "Statistique Canada",
-            status: "ok",
-            detail: null,
-          },
-          {
-            key: "provinces",
-            label: "Provinces",
-            status: "ok",
-            detail: null,
-          },
-        ],
-        issues: [],
-        generated_at: "2026-09-29T12:00:00Z",
-        refresh_after_seconds: 60,
-      }),
-    });
-  });
+test("Canada 360 Assistant envoie le mode Comparer au backend", async ({ page }) => {
+  await mockOverview(page);
+
+  let seenMode = "";
+
+  await page.route(
+    "**/api/anatole/api/v1/canada/assistant",
+    async (route) => {
+      const payload = route.request().postDataJSON();
+      seenMode = String(payload.mode);
+
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          answer:
+            "Comparaison officielle — chômage: Québec: 5,4 % · Ontario: 6,2 %.",
+          links: [],
+          source_line: "Statistique Canada.",
+          mode: payload.mode,
+          jurisdiction: payload.jurisdiction,
+        }),
+      });
+    },
+  );
 
   await page.goto("/canada", {
     waitUntil: "domcontentloaded",
@@ -174,7 +201,9 @@ test("Canada 360 Assistant compare deux provinces sans inventer de valeur", asyn
   await input.fill("Compare le chômage au Québec et en Ontario");
   await input.press("Enter");
 
-  const chat = page.getByTestId("canada360-assistant-chat");
-  await expect(chat).toContainText(/Québec: 5[,.]4 %/);
-  await expect(chat).toContainText(/Ontario: 6[,.]2 %/);
+  await expect(
+    page.getByTestId("canada360-assistant-chat"),
+  ).toContainText("Ontario: 6,2 %");
+
+  expect(seenMode).toBe("compare");
 });

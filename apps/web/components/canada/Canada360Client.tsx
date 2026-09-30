@@ -1068,9 +1068,8 @@ export function Canada360Client() {
       ) : null}
 
       <Canada360Assistant
-        key={selectedProvinceCode ?? "CA"}
+        key={`${language}:${selectedProvinceCode ?? "CA"}`}
         language={language}
-        snapshot={snapshot}
         selectedProvinceCode={selectedProvinceCode}
       />
 
