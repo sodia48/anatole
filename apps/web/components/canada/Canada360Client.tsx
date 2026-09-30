@@ -19,6 +19,7 @@ import {
 } from "react";
 
 import styles from "./Canada360Client.module.css";
+import { Canada360Assistant } from "./Canada360Assistant";
 import {
   AnnualGdpContext,
   RecentEconomicPulse,
@@ -1065,6 +1066,12 @@ export function Canada360Client() {
           {error}
         </div>
       ) : null}
+
+      <Canada360Assistant
+        language={language}
+        snapshot={snapshot}
+        selectedProvinceCode={selectedProvinceCode}
+      />
 
       <section className={`panel ${styles.pulsePanel}`}>
         <div className={styles.heading}>
