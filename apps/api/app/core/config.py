@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     redis_singleflight_poll_seconds: float = Field(default=0.05, ge=0.01, le=1.0)
     finnhub_api_key: str = ""
     barchart_api_key: str = ""
+    openai_api_key: str = Field(
+        default="",
+        validation_alias="OPENAI_API_KEY",
+    )
+    canada360_assistant_model: str = Field(
+        default="gpt-5.6-sol",
+        validation_alias="CANADA360_ASSISTANT_MODEL",
+    )
+    canada360_assistant_timeout_seconds: float = Field(
+        default=30.0,
+        validation_alias="CANADA360_ASSISTANT_TIMEOUT_SECONDS",
+        ge=10.0,
+        le=90.0,
+    )
     sec_user_agent: str = "Anatole contact@anatole.app"
     company_network_build_concurrency: int = Field(
         default=1,
