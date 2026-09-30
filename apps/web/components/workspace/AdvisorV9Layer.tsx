@@ -24,13 +24,11 @@ const V9_LOCAL_KEY = "anatole:advisor-v9-local:v1";
 const SYNC_EVENT = "anatole-workspace-sync-applied";
 
 type TabKey =
-  | "pulse"
-  | "household"
-  | "labs"
-  | "intelligence"
-  | "decisions"
-  | "optimize"
-  | "pro";
+  | "today"
+  | "money"
+  | "goals"
+  | "decide"
+  | "file";
 
 type Household = {
   userIncome?: number | null;
@@ -266,13 +264,11 @@ const TABS: Array<{
   fr: string;
   en: string;
 }> = [
-  { key: "pulse", index: "01", fr: "Pulse", en: "Pulse" },
-  { key: "household", index: "02", fr: "Ménage", en: "Household" },
-  { key: "labs", index: "03", fr: "Labs", en: "Labs" },
-  { key: "intelligence", index: "04", fr: "Intelligence", en: "Intelligence" },
-  { key: "decisions", index: "05", fr: "Décisions", en: "Decisions" },
-  { key: "optimize", index: "06", fr: "Optimiser", en: "Optimize" },
-  { key: "pro", index: "07", fr: "Pro", en: "Pro" },
+  { key: "today", index: "01", fr: "Aujourd’hui", en: "Today" },
+  { key: "money", index: "02", fr: "Mon argent", en: "My money" },
+  { key: "goals", index: "03", fr: "Mes objectifs", en: "My goals" },
+  { key: "decide", index: "04", fr: "Décider", en: "Decide" },
+  { key: "file", index: "05", fr: "Mon dossier", en: "My file" },
 ];
 
 function finite(value: number | null | undefined): number {
@@ -846,7 +842,7 @@ export function AdvisorV9Layer({
   language: AnatoleLanguage;
   portfolioCount: number;
 }) {
-  const [tab, setTab] = useState<TabKey>("pulse");
+  const [tab, setTab] = useState<TabKey>("today");
   const [workspace, setWorkspace] =
     useState<Workspace>(readWorkspace);
   const [v9, setV9] = useState<V9State>(readV9);
@@ -1523,13 +1519,11 @@ export function AdvisorV9Layer({
   };
 
   const modulesByTab: Record<TabKey, string[]> = {
-    pulse: ["01", "03", "04", "05", "06"],
-    household: ["02", "07", "08", "24", "32"],
-    labs: ["09", "10", "11", "12", "13"],
-    intelligence: ["17", "18", "19", "20", "21"],
-    decisions: ["14", "15", "16", "22", "23"],
-    optimize: ["26", "27", "28", "29", "30"],
-    pro: ["25", "31", "33", "34", "35"],
+    today: ["01", "03", "04", "05", "06", "17", "18", "19", "20", "21"],
+    money: ["02", "07", "08", "24", "32"],
+    goals: ["09", "10", "11", "12", "13", "26", "27", "28", "29", "30"],
+    decide: ["14", "15", "16", "22", "23"],
+    file: ["25", "31", "33", "34", "35"],
   };
 
   return (
@@ -1537,26 +1531,26 @@ export function AdvisorV9Layer({
       className={`${styles.shell} ${
         v9.emergencyMode ? styles.emergencyShell : ""
       }`}
-      data-testid="advisor-v9-layer"
+      data-testid="advisor-v10-layer"
       data-feature-count="35"
     >
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
           <span className={styles.kicker}>
-            ANATOLE CONSEIL · V9 INTELLIGENCE OS
+            ANATOLE CONSEIL · V10 FINANCIAL OS
           </span>
           <h2>
             {pick(
               language,
-              "Un cockpit qui relie tes comptes, tes décisions, ta famille et ton avenir.",
-              "One cockpit connecting your accounts, decisions, family and future.",
+              "Cinq espaces simples pour comprendre ton argent, avancer vers tes objectifs et prendre de meilleures décisions.",
+              "Five simple spaces to understand your money, move toward your goals and make better decisions.",
             )}
           </h2>
           <p>
             {pick(
               language,
-              "35 capacités reliées, avec hypothèses visibles, données manquantes explicites et aucune fausse donnée bancaire ou fiscale.",
-              "35 connected capabilities with visible assumptions, explicit missing data and no fabricated banking or tax data.",
+              "35 moteurs restent reliés sous cinq espaces. Une donnée saisie continue d’alimenter les autres calculs sans multiplier les écrans.",
+              "35 engines remain connected under five spaces. One entered data point continues to feed other calculations without multiplying screens.",
             )}
           </p>
         </div>
@@ -1566,8 +1560,8 @@ export function AdvisorV9Layer({
             <strong>{health.confidencePercent}%</strong>
           </div>
           <div>
-            <span>{pick(language, "MODULES", "MODULES")}</span>
-            <strong>35</strong>
+            <span>{pick(language, "ESPACES", "SPACES")}</span>
+            <strong>5</strong>
           </div>
           <div>
             <span>{pick(language, "IMPORTS", "IMPORTS")}</span>
@@ -1613,8 +1607,8 @@ export function AdvisorV9Layer({
         className={styles.tabs}
         aria-label={pick(
           language,
-          "Espaces Conseil V9",
-          "Advice V9 spaces",
+          "Espaces Conseil V10",
+          "Advice V10 spaces",
         )}
       >
         {TABS.map((item) => (
@@ -1623,7 +1617,7 @@ export function AdvisorV9Layer({
             type="button"
             aria-pressed={tab === item.key}
             className={tab === item.key ? styles.tabActive : undefined}
-            data-testid={`advisor-v9-tab-${item.key}`}
+            data-testid={`advisor-v10-tab-${item.key}`}
             onClick={() => setTab(item.key)}
           >
             <span>{item.index}</span>
@@ -1632,7 +1626,7 @@ export function AdvisorV9Layer({
         ))}
       </nav>
 
-      {tab === "pulse" ? (
+      {tab === "today" ? (
         <div className={styles.zone} data-testid="advisor-v9-pulse">
           <article className={`${styles.card} ${styles.cardHero}`} data-module="01">
             <div className={styles.cardEyebrow}>01 · BANK CONNECT CENTER</div>
@@ -1751,7 +1745,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "household" ? (
+      {tab === "money" ? (
         <div className={styles.zone} data-testid="advisor-v9-household">
           <article className={`${styles.card} ${styles.span2}`} data-module="02">
             <div className={styles.cardEyebrow}>02 · FINANCIAL GRAPH</div>
@@ -1859,7 +1853,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "labs" ? (
+      {tab === "goals" ? (
         <div className={styles.zone} data-testid="advisor-v9-labs">
           <article className={`${styles.card} ${styles.span2}`} data-module="09">
             <div className={styles.cardEyebrow}>09 · RETIREMENT LAB</div>
@@ -1926,7 +1920,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "intelligence" ? (
+      {tab === "today" ? (
         <div className={styles.zone} data-testid="advisor-v9-intelligence">
           <article className={styles.card} data-module="17">
             <div className={styles.cardEyebrow}>17 · GOAL SCORECARD</div>
@@ -1985,7 +1979,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "decisions" ? (
+      {tab === "decide" ? (
         <div className={styles.zone} data-testid="advisor-v9-decisions">
           <article className={styles.card} data-module="14">
             <div className={styles.cardEyebrow}>14 · DOCUMENT INTELLIGENCE</div>
@@ -2054,7 +2048,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "optimize" ? (
+      {tab === "goals" ? (
         <div className={styles.zone} data-testid="advisor-v9-optimize">
           <article className={styles.card} data-module="26">
             <div className={styles.cardEyebrow}>26 · DECISION HISTORY</div>
@@ -2120,7 +2114,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      {tab === "pro" ? (
+      {tab === "file" ? (
         <div className={styles.zone} data-testid="advisor-v9-pro">
           <article className={styles.card} data-module="25">
             <div className={styles.cardEyebrow}>25 · ADVISOR COLLAB PACKAGE</div>
@@ -2196,8 +2190,8 @@ export function AdvisorV9Layer({
 
       <footer className={styles.footer}>
         <div>
-          <strong>{pick(language, "35/35 modules V9", "35/35 V9 modules")}</strong>
-          <span>{pick(language, `${modulesByTab[tab].length} visibles dans cet espace`, `${modulesByTab[tab].length} visible in this space`)}</span>
+          <strong>{pick(language, "35 moteurs · V10", "35 engines · V10")}</strong>
+          <span>{pick(language, `${modulesByTab[tab].length} capacités regroupées ici`, `${modulesByTab[tab].length} capabilities grouped here`)}</span>
         </div>
         <div>
           <span>{pick(language, "Dépenses importées", "Imported expenses")}</span>

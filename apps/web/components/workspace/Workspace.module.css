@@ -2726,3 +2726,27 @@
 @media (max-width: 620px) {
   .portfolioGlobalForm { grid-template-columns: 1fr; }
 }
+
+.legacyAdvice{
+  overflow:hidden;
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--surface);
+}
+.legacyAdvice>summary{
+  min-height:52px;
+  padding:10px 12px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  cursor:pointer;
+  list-style:none;
+  background:var(--surface-raised);
+}
+.legacyAdvice>summary::-webkit-details-marker{display:none}
+.legacyAdvice>summary>span:first-child{display:grid;gap:3px}
+.legacyAdvice>summary strong{font-size:9px}
+.legacyAdvice>summary small,
+.legacyAdvice>summary>span:last-child{color:var(--muted);font-size:7px}
+.legacyAdvice[open]>summary{border-bottom:1px solid var(--border)}

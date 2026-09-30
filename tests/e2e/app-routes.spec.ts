@@ -633,6 +633,8 @@ test("Anatole Conseil V8 relie les 20 modules du Financial Command Deck", async 
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("advisor-v8-legacy").locator("summary").click();
+
   const v8 = page.getByTestId("advisor-v8-layer");
   await expect(v8).toBeVisible();
   await expect(v8).toHaveAttribute("data-feature-count", "20");
@@ -684,6 +686,7 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v8-legacy").locator("summary").click();
   await page.getByTestId("advisor-v8-tab-scenarios").click();
 
   const returnInput = page.getByLabel(
@@ -699,6 +702,7 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
   await expect(volatilityInput).toHaveValue("12.5");
 
   await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v8-legacy").locator("summary").click();
   await page.getByTestId("advisor-v8-tab-scenarios").click();
 
   await expect(
@@ -709,7 +713,7 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
   ).toHaveValue("12.5");
 });
 
-test("Anatole Conseil V9 expose les 35 capacités dans sept espaces", async ({ page }) => {
+test("Anatole Conseil V10 regroupe les 35 capacités dans cinq espaces", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem(
       "anatole:advisor-profile:v1",
@@ -790,29 +794,27 @@ test("Anatole Conseil V9 expose les 35 capacités dans sept espaces", async ({ p
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
-  const v9 = page.getByTestId("advisor-v9-layer");
-  await expect(v9).toBeVisible();
-  await expect(v9).toHaveAttribute("data-feature-count", "35");
-  await expect(v9).toContainText(/V9 INTELLIGENCE OS/i);
+  const v10 = page.getByTestId("advisor-v10-layer");
+  await expect(v10).toBeVisible();
+  await expect(v10).toHaveAttribute("data-feature-count", "35");
+  await expect(v10).toContainText(/V10 FINANCIAL OS/i);
 
   const spaces = [
-    "pulse",
-    "household",
-    "labs",
-    "intelligence",
-    "decisions",
-    "optimize",
-    "pro",
+    ["today", 10],
+    ["money", 5],
+    ["goals", 10],
+    ["decide", 5],
+    ["file", 5],
   ] as const;
 
-  for (const key of spaces) {
-    await page.getByTestId(`advisor-v9-tab-${key}`).click();
-    const zone = page.getByTestId(`advisor-v9-${key}`);
-    await expect(zone).toBeVisible();
-    await expect(zone.locator("[data-module]")).toHaveCount(5);
+  for (const [key, expectedModules] of spaces) {
+    await page.getByTestId(`advisor-v10-tab-${key}`).click();
+    await expect(v10.locator("[data-module]:visible")).toHaveCount(expectedModules);
   }
 
-  await expect(page.getByTestId("advisor-v8-layer")).toBeVisible();
+  const legacy = page.getByTestId("advisor-v8-legacy");
+  await expect(legacy).not.toHaveAttribute("open", "");
+  await expect(page.getByTestId("advisor-v8-layer")).toBeHidden();
 });
 
 test("Anatole Conseil V9 importe un CSV bancaire local et détecte les récurrences", async ({ page }) => {
@@ -898,16 +900,16 @@ test("Anatole Conseil V9 persiste le mode urgence localement", async ({ page }) 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
-  await page.getByTestId("advisor-v9-tab-pro").click();
+  await page.getByTestId("advisor-v10-tab-file").click();
 
   const toggle = page.getByTestId("advisor-v9-emergency-toggle");
   await toggle.check();
   await expect(toggle).toBeChecked();
 
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByTestId("advisor-v9-tab-pro").click();
+  await page.getByTestId("advisor-v10-tab-file").click();
   await expect(page.getByTestId("advisor-v9-emergency-toggle")).toBeChecked();
-  await expect(page.getByTestId("advisor-v9-layer")).toContainText(
+  await expect(page.getByTestId("advisor-v10-layer")).toContainText(
     /MODE URGENCE ACTIF|EMERGENCY MODE ACTIVE/i,
   );
 });
