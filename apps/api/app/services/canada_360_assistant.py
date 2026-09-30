@@ -1,21 +1,30 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import unicodedata
+from time import monotonic
 from urllib.parse import urlparse
+from uuid import UUID, uuid4
 
 import httpx
 
 from app.core.config import settings
+from app.core.distributed_cache import redis_snapshot_store
 from app.schemas.canada_360 import (
+    Canada360AssistantConversation,
     Canada360AssistantLink,
+    Canada360AssistantProfile,
     Canada360AssistantResponse,
+    Canada360AssistantTurn,
     Canada360Metric,
     Canada360Snapshot,
 )
 from app.services.canada_360 import canada_360_service
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+CONVERSATION_TTL_SECONDS = 2 * 60 * 60
+MAX_HISTORY_TURNS = 16
 
 PROVINCES = {
     "QC": (
@@ -58,7 +67,7 @@ PROVINCES = {
         "Nouveau-Brunswick",
         "New Brunswick",
         ("new brunswick", "nouveau brunswick"),
-        "https://www2.gnb.ca/content/gnb/en.html",
+        "https://www.gnb.ca/",
     ),
     "NS": (
         "Nouvelle-Écosse",
@@ -80,6 +89,59 @@ PROVINCES = {
     ),
 }
 
+PROVINCIAL_INCOME_ASSISTANCE = {
+    "QC": (
+        "Programme d’aide sociale",
+        "Social Assistance Program",
+        "https://www.quebec.ca/en/family-and-support-for-individuals/social-assistance-social-solidarity",
+    ),
+    "ON": (
+        "Ontario Works",
+        "Ontario Works",
+        "https://www.ontario.ca/page/ontario-works",
+    ),
+    "BC": (
+        "Income Assistance",
+        "Income Assistance",
+        "https://www2.gov.bc.ca/gov/content/family-social-supports/income-assistance",
+    ),
+    "AB": (
+        "Income Support",
+        "Income Support",
+        "https://www.alberta.ca/income-support",
+    ),
+    "SK": (
+        "Saskatchewan Income Support",
+        "Saskatchewan Income Support",
+        "https://www.saskatchewan.ca/residents/family-and-social-support/financial-help/saskatchewan-income-support-sis",
+    ),
+    "MB": (
+        "Employment and Income Assistance (EIA)",
+        "Employment and Income Assistance (EIA)",
+        "https://www.gov.mb.ca/fs/eia/",
+    ),
+    "NB": (
+        "Programme d’aide sociale",
+        "Social Assistance Program",
+        "https://www.gnb.ca/en/org/social-development.html",
+    ),
+    "NS": (
+        "Income Assistance",
+        "Income Assistance",
+        "https://novascotia.ca/coms/employment/income_assistance/",
+    ),
+    "PE": (
+        "Social Assistance Program",
+        "Social Assistance Program",
+        "https://www.princeedwardisland.ca/en/information/social-development-and-seniors/social-assistance-program",
+    ),
+    "NL": (
+        "Income Support",
+        "Income Support",
+        "https://www.gov.nl.ca/sswb/income-support/overview/",
+    ),
+}
+
 FEDERAL = {
     "services": (
         "Services du gouvernement du Canada",
@@ -90,6 +152,11 @@ FEDERAL = {
         "Chercheur de prestations",
         "Benefits Finder",
         "https://www.canada.ca/en/services/benefits/finder.html",
+    ),
+    "ei": (
+        "Assurance-emploi — prestations régulières",
+        "Employment Insurance — regular benefits",
+        "https://www.canada.ca/en/services/benefits/ei/ei-regular-benefit.html",
     ),
     "taxes": (
         "Impôt sur le revenu — ARC",
@@ -126,31 +193,6 @@ FEDERAL = {
         "Statistics Canada",
         "https://www.statcan.gc.ca/en/start",
     ),
-}
-
-PROVINCE_TOPIC_SOURCES = {
-    "QC": {
-        "benefits": (
-            "Aide financière — Gouvernement du Québec",
-            "Financial assistance — Gouvernement du Québec",
-            "https://www.quebec.ca/en/family-and-support-for-individuals/social-assistance-social-solidarity/how-to-apply",
-        ),
-        "business": (
-            "Aides financières aux entreprises — Québec",
-            "Business financial assistance — Quebec",
-            "https://www.quebec.ca/entreprises-et-travailleurs-autonomes/rechercher-aide-financiere",
-        ),
-        "health": (
-            "RAMQ",
-            "RAMQ",
-            "https://www.ramq.gouv.qc.ca/en/citizens/health-insurance",
-        ),
-        "taxes": (
-            "Revenu Québec",
-            "Revenu Québec",
-            "https://www.revenuquebec.ca/en/citizens/income-tax-return/",
-        ),
-    },
 }
 
 FEDERAL_DOMAINS = (
@@ -194,17 +236,59 @@ METRIC_ALIASES = {
     "tsx_composite": ("tsx", "tsx composite", "marche canadien"),
 }
 
-ANALYTICAL_CUES = (
-    "pourquoi",
-    "why",
-    "explique",
-    "explain",
-    "cause",
-    "causes",
-    "raison",
-    "reasons",
-    "impact",
-    "effet",
+STATISTICAL_CUES = (
+    "quel est",
+    "quelle est",
+    "quels sont",
+    "quelles sont",
+    "combien",
+    "taux",
+    "niveau",
+    "evolution",
+    "historique",
+    "variation",
+    "statistique",
+    "donnee",
+    "chiffre",
+    "compare",
+    "comparaison",
+    "what is",
+    "how many",
+    "rate",
+    "level",
+    "trend",
+    "history",
+    "data",
+    "statistic",
+    "compare",
+)
+
+PERSONAL_CUES = (
+    "je suis",
+    "j ai",
+    "jai ",
+    "mon revenu",
+    "mes revenus",
+    "je gagne",
+    "je vis",
+    "je cherche",
+    "ma situation",
+    "sans emploi",
+    "au chomage",
+    "celibataire",
+    "marie",
+    "conjoint de fait",
+    "i am",
+    "i m",
+    "i have",
+    "my income",
+    "i earn",
+    "i live",
+    "i need",
+    "unemployed",
+    "single",
+    "married",
+    "common law",
 )
 
 TOPICS = (
@@ -219,6 +303,8 @@ TOPICS = (
             "allocation",
             "subvention",
             "grant",
+            "income assistance",
+            "social assistance",
         ),
     ),
     (
@@ -282,128 +368,6 @@ TOPICS = (
     ),
 )
 
-FALLBACK_ANSWERS = {
-    "benefits": {
-        "fr": (
-            "Oui. Les aides publiques peuvent notamment concerner la retraite, "
-            "la perte d’emploi ou l’incapacité de travailler, l’invalidité, la "
-            "santé et les soins dentaires, les études, le logement, la famille "
-            "et certains besoins liés à une entreprise. Au Québec, l’aide sociale "
-            "et la solidarité sociale peuvent aussi s’appliquer selon les ressources "
-            "et la situation de la personne. Si tu me précises ton âge, ta situation "
-            "familiale, ton statut d’emploi et le type d’aide recherché, je peux "
-            "réduire la réponse sans présumer de ton admissibilité."
-        ),
-        "en": (
-            "Yes. Public support can cover retirement, job loss or inability to work, "
-            "disability, health and dental needs, education, housing, family needs and "
-            "some business-related support. Quebec also has social assistance and "
-            "social solidarity programs that depend on a person’s resources and "
-            "circumstances. If you give me your age, family situation, employment "
-            "status and the kind of help you need, I can narrow the answer without "
-            "assuming eligibility."
-        ),
-    },
-    "taxes": {
-        "fr": (
-            "Je peux t’expliquer directement les règles et démarches fiscales "
-            "publiées par l’ARC et, lorsqu’elles s’appliquent, par l’administration "
-            "provinciale. Donne-moi la situation précise — déclaration, crédit, "
-            "déduction, travail autonome ou autre — et je te répondrai à partir des "
-            "règles officielles, sans supposer le résultat de ta déclaration."
-        ),
-        "en": (
-            "I can explain the tax rules and filing steps published by the CRA and, "
-            "where applicable, the provincial tax authority. Tell me the exact issue "
-            "— filing, credit, deduction, self-employment or another topic — and I "
-            "will answer from official rules without assuming the outcome of your return."
-        ),
-    },
-    "immigration": {
-        "fr": (
-            "Je peux répondre directement sur les démarches d’immigration et de "
-            "citoyenneté à partir des règles officielles d’IRCC et des sources "
-            "provinciales pertinentes. Précise le type de démarche — visa, permis "
-            "d’études, permis de travail, résidence permanente ou citoyenneté — ainsi "
-            "que la province concernée."
-        ),
-        "en": (
-            "I can answer immigration and citizenship questions directly from official "
-            "IRCC rules and relevant provincial sources. Specify the process — visa, "
-            "study permit, work permit, permanent residence or citizenship — and the "
-            "province involved."
-        ),
-    },
-    "health": {
-        "fr": (
-            "Pour les services publics de santé, la couverture et l’inscription "
-            "dépendent surtout de la province ou du territoire. Je peux t’expliquer "
-            "les démarches administratives publiées par le gouvernement et l’organisme "
-            "provincial compétent; précise la province et le service recherché."
-        ),
-        "en": (
-            "For public health services, coverage and registration mainly depend on "
-            "the province or territory. I can explain the administrative steps published "
-            "by government and the responsible provincial body; tell me the province "
-            "and the service you need."
-        ),
-    },
-    "jobs": {
-        "fr": (
-            "Je peux répondre sur les services publics liés à l’emploi, à la recherche "
-            "d’emploi, à la formation et aux prestations associées en m’appuyant sur "
-            "les sources gouvernementales. Dis-moi si ta question concerne une recherche "
-            "d’emploi, une perte d’emploi, une formation ou un programme précis."
-        ),
-        "en": (
-            "I can answer questions about public employment services, job search, "
-            "training and related benefits using government sources. Tell me whether "
-            "your question is about finding work, job loss, training or a specific program."
-        ),
-    },
-    "business": {
-        "fr": (
-            "Les aides publiques aux entreprises peuvent prendre plusieurs formes, "
-            "notamment subventions ou contributions, prêts ou garanties, soutien "
-            "fiscal, accompagnement et programmes sectoriels. Je peux chercher les "
-            "programmes qui correspondent à ton projet à partir de sources fédérales "
-            "et provinciales officielles; précise la province, le secteur et le besoin."
-        ),
-        "en": (
-            "Public business support can include grants or contributions, loans or "
-            "guarantees, tax support, advisory services and sector programs. I can "
-            "narrow the programs for your project using official federal and provincial "
-            "sources; tell me the province, sector and need."
-        ),
-    },
-    "education": {
-        "fr": (
-            "Je peux répondre sur l’aide financière aux études, les prêts et bourses "
-            "et les autres services publics liés à l’éducation en m’appuyant sur les "
-            "sources fédérales et provinciales. Précise la province, le niveau d’études "
-            "et le type d’aide recherché."
-        ),
-        "en": (
-            "I can answer questions about student financial aid, loans and grants and "
-            "other public education services using federal and provincial sources. "
-            "Specify the province, level of study and kind of support you need."
-        ),
-    },
-    "services": {
-        "fr": (
-            "Pose-moi directement la question. Je peux expliquer des services publics, "
-            "des programmes, des démarches, des statistiques et des ressources fédérales "
-            "ou provinciales, puis afficher les sources gouvernementales utilisées sous "
-            "la réponse."
-        ),
-        "en": (
-            "Ask the question directly. I can explain public services, programs, steps, "
-            "statistics and federal or provincial resources, then show the government "
-            "sources used beneath the answer."
-        ),
-    },
-}
-
 
 def _normalize(value: str) -> str:
     ascii_value = unicodedata.normalize("NFKD", value).encode(
@@ -413,17 +377,13 @@ def _normalize(value: str) -> str:
     return re.sub(r"\s+", " ", ascii_value.lower().replace("'", " ")).strip()
 
 
-def _metric_key(question: str) -> str | None:
-    clean = _normalize(question)
-    for key, aliases in METRIC_ALIASES.items():
-        if any(_normalize(alias) in clean for alias in aliases):
-            return key
-    return None
-
-
-def _has_analytical_cue(question: str) -> bool:
-    clean = _normalize(question)
-    return any(cue in clean for cue in ANALYTICAL_CUES)
+def _valid_conversation_id(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return str(UUID(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 
 def _named_provinces(question: str) -> list[str]:
@@ -438,11 +398,181 @@ def _named_provinces(question: str) -> list[str]:
     return output
 
 
+def _province_label(code: str, lang: str) -> str:
+    province = PROVINCES.get(code)
+    if province is None:
+        return code
+    return province[1] if lang == "en" else province[0]
+
+
+def _metric_key(question: str) -> str | None:
+    clean = _normalize(question)
+    for key, aliases in METRIC_ALIASES.items():
+        if any(_normalize(alias) in clean for alias in aliases):
+            return key
+    return None
+
+
+def _has_personal_cue(question: str) -> bool:
+    clean = _normalize(question)
+    return any(cue in clean for cue in PERSONAL_CUES)
+
+
+def _explicit_statistical_intent(
+    question: str,
+    metric_key: str | None,
+    mode: str,
+) -> bool:
+    if metric_key is None:
+        return False
+
+    clean = _normalize(question)
+
+    if _has_personal_cue(question):
+        return False
+
+    if mode == "compare":
+        return True
+
+    if any(cue in clean for cue in STATISTICAL_CUES):
+        return True
+
+    words = clean.split()
+    return len(words) <= 6 and "?" not in question and metric_key != "employment"
+
+
 def _topic_key(question: str) -> str:
     clean = _normalize(question)
     for key, words in TOPICS:
         if any(_normalize(word) in clean for word in words):
             return key
+    return "services"
+
+
+def _resolve_topic(
+    question: str,
+    previous_topic: str,
+) -> str:
+    detected = _topic_key(question)
+
+    if (
+        previous_topic != "services"
+        and _has_personal_cue(question)
+        and detected in {"services", "jobs"}
+    ):
+        return previous_topic
+
+    if (
+        previous_topic != "services"
+        and detected == "services"
+        and len(_normalize(question).split()) <= 36
+    ):
+        return previous_topic
+
+    return detected
+
+
+def _update_profile(
+    current: Canada360AssistantProfile,
+    question: str,
+    jurisdiction: str,
+) -> Canada360AssistantProfile:
+    data = current.model_dump()
+
+    named = _named_provinces(question)
+    if named:
+        data["province"] = named[0]
+    elif jurisdiction != "CA":
+        data["province"] = jurisdiction
+
+    clean = _normalize(question)
+
+    age_match = re.search(
+        r"\b(?:j ai|jai|i am|i m)\s+(\d{1,3})\s*(?:ans|years old)?\b",
+        clean,
+    )
+    if age_match:
+        age = int(age_match.group(1))
+        if 13 <= age <= 120:
+            data["age"] = age
+
+    family_terms = (
+        ("celibataire", "single"),
+        ("single", "single"),
+        ("marie", "married"),
+        ("married", "married"),
+        ("conjoint de fait", "common_law"),
+        ("common law", "common_law"),
+        ("divorce", "divorced"),
+        ("divorced", "divorced"),
+        ("veuf", "widowed"),
+        ("widow", "widowed"),
+    )
+    for needle, value in family_terms:
+        if needle in clean:
+            data["family_status"] = value
+            break
+
+    employment_terms = (
+        ("sans emploi", "unemployed"),
+        ("au chomage", "unemployed"),
+        ("unemployed", "unemployed"),
+        ("sans travail", "unemployed"),
+        ("etudiant", "student"),
+        ("student", "student"),
+        ("travailleur autonome", "self_employed"),
+        ("self employed", "self_employed"),
+        ("je travaille", "employed"),
+        ("i work", "employed"),
+        ("employed", "employed"),
+    )
+    for needle, value in employment_terms:
+        if needle in clean:
+            data["employment_status"] = value
+            break
+
+    children_match = re.search(
+        r"\b(\d{1,2})\s+(?:enfant|enfants|child|children)\b",
+        clean,
+    )
+    if children_match:
+        data["children"] = min(20, int(children_match.group(1)))
+    elif "sans enfant" in clean or "no children" in clean:
+        data["children"] = 0
+
+    if any(
+        needle in clean
+        for needle in (
+            "aide financiere",
+            "prestation",
+            "prestations",
+            "benefit",
+            "benefits",
+            "income assistance",
+            "social assistance",
+        )
+    ):
+        data["objective"] = "financial_assistance"
+
+    return Canada360AssistantProfile.model_validate(data)
+
+
+def _intent_key(
+    *,
+    question: str,
+    metric_key: str | None,
+    mode: str,
+    has_history: bool,
+) -> str:
+    if _explicit_statistical_intent(question, metric_key, mode):
+        return "statistics"
+
+    if has_history and _has_personal_cue(question):
+        return "followup"
+
+    if mode == "compare":
+        return "compare"
+
     return "services"
 
 
@@ -475,13 +605,6 @@ def _metric_link(metric: Canada360Metric) -> Canada360AssistantLink:
         url=metric.source_url or FEDERAL["statistics"][2],
         level="statistics",
     )
-
-
-def _province_label(code: str, lang: str) -> str:
-    province = PROVINCES.get(code)
-    if province is None:
-        return code
-    return province[1] if lang == "en" else province[0]
 
 
 def _statistical_answer(
@@ -598,12 +721,10 @@ def _statistical_answer(
             links=[_metric_link(metric)],
             source_line=(
                 f"{metric.source_name} · "
-                f"{'source officielle' if metric.official else 'source publiée'} "
-                f"· fraîcheur {metric.freshness}."
+                f"{'source officielle' if metric.official else 'source publiée'}."
                 if lang == "fr"
                 else f"{metric.source_name} · "
-                f"{'official source' if metric.official else 'published source'} "
-                f"· freshness {metric.freshness}."
+                f"{'official source' if metric.official else 'published source'}."
             ),
             mode=mode,
             jurisdiction=jurisdiction,
@@ -624,32 +745,108 @@ def _statistical_answer(
     if metric is None or metric.value is None:
         return None
 
-    period = (
-        f" pour {metric.reference_period}"
-        if lang == "fr" and metric.reference_period
-        else (
-            f" for {metric.reference_period}"
-            if metric.reference_period
-            else ""
-        )
-    )
-
     return Canada360AssistantResponse(
         answer=(
             f"Canada — {metric.label}: "
-            f"{_format_number(metric.value, metric.unit, lang)}{period}."
+            f"{_format_number(metric.value, metric.unit, lang)}"
+            f"{f' pour {metric.reference_period}' if lang == 'fr' and metric.reference_period else f' for {metric.reference_period}' if metric.reference_period else ''}."
         ),
         links=[_metric_link(metric)],
-        source_line=(
-            f"{metric.source_name} · "
-            f"{'source officielle' if metric.official else 'source publiée'}."
-            if lang == "fr"
-            else f"{metric.source_name} · "
-            f"{'official source' if metric.official else 'published source'}."
-        ),
+        source_line=metric.source_name,
         mode=mode,
         jurisdiction=jurisdiction,
     )
+
+
+class _ConversationStore:
+    def __init__(self) -> None:
+        self._memory: dict[
+            str,
+            tuple[float, Canada360AssistantConversation],
+        ] = {}
+        self._lock = asyncio.Lock()
+        self._remote = redis_snapshot_store.namespace(
+            "canada360-assistant-conversation-v1"
+        )
+
+    async def load(
+        self,
+        conversation_id: str | None,
+        *,
+        lang: str,
+        jurisdiction: str,
+    ) -> Canada360AssistantConversation:
+        clean_id = _valid_conversation_id(conversation_id) or str(uuid4())
+        now = monotonic()
+
+        async with self._lock:
+            cached = self._memory.get(clean_id)
+            if cached and now - cached[0] <= CONVERSATION_TTL_SECONDS:
+                state = cached[1]
+                return self._with_context(
+                    state,
+                    lang=lang,
+                    jurisdiction=jurisdiction,
+                )
+
+        remote = await self._remote.read(clean_id)
+        if (
+            remote is not None
+            and isinstance(remote.value, Canada360AssistantConversation)
+            and remote.age_seconds <= CONVERSATION_TTL_SECONDS
+        ):
+            state = self._with_context(
+                remote.value,
+                lang=lang,
+                jurisdiction=jurisdiction,
+            )
+            async with self._lock:
+                self._memory[clean_id] = (now, state)
+            return state
+
+        return Canada360AssistantConversation(
+            conversation_id=clean_id,
+            lang=lang,
+            jurisdiction=jurisdiction,
+        )
+
+    async def save(
+        self,
+        state: Canada360AssistantConversation,
+    ) -> None:
+        now = monotonic()
+        async with self._lock:
+            self._memory[state.conversation_id] = (now, state)
+
+        await self._remote.write(
+            state.conversation_id,
+            state,
+            ttl_seconds=CONVERSATION_TTL_SECONDS,
+        )
+
+    @staticmethod
+    def _with_context(
+        state: Canada360AssistantConversation,
+        *,
+        lang: str,
+        jurisdiction: str,
+    ) -> Canada360AssistantConversation:
+        profile = state.profile
+        if jurisdiction != "CA" and profile.province is None:
+            profile = profile.model_copy(
+                update={"province": jurisdiction}
+            )
+
+        return state.model_copy(
+            update={
+                "lang": lang,
+                "jurisdiction": jurisdiction,
+                "profile": profile,
+            }
+        )
+
+
+conversation_store = _ConversationStore()
 
 
 def _official_domains(
@@ -659,6 +856,7 @@ def _official_domains(
 ) -> list[str]:
     domains = list(FEDERAL_DOMAINS)
     codes = _named_provinces(question)
+
     if not codes and jurisdiction != "CA":
         codes = [jurisdiction]
 
@@ -720,7 +918,11 @@ def _extract_model_response(
                     if isinstance(url, str):
                         source_rows.append(
                             (
-                                str(title or urlparse(url).hostname or "Source"),
+                                str(
+                                    title
+                                    or urlparse(url).hostname
+                                    or "Source"
+                                ),
                                 url,
                             )
                         )
@@ -729,6 +931,7 @@ def _extract_model_response(
             action = item.get("action")
             if not isinstance(action, dict):
                 continue
+
             sources = action.get("sources", [])
             if not sources and isinstance(action.get("search"), dict):
                 sources = action["search"].get("sources", [])
@@ -741,15 +944,22 @@ def _extract_model_response(
                 if isinstance(url, str):
                     source_rows.append(
                         (
-                            str(title or urlparse(url).hostname or "Source"),
+                            str(
+                                title
+                                or urlparse(url).hostname
+                                or "Source"
+                            ),
                             url,
                         )
                     )
 
-    answer = "\n\n".join(part for part in text_parts if part).strip()
+    answer = "\n\n".join(
+        part for part in text_parts if part
+    ).strip()
 
     links: list[Canada360AssistantLink] = []
     seen: set[str] = set()
+
     for title, url in source_rows:
         if url in seen or not _allowed_source(url, domains):
             continue
@@ -767,84 +977,276 @@ def _extract_model_response(
     return answer, links
 
 
-def _fallback_links(
-    *,
-    topic: str,
-    province_code: str | None,
+def _profile_summary(
+    profile: Canada360AssistantProfile,
     lang: str,
-) -> list[Canada360AssistantLink]:
-    federal = FEDERAL[topic]
+) -> str:
+    parts: list[str] = []
+
+    if profile.age is not None:
+        parts.append(
+            f"{profile.age} ans"
+            if lang == "fr"
+            else f"{profile.age} years old"
+        )
+
+    family = {
+        "single": ("célibataire", "single"),
+        "married": ("marié", "married"),
+        "common_law": ("conjoint de fait", "common-law"),
+        "divorced": ("divorcé", "divorced"),
+        "widowed": ("veuf/veuve", "widowed"),
+    }
+    if profile.family_status in family:
+        parts.append(
+            family[profile.family_status][0 if lang == "fr" else 1]
+        )
+
+    employment = {
+        "unemployed": ("sans emploi", "unemployed"),
+        "employed": ("en emploi", "employed"),
+        "student": ("étudiant", "student"),
+        "self_employed": (
+            "travailleur autonome",
+            "self-employed",
+        ),
+    }
+    if profile.employment_status in employment:
+        parts.append(
+            employment[profile.employment_status][
+                0 if lang == "fr" else 1
+            ]
+        )
+
+    if profile.children is not None:
+        parts.append(
+            f"{profile.children} enfant(s)"
+            if lang == "fr"
+            else f"{profile.children} child(ren)"
+        )
+
+    if profile.province:
+        parts.append(_province_label(profile.province, lang))
+
+    return ", ".join(parts)
+
+
+def _fallback_benefits_answer(
+    *,
+    profile: Canada360AssistantProfile,
+    jurisdiction: str,
+    lang: str,
+) -> tuple[str, list[Canada360AssistantLink]]:
+    province_code = profile.province or (
+        jurisdiction if jurisdiction != "CA" else None
+    )
+    summary = _profile_summary(profile, lang)
+
     links = [
         Canada360AssistantLink(
-            label=federal[1] if lang == "en" else federal[0],
+            label=FEDERAL["benefits"][1 if lang == "en" else 0],
+            url=FEDERAL["benefits"][2],
+            level="federal",
+        )
+    ]
+
+    if profile.employment_status == "unemployed":
+        links.append(
+            Canada360AssistantLink(
+                label=FEDERAL["ei"][1 if lang == "en" else 0],
+                url=FEDERAL["ei"][2],
+                level="federal",
+            )
+        )
+
+    program = None
+    if province_code in PROVINCIAL_INCOME_ASSISTANCE:
+        program = PROVINCIAL_INCOME_ASSISTANCE[province_code]
+        links.append(
+            Canada360AssistantLink(
+                label=program[1 if lang == "en" else 0],
+                url=program[2],
+                level="provincial",
+            )
+        )
+
+    if lang == "fr":
+        intro = (
+            f"En tenant compte de ce que tu m’as déjà indiqué ({summary}), "
+            if summary
+            else "Voici les pistes que je vérifierais en priorité : "
+        )
+
+        rows: list[str] = []
+
+        if profile.employment_status == "unemployed":
+            rows.append(
+                "1. Assurance-emploi — prestations régulières : à vérifier "
+                "si tu as récemment perdu un emploi assurable. Le droit dépend "
+                "notamment de la raison de la cessation d’emploi et du nombre "
+                "d’heures assurables."
+            )
+
+        if program is not None:
+            rows.append(
+                f"{len(rows) + 1}. {program[0]} : programme provincial à "
+                "vérifier lorsque les revenus et ressources ne suffisent pas "
+                "aux besoins essentiels. L’admissibilité dépend notamment de "
+                "la résidence, des revenus, des actifs et de la composition "
+                "du ménage."
+            )
+
+        rows.append(
+            f"{len(rows) + 1}. Prestations et crédits fondés sur le revenu : "
+            "certaines aides fédérales ou provinciales dépendent du revenu "
+            "déclaré; produire une déclaration de revenus peut rester important "
+            "même avec peu ou pas de revenu."
+        )
+
+        missing = (
+            "Pour affiner vraiment la liste, les informations les plus utiles "
+            "sont : la raison de la fin du dernier emploi, les heures assurables "
+            "récentes, le revenu actuel, l’épargne/les actifs et la situation "
+            "de logement."
+            if profile.employment_status == "unemployed"
+            else
+            "Pour affiner la liste, indique ton âge, ta situation familiale, "
+            "ton statut d’emploi, tes revenus/actifs et la province concernée."
+        )
+
+        return "\n".join([intro, *rows, "", missing]), links
+
+    intro = (
+        f"Based on what you already told me ({summary}), "
+        if summary
+        else "Here are the options I would check first: "
+    )
+
+    rows_en: list[str] = []
+
+    if profile.employment_status == "unemployed":
+        rows_en.append(
+            "1. Employment Insurance regular benefits: worth checking if you "
+            "recently lost insurable employment. Eligibility depends in part on "
+            "why the job ended and the number of insurable hours."
+        )
+
+    if program is not None:
+        rows_en.append(
+            f"{len(rows_en) + 1}. {program[1]}: a provincial program to check "
+            "when income and resources do not cover basic needs. Eligibility "
+            "generally depends on residence, income, assets and household composition."
+        )
+
+    rows_en.append(
+        f"{len(rows_en) + 1}. Income-tested benefits and credits: some federal "
+        "and provincial support depends on reported income, so filing a tax return "
+        "can remain important even with little or no income."
+    )
+
+    missing_en = (
+        "To narrow this properly, the most useful details are why your last job "
+        "ended, recent insurable hours, current income, savings/assets and housing."
+        if profile.employment_status == "unemployed"
+        else
+        "To narrow the list, provide your age, family situation, employment status, "
+        "income/assets and province."
+    )
+
+    return "\n".join(
+        [intro, *rows_en, "", missing_en]
+    ), links
+
+
+def _fallback_service_answer(
+    *,
+    topic: str,
+    profile: Canada360AssistantProfile,
+    jurisdiction: str,
+    lang: str,
+    mode: str,
+) -> Canada360AssistantResponse:
+    if topic == "benefits":
+        answer, links = _fallback_benefits_answer(
+            profile=profile,
+            jurisdiction=jurisdiction,
+            lang=lang,
+        )
+        return Canada360AssistantResponse(
+            answer=answer,
+            links=links,
+            source_line=(
+                "Réponse directe fondée sur des ressources gouvernementales "
+                "officielles; l’organisme public décide de l’admissibilité."
+                if lang == "fr"
+                else "Direct answer grounded in official government resources; "
+                "the public authority makes the eligibility decision."
+            ),
+            mode=mode,
+            jurisdiction=jurisdiction,
+        )
+
+    federal = FEDERAL.get(topic, FEDERAL["services"])
+    links = [
+        Canada360AssistantLink(
+            label=federal[1 if lang == "en" else 0],
             url=federal[2],
             level="federal",
         )
     ]
 
-    if province_code in PROVINCES:
-        special = PROVINCE_TOPIC_SOURCES.get(province_code, {}).get(topic)
-        if special is not None:
-            links.append(
-                Canada360AssistantLink(
-                    label=special[1] if lang == "en" else special[0],
-                    url=special[2],
-                    level="provincial",
-                )
-            )
-        else:
-            province = PROVINCES[province_code]
-            links.append(
-                Canada360AssistantLink(
-                    label=(
-                        f"{province[1]} government"
-                        if lang == "en"
-                        else f"Gouvernement du {province[0]}"
-                    ),
-                    url=province[3],
-                    level="provincial",
-                )
-            )
-
-    return links
-
-
-def _fallback_service_answer(
-    *,
-    question: str,
-    lang: str,
-    jurisdiction: str,
-    mode: str,
-) -> Canada360AssistantResponse:
-    topic = _topic_key(question)
-    named = _named_provinces(question)
-    province_code = named[0] if named else (
+    province_code = profile.province or (
         jurisdiction if jurisdiction != "CA" else None
     )
+    if province_code in PROVINCES:
+        province = PROVINCES[province_code]
+        links.append(
+            Canada360AssistantLink(
+                label=(
+                    f"{province[1]} government"
+                    if lang == "en"
+                    else f"Gouvernement du {province[0]}"
+                ),
+                url=province[3],
+                level="provincial",
+            )
+        )
 
-    answer = FALLBACK_ANSWERS[topic][lang]
-    if province_code and topic not in {"benefits"}:
-        place = _province_label(province_code, lang)
-        prefix = f"Pour {place}, " if lang == "fr" else f"For {place}, "
-        answer = prefix + answer[0].lower() + answer[1:]
+    answer = (
+        "Je peux répondre directement sur ce sujet à partir des règles et "
+        "ressources publiques fédérales et provinciales. Précise le service, "
+        "le programme ou la démarche que tu veux vérifier et je conserverai "
+        "le contexte déjà donné dans cette conversation."
+        if lang == "fr"
+        else "I can answer this directly from federal and provincial public "
+        "rules and resources. Specify the service, program or process you want "
+        "to verify and I will keep the context already provided in this conversation."
+    )
 
     return Canada360AssistantResponse(
         answer=answer,
-        links=_fallback_links(
-            topic=topic,
-            province_code=province_code,
-            lang=lang,
-        ),
+        links=links,
         source_line=(
-            "Réponse directe fondée sur des ressources gouvernementales officielles. "
-            "Les sources sont affichées sous la réponse."
+            "Sources gouvernementales officielles uniquement."
             if lang == "fr"
-            else "Direct answer grounded in official government resources. "
-            "Sources are shown below the answer."
+            else "Official government sources only."
         ),
         mode=mode,
         jurisdiction=jurisdiction,
     )
+
+
+def _history_for_prompt(
+    history: list[Canada360AssistantTurn],
+) -> str:
+    if not history:
+        return "(no previous turns)"
+
+    rows = []
+    for turn in history[-10:]:
+        role = "User" if turn.role == "user" else "Canada 360"
+        rows.append(f"{role}: {turn.text[:1200]}")
+    return "\n".join(rows)
 
 
 def _model_prompt(
@@ -853,33 +1255,49 @@ def _model_prompt(
     lang: str,
     jurisdiction: str,
     mode: str,
+    topic: str,
+    profile: Canada360AssistantProfile,
+    history: list[Canada360AssistantTurn],
 ) -> str:
     language = "French" if lang == "fr" else "English"
-    province_label = (
+    place = (
         _province_label(jurisdiction, lang)
         if jurisdiction != "CA"
         else "Canada"
     )
+    profile_json = profile.model_dump(exclude_none=True)
 
-    return f"""You are Canada 360, a Canadian public-service and public-data assistant.
+    return f"""You are Canada 360, a conversational Canadian public-service and public-data assistant.
 
-Answer the user's question directly in {language}. Do not make the user click a link to obtain the substance of the answer. Links are evidence, not the answer.
+Answer the current user message directly in {language}. Continue the conversation instead of treating each message as unrelated.
 
-Jurisdiction context: {province_label}
-Mode: {mode}
-Question: {question}
+Current jurisdiction: {place}
+Current mode: {mode}
+Current topic: {topic}
+Structured session context: {profile_json}
 
-Rules:
+Recent conversation:
+{_history_for_prompt(history)}
+
+Current user message:
+{question}
+
+Critical routing rule:
+- A personal statement such as "je suis sans emploi", "I am unemployed", "j'ai 25 ans", or "I am single" is PROFILE CONTEXT, not a request for an employment/population statistic.
+- Use statistical data only when the user explicitly asks for a statistic, number, rate, trend, comparison, history or similar measurement.
+
+Answer rules:
 - Use only information found through the provided web search tool, which is restricted to official Canadian federal and provincial government domains.
-- Lead with the answer. Then explain the most useful eligibility criteria, steps, amounts, dates, definitions, comparisons, or limitations supported by the official sources.
-- Do not invent eligibility, amounts, deadlines, statistics, forms, programs, or legal requirements.
-- When eligibility depends on personal facts that were not provided, explain which facts matter and say the public authority makes the final determination.
+- Search the relevant province as well as federal sources when the question depends on province.
+- Lead with the answer, not with links.
+- For benefits or services, enumerate the most relevant programs/options and explain why each may matter given the conversation context.
+- Ask at most 1 or 2 targeted follow-up questions when important eligibility facts are still missing.
+- Never say that the user is definitely eligible unless an official source makes that determination from all required facts. Explain what appears potentially relevant and what still needs verification.
 - For statistics, identify the reference period when available.
 - For health questions, provide administrative/service information only; do not diagnose or prescribe treatment.
 - For laws, public policy, elected officials, parties, elections or ballot questions, stay neutral and factual and do not recommend a political choice.
-- Do not output raw URLs. The interface will display the official sources separately.
-- Keep the answer concise but substantive: usually 2 to 6 short paragraphs or bullets.
-- If the official sources are insufficient or conflicting, say what can and cannot be confirmed instead of guessing.
+- Do not output raw URLs. The interface displays official sources below the answer.
+- If official sources are insufficient or conflicting, say what can and cannot be confirmed instead of guessing.
 """
 
 
@@ -889,6 +1307,9 @@ async def _grounded_model_answer(
     lang: str,
     jurisdiction: str,
     mode: str,
+    topic: str,
+    profile: Canada360AssistantProfile,
+    history: list[Canada360AssistantTurn],
 ) -> Canada360AssistantResponse | None:
     api_key = settings.openai_api_key.strip()
     if not api_key:
@@ -917,8 +1338,11 @@ async def _grounded_model_answer(
             lang=lang,
             jurisdiction=jurisdiction,
             mode=mode,
+            topic=topic,
+            profile=profile,
+            history=history,
         ),
-        "max_output_tokens": 900,
+        "max_output_tokens": 1000,
     }
 
     try:
@@ -929,6 +1353,7 @@ async def _grounded_model_answer(
                 settings.canada360_assistant_timeout_seconds,
             ),
         )
+
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 OPENAI_RESPONSES_URL,
@@ -938,6 +1363,7 @@ async def _grounded_model_answer(
                 },
                 json=payload,
             )
+
         response.raise_for_status()
         answer, links = _extract_model_response(
             response.json(),
@@ -953,11 +1379,10 @@ async def _grounded_model_answer(
         answer=answer,
         links=links,
         source_line=(
-            "Réponse synthétisée à partir de sources gouvernementales officielles "
-            "uniquement. Les sources utilisées sont affichées ci-dessous."
+            "Réponse synthétisée uniquement à partir de sources "
+            "gouvernementales officielles."
             if lang == "fr"
-            else "Answer synthesized only from official government sources. "
-            "The sources used are shown below."
+            else "Answer synthesized only from official government sources."
         ),
         mode=mode,
         jurisdiction=jurisdiction,
@@ -965,6 +1390,19 @@ async def _grounded_model_answer(
 
 
 class Canada360AssistantService:
+    async def get_conversation(
+        self,
+        *,
+        conversation_id: str | None,
+        lang: str,
+        jurisdiction: str,
+    ) -> Canada360AssistantConversation:
+        return await conversation_store.load(
+            conversation_id,
+            lang=lang,
+            jurisdiction=jurisdiction,
+        )
+
     async def answer(
         self,
         *,
@@ -972,88 +1410,113 @@ class Canada360AssistantService:
         lang: str,
         jurisdiction: str,
         mode: str,
+        conversation_id: str | None = None,
     ) -> Canada360AssistantResponse:
-        metric_key = _metric_key(question)
-
-        if metric_key is not None and not _has_analytical_cue(question):
-            snapshot = await canada_360_service.get_snapshot(
-                lang=lang,
-                force=False,
-            )
-            response = _statistical_answer(
-                question=question,
-                metric_key=metric_key,
-                lang=lang,
-                jurisdiction=jurisdiction,
-                mode=mode,
-                snapshot=snapshot,
-            )
-            if response is not None:
-                return response
-
-        grounded = await _grounded_model_answer(
-            question=question,
+        state = await conversation_store.load(
+            conversation_id,
             lang=lang,
             jurisdiction=jurisdiction,
-            mode=mode,
         )
-        if grounded is not None:
-            return grounded
 
-        if metric_key is not None:
+        profile = _update_profile(
+            state.profile,
+            question,
+            jurisdiction,
+        )
+
+        effective_jurisdiction = (
+            profile.province
+            or (jurisdiction if jurisdiction != "CA" else state.jurisdiction)
+            or "CA"
+        )
+        if effective_jurisdiction not in PROVINCES and effective_jurisdiction != "CA":
+            effective_jurisdiction = "CA"
+
+        topic = _resolve_topic(
+            question,
+            state.topic,
+        )
+
+        metric_key = _metric_key(question)
+        intent = _intent_key(
+            question=question,
+            metric_key=metric_key,
+            mode=mode,
+            has_history=bool(state.history),
+        )
+
+        base_response: Canada360AssistantResponse | None = None
+
+        if intent == "statistics" and metric_key is not None:
             snapshot = await canada_360_service.get_snapshot(
                 lang=lang,
                 force=False,
             )
-            response = _statistical_answer(
+            base_response = _statistical_answer(
                 question=question,
                 metric_key=metric_key,
                 lang=lang,
-                jurisdiction=jurisdiction,
+                jurisdiction=effective_jurisdiction,
                 mode=mode,
                 snapshot=snapshot,
             )
-            if response is not None:
-                return response
 
-        if any(
-            word in _normalize(question)
-            for word in ("statistique", "statistics", "donnee", "data")
-        ):
-            federal = FEDERAL["statistics"]
-            return Canada360AssistantResponse(
-                answer=(
-                    "Je peux répondre directement à partir des séries déjà chargées "
-                    "dans Canada 360. Précise l’indicateur — inflation, chômage, "
-                    "population, PIB réel, emploi, ventes au détail ou mises en chantier — "
-                    "ainsi que la province ou la comparaison voulue."
-                    if lang == "fr"
-                    else "I can answer directly from series already loaded in Canada 360. "
-                    "Specify the indicator — inflation, unemployment, population, real GDP, "
-                    "employment, retail sales or housing starts — and the province or "
-                    "comparison you want."
-                ),
-                links=[
-                    Canada360AssistantLink(
-                        label=federal[1] if lang == "en" else federal[0],
-                        url=federal[2],
-                        level="statistics",
-                    )
-                ],
-                source_line=(
-                    "Statistique Canada est la source nationale de référence."
-                    if lang == "fr"
-                    else "Statistics Canada is the national reference source."
-                ),
+        if base_response is None:
+            base_response = await _grounded_model_answer(
+                question=question,
+                lang=lang,
+                jurisdiction=effective_jurisdiction,
                 mode=mode,
-                jurisdiction=jurisdiction,
+                topic=topic,
+                profile=profile,
+                history=state.history,
             )
 
-        return _fallback_service_answer(
-            question=question,
+        if base_response is None:
+            base_response = _fallback_service_answer(
+                topic=topic,
+                profile=profile,
+                jurisdiction=effective_jurisdiction,
+                lang=lang,
+                mode=mode,
+            )
+
+        user_turn = Canada360AssistantTurn(
+            role="user",
+            text=question,
+        )
+        assistant_turn = Canada360AssistantTurn(
+            role="assistant",
+            text=base_response.answer,
+            links=base_response.links,
+            source_line=base_response.source_line,
+        )
+
+        history = [
+            *state.history,
+            user_turn,
+            assistant_turn,
+        ][-MAX_HISTORY_TURNS:]
+
+        next_state = Canada360AssistantConversation(
+            conversation_id=state.conversation_id,
             lang=lang,
-            jurisdiction=jurisdiction,
-            mode=mode,
+            jurisdiction=effective_jurisdiction,
+            topic=topic,
+            profile=profile,
+            history=history,
+        )
+
+        await conversation_store.save(next_state)
+
+        return base_response.model_copy(
+            update={
+                "jurisdiction": effective_jurisdiction,
+                "conversation_id": next_state.conversation_id,
+                "history": history,
+                "profile": profile,
+                "intent": intent,
+            }
         )
 
 

@@ -14,7 +14,7 @@ from app.schemas.canada_360 import (
 )
 from app.services.canada_360 import canada_360_service
 from app.services.canada_360_assistant import (
-    _extract_model_response,
+    PROVINCIAL_INCOME_ASSISTANCE,
     _official_domains,
     canada_360_assistant_service,
 )
@@ -44,42 +44,126 @@ def metric(
 
 
 @pytest.mark.asyncio
-async def test_assistant_answers_from_official_snapshot(
+async def test_profile_followup_keeps_history_and_does_not_become_employment_stat(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "openai_api_key", "")
+
+    first = await canada_360_assistant_service.answer(
+        question="Quelles prestations existent au Québec ?",
+        lang="fr",
+        jurisdiction="CA",
+        mode="ask",
+    )
+
+    second = await canada_360_assistant_service.answer(
+        question=(
+            "J'ai 25 ans, je suis célibataire, je suis sans emploi "
+            "et je cherche une aide financière"
+        ),
+        lang="fr",
+        jurisdiction="CA",
+        mode="ask",
+        conversation_id=first.conversation_id,
+    )
+
+    assert second.conversation_id == first.conversation_id
+    assert len(second.history) == 4
+    assert second.profile.age == 25
+    assert second.profile.family_status == "single"
+    assert second.profile.employment_status == "unemployed"
+    assert second.profile.province == "QC"
+    assert second.intent == "followup"
+    assert "Assurance-emploi" in second.answer
+    assert "Programme d’aide sociale" in second.answer
+    assert "Canada — Emploi" not in second.answer
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("code", "program_name"),
+    [
+        ("QC", "Programme d’aide sociale"),
+        ("ON", "Ontario Works"),
+        ("BC", "Income Assistance"),
+        ("AB", "Income Support"),
+        ("SK", "Saskatchewan Income Support"),
+        ("MB", "Employment and Income Assistance"),
+        ("NB", "Programme d’aide sociale"),
+        ("NS", "Income Assistance"),
+        ("PE", "Social Assistance Program"),
+        ("NL", "Income Support"),
+    ],
+)
+async def test_unemployed_profile_is_supported_for_all_ten_provinces(
+    monkeypatch,
+    code,
+    program_name,
+) -> None:
+    monkeypatch.setattr(settings, "openai_api_key", "")
+
+    answer = await canada_360_assistant_service.answer(
+        question=(
+            "J'ai 25 ans, je suis célibataire, sans emploi "
+            "et je cherche une aide financière"
+        ),
+        lang="fr",
+        jurisdiction=code,
+        mode="ask",
+    )
+
+    assert answer.profile.province == code
+    assert answer.intent == "services"
+    assert program_name in answer.answer
+    assert PROVINCIAL_INCOME_ASSISTANCE[code][2] in {
+        link.url for link in answer.links
+    }
+
+
+def test_official_domain_filter_covers_all_ten_provinces() -> None:
+    expected = {
+        "QC": "quebec.ca",
+        "ON": "ontario.ca",
+        "BC": "gov.bc.ca",
+        "AB": "alberta.ca",
+        "SK": "saskatchewan.ca",
+        "MB": "gov.mb.ca",
+        "NB": "gnb.ca",
+        "NS": "novascotia.ca",
+        "PE": "princeedwardisland.ca",
+        "NL": "gov.nl.ca",
+    }
+
+    for code, domain in expected.items():
+        domains = _official_domains(
+            question="aide financière",
+            jurisdiction=code,
+        )
+        assert "canada.ca" in domains
+        assert domain in domains
+
+
+@pytest.mark.asyncio
+async def test_explicit_statistical_question_still_uses_snapshot(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(settings, "openai_api_key", "")
 
     async def fake_snapshot(lang="fr", *, force=False):
-        assert lang == "fr"
-        assert force is False
         return Canada360Snapshot(
             language="fr",
             status="ok",
             macro=[
                 metric(
-                    "inflation_yoy",
-                    "Inflation sur 12 mois",
-                    2.1,
+                    "employment",
+                    "Emploi",
+                    21_173_100,
+                    "persons",
                 )
             ],
             rates=[],
             markets=[],
-            provinces=[
-                Canada360Province(
-                    code="QC",
-                    name="Québec",
-                    status="ok",
-                    metrics=[
-                        metric(
-                            "unemployment_rate",
-                            "Taux de chômage",
-                            5.4,
-                        )
-                    ],
-                    source_name="Statistique Canada",
-                    source_url="https://www.statcan.gc.ca/",
-                )
-            ],
+            provinces=[],
             sources=[],
             issues=[],
             generated_at=datetime.now(UTC),
@@ -93,125 +177,30 @@ async def test_assistant_answers_from_official_snapshot(
     )
 
     answer = await canada_360_assistant_service.answer(
-        question="Quel est le taux de chômage au Québec ?",
+        question="Combien d'emplois y a-t-il au Canada ?",
         lang="fr",
         jurisdiction="CA",
         mode="ask",
     )
 
-    assert "Québec" in answer.answer
-    assert "5,4 %" in answer.answer
-    assert answer.links[0].url == "https://www.statcan.gc.ca/"
-    assert answer.links[0].level == "statistics"
+    assert answer.intent == "statistics"
+    assert "21 173 100" in answer.answer
 
 
-@pytest.mark.asyncio
-async def test_assistant_answers_benefits_before_showing_sources(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "")
+def test_assistant_route_accepts_conversation_id(monkeypatch) -> None:
+    from app.schemas.canada_360 import Canada360AssistantResponse
 
-    answer = await canada_360_assistant_service.answer(
-        question="Quelles prestations existent au Québec ?",
-        lang="fr",
-        jurisdiction="CA",
-        mode="ask",
-    )
-
-    normalized = answer.answer.lower()
-    assert "retraite" in normalized
-    assert "aide sociale" in normalized
-    assert "portes d’entrée" not in normalized
-
-    urls = {item.url for item in answer.links}
-    assert "https://www.canada.ca/en/services/benefits/finder.html" in urls
-    assert (
-        "https://www.quebec.ca/en/family-and-support-for-individuals/"
-        "social-assistance-social-solidarity/how-to-apply"
-    ) in urls
-
-
-def test_qc_web_search_is_restricted_to_official_domains() -> None:
-    domains = _official_domains(
-        question="Quelles prestations existent au Québec ?",
-        jurisdiction="CA",
-    )
-
-    assert "canada.ca" in domains
-    assert "statcan.gc.ca" in domains
-    assert "quebec.ca" in domains
-    assert "revenuquebec.ca" in domains
-    assert "ramq.gouv.qc.ca" in domains
-    assert "example.com" not in domains
-
-
-def test_model_response_keeps_only_official_sources() -> None:
-    payload = {
-        "output": [
-            {
-                "type": "message",
-                "content": [
-                    {
-                        "type": "output_text",
-                        "text": (
-                            "Au Québec, plusieurs aides fédérales et "
-                            "provinciales peuvent s’appliquer selon la situation."
-                        ),
-                        "annotations": [
-                            {
-                                "type": "url_citation",
-                                "title": "Benefits Finder",
-                                "url": (
-                                    "https://www.canada.ca/en/services/"
-                                    "benefits/finder.html"
-                                ),
-                            },
-                            {
-                                "type": "url_citation",
-                                "title": "Non officiel",
-                                "url": "https://example.com/benefits",
-                            },
-                        ],
-                    }
-                ],
-            },
-            {
-                "type": "web_search_call",
-                "action": {
-                    "sources": [
-                        {
-                            "title": "Gouvernement du Québec",
-                            "url": "https://www.quebec.ca/",
-                        }
-                    ]
-                },
-            },
-        ]
-    }
-
-    answer, links = _extract_model_response(
-        payload,
-        domains=["canada.ca", "quebec.ca"],
-    )
-
-    assert answer.startswith("Au Québec")
-    assert {item.url for item in links} == {
-        "https://www.canada.ca/en/services/benefits/finder.html",
-        "https://www.quebec.ca/",
-    }
-
-
-def test_assistant_route_is_registered(monkeypatch) -> None:
     async def fake_answer(**kwargs):
-        from app.schemas.canada_360 import Canada360AssistantResponse
-
-        assert kwargs["question"] == "inflation"
+        assert kwargs["conversation_id"] == (
+            "11111111-1111-1111-1111-111111111111"
+        )
         return Canada360AssistantResponse(
-            answer="Canada — inflation: 2,1 %.",
+            answer="Réponse",
             links=[],
-            source_line="Statistique Canada",
+            source_line=None,
             mode=kwargs["mode"],
             jurisdiction=kwargs["jurisdiction"],
+            conversation_id=kwargs["conversation_id"],
         )
 
     monkeypatch.setattr(
@@ -223,12 +212,18 @@ def test_assistant_route_is_registered(monkeypatch) -> None:
     response = TestClient(app).post(
         "/api/v1/canada/assistant",
         json={
-            "question": "inflation",
+            "question": "aide financière",
             "lang": "fr",
-            "jurisdiction": "CA",
+            "jurisdiction": "ON",
             "mode": "ask",
+            "conversation_id": (
+                "11111111-1111-1111-1111-111111111111"
+            ),
         },
     )
 
     assert response.status_code == 200
-    assert response.json()["answer"] == "Canada — inflation: 2,1 %."
+    assert (
+        response.json()["conversation_id"]
+        == "11111111-1111-1111-1111-111111111111"
+    )

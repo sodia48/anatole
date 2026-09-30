@@ -27,7 +27,7 @@ async function mockOverview(
 }
 
 test(
-  "Canada 360 Assistant répond directement avant les sources",
+  "Canada 360 garde l'historique et enrichit une demande d'aide",
   async ({ page }) => {
     await mockOverview(page);
 
@@ -39,15 +39,24 @@ test(
       '[data-testid="canada360-assistant-frame"]',
     );
 
-    await expect(
-      frame.getByTestId("canada360-assistant-shell"),
-    ).toBeVisible();
-
-    const input = frame.getByLabel(
+    let input = frame.getByLabel(
       "Question à Canada 360",
     );
+
     await input.fill(
       "Quelles prestations existent au Québec ?",
+    );
+    await frame
+      .getByRole("button", { name: "Envoyer" })
+      .click();
+
+    await expect(
+      frame.getByTestId("canada360-assistant-chat"),
+    ).toContainText(/aide sociale|prestations/i);
+
+    input = frame.getByLabel("Question à Canada 360");
+    await input.fill(
+      "J'ai 25 ans, je suis célibataire, je suis sans emploi et je cherche une aide financière",
     );
     await frame
       .getByRole("button", { name: "Envoyer" })
@@ -57,26 +66,33 @@ test(
       "canada360-assistant-chat",
     );
 
-    await expect(chat).toContainText(/retraite/i);
-    await expect(chat).toContainText(/aide sociale/i);
-    await expect(chat).not.toContainText(/voici les portes d’entrée/i);
     await expect(chat).toContainText(
-      /Sources gouvernementales utilisées/i,
+      "Quelles prestations existent au Québec ?",
+    );
+    await expect(chat).toContainText(
+      /25 ans|Assurance-emploi/i,
+    );
+    await expect(chat).toContainText(
+      /Programme d’aide sociale/i,
+    );
+    await expect(chat).not.toContainText(
+      /Canada — Emploi: 21 173 100/i,
     );
 
     await expect(
-      chat.getByRole("link", {
-        name: /Chercheur de prestations/i,
-      }),
-    ).toHaveAttribute(
-      "href",
-      "https://www.canada.ca/en/services/benefits/finder.html",
-    );
+      frame.getByText(
+        /Contexte retenu pour cette conversation/i,
+      ),
+    ).toBeVisible();
+
+    await expect(
+      frame.getByText(/25 ans/i),
+    ).toBeVisible();
   },
 );
 
 test(
-  "Canada 360 Assistant conserve le mode Comparer côté serveur",
+  "Canada 360 peut démarrer une nouvelle conversation",
   async ({ page }) => {
     await mockOverview(page);
 
@@ -88,21 +104,29 @@ test(
       '[data-testid="canada360-assistant-frame"]',
     );
 
-    const mode = frame.getByLabel("Mode");
-    await mode.selectOption("compare");
-
     const input = frame.getByLabel(
       "Question à Canada 360",
     );
+
     await input.fill(
-      "Quelles prestations existent au Québec ?",
+      "Quelles prestations existent en Ontario ?",
     );
     await frame
       .getByRole("button", { name: "Envoyer" })
       .click();
 
     await expect(
-      frame.getByLabel("Mode"),
-    ).toHaveValue("compare");
+      frame.getByTestId("canada360-assistant-chat"),
+    ).toContainText(/Ontario/i);
+
+    await frame
+      .getByTestId("canada360-new-conversation")
+      .click();
+
+    await expect(
+      frame.getByTestId("canada360-assistant-chat"),
+    ).not.toContainText(
+      "Quelles prestations existent en Ontario ?",
+    );
   },
 );

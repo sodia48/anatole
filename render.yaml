@@ -65,5 +65,11 @@ services:
         sync: false
       - key: FINNHUB_API_KEY
         sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CANADA360_ASSISTANT_MODEL
+        value: "gpt-5.6-sol"
+      - key: CANADA360_ASSISTANT_TIMEOUT_SECONDS
+        value: "30"
       - key: SEC_USER_AGENT
         sync: false
