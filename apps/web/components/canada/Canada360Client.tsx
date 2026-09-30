@@ -19,7 +19,6 @@ import {
 } from "react";
 
 import styles from "./Canada360Client.module.css";
-import { Canada360Assistant } from "./Canada360Assistant";
 import {
   AnnualGdpContext,
   RecentEconomicPulse,
@@ -1067,10 +1066,15 @@ export function Canada360Client() {
         </div>
       ) : null}
 
-      <Canada360Assistant
-        key={`${language}:${selectedProvinceCode ?? "CA"}`}
-        language={language}
-        selectedProvinceCode={selectedProvinceCode}
+      <iframe
+        className={styles.assistantFrame}
+        src={`/api/canada-assistant?lang=${language}&jurisdiction=${selectedProvinceCode ?? "CA"}`}
+        title={pick(
+          language,
+          "Assistant Canada 360",
+          "Canada 360 Assistant",
+        )}
+        data-testid="canada360-assistant-frame"
       />
 
       <section className={`panel ${styles.pulsePanel}`}>
