@@ -1023,3 +1023,16 @@ a.sourceLink:hover {
     width: 100%;
   }
 }
+
+.assistantFrame{
+  width:100%;
+  min-height:430px;
+  border:0;
+  border-radius:16px;
+  background:var(--panel);
+}
+@media(max-width:760px){
+  .assistantFrame{
+    min-height:520px;
+  }
+}

@@ -1066,6 +1066,17 @@ export function Canada360Client() {
         </div>
       ) : null}
 
+      <iframe
+        className={styles.assistantFrame}
+        src={`/api/canada-assistant?lang=${language}&jurisdiction=${selectedProvinceCode ?? "CA"}`}
+        title={pick(
+          language,
+          "Assistant Canada 360",
+          "Canada 360 Assistant",
+        )}
+        data-testid="canada360-assistant-frame"
+      />
+
       <section className={`panel ${styles.pulsePanel}`}>
         <div className={styles.heading}>
           <div>
