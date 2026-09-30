@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { NextRequest } from "next/server";
 
 export const runtime = "nodejs";
@@ -9,6 +11,9 @@ const API_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   "https://anatole-api.onrender.com"
 ).replace(/\/+$/, "");
+
+const CONVERSATION_COOKIE = "canada360_conversation";
+const CONVERSATION_TTL_SECONDS = 2 * 60 * 60;
 
 const JURISDICTIONS = new Set([
   "CA",
@@ -30,10 +35,37 @@ type AssistantLink = {
   level: "federal" | "provincial" | "statistics";
 };
 
-type AssistantResponse = {
+type AssistantProfile = {
+  age: number | null;
+  family_status: string | null;
+  employment_status: string | null;
+  children: number | null;
+  province: string | null;
+  objective: string | null;
+};
+
+type AssistantTurn = {
+  role: "user" | "assistant";
+  text: string;
+  links: AssistantLink[];
+  source_line: string | null;
+};
+
+type AssistantConversation = {
+  conversation_id: string;
+  lang: "fr" | "en";
+  jurisdiction: string;
+  topic: string;
+  profile: AssistantProfile;
+  history: AssistantTurn[];
+};
+
+type AssistantResponse = AssistantConversation & {
   answer: string;
   links: AssistantLink[];
   source_line: string | null;
+  mode: "ask" | "compare" | "find";
+  intent: "statistics" | "services" | "followup" | "compare";
 };
 
 function escapeHtml(value: string): string {
@@ -43,6 +75,11 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function validConversationId(value: string | null): string | null {
+  if (!value) return null;
+  return /^[0-9a-fA-F-]{36}$/.test(value) ? value : null;
 }
 
 function safeUrl(value: string): string | null {
@@ -79,44 +116,118 @@ function linkMarkup(
     .join("");
 }
 
+function profileMarkup(
+  profile: AssistantProfile | null,
+  language: "fr" | "en",
+): string {
+  if (!profile) return "";
+
+  const values: string[] = [];
+
+  if (profile.age != null) {
+    values.push(
+      language === "fr"
+        ? `${profile.age} ans`
+        : `${profile.age} years old`,
+    );
+  }
+
+  const family: Record<string, [string, string]> = {
+    single: ["célibataire", "single"],
+    married: ["marié", "married"],
+    common_law: ["conjoint de fait", "common-law"],
+    divorced: ["divorcé", "divorced"],
+    widowed: ["veuf/veuve", "widowed"],
+  };
+
+  if (profile.family_status && family[profile.family_status]) {
+    values.push(
+      family[profile.family_status][language === "fr" ? 0 : 1],
+    );
+  }
+
+  const work: Record<string, [string, string]> = {
+    unemployed: ["sans emploi", "unemployed"],
+    employed: ["en emploi", "employed"],
+    student: ["étudiant", "student"],
+    self_employed: ["travailleur autonome", "self-employed"],
+  };
+
+  if (profile.employment_status && work[profile.employment_status]) {
+    values.push(
+      work[profile.employment_status][language === "fr" ? 0 : 1],
+    );
+  }
+
+  if (profile.children != null) {
+    values.push(
+      language === "fr"
+        ? `${profile.children} enfant(s)`
+        : `${profile.children} child(ren)`,
+    );
+  }
+
+  if (profile.province) {
+    values.push(profile.province);
+  }
+
+  if (!values.length) return "";
+
+  return `<div class="memory" data-testid="canada360-conversation-memory"><span>${language === "fr" ? "Contexte retenu pour cette conversation" : "Context kept for this conversation"}</span><strong>${escapeHtml(values.join(" · "))}</strong></div>`;
+}
+
+function turnMarkup(
+  turn: AssistantTurn,
+  language: "fr" | "en",
+): string {
+  const isUser = turn.role === "user";
+  const sources = !isUser && turn.links?.length
+    ? `<section class="sources"><div class="sourceHeading">${language === "fr" ? "Sources gouvernementales utilisées" : "Government sources used"}</div><div class="links">${linkMarkup(turn.links, language)}</div></section>`
+    : "";
+
+  const sourceLine = !isUser && turn.source_line
+    ? `<small>${escapeHtml(turn.source_line)}</small>`
+    : "";
+
+  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}</article>`;
+}
+
 function renderPage({
   language,
   jurisdiction,
   mode,
-  question,
-  result,
+  conversationId,
+  conversation,
   failed,
 }: {
   language: "fr" | "en";
   jurisdiction: string;
   mode: "ask" | "compare" | "find";
-  question: string;
-  result: AssistantResponse | null;
+  conversationId: string;
+  conversation: AssistantConversation | null;
   failed: boolean;
 }): string {
   const fr = language === "fr";
 
-  const answer = failed
-    ? fr
-      ? "Je n’ai pas pu vérifier cette réponse pour le moment. Réessaie ou ouvre une ressource officielle."
-      : "I could not verify this answer right now. Try again or open an official resource."
-    : result?.answer ?? (
-        fr
-          ? "Pose une question sur une statistique, un service public ou une ressource gouvernementale."
-          : "Ask about a statistic, public service or government resource."
-      );
+  const history = conversation?.history ?? [];
 
-  const links = result?.links?.length
-    ? `<section class="sources"><div class="sourceHeading">${fr ? "Sources gouvernementales utilisées" : "Government sources used"}</div><div class="links">${linkMarkup(result.links, language)}</div></section>`
+  const chatMarkup = history.length
+    ? history.map((turn) => turnMarkup(turn, language)).join("")
+    : `<article class="message"><b>CANADA 360</b><p>${fr ? "Pose une question sur une statistique, un service public ou une ressource gouvernementale. Je garderai le contexte de cette conversation pour affiner mes réponses." : "Ask about a statistic, public service or government resource. I will keep this conversation context to refine later answers."}</p></article>`;
+
+  const failedMarkup = failed
+    ? `<article class="message error"><b>CANADA 360</b><p>${fr ? "Je n’ai pas pu vérifier la dernière réponse. Le reste de la conversation est conservé; réessaie." : "I could not verify the last answer. The rest of the conversation is preserved; try again."}</p></article>`
     : "";
 
-  const source = result?.source_line
-    ? `<small>${escapeHtml(result.source_line)}</small>`
-    : "";
+  const profile = profileMarkup(
+    conversation?.profile ?? null,
+    language,
+  );
 
-  const userBubble = question
-    ? `<article class="message user"><b>${fr ? "TOI" : "YOU"}</b><p>${escapeHtml(question)}</p></article>`
-    : "";
+  const resetHref =
+    `/api/canada-assistant?lang=${language}` +
+    `&jurisdiction=${encodeURIComponent(jurisdiction)}` +
+    "&new=1";
 
   return `<!doctype html>
 <html lang="${language}">
@@ -131,45 +242,73 @@ main{display:grid;gap:12px;padding:14px}
 header{display:flex;justify-content:space-between;gap:12px;align-items:start}
 .eyebrow,b{font-size:11px;font-weight:850}.eyebrow{color:#79b9ff;letter-spacing:.08em}
 h1{font-size:20px;margin:4px 0 0}.trust,small{color:#9aa9b7;font-size:11px}
+.headerActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.newChat{padding:7px 9px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;font-size:11px;background:#0c1925}
+.memory{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid #263747;border-radius:10px;background:#0c1925}
+.memory span{font-size:10px;color:#9aa9b7}.memory strong{font-size:11px}
 form{display:grid;grid-template-columns:150px 1fr auto;gap:8px}
 select,input,button{min-height:42px;border-radius:10px;border:1px solid #263747;font:inherit}
 select,input{background:#0c1925;color:#eef5fb;padding:0 11px}
 button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:pointer}
-.chat{display:grid;gap:8px;min-height:150px;padding:10px;border:1px solid #263747;border-radius:12px;background:#091520}
+.chat{display:grid;gap:8px;max-height:560px;overflow:auto;padding:10px;border:1px solid #263747;border-radius:12px;background:#091520}
 .message{max-width:92%;padding:10px;border:1px solid #263747;border-radius:11px;background:#0c1925}
-.message.user{justify-self:end;background:#10243a}.message p{margin:5px 0 0;line-height:1.55;font-size:13px;white-space:pre-wrap}
+.message.user{justify-self:end;background:#10243a}.message.error{border-color:#7a3940}.message p{margin:5px 0 0;line-height:1.55;font-size:13px;white-space:pre-wrap}
 .sources{display:grid;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #263747}.sourceHeading{color:#9aa9b7;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 .links{display:grid;gap:6px}.links a{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;background:#091520}
 .links span{color:#79b9ff;font-size:10px}.links strong{font-size:12px}
 footer{color:#9aa9b7;font-size:10px;line-height:1.5}
-@media(max-width:640px){main{padding:10px}header{display:grid}form{grid-template-columns:1fr}.message{max-width:96%}}
+@media(max-width:640px){main{padding:10px}header{display:grid}.headerActions{justify-content:flex-start}form{grid-template-columns:1fr}.message{max-width:96%}.chat{max-height:520px}}
 </style>
 </head>
 <body>
 <main data-testid="canada360-assistant-shell">
 <header>
-<div><span class="eyebrow">CANADA 360 ASSISTANT</span><h1>${fr ? "Demande. Compare. Trouve." : "Ask. Compare. Find."}</h1></div>
-<span class="trust">${fr ? "Sources officielles prioritaires" : "Official sources first"} · ${escapeHtml(jurisdiction)}</span>
+<div><span class="eyebrow">CANADA 360 ASSISTANT</span><h1>${fr ? "Une conversation, pas une série de recherches isolées." : "One conversation, not a series of isolated searches."}</h1></div>
+<div class="headerActions"><span class="trust">${fr ? "10 provinces · sources officielles" : "10 provinces · official sources"} · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
 </header>
+${profile}
 <section class="chat" data-testid="canada360-assistant-chat">
-${userBubble}
-<article class="message"><b>CANADA 360</b><p>${escapeHtml(answer)}</p>${links}${source}</article>
+${chatMarkup}
+${failedMarkup}
 </section>
 <form method="get" action="/api/canada-assistant">
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
+<input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
 <select name="mode" aria-label="Mode">
 <option value="ask"${mode === "ask" ? " selected" : ""}>${fr ? "Demander" : "Ask"}</option>
 <option value="compare"${mode === "compare" ? " selected" : ""}>${fr ? "Comparer" : "Compare"}</option>
 <option value="find"${mode === "find" ? " selected" : ""}>${fr ? "Trouver" : "Find"}</option>
 </select>
-<input name="q" maxlength="500" value="${escapeHtml(question)}" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Ex. Quelles prestations existent au Québec ?" : "E.g. What benefits exist in Quebec?"}">
+<input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Ajoute une précision ou pose la prochaine question…" : "Add context or ask the next question…"}">
 <button type="submit">${fr ? "Envoyer" : "Send"}</button>
 </form>
-<footer>${fr ? "Canada 360 ne remplace pas une décision administrative et ne déduit pas ton admissibilité." : "Canada 360 does not replace an administrative decision or infer eligibility."}</footer>
+<footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
 </main>
 </body>
 </html>`;
+}
+
+async function loadConversation(
+  conversationId: string,
+  language: "fr" | "en",
+  jurisdiction: string,
+): Promise<AssistantConversation | null> {
+  try {
+    const response = await fetch(
+      `${API_URL}/api/v1/canada/assistant/conversations/${encodeURIComponent(conversationId)}?lang=${language}&jurisdiction=${encodeURIComponent(jurisdiction)}`,
+      {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      },
+    );
+
+    if (!response.ok) return null;
+
+    return (await response.json()) as AssistantConversation;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(
@@ -177,6 +316,7 @@ export async function GET(
 ): Promise<Response> {
   const params = request.nextUrl.searchParams;
   const language = params.get("lang") === "en" ? "en" : "fr";
+
   const rawJurisdiction = (
     params.get("jurisdiction") ?? "CA"
   ).toUpperCase();
@@ -190,8 +330,20 @@ export async function GET(
       ? rawMode
       : "ask";
 
+  const reset = params.get("new") === "1";
+  const requestedId = validConversationId(
+    params.get("conversation_id"),
+  );
+  const cookieId = validConversationId(
+    request.cookies.get(CONVERSATION_COOKIE)?.value ?? null,
+  );
+
+  let conversationId = reset
+    ? randomUUID()
+    : requestedId ?? cookieId ?? randomUUID();
+
   const question = (params.get("q") ?? "").trim().slice(0, 500);
-  let result: AssistantResponse | null = null;
+  let conversation: AssistantConversation | null = null;
   let failed = false;
 
   if (question) {
@@ -209,6 +361,7 @@ export async function GET(
             lang: language,
             jurisdiction,
             mode,
+            conversation_id: conversationId,
           }),
           cache: "no-store",
         },
@@ -216,21 +369,39 @@ export async function GET(
 
       if (!upstream.ok) {
         failed = true;
+        conversation = await loadConversation(
+          conversationId,
+          language,
+          jurisdiction,
+        );
       } else {
-        result = (await upstream.json()) as AssistantResponse;
+        const result = (await upstream.json()) as AssistantResponse;
+        conversationId = result.conversation_id || conversationId;
+        conversation = result;
       }
     } catch {
       failed = true;
+      conversation = await loadConversation(
+        conversationId,
+        language,
+        jurisdiction,
+      );
     }
+  } else if (!reset) {
+    conversation = await loadConversation(
+      conversationId,
+      language,
+      jurisdiction,
+    );
   }
 
-  return new Response(
+  const response = new Response(
     renderPage({
       language,
       jurisdiction,
       mode,
-      question,
-      result,
+      conversationId,
+      conversation,
       failed,
     }),
     {
@@ -243,4 +414,12 @@ export async function GET(
       },
     },
   );
+
+  const secure = request.nextUrl.protocol === "https:" ? "; Secure" : "";
+  response.headers.append(
+    "Set-Cookie",
+    `${CONVERSATION_COOKIE}=${conversationId}; Path=/api/canada-assistant; Max-Age=${CONVERSATION_TTL_SECONDS}; HttpOnly; SameSite=Lax${secure}`,
+  );
+
+  return response;
 }

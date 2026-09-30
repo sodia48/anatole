@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.canada_360 import (
+    Canada360AssistantConversation,
     Canada360AssistantRequest,
     Canada360AssistantResponse,
     Canada360Snapshot,
@@ -40,6 +41,27 @@ async def canada_assistant(
         lang=payload.lang,
         jurisdiction=payload.jurisdiction,
         mode=payload.mode,
+        conversation_id=payload.conversation_id,
+    )
+
+
+@router.get(
+    "/assistant/conversations/{conversation_id}",
+    response_model=Canada360AssistantConversation,
+    summary="Conversation courante de Canada 360 Assistant",
+)
+async def canada_assistant_conversation(
+    conversation_id: str,
+    lang: str = Query("fr", pattern="^(fr|en)$"),
+    jurisdiction: str = Query(
+        "CA",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+    ),
+) -> Canada360AssistantConversation:
+    return await canada_360_assistant_service.get_conversation(
+        conversation_id=conversation_id,
+        lang=lang,
+        jurisdiction=jurisdiction,
     )
 
 

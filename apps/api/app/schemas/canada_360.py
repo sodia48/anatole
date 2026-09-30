@@ -16,6 +16,50 @@ class Canada360AssistantLink(BaseModel):
     level: Literal["federal", "provincial", "statistics"]
 
 
+class Canada360AssistantProfile(BaseModel):
+    age: int | None = Field(default=None, ge=13, le=120)
+    family_status: Literal[
+        "single",
+        "married",
+        "common_law",
+        "divorced",
+        "widowed",
+    ] | None = None
+    employment_status: Literal[
+        "unemployed",
+        "employed",
+        "student",
+        "self_employed",
+    ] | None = None
+    children: int | None = Field(default=None, ge=0, le=20)
+    province: str | None = Field(
+        default=None,
+        pattern="^(QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+    )
+    objective: str | None = Field(default=None, max_length=80)
+
+
+class Canada360AssistantTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=6000)
+    links: list[Canada360AssistantLink] = Field(default_factory=list)
+    source_line: str | None = Field(default=None, max_length=1000)
+
+
+class Canada360AssistantConversation(BaseModel):
+    conversation_id: str
+    lang: Literal["fr", "en"] = "fr"
+    jurisdiction: str = Field(
+        default="CA",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+    )
+    topic: str = Field(default="services", max_length=40)
+    profile: Canada360AssistantProfile = Field(
+        default_factory=Canada360AssistantProfile
+    )
+    history: list[Canada360AssistantTurn] = Field(default_factory=list)
+
+
 class Canada360AssistantRequest(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     lang: Literal["fr", "en"] = "fr"
@@ -24,6 +68,10 @@ class Canada360AssistantRequest(BaseModel):
         pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
     )
     mode: Literal["ask", "compare", "find"] = "ask"
+    conversation_id: str | None = Field(
+        default=None,
+        pattern="^[0-9a-fA-F-]{36}$",
+    )
 
 
 class Canada360AssistantResponse(BaseModel):
@@ -32,6 +80,17 @@ class Canada360AssistantResponse(BaseModel):
     source_line: str | None = None
     mode: Literal["ask", "compare", "find"]
     jurisdiction: str
+    conversation_id: str = ""
+    history: list[Canada360AssistantTurn] = Field(default_factory=list)
+    profile: Canada360AssistantProfile = Field(
+        default_factory=Canada360AssistantProfile
+    )
+    intent: Literal[
+        "statistics",
+        "services",
+        "followup",
+        "compare",
+    ] = "services"
 
 
 class Canada360MetricPoint(BaseModel):
