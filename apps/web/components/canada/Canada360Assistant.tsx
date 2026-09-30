@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import {
   type FormEvent,
-  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -731,6 +731,7 @@ export function Canada360Assistant({
     selectedProvinceCode ?? "CA",
   );
   const [input, setInput] = useState("");
+  const messageId = useRef(0);
   const [messages, setMessages] = useState<AssistantReply[]>(() => [
     {
       id: "welcome",
@@ -742,12 +743,6 @@ export function Canada360Assistant({
       ),
     },
   ]);
-
-  useEffect(() => {
-    if (selectedProvinceCode) {
-      setContextProvince(selectedProvinceCode);
-    }
-  }, [selectedProvinceCode]);
 
   const suggestions = useMemo(() => {
     if (mode === "compare") {
@@ -795,7 +790,8 @@ export function Canada360Assistant({
     const clean = question.trim();
     if (!clean) return;
 
-    const now = Date.now().toString();
+    messageId.current += 1;
+    const now = messageId.current.toString();
     const reply = answerQuestion(
       clean,
       language,
