@@ -79,15 +79,17 @@ test(
       /Canada — Emploi: 21 173 100/i,
     );
 
-    await expect(
-      frame.getByText(
-        /Contexte retenu pour cette conversation/i,
-      ),
-    ).toBeVisible();
+    const memory = frame.getByTestId(
+      "canada360-conversation-memory",
+    );
 
-    await expect(
-      frame.getByText(/25 ans/i),
-    ).toBeVisible();
+    await expect(memory).toContainText(
+      /Contexte retenu pour cette conversation/i,
+    );
+    await expect(memory).toContainText(/25 ans/i);
+    await expect(memory).toContainText(/célibataire/i);
+    await expect(memory).toContainText(/sans emploi/i);
+    await expect(memory).toContainText(/QC/i);
   },
 );
 

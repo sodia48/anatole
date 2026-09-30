@@ -173,7 +173,7 @@ function profileMarkup(
 
   if (!values.length) return "";
 
-  return `<div class="memory"><span>${language === "fr" ? "Contexte retenu pour cette conversation" : "Context kept for this conversation"}</span><strong>${escapeHtml(values.join(" · "))}</strong></div>`;
+  return `<div class="memory" data-testid="canada360-conversation-memory"><span>${language === "fr" ? "Contexte retenu pour cette conversation" : "Context kept for this conversation"}</span><strong>${escapeHtml(values.join(" · "))}</strong></div>`;
 }
 
 function turnMarkup(
