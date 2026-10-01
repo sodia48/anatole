@@ -23,7 +23,7 @@ class Settings(BaseSettings):
         validation_alias="OPENAI_API_KEY",
     )
     canada360_assistant_model: str = Field(
-        default="gpt-5.6-sol",
+        default="gpt-5.4-mini",
         validation_alias="CANADA360_ASSISTANT_MODEL",
     )
     canada360_assistant_timeout_seconds: float = Field(
