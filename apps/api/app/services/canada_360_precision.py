@@ -77,6 +77,7 @@ PROCEDURE_CUES = (
 )
 
 JOB_END_REASON_CUES = (
+    "mis a pied",
     "mise a pied",
     "licencie",
     "licenciement",
@@ -399,6 +400,10 @@ def audit_grounded_answer(
         _is_provincial(url, jurisdiction)
         for url in urls
     )
+    provincial_detailed = any(
+        _is_provincial(url, jurisdiction) and _path_is_detailed(url)
+        for url in urls
+    )
     detailed = any(_path_is_detailed(url) for url in urls)
 
     if not urls:
@@ -439,6 +444,26 @@ def audit_grounded_answer(
             detailed,
         )
 
+    personal_benefits = (
+        topic == "benefits"
+        and jurisdiction != "CA"
+        and (
+            getattr(profile, "employment_status", None) is not None
+            or getattr(profile, "objective", None)
+            == "financial_assistance"
+        )
+    )
+
+    if personal_benefits and not (federal and provincial):
+        return PrecisionAudit(
+            False,
+            "financial-assistance answer needs federal and provincial coverage",
+            len(urls),
+            federal,
+            provincial,
+            detailed,
+        )
+
     if (
         jurisdiction != "CA"
         and topic in {
@@ -458,20 +483,20 @@ def audit_grounded_answer(
             detailed,
         )
 
-    personal_benefits = (
-        topic == "benefits"
+    if (
+        precision_sensitive
         and jurisdiction != "CA"
-        and (
-            getattr(profile, "employment_status", None) is not None
-            or getattr(profile, "objective", None)
-            == "financial_assistance"
-        )
-    )
-
-    if personal_benefits and not (federal and provincial):
+        and topic in {
+            "benefits",
+            "health",
+            "business",
+            "education",
+        }
+        and not provincial_detailed
+    ):
         return PrecisionAudit(
             False,
-            "financial-assistance answer needs federal and provincial coverage",
+            "province-specific answer lacks a detailed provincial official source",
             len(urls),
             federal,
             provincial,

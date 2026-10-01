@@ -113,6 +113,30 @@ def test_detailed_question_rejects_homepage_only_evidence() -> None:
     assert "generic government landing pages" in audit.reason
 
 
+def test_federal_detail_does_not_make_provincial_homepage_sufficient() -> None:
+    audit = audit_grounded_answer(
+        answer="Voici les programmes à vérifier selon ta situation.",
+        source_urls=[
+            (
+                "https://www.canada.ca/en/services/benefits/"
+                "ei/ei-regular-benefit/eligibility.html"
+            ),
+            "https://www.ontario.ca/",
+        ],
+        question="Suis-je admissible à cette aide ?",
+        topic="benefits",
+        jurisdiction="ON",
+        profile=Canada360AssistantProfile(
+            province="ON",
+            objective="financial_assistance",
+        ),
+        history=[],
+    )
+
+    assert audit.accepted is False
+    assert "detailed provincial official source" in audit.reason
+
+
 def test_categorical_eligibility_is_rejected_when_material_facts_missing() -> None:
     profile = Canada360AssistantProfile(
         age=25,
@@ -165,10 +189,16 @@ def test_precision_prompt_identifies_missing_unemployment_facts() -> None:
     assert "federal and provincial programs" in instructions
 
 
-def test_precision_prompt_stops_reasking_facts_already_in_history() -> None:
+@pytest.mark.parametrize(
+    "job_end_reason",
+    ["mis à pied", "mise à pied", "laid off", "contract ended"],
+)
+def test_precision_prompt_stops_reasking_facts_already_in_history(
+    job_end_reason: str,
+) -> None:
     class Turn:
         text = (
-            "J'ai été mis à pied. J'ai 650 heures assurables, "
+            f"J'ai été {job_end_reason}. J'ai 650 heures assurables, "
             "mon revenu est de 0 $ et j'ai 500 $ d'épargne."
         )
 
@@ -190,3 +220,22 @@ def test_precision_prompt_stops_reasking_facts_already_in_history() -> None:
     assert "recent insurable hours" not in instructions
     assert "current income" not in instructions
     assert "savings/assets" not in instructions
+
+
+def test_precision_prompt_does_not_infer_job_end_reason_from_work_history() -> None:
+    class Turn:
+        text = "J'ai travaillé 650 heures et mon revenu est de 0 $."
+
+    instructions = build_precision_instructions(
+        question="Quelles aides dois-je vérifier maintenant ?",
+        topic="benefits",
+        jurisdiction="MB",
+        profile=Canada360AssistantProfile(
+            employment_status="unemployed",
+            province="MB",
+            objective="financial_assistance",
+        ),
+        history=[Turn()],
+    )
+
+    assert "reason the last job ended" in instructions
