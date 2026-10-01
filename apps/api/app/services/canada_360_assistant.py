@@ -21,6 +21,10 @@ from app.schemas.canada_360 import (
     Canada360Snapshot,
 )
 from app.services.canada_360 import canada_360_service
+from app.services.canada_360_precision import (
+    audit_grounded_answer,
+    build_precision_instructions,
+)
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 CONVERSATION_TTL_SECONDS = 2 * 60 * 60
@@ -1266,6 +1270,13 @@ def _model_prompt(
         else "Canada"
     )
     profile_json = profile.model_dump(exclude_none=True)
+    precision_instructions = build_precision_instructions(
+        question=question,
+        topic=topic,
+        jurisdiction=jurisdiction,
+        profile=profile,
+        history=history,
+    )
 
     return f"""You are Canada 360, a conversational Canadian public-service and public-data assistant.
 
@@ -1281,6 +1292,9 @@ Recent conversation:
 
 Current user message:
 {question}
+
+Precision protocol:
+{precision_instructions}
 
 Critical routing rule:
 - A personal statement such as "je suis sans emploi", "I am unemployed", "j'ai 25 ans", or "I am single" is PROFILE CONTEXT, not a request for an employment/population statistic.
@@ -1322,11 +1336,11 @@ async def _grounded_model_answer(
 
     payload = {
         "model": settings.canada360_assistant_model,
-        "reasoning": {"effort": "low"},
+        "reasoning": {"effort": "medium"},
         "tools": [
             {
                 "type": "web_search",
-                "search_context_size": "medium",
+                "search_context_size": "high",
                 "filters": {
                     "allowed_domains": domains,
                 },
@@ -1342,7 +1356,7 @@ async def _grounded_model_answer(
             profile=profile,
             history=history,
         ),
-        "max_output_tokens": 1000,
+        "max_output_tokens": 1200,
     }
 
     try:
@@ -1375,15 +1389,23 @@ async def _grounded_model_answer(
     if not answer or not links:
         return None
 
+    audit = audit_grounded_answer(
+        answer=answer,
+        source_urls=[link.url for link in links],
+        question=question,
+        topic=topic,
+        jurisdiction=jurisdiction,
+        profile=profile,
+        history=history,
+    )
+
+    if not audit.accepted:
+        return None
+
     return Canada360AssistantResponse(
         answer=answer,
         links=links,
-        source_line=(
-            "Réponse synthétisée uniquement à partir de sources "
-            "gouvernementales officielles."
-            if lang == "fr"
-            else "Answer synthesized only from official government sources."
-        ),
+        source_line=audit.source_line(lang),
         mode=mode,
         jurisdiction=jurisdiction,
     )
