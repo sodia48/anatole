@@ -195,14 +195,12 @@ function turnMarkup(
 function renderPage({
   language,
   jurisdiction,
-  mode,
   conversationId,
   conversation,
   failed,
 }: {
   language: "fr" | "en";
   jurisdiction: string;
-  mode: "ask" | "compare" | "find";
   conversationId: string;
   conversation: AssistantConversation | null;
   failed: boolean;
@@ -241,14 +239,14 @@ function renderPage({
 main{display:grid;gap:12px;padding:14px}
 header{display:flex;justify-content:space-between;gap:12px;align-items:start}
 .eyebrow,b{font-size:11px;font-weight:850}.eyebrow{color:#79b9ff;letter-spacing:.08em}
-h1{font-size:20px;margin:4px 0 0}.trust,small{color:#9aa9b7;font-size:11px}
+.trust,small{color:#9aa9b7;font-size:11px}
 .headerActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .newChat{padding:7px 9px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;font-size:11px;background:#0c1925}
 .memory{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid #263747;border-radius:10px;background:#0c1925}
 .memory span{font-size:10px;color:#9aa9b7}.memory strong{font-size:11px}
-form{display:grid;grid-template-columns:150px 1fr auto;gap:8px}
-select,input,button{min-height:42px;border-radius:10px;border:1px solid #263747;font:inherit}
-select,input{background:#0c1925;color:#eef5fb;padding:0 11px}
+form{display:grid;grid-template-columns:1fr auto;gap:8px}
+input,button{min-height:42px;border-radius:10px;border:1px solid #263747;font:inherit}
+input{background:#0c1925;color:#eef5fb;padding:0 11px;min-width:0}
 button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:pointer}
 .chat{display:grid;gap:8px;max-height:560px;overflow:auto;padding:10px;border:1px solid #263747;border-radius:12px;background:#091520}
 .message{max-width:92%;padding:10px;border:1px solid #263747;border-radius:11px;background:#0c1925}
@@ -263,7 +261,7 @@ footer{color:#9aa9b7;font-size:10px;line-height:1.5}
 <body>
 <main data-testid="canada360-assistant-shell">
 <header>
-<div><span class="eyebrow">CANADA 360 ASSISTANT</span><h1>${fr ? "Une conversation, pas une série de recherches isolées." : "One conversation, not a series of isolated searches."}</h1></div>
+<span class="eyebrow">CANADA 360 ASSISTANT</span>
 <div class="headerActions"><span class="trust">${fr ? "10 provinces · sources officielles" : "10 provinces · official sources"} · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
 </header>
 ${profile}
@@ -275,12 +273,7 @@ ${failedMarkup}
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
-<select name="mode" aria-label="Mode">
-<option value="ask"${mode === "ask" ? " selected" : ""}>${fr ? "Demander" : "Ask"}</option>
-<option value="compare"${mode === "compare" ? " selected" : ""}>${fr ? "Comparer" : "Compare"}</option>
-<option value="find"${mode === "find" ? " selected" : ""}>${fr ? "Trouver" : "Find"}</option>
-</select>
-<input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Ajoute une précision ou pose la prochaine question…" : "Add context or ask the next question…"}">
+<input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Pose ta question à Canada 360…" : "Ask Canada 360…"}">
 <button type="submit">${fr ? "Envoyer" : "Send"}</button>
 </form>
 <footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
@@ -324,12 +317,6 @@ export async function GET(
     ? rawJurisdiction
     : "CA";
 
-  const rawMode = params.get("mode");
-  const mode: "ask" | "compare" | "find" =
-    rawMode === "compare" || rawMode === "find"
-      ? rawMode
-      : "ask";
-
   const reset = params.get("new") === "1";
   const requestedId = validConversationId(
     params.get("conversation_id"),
@@ -360,7 +347,6 @@ export async function GET(
             question,
             lang: language,
             jurisdiction,
-            mode,
             conversation_id: conversationId,
           }),
           cache: "no-store",
@@ -399,7 +385,6 @@ export async function GET(
     renderPage({
       language,
       jurisdiction,
-      mode,
       conversationId,
       conversation,
       failed,

@@ -78,7 +78,7 @@ class Canada360AssistantResponse(BaseModel):
     answer: str
     links: list[Canada360AssistantLink] = Field(default_factory=list)
     source_line: str | None = None
-    mode: Literal["ask", "compare", "find"]
+    mode: Literal["ask", "compare", "find"] = "ask"
     jurisdiction: str
     conversation_id: str = ""
     history: list[Canada360AssistantTurn] = Field(default_factory=list)
@@ -90,6 +90,9 @@ class Canada360AssistantResponse(BaseModel):
         "services",
         "followup",
         "compare",
+        "comparison",
+        "explanation",
+        "navigation",
     ] = "services"
 
 
