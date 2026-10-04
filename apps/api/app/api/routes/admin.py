@@ -18,6 +18,7 @@ from app.schemas.admin import (
     AdminUserList,
 )
 from app.services.accounts import account_service
+from app.services.canada_360_assistant import check_provider_health
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -34,6 +35,13 @@ async def current_admin(
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Accès réservé à l’administration Anatole.")
     return user
+
+
+@router.get("/canada360/provider-health", include_in_schema=False)
+async def canada360_provider_health(
+    _: AccountUser = Depends(current_admin),
+) -> dict[str, bool]:
+    return await check_provider_health()
 
 
 @router.get("/overview", response_model=AdminOverview)

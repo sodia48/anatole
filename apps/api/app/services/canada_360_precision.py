@@ -5,31 +5,10 @@ import unicodedata
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-FEDERAL_DOMAINS = (
-    "canada.ca",
-    "statcan.gc.ca",
-    "bankofcanada.ca",
-    "jobbank.gc.ca",
-    "innovation.canada.ca",
+from app.services.canada_360_sources import (
+    FEDERAL_DOMAINS,
+    REGIONAL_DOMAINS as PROVINCE_DOMAINS,
 )
-
-PROVINCE_DOMAINS = {
-    "QC": (
-        "quebec.ca",
-        "revenuquebec.ca",
-        "ramq.gouv.qc.ca",
-        "statistique.quebec.ca",
-    ),
-    "ON": ("ontario.ca",),
-    "BC": ("gov.bc.ca",),
-    "AB": ("alberta.ca",),
-    "SK": ("saskatchewan.ca",),
-    "MB": ("gov.mb.ca",),
-    "NB": ("gnb.ca",),
-    "NS": ("novascotia.ca",),
-    "PE": ("princeedwardisland.ca",),
-    "NL": ("gov.nl.ca",),
-}
 
 ELIGIBILITY_CUES = (
     "admissible",
@@ -396,6 +375,9 @@ def audit_grounded_answer(
     urls = list(dict.fromkeys(url for url in source_urls if url))
 
     federal = any(_is_federal(url) for url in urls)
+    federal_detailed = any(
+        _is_federal(url) and _path_is_detailed(url) for url in urls
+    )
     provincial = any(
         _is_provincial(url, jurisdiction)
         for url in urls
@@ -497,6 +479,16 @@ def audit_grounded_answer(
         return PrecisionAudit(
             False,
             "province-specific answer lacks a detailed provincial official source",
+            len(urls),
+            federal,
+            provincial,
+            detailed,
+        )
+
+    if personal_benefits and not federal_detailed:
+        return PrecisionAudit(
+            False,
+            "financial-assistance answer needs detailed federal and provincial coverage",
             len(urls),
             federal,
             provincial,

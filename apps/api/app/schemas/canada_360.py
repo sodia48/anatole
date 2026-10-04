@@ -14,6 +14,9 @@ class Canada360AssistantLink(BaseModel):
     label: str
     url: str
     level: Literal["federal", "provincial", "statistics"]
+    agency: str | None = None
+    jurisdiction: str | None = None
+    updated_at: str | None = None
 
 
 class Canada360AssistantProfile(BaseModel):
@@ -34,7 +37,7 @@ class Canada360AssistantProfile(BaseModel):
     children: int | None = Field(default=None, ge=0, le=20)
     province: str | None = Field(
         default=None,
-        pattern="^(QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+        pattern="^(QC|ON|BC|AB|SK|MB|NB|NS|PE|NL|YT|NT|NU)$",
     )
     objective: str | None = Field(default=None, max_length=80)
 
@@ -44,6 +47,7 @@ class Canada360AssistantTurn(BaseModel):
     text: str = Field(min_length=1, max_length=6000)
     links: list[Canada360AssistantLink] = Field(default_factory=list)
     source_line: str | None = Field(default=None, max_length=1000)
+    feedback: Literal["up", "down"] | None = None
 
 
 class Canada360AssistantConversation(BaseModel):
@@ -51,7 +55,7 @@ class Canada360AssistantConversation(BaseModel):
     lang: Literal["fr", "en"] = "fr"
     jurisdiction: str = Field(
         default="CA",
-        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL|YT|NT|NU)$",
     )
     topic: str = Field(default="services", max_length=40)
     profile: Canada360AssistantProfile = Field(
@@ -65,7 +69,7 @@ class Canada360AssistantRequest(BaseModel):
     lang: Literal["fr", "en"] = "fr"
     jurisdiction: str = Field(
         default="CA",
-        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL|YT|NT|NU)$",
     )
     mode: Literal["ask", "compare", "find"] = "ask"
     conversation_id: str | None = Field(
@@ -93,7 +97,32 @@ class Canada360AssistantResponse(BaseModel):
         "comparison",
         "explanation",
         "navigation",
+        "compare_statistics",
+        "explain_difference",
+        "benefit_or_program",
+        "eligibility",
+        "procedure",
+        "deadline",
+        "amount",
+        "government_document",
+        "life_event",
+        "business_support",
+        "immigration",
+        "tax",
+        "health_admin",
+        "local_resource",
     ] = "services"
+
+
+class Canada360AssistantFeedbackRequest(BaseModel):
+    conversation_id: str = Field(pattern="^[0-9a-fA-F-]{36}$")
+    turn_index: int = Field(ge=0, le=15)
+    rating: Literal["up", "down"]
+    lang: Literal["fr", "en"] = "fr"
+    jurisdiction: str = Field(
+        default="CA",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL|YT|NT|NU)$",
+    )
 
 
 class Canada360MetricPoint(BaseModel):

@@ -28,10 +28,14 @@ from app.services.canada_360_precision import (
     audit_grounded_answer,
     build_precision_instructions,
 )
+from app.services.canada_360_sources import (
+    REGIONAL_DOMAINS as PROVINCE_DOMAINS,
+    identify_official_source,
+    official_domains,
+)
 from app.services.provincial_statistics import provincial_statistics_service
 
 OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-DEFAULT_ASSISTANT_MODEL = "gpt-5.4-mini"
 CONVERSATION_TTL_SECONDS = 2 * 60 * 60
 MAX_HISTORY_TURNS = 16
 logger = logging.getLogger(__name__)
@@ -97,32 +101,13 @@ PROVINCES = {
         ("newfoundland and labrador", "terre neuve et labrador"),
         "https://www.gov.nl.ca/",
     ),
-}
-
-FEDERAL_DOMAINS = (
-    "canada.ca",
-    "statcan.gc.ca",
-    "bankofcanada.ca",
-    "jobbank.gc.ca",
-    "innovation.canada.ca",
-)
-
-PROVINCE_DOMAINS = {
-    "QC": (
-        "quebec.ca",
-        "revenuquebec.ca",
-        "ramq.gouv.qc.ca",
-        "statistique.quebec.ca",
+    "YT": ("Yukon", "Yukon", ("yukon",), "https://yukon.ca/"),
+    "NT": (
+        "Territoires du Nord-Ouest", "Northwest Territories",
+        ("territoires du nord ouest", "northwest territories"),
+        "https://www.gov.nt.ca/",
     ),
-    "ON": ("ontario.ca",),
-    "BC": ("gov.bc.ca",),
-    "AB": ("alberta.ca",),
-    "SK": ("saskatchewan.ca",),
-    "MB": ("gov.mb.ca",),
-    "NB": ("gnb.ca",),
-    "NS": ("novascotia.ca",),
-    "PE": ("princeedwardisland.ca",),
-    "NL": ("gov.nl.ca",),
+    "NU": ("Nunavut", "Nunavut", ("nunavut",), "https://www.gov.nu.ca/"),
 }
 
 METRIC_ALIASES = {
@@ -209,6 +194,12 @@ TOPICS = (
             "grant",
             "income assistance",
             "social assistance",
+            "soins dentaires",
+            "assurance dentaire",
+            "dental care",
+            "dental plan",
+            "rcsd",
+            "cdcp",
         ),
     ),
     (
@@ -502,10 +493,32 @@ def _intent_key(
         question, history
     ):
         return (
-            "comparison"
+            "compare_statistics"
             if _comparison_requested(question) or len(_named_provinces(question)) > 1
             else "statistics"
         )
+
+    clean = _normalize(question)
+    if history and clean.startswith(("pourquoi ", "why ", "comment expliquer ")):
+        return "explain_difference"
+
+    if any(term in clean for term in (
+        "viens d avoir un enfant", "naissance", "nouveau ne", "new baby",
+        "just had a child", "life event",
+    )):
+        return "life_event"
+
+    if any(term in clean for term in (
+        "lettre de l arc", "lettre de la cra", "formulaire", "document officiel",
+        "government letter", "government form",
+    )):
+        return "government_document"
+
+    if any(term in clean for term in (
+        "ai je droit", "suis je admissible", "eligible", "admissible",
+        "do i qualify", "am i eligible",
+    )):
+        return "eligibility"
 
     if history and _has_personal_cue(question):
         return "followup"
@@ -513,16 +526,31 @@ def _intent_key(
     if _comparison_requested(question):
         return "comparison"
 
-    if history and _normalize(question).startswith(
-        ("pourquoi ", "why ", "comment expliquer ")
-    ):
-        return "explanation"
-
-    if history and _normalize(question).startswith(
+    if history and clean.startswith(
         ("et ", "what about ", "how about ")
     ):
         return "followup"
 
+    if any(term in clean for term in ("date limite", "delai", "echeance", "deadline")):
+        return "deadline"
+    if any(term in clean for term in ("montant", "combien", "how much", "amount")):
+        return "amount"
+    if any(term in clean for term in ("comment", "demarche", "faire une demande", "how to", "apply")):
+        return "procedure"
+
+    topic = _topic_key(question)
+    if topic == "benefits":
+        return "benefit_or_program"
+    if topic == "business":
+        return "business_support"
+    if topic == "immigration":
+        return "immigration"
+    if topic == "taxes":
+        return "tax"
+    if topic == "health":
+        return "health_admin"
+    if _named_provinces(question):
+        return "local_resource"
     return "services"
 
 
@@ -551,16 +579,20 @@ def _format_number(value: float, unit: str, lang: str) -> str:
 
 def _metric_link(metric: Canada360Metric) -> Canada360AssistantLink:
     url = metric.source_url or ""
+    source = identify_official_source(url)
     return Canada360AssistantLink(
-        label=metric.source_name,
+        label=metric.label,
         url=url,
         level=_source_level(url),
+        agency=metric.source_name or (source.agency if source else None),
+        jurisdiction=source.jurisdiction if source else None,
+        updated_at=metric.reference_period,
     )
 
 
 def _trusted_metric(metric: Canada360Metric, jurisdiction: str) -> bool:
     url = metric.source_url or ""
-    domains = [*FEDERAL_DOMAINS, *PROVINCE_DOMAINS.get(jurisdiction, ())]
+    domains = official_domains([jurisdiction])
     return bool(
         metric.official
         and metric.value is not None
@@ -849,7 +881,6 @@ def _official_domains(
     jurisdiction: str,
     history: list[Canada360AssistantTurn] | None = None,
 ) -> list[str]:
-    domains = list(FEDERAL_DOMAINS)
     codes = _named_provinces(question)
 
     for turn in (history or [])[-10:]:
@@ -859,15 +890,15 @@ def _official_domains(
     if not codes and jurisdiction != "CA":
         codes = [jurisdiction]
 
-    for code in codes:
-        domains.extend(PROVINCE_DOMAINS.get(code, ()))
-
-    return list(dict.fromkeys(domains))
+    return official_domains(codes)
 
 
 def _allowed_source(url: str, domains: list[str]) -> bool:
     try:
-        host = (urlparse(url).hostname or "").lower().rstrip(".")
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or identify_official_source(url) is None:
+            return False
+        host = (parsed.hostname or "").lower().rstrip(".")
     except ValueError:
         return False
 
@@ -878,13 +909,10 @@ def _allowed_source(url: str, domains: list[str]) -> bool:
 
 
 def _source_level(url: str) -> str:
-    host = (urlparse(url).hostname or "").lower()
-    if "statcan.gc.ca" in host or "bankofcanada.ca" in host:
+    source = identify_official_source(url)
+    if source and source.source_type in {"statistics", "central_bank"}:
         return "statistics"
-    if any(
-        host == domain or host.endswith(f".{domain}")
-        for domain in FEDERAL_DOMAINS
-    ):
+    if source and source.jurisdiction == "CA":
         return "federal"
     return "provincial"
 
@@ -968,6 +996,8 @@ def _extract_model_response(
                 label=title[:180],
                 url=url,
                 level=_source_level(url),
+                agency=(identify_official_source(url).agency if identify_official_source(url) else None),
+                jurisdiction=(identify_official_source(url).jurisdiction if identify_official_source(url) else None),
             )
         )
         if len(links) >= 6:
@@ -995,6 +1025,7 @@ def _model_prompt(
     lang: str,
     jurisdiction: str,
     topic: str,
+    intent: str = "services",
     profile: Canada360AssistantProfile,
     history: list[Canada360AssistantTurn],
 ) -> str:
@@ -1019,6 +1050,7 @@ Answer the current user message directly in {language}. Continue the conversatio
 
 Current jurisdiction: {place}
 Current topic: {topic}
+Inferred intent: {intent}
 Structured session context: {profile_json}
 
 Recent conversation:
@@ -1049,6 +1081,121 @@ Answer rules:
 """
 
 
+def _provider_error_code(response: httpx.Response) -> str | None:
+    try:
+        error = response.json().get("error", {})
+    except (ValueError, TypeError, AttributeError):
+        return None
+    return error.get("code") if isinstance(error, dict) else None
+
+
+async def _responses_request(payload: dict) -> dict | None:
+    api_key = settings.openai_api_key.strip()
+    if not api_key:
+        logger.warning("canada360_path=provider_unavailable reason=key_missing")
+        return None
+
+    timeout = httpx.Timeout(
+        settings.canada360_assistant_timeout_seconds,
+        connect=min(8.0, settings.canada360_assistant_timeout_seconds),
+    )
+    models = list(dict.fromkeys(filter(None, (
+        settings.canada360_assistant_model.strip(),
+        settings.canada360_assistant_fallback_model.strip(),
+    ))))
+    if not models:
+        logger.warning("canada360_path=provider_unavailable reason=model_missing")
+        return None
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for model in models:
+            request_payload = {**payload, "model": model}
+            if model.startswith(("gpt-4.", "gpt-4o")):
+                request_payload.pop("reasoning", None)
+            for attempt in range(settings.canada360_assistant_retries + 1):
+                try:
+                    response = await client.post(
+                        OPENAI_RESPONSES_URL,
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json=request_payload,
+                    )
+                    if response.is_success:
+                        result = response.json()
+                        if isinstance(result, dict):
+                            return result
+                        logger.warning("canada360_path=provider_unavailable reason=invalid_payload")
+                        return None
+
+                    status = response.status_code
+                    code = _provider_error_code(response)
+                    if status in {400, 404} and code in {
+                        "model_not_found", "invalid_model",
+                    }:
+                        logger.warning(
+                            "canada360_path=provider_unavailable reason=invalid_model model=%s status=%s",
+                            model, status,
+                        )
+                        break
+                    if status in {429, 500, 502, 503, 504}:
+                        if attempt < settings.canada360_assistant_retries:
+                            await asyncio.sleep(0.4 * (attempt + 1))
+                            continue
+                        logger.warning(
+                            "canada360_path=provider_unavailable reason=transient_http status=%s",
+                            status,
+                        )
+                        break
+                    logger.warning(
+                        "canada360_path=provider_unavailable reason=http_status status=%s",
+                        status,
+                    )
+                    return None
+                except (httpx.TimeoutException, httpx.TransportError) as exc:
+                    if attempt < settings.canada360_assistant_retries:
+                        await asyncio.sleep(0.4 * (attempt + 1))
+                        continue
+                    logger.warning(
+                        "canada360_path=provider_unavailable reason=%s",
+                        type(exc).__name__,
+                    )
+                    break
+                except (ValueError, TypeError) as exc:
+                    logger.warning(
+                        "canada360_path=provider_unavailable reason=%s",
+                        type(exc).__name__,
+                    )
+                    return None
+    return None
+
+
+def _targeted_retrieval_query(
+    *, question: str, jurisdiction: str, topic: str, reason: str,
+) -> str:
+    regional = PROVINCE_DOMAINS.get(jurisdiction, ())
+    region_scope = f"site:{regional[0]}" if regional else "site:canada.ca"
+    focus = {
+        "no official source": "official program details",
+        "only generic government landing pages were found":
+            "detailed eligibility requirements application steps",
+        "financial-assistance answer needs federal and provincial coverage":
+            "federal and provincial benefit eligibility",
+        "financial-assistance answer needs detailed federal and provincial coverage":
+            "detailed federal and provincial benefit eligibility pages",
+        "province-specific answer lacks a provincial official source":
+            "provincial government program details",
+        "province-specific answer lacks a detailed provincial official source":
+            "provincial eligibility requirements application details",
+        "categorical eligibility claim with missing facts":
+            "official eligibility criteria and missing facts",
+        "numeric claim lacks a detailed official page":
+            "official detailed amounts dates and requirements",
+    }.get(reason, "official detailed program or procedure page")
+    return f"{question} {topic} {focus} {region_scope}"
+
+
 async def _grounded_model_answer(
     *,
     question: str,
@@ -1056,13 +1203,10 @@ async def _grounded_model_answer(
     jurisdiction: str,
     mode: str,
     topic: str,
+    intent: str = "services",
     profile: Canada360AssistantProfile,
     history: list[Canada360AssistantTurn],
 ) -> Canada360AssistantResponse | None:
-    api_key = settings.openai_api_key.strip()
-    if not api_key:
-        return None
-
     domains = _official_domains(
         question=question,
         jurisdiction=jurisdiction,
@@ -1070,7 +1214,6 @@ async def _grounded_model_answer(
     )
 
     payload = {
-        "model": settings.canada360_assistant_model,
         "reasoning": {"effort": "low"},
         "tools": [
             {
@@ -1088,97 +1231,107 @@ async def _grounded_model_answer(
             lang=lang,
             jurisdiction=jurisdiction,
             topic=topic,
+            intent=intent,
             profile=profile,
             history=history,
         ),
-        "max_output_tokens": 1200,
+        "max_output_tokens": 1800,
         "store": False,
     }
-
-    try:
-        timeout = httpx.Timeout(
-            settings.canada360_assistant_timeout_seconds,
-            connect=min(
-                8.0,
-                settings.canada360_assistant_timeout_seconds,
-            ),
-        )
-
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            models = [settings.canada360_assistant_model]
-            if models[0] != DEFAULT_ASSISTANT_MODEL:
-                models.append(DEFAULT_ASSISTANT_MODEL)
-            for index, model in enumerate(models):
-                payload["model"] = model
-                response = await client.post(
-                    OPENAI_RESPONSES_URL,
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
+    for draft in (1, 2):
+        result = await _responses_request(payload)
+        if result is None:
+            return None
+        answer, links = _extract_model_response(result, domains=domains)
+        if not answer or not links:
+            reason = "no official source"
+            logger.info("canada360_path=retrieval_unavailable draft=%s", draft)
+        else:
+            audit = audit_grounded_answer(
+                answer=answer,
+                source_urls=[link.url for link in links],
+                question=question,
+                topic=topic,
+                jurisdiction=jurisdiction,
+                profile=profile,
+                history=history,
+            )
+            if audit.accepted:
+                return Canada360AssistantResponse(
+                    answer=answer,
+                    links=links,
+                    source_line=audit.source_line(lang),
+                    mode=mode,
+                    jurisdiction=jurisdiction,
                 )
-                error = response.json().get("error", {}) if response.is_error else {}
-                error_code = error.get("code") if isinstance(error, dict) else None
-                if (
-                    index + 1 < len(models)
-                    and response.status_code in {400, 404}
-                    and error_code in {"model_not_found", "invalid_model"}
-                ):
-                    logger.warning(
-                        "canada360_model_unavailable configured_model=%s status=%s",
-                        model, response.status_code,
-                    )
-                    continue
-                break
+            reason = audit.reason
+            logger.info(
+                "canada360_path=precision_rejected draft=%s reason=%s",
+                draft, reason,
+            )
+        if draft == 1:
+            query = _targeted_retrieval_query(
+                question=question, jurisdiction=jurisdiction, topic=topic,
+                reason=reason,
+            )
+            logger.info("canada360_path=precision_retry reason=%s", reason)
+            payload["input"] = (
+                f"{payload['input']}\n\nPrecision audit rejected draft #1: {reason}.\n"
+                f"Perform a NEW official-government web search targeted to: {query}\n"
+                "Use detailed program, eligibility, amount, deadline or procedure pages. "
+                "For provincial assistance, retrieve detailed federal and provincial pages. "
+                "Write a fresh answer grounded in those pages. Do not assert eligibility "
+                "when material personal facts are missing."
+            )
+    return None
 
-        response.raise_for_status()
-        answer, links = _extract_model_response(
-            response.json(),
-            domains=domains,
-        )
-    except httpx.HTTPStatusError as exc:
-        logger.warning(
-            "canada360_model_request_failed status=%s",
-            exc.response.status_code,
-        )
-        return None
-    except (httpx.HTTPError, ValueError, TypeError) as exc:
-        logger.warning(
-            "canada360_model_request_failed error=%s", type(exc).__name__
-        )
-        return None
 
-    if not answer or not links:
-        return None
-
-    audit = audit_grounded_answer(
-        answer=answer,
-        source_urls=[link.url for link in links],
-        question=question,
-        topic=topic,
-        jurisdiction=jurisdiction,
-        profile=profile,
-        history=history,
-    )
-
-    if not audit.accepted:
-        logger.info(
-            "canada360_path=rejected_by_precision_audit reason=%s",
-            audit.reason,
-        )
-        return None
-
-    return Canada360AssistantResponse(
-        answer=answer,
-        links=links,
-        source_line=audit.source_line(lang),
-        mode=mode,
-        jurisdiction=jurisdiction,
-    )
+async def check_provider_health() -> dict[str, bool]:
+    if not settings.openai_api_key.strip():
+        return {
+            "key_configured": False,
+            "model_reachable": False,
+            "web_search_reachable": False,
+        }
+    result = await _responses_request({
+        "reasoning": {"effort": "low"},
+        "tools": [{"type": "web_search", "filters": {
+            "allowed_domains": ["canada.ca"],
+        }}],
+        "tool_choice": "required",
+        "input": "Find the official Government of Canada services page. Answer briefly.",
+        "max_output_tokens": 180,
+        "store": False,
+    })
+    return {
+        "key_configured": True,
+        "model_reachable": result is not None,
+        "web_search_reachable": bool(result and any(
+            item.get("type") == "web_search_call"
+            and item.get("status") != "failed"
+            for item in result.get("output", []) if isinstance(item, dict)
+        )),
+    }
 
 
 class Canada360AssistantService:
+    async def rate_answer(
+        self, *, conversation_id: str, turn_index: int, rating: str,
+        lang: str, jurisdiction: str,
+    ) -> bool:
+        state = await conversation_store.load(
+            conversation_id, lang=lang, jurisdiction=jurisdiction,
+        )
+        if turn_index >= len(state.history) or state.history[turn_index].role != "assistant":
+            return False
+        history = list(state.history)
+        history[turn_index] = history[turn_index].model_copy(
+            update={"feedback": rating},
+        )
+        await conversation_store.save(state.model_copy(update={"history": history}))
+        logger.info("canada360_feedback rating=%s", rating)
+        return True
+
     async def get_conversation(
         self,
         *,
@@ -1237,12 +1390,12 @@ class Canada360AssistantService:
 
         base_response: Canada360AssistantResponse | None = None
 
-        if intent in {"statistics", "comparison"} and metric_key is not None:
+        if intent in {"statistics", "compare_statistics"} and metric_key is not None:
             targets = _named_provinces(question)
             previous_province = state.profile.province or (
                 state.jurisdiction if state.jurisdiction != "CA" else None
             )
-            if intent == "comparison" and previous_province:
+            if intent == "compare_statistics" and previous_province:
                 if previous_province not in targets:
                     targets.insert(0, previous_province)
             if not targets and effective_jurisdiction != "CA":
@@ -1263,7 +1416,7 @@ class Canada360AssistantService:
                     jurisdiction=effective_jurisdiction,
                     mode=mode,
                     targets=targets,
-                    comparison=intent == "comparison",
+                    comparison=intent == "compare_statistics",
                     snapshot=snapshot,
                 )
             except Exception as exc:  # noqa: BLE001
@@ -1272,7 +1425,7 @@ class Canada360AssistantService:
                     type(exc).__name__,
                 )
             if base_response is not None:
-                logger.info("canada360_path=structured_stat_answer")
+                logger.info("canada360_path=structured_answer")
 
         if base_response is None:
             base_response = await _grounded_model_answer(
@@ -1281,21 +1434,23 @@ class Canada360AssistantService:
                 jurisdiction=effective_jurisdiction,
                 mode=mode,
                 topic=topic,
+                intent=intent,
                 profile=profile,
                 history=state.history,
             )
             if base_response is not None:
-                logger.info("canada360_path=grounded_model_answer")
+                logger.info("canada360_path=grounded_answer")
 
         if base_response is None:
-            logger.info("canada360_path=conservative_unavailable")
+            logger.info("canada360_path=retrieval_unavailable reason=no_verified_answer")
             base_response = Canada360AssistantResponse(
                 answer=(
-                    "Je ne peux pas vérifier cette réponse en profondeur pour "
-                    "le moment. Réessaie dans quelques instants."
+                    "Le service de recherche gouvernementale est momentanément "
+                    "indisponible. Je ne peux pas vérifier cette réponse maintenant. "
+                    "Réessaie plus tard."
                     if lang == "fr" else
-                    "I can't verify this answer in depth right now. "
-                    "Please try again in a moment."
+                    "The government search service is temporarily unavailable. "
+                    "I can't verify this answer right now. Please try again later."
                 ),
                 jurisdiction=effective_jurisdiction,
                 mode=mode,

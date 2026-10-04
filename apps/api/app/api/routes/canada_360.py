@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.canada_360 import (
     Canada360AssistantConversation,
+    Canada360AssistantFeedbackRequest,
     Canada360AssistantRequest,
     Canada360AssistantResponse,
     Canada360Snapshot,
@@ -14,6 +15,21 @@ from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.province_series import province_series_service
 
 router = APIRouter()
+
+
+@router.post("/assistant/feedback", status_code=204)
+async def canada_assistant_feedback(
+    payload: Canada360AssistantFeedbackRequest,
+) -> None:
+    saved = await canada_360_assistant_service.rate_answer(
+        conversation_id=payload.conversation_id,
+        turn_index=payload.turn_index,
+        rating=payload.rating,
+        lang=payload.lang,
+        jurisdiction=payload.jurisdiction,
+    )
+    if not saved:
+        raise HTTPException(status_code=404, detail="Assistant turn not found")
 
 
 @router.get(
@@ -55,7 +71,7 @@ async def canada_assistant_conversation(
     lang: str = Query("fr", pattern="^(fr|en)$"),
     jurisdiction: str = Query(
         "CA",
-        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL)$",
+        pattern="^(CA|QC|ON|BC|AB|SK|MB|NB|NS|PE|NL|YT|NT|NU)$",
     ),
 ) -> Canada360AssistantConversation:
     return await canada_360_assistant_service.get_conversation(

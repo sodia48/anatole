@@ -27,12 +27,18 @@ const JURISDICTIONS = new Set([
   "NS",
   "PE",
   "NL",
+  "YT",
+  "NT",
+  "NU",
 ]);
 
 type AssistantLink = {
   label: string;
   url: string;
   level: "federal" | "provincial" | "statistics";
+  agency?: string | null;
+  jurisdiction?: string | null;
+  updated_at?: string | null;
 };
 
 type AssistantProfile = {
@@ -49,6 +55,7 @@ type AssistantTurn = {
   text: string;
   links: AssistantLink[];
   source_line: string | null;
+  feedback?: "up" | "down" | null;
 };
 
 type AssistantConversation = {
@@ -65,7 +72,7 @@ type AssistantResponse = AssistantConversation & {
   links: AssistantLink[];
   source_line: string | null;
   mode: "ask" | "compare" | "find";
-  intent: "statistics" | "services" | "followup" | "compare";
+  intent: string;
 };
 
 function escapeHtml(value: string): string {
@@ -96,7 +103,7 @@ function linkMarkup(
   language: "fr" | "en",
 ): string {
   return links
-    .map((link) => {
+    .map((link, index) => {
       const href = safeUrl(link.url);
       if (!href) return "";
 
@@ -111,7 +118,12 @@ function linkMarkup(
               : "Federal"
             : "Provincial";
 
-      return `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer"><span>${escapeHtml(level)}</span><strong>${escapeHtml(link.label)}</strong></a>`;
+      const agency = link.agency ?? level;
+      const jurisdiction = link.jurisdiction ?? "CA";
+      const updated = link.updated_at
+        ? `<small>${language === "fr" ? "Période / mise à jour" : "Period / update"}: ${escapeHtml(link.updated_at)}</small>`
+        : "";
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer"><span>[${index + 1}] ${escapeHtml(agency)} · ${escapeHtml(jurisdiction)}</span><strong>${escapeHtml(link.label)}</strong><small>${escapeHtml(href)}</small>${updated}</a>`;
     })
     .join("");
 }
@@ -179,6 +191,9 @@ function profileMarkup(
 function turnMarkup(
   turn: AssistantTurn,
   language: "fr" | "en",
+  index: number,
+  conversationId: string,
+  jurisdiction: string,
 ): string {
   const isUser = turn.role === "user";
   const sources = !isUser && turn.links?.length
@@ -189,7 +204,20 @@ function turnMarkup(
     ? `<small>${escapeHtml(turn.source_line)}</small>`
     : "";
 
-  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}</article>`;
+  const feedback = !isUser
+    ? `<form class="feedback" method="post" action="/api/canada-assistant">
+<input type="hidden" name="action" value="feedback">
+<input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
+<input type="hidden" name="turn_index" value="${index}">
+<input type="hidden" name="lang" value="${language}">
+<input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
+<span>${language === "fr" ? "Utile ?" : "Helpful?"}</span>
+<button type="submit" name="rating" value="up" aria-label="${language === "fr" ? "Réponse utile" : "Helpful answer"}" aria-pressed="${turn.feedback === "up"}">👍</button>
+<button type="submit" name="rating" value="down" aria-label="${language === "fr" ? "Réponse inutile" : "Unhelpful answer"}" aria-pressed="${turn.feedback === "down"}">👎</button>
+</form>`
+    : "";
+
+  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}${feedback}</article>`;
 }
 
 function renderPage({
@@ -210,7 +238,9 @@ function renderPage({
   const history = conversation?.history ?? [];
 
   const chatMarkup = history.length
-    ? history.map((turn) => turnMarkup(turn, language)).join("")
+    ? history.map((turn, index) => turnMarkup(
+        turn, language, index, conversationId, jurisdiction,
+      )).join("")
     : `<article class="message"><b>CANADA 360</b><p>${fr ? "Pose une question sur une statistique, un service public ou une ressource gouvernementale. Je garderai le contexte de cette conversation pour affiner mes réponses." : "Ask about a statistic, public service or government resource. I will keep this conversation context to refine later answers."}</p></article>`;
 
   const failedMarkup = failed
@@ -240,6 +270,7 @@ main{display:grid;gap:12px;padding:14px}
 header{display:flex;justify-content:space-between;gap:12px;align-items:start}
 .eyebrow,b{font-size:11px;font-weight:850}.eyebrow{color:#79b9ff;letter-spacing:.08em}
 .trust,small{color:#9aa9b7;font-size:11px}
+.disclaimer,.privacy{color:#b8c8d5;font-size:11px;line-height:1.4}
 .headerActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .newChat{padding:7px 9px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;font-size:11px;background:#0c1925}
 .memory{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid #263747;border-radius:10px;background:#0c1925}
@@ -252,8 +283,9 @@ button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:poin
 .message{max-width:92%;padding:10px;border:1px solid #263747;border-radius:11px;background:#0c1925}
 .message.user{justify-self:end;background:#10243a}.message.error{border-color:#7a3940}.message p{margin:5px 0 0;line-height:1.55;font-size:13px;white-space:pre-wrap}
 .sources{display:grid;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid #263747}.sourceHeading{color:#9aa9b7;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-.links{display:grid;gap:6px}.links a{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;background:#091520}
-.links span{color:#79b9ff;font-size:10px}.links strong{font-size:12px}
+.links{display:grid;gap:6px}.links a{display:grid;gap:3px;padding:8px;border:1px solid #263747;border-radius:9px;color:#eef5fb;text-decoration:none;background:#091520;overflow-wrap:anywhere}
+.links span{color:#79b9ff;font-size:10px}.links strong{font-size:12px}.links small{font-size:10px}
+.feedback{display:flex;align-items:center;gap:6px;margin-top:10px}.feedback span{font-size:10px;color:#9aa9b7}.feedback button{min-height:28px;padding:2px 7px;background:#132536}.feedback button[aria-pressed="true"]{border-color:#79b9ff;background:#19406a}
 footer{color:#9aa9b7;font-size:10px;line-height:1.5}
 @media(max-width:640px){main{padding:10px}header{display:grid}.headerActions{justify-content:flex-start}form{grid-template-columns:1fr}.message{max-width:96%}.chat{max-height:520px}}
 </style>
@@ -262,20 +294,23 @@ footer{color:#9aa9b7;font-size:10px;line-height:1.5}
 <main data-testid="canada360-assistant-shell">
 <header>
 <span class="eyebrow">CANADA 360 ASSISTANT</span>
-<div class="headerActions"><span class="trust">${fr ? "10 provinces · sources officielles" : "10 provinces · official sources"} · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
+<div class="headerActions"><span class="trust">${fr ? "13 provinces et territoires · sources officielles" : "13 provinces and territories · official sources"} · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
 </header>
+<div class="disclaimer">${fr ? "Canada 360 est un produit Anatole indépendant, pas un service officiel du gouvernement du Canada." : "Canada 360 is an independent Anatole product, not an official Government of Canada service."}</div>
 ${profile}
 <section class="chat" data-testid="canada360-assistant-chat">
 ${chatMarkup}
 ${failedMarkup}
 </section>
-<form method="get" action="/api/canada-assistant">
+<form method="post" action="/api/canada-assistant" data-testid="canada360-message-form">
+<input type="hidden" name="action" value="question">
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
 <input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Pose ta question à Canada 360…" : "Ask Canada 360…"}">
 <button type="submit">${fr ? "Envoyer" : "Send"}</button>
 </form>
+<div class="privacy">${fr ? "Avant d'envoyer : ne saisis pas ton NAS, un numéro de carte ou un mot de passe." : "Before sending: do not enter your SIN, card number or password."}</div>
 <footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
 </main>
 </body>
@@ -304,10 +339,11 @@ async function loadConversation(
   }
 }
 
-export async function GET(
+async function renderAssistant(
   request: NextRequest,
+  params: URLSearchParams,
+  question: string,
 ): Promise<Response> {
-  const params = request.nextUrl.searchParams;
   const language = params.get("lang") === "en" ? "en" : "fr";
 
   const rawJurisdiction = (
@@ -329,7 +365,6 @@ export async function GET(
     ? randomUUID()
     : requestedId ?? cookieId ?? randomUUID();
 
-  const question = (params.get("q") ?? "").trim().slice(0, 500);
   let conversation: AssistantConversation | null = null;
   let failed = false;
 
@@ -407,4 +442,59 @@ export async function GET(
   );
 
   return response;
+}
+
+export async function GET(request: NextRequest): Promise<Response> {
+  return renderAssistant(request, request.nextUrl.searchParams, "");
+}
+
+export async function POST(request: NextRequest): Promise<Response> {
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  const form = await request.formData();
+  const params = new URLSearchParams();
+  for (const key of ["lang", "jurisdiction", "conversation_id"]) {
+    const value = form.get(key);
+    if (typeof value === "string") params.set(key, value);
+  }
+
+  if (form.get("action") === "feedback") {
+    const conversationId = validConversationId(params.get("conversation_id"));
+    const rating = form.get("rating");
+    const turnIndex = Number(form.get("turn_index"));
+    if (!conversationId || !["up", "down"].includes(String(rating)) ||
+        !Number.isInteger(turnIndex) || turnIndex < 0 || turnIndex > 15) {
+      return new Response("Invalid feedback", { status: 400 });
+    }
+    const upstream = await fetch(`${API_URL}/api/v1/canada/assistant/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversation_id: conversationId,
+        turn_index: turnIndex,
+        rating,
+        lang: params.get("lang") === "en" ? "en" : "fr",
+        jurisdiction: params.get("jurisdiction") ?? "CA",
+      }),
+      cache: "no-store",
+    });
+    if (!upstream.ok) return new Response("Feedback unavailable", { status: 502 });
+    const destination = new URLSearchParams({
+      lang: params.get("lang") === "en" ? "en" : "fr",
+      jurisdiction: params.get("jurisdiction") ?? "CA",
+      conversation_id: conversationId,
+    });
+    return new Response(null, {
+      status: 303,
+      headers: { Location: `/api/canada-assistant?${destination.toString()}` },
+    });
+  }
+
+  const question = typeof form.get("q") === "string"
+    ? String(form.get("q")).trim().slice(0, 500)
+    : "";
+  return renderAssistant(request, params, question);
 }

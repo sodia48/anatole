@@ -26,6 +26,16 @@ class Settings(BaseSettings):
         default="gpt-5.4-mini",
         validation_alias="CANADA360_ASSISTANT_MODEL",
     )
+    canada360_assistant_fallback_model: str = Field(
+        default="gpt-4.1-mini",
+        validation_alias="CANADA360_ASSISTANT_FALLBACK_MODEL",
+    )
+    canada360_assistant_retries: int = Field(
+        default=1,
+        validation_alias="CANADA360_ASSISTANT_RETRIES",
+        ge=0,
+        le=2,
+    )
     canada360_assistant_timeout_seconds: float = Field(
         default=30.0,
         validation_alias="CANADA360_ASSISTANT_TIMEOUT_SECONDS",
