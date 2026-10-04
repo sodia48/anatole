@@ -31,6 +31,7 @@ const JURISDICTIONS = new Set([
   "NT",
   "NU",
 ]);
+const PDF_MAX_BYTES = 2 * 1024 * 1024;
 
 type AssistantLink = {
   label: string;
@@ -203,6 +204,9 @@ function turnMarkup(
   const sourceLine = !isUser && turn.source_line
     ? `<small>${escapeHtml(turn.source_line)}</small>`
     : "";
+  const speak = !isUser
+    ? `<button type="button" class="speak" data-voice-speak hidden>${language === "fr" ? "Écouter la réponse" : "Listen to answer"}</button>`
+    : "";
 
   const feedback = !isUser
     ? `<form class="feedback" method="post" action="/api/canada-assistant">
@@ -217,7 +221,7 @@ function turnMarkup(
 </form>`
     : "";
 
-  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}${feedback}</article>`;
+  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}${speak}${feedback}</article>`;
 }
 
 function renderPage({
@@ -226,12 +230,14 @@ function renderPage({
   conversationId,
   conversation,
   failed,
+  uploadError,
 }: {
   language: "fr" | "en";
   jurisdiction: string;
   conversationId: string;
   conversation: AssistantConversation | null;
   failed: boolean;
+  uploadError: string;
 }): string {
   const fr = language === "fr";
 
@@ -245,6 +251,9 @@ function renderPage({
 
   const failedMarkup = failed
     ? `<article class="message error"><b>CANADA 360</b><p>${fr ? "Je n’ai pas pu vérifier la dernière réponse. Le reste de la conversation est conservé; réessaie." : "I could not verify the last answer. The rest of the conversation is preserved; try again."}</p></article>`
+    : "";
+  const uploadErrorMarkup = uploadError
+    ? `<article class="message error"><b>CANADA 360</b><p>${escapeHtml(uploadError)}</p></article>`
     : "";
 
   const profile = profileMarkup(
@@ -276,6 +285,7 @@ header{display:flex;justify-content:space-between;gap:12px;align-items:start}
 .memory{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border:1px solid #263747;border-radius:10px;background:#0c1925}
 .memory span{font-size:10px;color:#9aa9b7}.memory strong{font-size:11px}
 form{display:grid;grid-template-columns:1fr auto;gap:8px}
+[data-testid="canada360-message-form"]{grid-template-columns:minmax(0,1fr) auto auto}
 input,button{min-height:42px;border-radius:10px;border:1px solid #263747;font:inherit}
 input{background:#0c1925;color:#eef5fb;padding:0 11px;min-width:0}
 button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:pointer}
@@ -287,7 +297,8 @@ button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:poin
 .links span{color:#79b9ff;font-size:10px}.links strong{font-size:12px}.links small{font-size:10px}
 .feedback{display:flex;align-items:center;gap:6px;margin-top:10px}.feedback span{font-size:10px;color:#9aa9b7}.feedback button{min-height:28px;padding:2px 7px;background:#132536}.feedback button[aria-pressed="true"]{border-color:#79b9ff;background:#19406a}
 footer{color:#9aa9b7;font-size:10px;line-height:1.5}
-@media(max-width:640px){main{padding:10px}header{display:grid}.headerActions{justify-content:flex-start}form{grid-template-columns:1fr}.message{max-width:96%}.chat{max-height:520px}}
+.speak,#voice-start{min-height:28px;padding:2px 9px;font-size:11px;background:#132536}.speak{margin-top:9px}.attachment,.consent{grid-column:1/-1;display:flex;gap:8px;align-items:center;color:#b8c8d5;font-size:11px}.attachment input{max-width:100%;font-size:11px}.consent input{width:auto;min-height:0}.voiceStatus{color:#9aa9b7;font-size:11px}
+@media(max-width:640px){main{padding:10px}header{display:grid}.headerActions{justify-content:flex-start}form,[data-testid="canada360-message-form"]{grid-template-columns:1fr}.message{max-width:96%}.chat{max-height:520px}}
 </style>
 </head>
 <body>
@@ -301,18 +312,24 @@ ${profile}
 <section class="chat" data-testid="canada360-assistant-chat">
 ${chatMarkup}
 ${failedMarkup}
+${uploadErrorMarkup}
 </section>
-<form method="post" action="/api/canada-assistant" data-testid="canada360-message-form">
+<form method="post" enctype="multipart/form-data" action="/api/canada-assistant" data-testid="canada360-message-form">
 <input type="hidden" name="action" value="question">
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
 <input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Pose ta question à Canada 360…" : "Ask Canada 360…"}">
+<button type="button" id="voice-start" hidden>${fr ? "Dicter" : "Dictate"}</button>
 <button type="submit">${fr ? "Envoyer" : "Send"}</button>
+<label class="attachment">${fr ? "Joindre un PDF officiel (2 Mo max)" : "Attach an official PDF (2 MB max)"}<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
+<label class="consent"><input type="checkbox" name="document_consent" value="on">${fr ? "Je comprends que le texte du PDF sera envoyé au service d’analyse; je masque d’abord NAS, carte et mot de passe." : "I understand the PDF text will be sent for analysis; I remove SIN, card and password details first."}</label>
 </form>
-<div class="privacy">${fr ? "Avant d'envoyer : ne saisis pas ton NAS, un numéro de carte ou un mot de passe." : "Before sending: do not enter your SIN, card number or password."}</div>
+<div class="voiceStatus" id="voice-status" role="status" aria-live="polite"></div>
+<div class="privacy">${fr ? "Avant d'envoyer : ne saisis pas ton NAS, un numéro de carte ou un mot de passe. La dictée peut utiliser le service vocal du navigateur; relis le texte avant d'envoyer." : "Before sending: do not enter your SIN, card number or password. Dictation may use your browser's voice service; review the text before sending."}</div>
 <footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
 </main>
+<script defer src="/canada-assistant-voice.js"></script>
 </body>
 </html>`;
 }
@@ -343,6 +360,7 @@ async function renderAssistant(
   request: NextRequest,
   params: URLSearchParams,
   question: string,
+  options: { documentBase64?: string; uploadError?: string } = {},
 ): Promise<Response> {
   const language = params.get("lang") === "en" ? "en" : "fr";
 
@@ -367,11 +385,12 @@ async function renderAssistant(
 
   let conversation: AssistantConversation | null = null;
   let failed = false;
+  let uploadError = options.uploadError ?? "";
 
   if (question) {
     try {
       const upstream = await fetch(
-        `${API_URL}/api/v1/canada/assistant`,
+        `${API_URL}/api/v1/canada/assistant${options.documentBase64 ? "/document" : ""}`,
         {
           method: "POST",
           headers: {
@@ -383,13 +402,22 @@ async function renderAssistant(
             lang: language,
             jurisdiction,
             conversation_id: conversationId,
+            ...(options.documentBase64
+              ? { document_base64: options.documentBase64, document_consent: true }
+              : {}),
           }),
           cache: "no-store",
         },
       );
 
       if (!upstream.ok) {
-        failed = true;
+        if (options.documentBase64 && [413, 422].includes(upstream.status)) {
+          uploadError = language === "fr"
+            ? "PDF invalide, protégé ou sans texte lisible. Choisis un PDF de 2 Mo et 10 pages maximum."
+            : "Invalid, protected, or unreadable PDF. Choose a PDF up to 2 MB and 10 pages.";
+        } else {
+          failed = true;
+        }
         conversation = await loadConversation(
           conversationId,
           language,
@@ -423,13 +451,14 @@ async function renderAssistant(
       conversationId,
       conversation,
       failed,
+      uploadError,
     }),
     {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store, max-age=0",
         "Content-Security-Policy":
-          "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
+          "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff",
       },
     },
@@ -452,6 +481,10 @@ export async function POST(request: NextRequest): Promise<Response> {
   const fetchSite = request.headers.get("sec-fetch-site");
   if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
     return new Response("Forbidden", { status: 403 });
+  }
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > PDF_MAX_BYTES + 64 * 1024) {
+    return new Response("PDF too large", { status: 413 });
   }
 
   const form = await request.formData();
@@ -496,5 +529,32 @@ export async function POST(request: NextRequest): Promise<Response> {
   const question = typeof form.get("q") === "string"
     ? String(form.get("q")).trim().slice(0, 500)
     : "";
+  const pdf = form.get("pdf");
+  if (pdf instanceof File && pdf.size > 0) {
+    const french = params.get("lang") !== "en";
+    if (pdf.size > PDF_MAX_BYTES) {
+      return renderAssistant(request, params, "", {
+        uploadError: french ? "Le PDF dépasse la limite de 2 Mo." : "The PDF exceeds the 2 MB limit.",
+      });
+    }
+    if (form.get("document_consent") !== "on") {
+      return renderAssistant(request, params, "", {
+        uploadError: french
+          ? "Confirme l’avertissement sur les données sensibles avant de joindre le PDF."
+          : "Confirm the sensitive-data notice before attaching the PDF.",
+      });
+    }
+    const bytes = Buffer.from(await pdf.arrayBuffer());
+    if (bytes.subarray(0, 5).toString("ascii") !== "%PDF-") {
+      return renderAssistant(request, params, "", {
+        uploadError: french ? "Le fichier joint n’est pas un PDF valide." : "The attachment is not a valid PDF.",
+      });
+    }
+    return renderAssistant(
+      request, params,
+      question || (french ? "Explique-moi ce document officiel." : "Explain this official document."),
+      { documentBase64: bytes.toString("base64") },
+    );
+  }
   return renderAssistant(request, params, question);
 }

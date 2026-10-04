@@ -1068,6 +1068,7 @@ export function Canada360Client() {
 
       <iframe
         className={styles.assistantFrame}
+        allow="microphone"
         src={`/api/canada-assistant?lang=${language}&jurisdiction=${selectedProvinceCode ?? "CA"}`}
         title={pick(
           language,

@@ -45,7 +45,7 @@ test(
     })).toHaveCount(0);
     await expect(frame.locator("form select")).toHaveCount(0);
     await expect(frame.getByTestId("canada360-message-form")).toHaveAttribute("method", "post");
-    await expect(frame.locator("form input:not([type=hidden])")).toHaveCount(1);
+    await expect(frame.locator('input[name="q"]')).toHaveCount(1);
     await expect(frame.getByTestId("canada360-new-conversation")).toBeVisible();
     await expect(frame.locator("body")).toContainText("produit Anatole indépendant");
     await expect(frame.locator("body")).toContainText("ne saisis pas ton NAS");

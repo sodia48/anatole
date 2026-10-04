@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.canada_360 import (
     Canada360AssistantConversation,
+    Canada360AssistantDocumentRequest,
     Canada360AssistantFeedbackRequest,
     Canada360AssistantRequest,
     Canada360AssistantResponse,
@@ -12,6 +15,7 @@ from app.schemas.canada_360 import (
 from app.schemas.province_series import ProvinceSeriesSnapshot
 from app.services.canada_360 import canada_360_service
 from app.services.canada_360_assistant import canada_360_assistant_service
+from app.services.canada_360_document import DocumentValidationError, extract_pdf_text
 from app.services.province_series import province_series_service
 
 router = APIRouter()
@@ -58,6 +62,34 @@ async def canada_assistant(
         jurisdiction=payload.jurisdiction,
         mode=payload.mode,
         conversation_id=payload.conversation_id,
+    )
+
+
+@router.post(
+    "/assistant/document",
+    response_model=Canada360AssistantResponse,
+    summary="Expliquer un PDF gouvernemental fourni par l'utilisateur",
+)
+async def canada_assistant_document(
+    payload: Canada360AssistantDocumentRequest,
+) -> Canada360AssistantResponse:
+    try:
+        document_text = await asyncio.to_thread(
+            extract_pdf_text, payload.document_base64,
+        )
+    except DocumentValidationError as exc:
+        reason = str(exc)
+        raise HTTPException(
+            status_code=413 if reason == "pdf_too_large" else 422,
+            detail=reason,
+        ) from exc
+
+    return await canada_360_assistant_service.answer(
+        question=payload.question,
+        lang=payload.lang,
+        jurisdiction=payload.jurisdiction,
+        conversation_id=payload.conversation_id,
+        document_text=document_text,
     )
 
 
