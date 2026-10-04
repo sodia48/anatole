@@ -78,6 +78,11 @@ class Canada360AssistantRequest(BaseModel):
     )
 
 
+class Canada360AssistantDocumentRequest(Canada360AssistantRequest):
+    document_base64: str
+    document_consent: Literal[True]
+
+
 class Canada360AssistantResponse(BaseModel):
     answer: str
     links: list[Canada360AssistantLink] = Field(default_factory=list)
