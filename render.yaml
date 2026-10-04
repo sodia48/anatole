@@ -68,7 +68,11 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: CANADA360_ASSISTANT_MODEL
-        value: "gpt-5.6-sol"
+        value: "gpt-5.4-mini"
+      - key: CANADA360_ASSISTANT_FALLBACK_MODEL
+        value: "gpt-4.1-mini"
+      - key: CANADA360_ASSISTANT_RETRIES
+        value: "1"
       - key: CANADA360_ASSISTANT_TIMEOUT_SECONDS
         value: "30"
       - key: SEC_USER_AGENT

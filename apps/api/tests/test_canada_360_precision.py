@@ -137,6 +137,25 @@ def test_federal_detail_does_not_make_provincial_homepage_sufficient() -> None:
     assert "detailed provincial official source" in audit.reason
 
 
+def test_provincial_detail_does_not_make_federal_homepage_sufficient() -> None:
+    audit = audit_grounded_answer(
+        answer="Voici les programmes à vérifier selon votre situation.",
+        source_urls=[
+            "https://www.canada.ca/",
+            "https://www.ontario.ca/page/ontario-works",
+        ],
+        question="Je cherche une aide financière personnelle.",
+        topic="benefits",
+        jurisdiction="ON",
+        profile=Canada360AssistantProfile(
+            province="ON", objective="financial_assistance",
+        ),
+        history=[],
+    )
+    assert audit.accepted is False
+    assert "detailed federal and provincial coverage" in audit.reason
+
+
 def test_categorical_eligibility_is_rejected_when_material_facts_missing() -> None:
     profile = Canada360AssistantProfile(
         age=25,

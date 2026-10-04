@@ -28,7 +28,7 @@ async function mockOverview(
 
 test(
   "Canada 360 traite une question statistique et garde le contexte du suivi",
-  async ({ page }) => {
+  async ({ page, isMobile }) => {
     test.setTimeout(90_000);
     await mockOverview(page);
 
@@ -44,8 +44,11 @@ test(
       name: "Une conversation, pas une série de recherches isolées.",
     })).toHaveCount(0);
     await expect(frame.locator("form select")).toHaveCount(0);
+    await expect(frame.getByTestId("canada360-message-form")).toHaveAttribute("method", "post");
     await expect(frame.locator("form input:not([type=hidden])")).toHaveCount(1);
     await expect(frame.getByTestId("canada360-new-conversation")).toBeVisible();
+    await expect(frame.locator("body")).toContainText("produit Anatole indépendant");
+    await expect(frame.locator("body")).toContainText("ne saisis pas ton NAS");
 
     let input = frame.getByLabel("Question à Canada 360");
     await expect(input).toHaveAttribute(
@@ -55,13 +58,12 @@ test(
     await input.fill(
       "Quel est le taux de chômage actuel en Alberta ?",
     );
-    await frame
-      .getByRole("button", { name: "Envoyer" })
-      .click();
+    if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
+    await frame.getByRole("button", { name: "Envoyer" }).click();
 
     const firstAnswer = frame.locator(".message").last();
     await expect(firstAnswer).toContainText(
-      /Alberta|Je ne peux pas vérifier cette réponse en profondeur/,
+      /Alberta|momentanément indisponible/,
     );
     if ((await firstAnswer.innerText()).includes("Alberta")) {
       await expect(firstAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -73,9 +75,8 @@ test(
     await input.fill(
       "Et l'Ontario ?",
     );
-    await frame
-      .getByRole("button", { name: "Envoyer" })
-      .click();
+    if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
+    await frame.getByRole("button", { name: "Envoyer" }).click();
 
     const chat = frame.getByTestId(
       "canada360-assistant-chat",
@@ -87,7 +88,7 @@ test(
     await expect(chat).toContainText("Et l'Ontario ?");
     const followupAnswer = frame.locator(".message").last();
     await expect(followupAnswer).toContainText(
-      /Ontario|Je ne peux pas vérifier cette réponse en profondeur/,
+      /Ontario|momentanément indisponible/,
     );
     if ((await followupAnswer.innerText()).includes("Ontario")) {
       await expect(followupAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -103,8 +104,42 @@ test(
       /Contexte retenu pour cette conversation/i,
     );
     await expect(memory).toContainText(/ON/i);
+
+    await followupAnswer.getByRole("button", { name: "Réponse utile" }).click();
+    await expect.poll(
+      () => frame.locator("body").evaluate(() => window.location.search),
+      { timeout: 30_000 },
+    ).toContain("conversation_id=");
+    await expect(frame.locator(".message").last().getByRole("button", {
+      name: "Réponse utile",
+    })).toHaveAttribute("aria-pressed", "true");
+    await expect(frame.getByTestId("canada360-assistant-chat")).toContainText("Et l'Ontario ?");
+    expect(await frame.locator("body").evaluate(() => window.location.href)).not.toContain("q=");
   },
 );
+
+test("Canada 360 traite la question dentaire avec des sources ou signale une panne réelle", async ({ page, isMobile }) => {
+  test.setTimeout(90_000);
+  await mockOverview(page);
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  const input = frame.getByLabel("Question à Canada 360");
+  await input.fill(
+    "Ai-je droit au Régime canadien de soins dentaires ?",
+  );
+  if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  const answer = frame.locator(".message").last();
+  await expect(answer).toContainText(/soins dentaires|momentanément indisponible/i);
+  if (!(await answer.innerText()).includes("momentanément indisponible")) {
+    await expect(answer).toContainText(/admissib|couverture|revenu/i);
+    await expect(answer.locator(".sources a")).not.toHaveCount(0);
+    await expect(answer.locator(".sources a").first()).toContainText(/canada\.ca/i);
+  }
+  await expect(frame.getByTestId("canada360-assistant-chat")).toContainText(
+    "Ai-je droit au Régime canadien de soins dentaires ?",
+  );
+});
 
 test(
   "Canada 360 peut démarrer une nouvelle conversation",
