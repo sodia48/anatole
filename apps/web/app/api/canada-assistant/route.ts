@@ -198,7 +198,7 @@ function turnMarkup(
 ): string {
   const isUser = turn.role === "user";
   const sources = !isUser && turn.links?.length
-    ? `<section class="sources"><div class="sourceHeading">${language === "fr" ? "Sources gouvernementales utilisées" : "Government sources used"}</div><div class="links">${linkMarkup(turn.links, language)}</div></section>`
+    ? `<details class="sources"><summary>${language === "fr" ? "Sources officielles" : "Official sources"} (${turn.links.length})</summary><div class="links">${linkMarkup(turn.links, language)}</div></details>`
     : "";
 
   const sourceLine = !isUser && turn.source_line
@@ -247,7 +247,7 @@ function renderPage({
     ? history.map((turn, index) => turnMarkup(
         turn, language, index, conversationId, jurisdiction,
       )).join("")
-    : `<article class="message"><b>CANADA 360</b><p>${fr ? "Pose une question sur une statistique, un service public ou une ressource gouvernementale. Je garderai le contexte de cette conversation pour affiner mes réponses." : "Ask about a statistic, public service or government resource. I will keep this conversation context to refine later answers."}</p></article>`;
+    : "";
 
   const failedMarkup = failed
     ? `<article class="message error"><b>CANADA 360</b><p>${fr ? "Je n’ai pas pu vérifier la dernière réponse. Le reste de la conversation est conservé; réessaie." : "I could not verify the last answer. The rest of the conversation is preserved; try again."}</p></article>`
@@ -267,7 +267,7 @@ function renderPage({
     "&new=1";
 
   return `<!doctype html>
-<html lang="${language}">
+<html lang="${language}" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -299,37 +299,82 @@ button{background:#1f6feb;color:white;padding:0 15px;font-weight:800;cursor:poin
 footer{color:#9aa9b7;font-size:10px;line-height:1.5}
 .speak,#voice-start{min-height:28px;padding:2px 9px;font-size:11px;background:#132536}.speak{margin-top:9px}.attachment,.consent{grid-column:1/-1;display:flex;gap:8px;align-items:center;color:#b8c8d5;font-size:11px}.attachment input{max-width:100%;font-size:11px}.consent input{width:auto;min-height:0}.voiceStatus{color:#9aa9b7;font-size:11px}
 @media(max-width:640px){main{padding:10px}header{display:grid}.headerActions{justify-content:flex-start}form,[data-testid="canada360-message-form"]{grid-template-columns:1fr}.message{max-width:96%}.chat{max-height:520px}}
+html,body{height:100%;overflow:hidden}body{background:radial-gradient(circle at 50% 35%,#123451 0,#091c2d 35%,#07111b 75%)}
+main{height:100dvh;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px clamp(10px,2vw,24px)}
+header{flex:0 0 auto;align-items:center}.headerActions{flex-wrap:nowrap}.trust{white-space:nowrap}
+.trustChip{border:1px solid #315778;border-radius:999px;padding:5px 9px;background:#10283b;color:#aad6f5;font-size:10px}
+.disclaimer{flex:0 0 auto}.memory{flex:0 0 auto}.privacy,footer{flex:0 0 auto}
+.chat{flex:1;min-height:0;max-height:none;display:flex;flex-direction:column;align-items:center;gap:18px;overflow-y:auto;overscroll-behavior:contain;border:0;background:transparent;padding:16px 6px 24px;scrollbar-gutter:stable}
+.chat:empty{display:none}.message{width:min(100%,920px);max-width:none;padding:8px 4px;border:0;border-radius:0;background:transparent;flex:0 0 auto}
+.message.user{width:fit-content;max-width:min(80%,720px);align-self:flex-end;margin-right:max(0px,calc((100% - 920px)/2));padding:11px 16px;border-radius:18px 18px 5px 18px;background:#183650}
+.message.error{border:1px solid #95505a;border-radius:12px;padding:12px;background:#351b27}
+.message p{font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.message b{color:#98cfff}.message.user b{color:#c8e2f6}
+.sources{display:block;margin-top:12px;border-top:1px solid #294257;padding-top:10px}.sources summary{width:fit-content;cursor:pointer;color:#acd5f3;font-size:11px;font-weight:750}.links{margin-top:10px}
+.pending p{color:#b8d8ee}.dots::after{content:'…';animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}
+.emptyHero{flex:1;min-height:0;display:grid;place-content:end center;text-align:center;padding:25px 10px 12px}.emptyHero h1{font-size:clamp(23px,4vw,38px);line-height:1.2;margin:0 0 8px;color:#f3f9ff;letter-spacing:-.035em}.emptyHero p{font-size:12px;color:#b8c8d5;margin:0}
+.composerWrap{position:relative;flex:0 0 auto;width:min(100%,950px);margin:0 auto}.composerWrap.empty{margin-bottom:auto}
+[data-testid="canada360-message-form"]{display:flex;align-items:end;gap:8px;padding:9px 11px;border:1px solid #386182;border-radius:24px;background:#102437;box-shadow:0 16px 40px #0005;transition:border-color .18s,box-shadow .18s}
+[data-testid="canada360-message-form"]:focus-within{border-color:#79b9ff;box-shadow:0 0 0 2px #79b9ff55,0 16px 40px #0005}
+.composerButton{flex:0 0 auto;min-width:40px;height:40px;min-height:40px;border:0;border-radius:50%;padding:0 8px;background:#1c3d58;color:#eef5fb;font-size:17px}
+.composerButton:hover,.newChat:hover{background:#245372}.sendButton{border-radius:15px;background:#1877ce;font-size:12px}.sendButton:disabled{opacity:.55;cursor:wait}
+#voice-start.composerButton{min-width:40px;height:40px;min-height:40px;padding:0 8px;font-size:17px;background:#1c3d58;border:0;border-radius:50%}
+textarea[name="q"]{flex:1;min-width:0;min-height:40px;max-height:150px;resize:none;border:0;outline:0;background:transparent;color:#eef5fb;padding:10px 5px;font:inherit;font-size:14px;line-height:20px}
+textarea[name="q"]::placeholder{color:#aec3d2}.tools{position:relative}.toolsPanel{position:absolute;bottom:48px;left:0;z-index:3;width:min(320px,86vw);padding:12px;border:1px solid #386182;border-radius:14px;background:#102437;box-shadow:0 14px 32px #0008}
+.toolsPanel[hidden],.emptyHero[hidden],.lastMessage[hidden]{display:none}.toolsPanel .attachment,.toolsPanel .consent{display:grid;gap:5px;margin:0 0 9px;font-size:11px}.toolsPanel .consent{display:flex;align-items:start}.toolsPanel input[type="file"]{min-height:0}.toolsPanel input[type="checkbox"]{margin-top:2px}
+.lastMessage{position:absolute;right:10px;bottom:calc(100% + 10px);border-radius:999px;border:1px solid #456e8e;background:#173650;box-shadow:0 7px 18px #0008;font-size:11px;min-height:34px;padding:0 12px}
+.voiceStatus:empty{display:none}.voiceStatus{width:min(100%,950px);margin:0 auto}.privacy,footer{font-size:11px}.chatShell{flex:1;min-height:0;display:flex;flex-direction:column}
+.chatShell.empty{justify-content:center}.chatShell.empty .emptyHero{flex:0;padding:0 10px 22px}.chatShell.empty .composerWrap{margin:0 auto}.chat[hidden]{display:none}
+.no-js #tools-toggle{display:none}.no-js .toolsPanel[hidden]{display:block;position:static;width:100%;box-shadow:none}.no-js [data-testid="canada360-message-form"]{flex-wrap:wrap}.no-js .tools{order:3;width:100%}.no-js textarea[name="q"]{flex-basis:100%}
+html[data-theme="blue"]{color-scheme:light;background:#f5faff;color:#15324b}html[data-theme="blue"] body{background:radial-gradient(circle at 50% 36%,#e6f5ff,#f5faff 68%);color:#15324b}
+html[data-theme="blue"] .emptyHero h1{color:#143452}html[data-theme="blue"] .trustChip{background:#e7f3fb;color:#205475;border-color:#b9d5e8}
+html[data-theme="blue"] .newChat,html[data-theme="blue"] .memory{background:#fff;color:#15324b;border-color:#c6dbe9}
+html[data-theme="blue"] [data-testid="canada360-message-form"],html[data-theme="blue"] .toolsPanel{background:#fff;border-color:#a8c8de;box-shadow:0 14px 30px #173e6726}
+html[data-theme="blue"] textarea[name="q"]{color:#15324b}html[data-theme="blue"] textarea[name="q"]::placeholder{color:#53738c}
+html[data-theme="blue"] .composerButton{background:#e2f0fa;color:#164f79}html[data-theme="blue"] .sendButton{background:#1269ad;color:#fff}
+html[data-theme="blue"] #voice-start.composerButton{background:#e2f0fa;color:#164f79}
+html[data-theme="blue"] .message.user{background:#dceffc;color:#15324b}html[data-theme="blue"] .message b,html[data-theme="blue"] .sources summary{color:#145f99}
+html[data-theme="blue"] .message.error{background:#fff1f1;color:#602b32}html[data-theme="blue"] .links a{background:#fff;color:#15324b;border-color:#c6dbe9}
+html[data-theme="blue"] .feedback button,html[data-theme="blue"] .speak{background:#e6f2fa;color:#15324b}html[data-theme="blue"] .lastMessage{background:#fff;color:#145078;border-color:#a8c8de}
+@media(max-width:640px){header{display:flex;align-items:center}.trust{display:none}.chat{padding:10px 2px 20px}.message.user{max-width:86%;margin-right:0}.composerButton,#voice-start.composerButton{min-width:36px;height:36px;min-height:36px}.sendButton{font-size:11px}[data-testid="canada360-message-form"]{gap:4px;padding:7px}.emptyHero{padding-top:16px}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
 </style>
 </head>
 <body>
 <main data-testid="canada360-assistant-shell">
 <header>
 <span class="eyebrow">CANADA 360 ASSISTANT</span>
-<div class="headerActions"><span class="trust">${fr ? "13 provinces et territoires · sources officielles" : "13 provinces and territories · official sources"} · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
+<div class="headerActions"><span class="trustChip">${fr ? "Sources gouvernementales vérifiées" : "Verified government sources"}</span><span class="trust">13 · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
 </header>
 <div class="disclaimer">${fr ? "Canada 360 est un produit Anatole indépendant, pas un service officiel du gouvernement du Canada." : "Canada 360 is an independent Anatole product, not an official Government of Canada service."}</div>
-${profile}
-<section class="chat" data-testid="canada360-assistant-chat">
+<div id="conversation-memory">${profile}</div>
+<div class="chatShell ${history.length ? "" : "empty"}" id="chat-shell">
+<div class="emptyHero" id="empty-hero" ${history.length ? "hidden" : ""}><h1>${fr ? "Que veux-tu savoir sur le Canada ?" : "What would you like to know about Canada?"}</h1><p>${fr ? "Statistiques, services publics et programmes, avec des sources officielles." : "Statistics, public services and programs, backed by official sources."}</p></div>
+<section class="chat" data-testid="canada360-assistant-chat" ${history.length || failed || uploadError ? "" : "hidden"}>
 ${chatMarkup}
 ${failedMarkup}
 ${uploadErrorMarkup}
 </section>
+<div class="composerWrap ${history.length ? "" : "empty"}" id="composer-wrap">
+<button class="lastMessage" id="last-message" type="button" hidden>${fr ? "↓ Dernier message" : "↓ Latest message"}</button>
 <form method="post" enctype="multipart/form-data" action="/api/canada-assistant" data-testid="canada360-message-form">
 <input type="hidden" name="action" value="question">
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
-<input name="q" maxlength="500" autocomplete="off" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Pose ta question à Canada 360…" : "Ask Canada 360…"}">
-<button type="button" id="voice-start" hidden>${fr ? "Dicter" : "Dictate"}</button>
-<button type="submit">${fr ? "Envoyer" : "Send"}</button>
+<div class="tools"><button type="button" class="composerButton" id="tools-toggle" aria-label="${fr ? "Outils et PDF" : "Tools and PDF"}" aria-expanded="false" aria-controls="tools-panel">+</button><div class="toolsPanel" id="tools-panel" hidden>
 <label class="attachment">${fr ? "Joindre un PDF officiel (2 Mo max)" : "Attach an official PDF (2 MB max)"}<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
-<label class="consent"><input type="checkbox" name="document_consent" value="on">${fr ? "Je comprends que le texte du PDF sera envoyé au service d’analyse; je masque d’abord NAS, carte et mot de passe." : "I understand the PDF text will be sent for analysis; I remove SIN, card and password details first."}</label>
+<label class="consent"><input type="checkbox" name="document_consent" value="on">${fr ? "Je comprends que le texte du PDF sera envoyé au service d’analyse; je masque d’abord NAS, carte et mot de passe." : "I understand the PDF text will be sent for analysis; I remove SIN, card and password details first."}</label></div></div>
+<textarea name="q" maxlength="500" rows="1" aria-label="${fr ? "Question à Canada 360" : "Question for Canada 360"}" placeholder="${fr ? "Pose ta question à Canada 360…" : "Ask Canada 360…"}"></textarea>
+<button type="button" class="composerButton" id="voice-start" aria-label="${fr ? "Dicter" : "Dictate"}" hidden>🎙</button>
+<button type="submit" class="composerButton sendButton" id="send-message" aria-label="${fr ? "Envoyer" : "Send"}">${fr ? "Envoyer" : "Send"}</button>
 </form>
+</div></div>
 <div class="voiceStatus" id="voice-status" role="status" aria-live="polite"></div>
 <div class="privacy">${fr ? "Avant d'envoyer : ne saisis pas ton NAS, un numéro de carte ou un mot de passe. La dictée peut utiliser le service vocal du navigateur; relis le texte avant d'envoyer." : "Before sending: do not enter your SIN, card number or password. Dictation may use your browser's voice service; review the text before sending."}</div>
 <footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
 </main>
 <script defer src="/canada-assistant-voice.js"></script>
+<script defer src="/canada-assistant-chat.js"></script>
 </body>
 </html>`;
 }
@@ -444,8 +489,15 @@ async function renderAssistant(
     );
   }
 
+  const wantsJson = request.method === "POST" && request.headers.get("accept")?.includes("application/json");
   const response = new Response(
-    renderPage({
+    wantsJson ? JSON.stringify({
+      conversation_id: conversationId,
+      turns: conversation?.history ?? [],
+      profile: conversation?.profile ?? null,
+      failed,
+      upload_error: uploadError,
+    }) : renderPage({
       language,
       jurisdiction,
       conversationId,
@@ -455,10 +507,10 @@ async function renderAssistant(
     }),
     {
       headers: {
-        "Content-Type": "text/html; charset=utf-8",
+        "Content-Type": wantsJson ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
         "Cache-Control": "no-store, max-age=0",
         "Content-Security-Policy":
-          "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
+          "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff",
       },
     },
@@ -499,7 +551,7 @@ export async function POST(request: NextRequest): Promise<Response> {
     const rating = form.get("rating");
     const turnIndex = Number(form.get("turn_index"));
     if (!conversationId || !["up", "down"].includes(String(rating)) ||
-        !Number.isInteger(turnIndex) || turnIndex < 0 || turnIndex > 15) {
+        !Number.isInteger(turnIndex) || turnIndex < 0 || turnIndex > 39) {
       return new Response("Invalid feedback", { status: 400 });
     }
     const upstream = await fetch(`${API_URL}/api/v1/canada/assistant/feedback`, {

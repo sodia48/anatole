@@ -276,7 +276,8 @@ async def test_circuit_breaker_skips_provider_during_cooldown(monkeypatch) -> No
 
 
 @pytest.mark.asyncio
-async def test_retry_is_bounded_at_one(monkeypatch) -> None:
+@pytest.mark.parametrize("category", ["timeout", "rate_limit", "server_error", "transport"])
+async def test_technical_failure_moves_on_without_retry(monkeypatch, category) -> None:
     monkeypatch.setattr(settings, "anthropic_api_key", "test-only-key")
     monkeypatch.setattr(settings, "canada360_provider_retries", 1)
     router = Canada360ProviderRouter()
@@ -286,11 +287,11 @@ async def test_retry_is_bounded_at_one(monkeypatch) -> None:
     async def failing(**kwargs):
         calls.append(1)
         return ProviderResult(provider="anthropic", model=provider.model,
-                              error_category="timeout", retryable=True)
+                              error_category=category, retryable=True)
 
     monkeypatch.setattr(provider, "generate", failing)
     await router.generate(provider, prompt="Question", domains=["canada.ca"])
-    assert len(calls) == 2
+    assert len(calls) == 1
 
 
 @pytest.mark.asyncio

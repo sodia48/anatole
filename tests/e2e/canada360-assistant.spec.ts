@@ -45,7 +45,7 @@ test(
     })).toHaveCount(0);
     await expect(frame.locator("form select")).toHaveCount(0);
     await expect(frame.getByTestId("canada360-message-form")).toHaveAttribute("method", "post");
-    await expect(frame.locator('input[name="q"]')).toHaveCount(1);
+    await expect(frame.locator('textarea[name="q"]')).toHaveCount(1);
     await expect(frame.getByTestId("canada360-new-conversation")).toBeVisible();
     await expect(frame.locator("body")).toContainText("produit Anatole indépendant");
     await expect(frame.locator("body")).toContainText("ne saisis pas ton NAS");
@@ -58,7 +58,7 @@ test(
     await input.fill(
       "Quel est le taux de chômage actuel en Alberta ?",
     );
-    if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
+    if (isMobile) await input.evaluate((element) => (element as HTMLTextAreaElement).blur());
     await frame.getByRole("button", { name: "Envoyer" }).click();
 
     const firstAnswer = frame.locator(".message").last();
@@ -75,7 +75,7 @@ test(
     await input.fill(
       "Et l'Ontario ?",
     );
-    if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
+    if (isMobile) await input.evaluate((element) => (element as HTMLTextAreaElement).blur());
     await frame.getByRole("button", { name: "Envoyer" }).click();
 
     const chat = frame.getByTestId(

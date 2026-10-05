@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -20,6 +21,7 @@ from app.services.canada_360 import canada_360_service
 from app.services.canada_360_assistant import (
     PROVINCES,
     _grounded_model_answer,
+    _history_for_prompt,
     _official_domains,
     check_provider_health,
     canada_360_assistant_service,
@@ -34,6 +36,42 @@ def test_registry_recognizes_dedicated_agency_domains() -> None:
     innovation = identify_official_source("https://innovation.canada.ca/en/")
     assert job_bank is not None and job_bank.agency == "Employment and Social Development Canada"
     assert innovation is not None and innovation.agency == "Innovation Canada"
+
+
+@pytest.mark.asyncio
+async def test_display_history_keeps_twenty_exchanges_with_ten_turn_model_window(monkeypatch) -> None:
+    async def fake_model(**kwargs):
+        return Canada360AssistantResponse(answer="Réponse vérifiée.", jurisdiction="CA")
+
+    monkeypatch.setattr(assistant_module, "_grounded_model_answer", fake_model)
+    conversation_id = None
+    for number in range(21):
+        result = await canada_360_assistant_service.answer(
+            question=f"Bonjour numéro {number}", lang="fr", jurisdiction="CA",
+            conversation_id=conversation_id,
+        )
+        conversation_id = result.conversation_id
+    assert len(result.history) == 40
+    assert result.history[0].text == "Bonjour numéro 1"
+    prompt = _history_for_prompt(result.history)
+    assert "User: Bonjour numéro 1\n" not in prompt
+    assert "Bonjour numéro 20" in prompt
+    assert prompt.count("User:") == 5
+
+
+@pytest.mark.asyncio
+async def test_response_deadline_returns_transparent_outage(monkeypatch) -> None:
+    async def stalled_model(**kwargs):
+        await asyncio.sleep(1)
+        return Canada360AssistantResponse(answer="Trop tard", jurisdiction="CA")
+
+    monkeypatch.setattr(assistant_module, "_grounded_model_answer", stalled_model)
+    monkeypatch.setattr(settings, "canada360_total_response_deadline_seconds", 0.02)
+    result = await canada_360_assistant_service.answer(
+        question="Aide pour une démarche ?", lang="fr", jurisdiction="CA",
+    )
+    assert "moteur d’analyse" in result.answer
+    assert "Trop tard" not in result.answer
 
 
 def metric(
@@ -312,7 +350,9 @@ def mock_router(monkeypatch, names, respond):
     providers = [SimpleNamespace(name=name, model="test-model") for name in names]
     monkeypatch.setattr(provider_router, "available", lambda: providers)
 
-    async def generate(provider, *, prompt, domains, max_output_tokens=1800):
+    async def generate(provider, *, prompt, domains, max_output_tokens=1800, attempts=None):
+        if attempts is not None:
+            attempts[0] += 1
         return await respond(provider, prompt, domains)
 
     monkeypatch.setattr(provider_router, "generate", generate)
