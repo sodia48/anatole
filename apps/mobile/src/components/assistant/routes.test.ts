@@ -6,6 +6,7 @@ describe("mobile assistant routes", () => {
     expect(mobileAssistantHref("/portefeuille")).toBe("/(tabs)/portfolio");
     expect(mobileAssistantHref("/alertes?symbol=RY")).toEqual({ pathname: "/alerts", params: { symbol: "RY" } });
     expect(mobileAssistantHref("/focus/ry")).toEqual({ pathname: "/focus/[ticker]", params: { ticker: "RY" } });
+    expect(mobileAssistantHref("/etf/XIC")).toEqual({ pathname: "/etf/[ticker]", params: { ticker: "XIC" } });
   });
 
   it("does not expose an incompatible backend-only route", () => expect(mobileAssistantHref("/qualite")).toBeNull());

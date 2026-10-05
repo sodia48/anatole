@@ -5,6 +5,7 @@ import type {
 } from "react";
 
 import { AppearanceChoiceModal } from "@/components/appearance/AppearanceChoiceModal";
+import { AssistantContextProvider } from "@/components/assistant/AssistantContextProvider";
 import { WebPerformanceWarmup } from "@/components/performance/WebPerformanceWarmup";
 import { AccountProvider } from "@/components/providers/AccountProvider";
 import { PreferencesProvider } from "@/components/providers/PreferencesProvider";
@@ -25,7 +26,7 @@ export function AppProviders({
     <PreferencesProvider>
       <AccountProvider>
         <WebPerformanceWarmup />
-        {children}
+        <AssistantContextProvider>{children}</AssistantContextProvider>
         <AppearanceChoiceModal />
       </AccountProvider>
     </PreferencesProvider>

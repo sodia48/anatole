@@ -414,6 +414,59 @@ class Canada360ProviderRouter:
             and not self.circuit_open(self._providers[name])
         ]
 
+    async def generate_internal_evidence(
+        self, *, prompt: str, max_output_tokens: int = 450,
+    ) -> ProviderResult | None:
+        """Synthesize supplied evidence only, without a search tool or persistence."""
+        for provider in self.available():
+            if provider.name == "anthropic":
+                result = await _post_json(
+                    name=provider.name, model=provider.model, url=ANTHROPIC_URL,
+                    headers={"x-api-key": provider.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                    payload={"model": provider.model, "max_tokens": max_output_tokens,
+                             "messages": [{"role": "user", "content": prompt}]},
+                )
+                if isinstance(result, ProviderResult):
+                    continue
+                if result.get("stop_reason") == "max_tokens":
+                    continue
+                parts = result.get("content") or []
+                answer = "\n".join(row.get("text", "") for row in parts if isinstance(row, dict) and row.get("type") == "text")
+            elif provider.name == "gemini":
+                result = await _post_json(
+                    name=provider.name, model=provider.model,
+                    url=f"{GEMINI_BASE_URL}/{provider.model}:generateContent",
+                    headers={"x-goog-api-key": provider.api_key, "content-type": "application/json"},
+                    payload={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                             "generationConfig": {"maxOutputTokens": max_output_tokens}},
+                )
+                if isinstance(result, ProviderResult):
+                    continue
+                candidates = result.get("candidates") or []
+                if candidates and isinstance(candidates[0], dict) and candidates[0].get("finishReason") == "MAX_TOKENS":
+                    continue
+                parts = (candidates[0].get("content") or {}).get("parts") or [] if candidates and isinstance(candidates[0], dict) else []
+                answer = "\n".join(row.get("text", "") for row in parts if isinstance(row, dict) and isinstance(row.get("text"), str))
+            else:
+                result = await _post_json(
+                    name=provider.name, model=provider.model, url=OPENAI_URL,
+                    headers={"authorization": f"Bearer {provider.api_key}", "content-type": "application/json"},
+                    payload={"model": provider.model, "input": prompt, "max_output_tokens": max_output_tokens,
+                             "store": False},
+                )
+                if isinstance(result, ProviderResult):
+                    continue
+                answer = "\n".join(
+                    part.get("text", "") for row in result.get("output") or []
+                    if isinstance(row, dict) and row.get("type") == "message"
+                    for part in row.get("content") or []
+                    if isinstance(part, dict) and part.get("type") == "output_text"
+                )
+            if answer.strip() and result.get("status") != "incomplete":
+                return ProviderResult(provider=provider.name, model=provider.model,
+                                      answer=answer.strip(), success=True)
+        return None
+
     async def generate(
         self, provider: Canada360Provider, *, prompt: str, domains: list[str],
         max_output_tokens: int = 1800,
