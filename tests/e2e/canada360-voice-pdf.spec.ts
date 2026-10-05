@@ -28,6 +28,7 @@ test("Canada 360 accepte un PDF lisible avec consentement explicite", async ({ p
   test.setTimeout(90_000);
   await page.goto("/canada", { waitUntil: "domcontentloaded" });
   const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  await frame.getByRole("button", { name: "Outils et PDF" }).click();
   await frame.getByLabel("Question à Canada 360").fill("Explique-moi cette lettre de l'ARC.");
   await frame.locator('input[name="pdf"]').setInputFiles({
     name: "lettre-arc.pdf",
@@ -41,6 +42,9 @@ test("Canada 360 accepte un PDF lisible avec consentement explicite", async ({ p
   await expect(frame.getByTestId("canada360-assistant-chat")).not.toContainText(
     "Explique-moi cette lettre de l'ARC.",
   );
+  if (await frame.locator('#tools-panel').isHidden()) {
+    await frame.getByRole("button", { name: "Outils et PDF" }).click();
+  }
   await frame.getByLabel("Question à Canada 360").fill("Explique-moi cette lettre de l'ARC.");
   await frame.locator('input[name="pdf"]').setInputFiles({
     name: "lettre-arc.pdf",
@@ -50,7 +54,7 @@ test("Canada 360 accepte un PDF lisible avec consentement explicite", async ({ p
   await frame.locator('input[name="document_consent"]').check();
   if (isMobile) {
     await frame.getByLabel("Question à Canada 360").evaluate(
-      (element) => (element as HTMLInputElement).blur(),
+      (element) => (element as HTMLTextAreaElement).blur(),
     );
   }
   await frame.getByRole("button", { name: "Envoyer" }).click();

@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
 from app.core.distributed_cache import redis_snapshot_store
+from app.core.config import settings
 from app.schemas.canada_360 import (
     Canada360AssistantConversation,
     Canada360AssistantLink,
@@ -34,7 +35,8 @@ from app.services.canada_360_sources import (
 from app.services.provincial_statistics import provincial_statistics_service
 
 CONVERSATION_TTL_SECONDS = 2 * 60 * 60
-MAX_HISTORY_TURNS = 16
+MAX_DISPLAY_HISTORY_TURNS = 40
+MAX_MODEL_HISTORY_TURNS = 10
 logger = logging.getLogger(__name__)
 
 PROVINCES = {
@@ -940,7 +942,7 @@ def _history_for_prompt(
         return "(no previous turns)"
 
     rows = []
-    for turn in history[-10:]:
+    for turn in history[-MAX_MODEL_HISTORY_TURNS:]:
         role = "User" if turn.role == "user" else "Canada 360"
         rows.append(f"{role}: {turn.text[:1200]}")
     return "\n".join(rows)
@@ -1055,6 +1057,7 @@ async def _grounded_model_answer(
     profile: Canada360AssistantProfile,
     history: list[Canada360AssistantTurn],
     document_text: str | None = None,
+    telemetry: dict | None = None,
 ) -> Canada360AssistantResponse | None:
     domains = _official_domains(
         question=question, jurisdiction=jurisdiction, history=history,
@@ -1067,6 +1070,8 @@ async def _grounded_model_answer(
     providers = provider_router.available()
     for index, provider in enumerate(providers):
         if index:
+            if telemetry is not None:
+                telemetry["fallback"] = True
             logger.info(
                 "canada360_path=provider_fallback provider=%s model=%s",
                 provider.name, provider.model,
@@ -1075,6 +1080,7 @@ async def _grounded_model_answer(
         for draft in (1, 2):
             result = await provider_router.generate(
                 provider, prompt=prompt, domains=domains,
+                **({"attempts": telemetry["attempts"]} if telemetry is not None else {}),
             )
             if not result.success:
                 break
@@ -1094,6 +1100,8 @@ async def _grounded_model_answer(
                     history=history,
                 )
                 if audit.accepted:
+                    if telemetry is not None:
+                        telemetry["provider"] = provider.name
                     return Canada360AssistantResponse(
                         answer=result.answer,
                         links=links,
@@ -1107,6 +1115,8 @@ async def _grounded_model_answer(
                 provider.name, draft, reason,
             )
             if draft == 1:
+                if telemetry is not None:
+                    telemetry["precision_retry"] = True
                 query = _targeted_retrieval_query(
                     question=question, jurisdiction=jurisdiction,
                     topic=topic, reason=reason,
@@ -1172,6 +1182,10 @@ class Canada360AssistantService:
         conversation_id: str | None = None,
         document_text: str | None = None,
     ) -> Canada360AssistantResponse:
+        started = monotonic()
+        deadline = settings.canada360_total_response_deadline_seconds
+        telemetry = {"attempts": [0], "provider": "none", "fallback": False,
+                     "precision_retry": False}
         state = await conversation_store.load(
             conversation_id,
             lang=lang,
@@ -1209,6 +1223,7 @@ class Canada360AssistantService:
             intent = "government_document"
 
         base_response: Canada360AssistantResponse | None = None
+        answer_path = "provider"
 
         if not document_text and intent in {"statistics", "compare_statistics"} and metric_key is not None:
             targets = _named_provinces(question)
@@ -1221,14 +1236,14 @@ class Canada360AssistantService:
             if not targets and effective_jurisdiction != "CA":
                 targets = [effective_jurisdiction]
             try:
-                snapshot = await canada_360_service.get_snapshot(
-                    lang=lang, force=False,
+                snapshot = await asyncio.wait_for(
+                    canada_360_service.get_snapshot(lang=lang, force=False),
+                    timeout=max(0.01, deadline - (monotonic() - started)),
                 )
-                snapshot = await _hydrate_province_metrics(
-                    snapshot,
-                    targets=targets,
-                    metric_key=metric_key,
-                    lang=lang,
+                snapshot = await asyncio.wait_for(
+                    _hydrate_province_metrics(snapshot, targets=targets,
+                                              metric_key=metric_key, lang=lang),
+                    timeout=max(0.01, deadline - (monotonic() - started)),
                 )
                 base_response = _statistical_answer(
                     metric_key=metric_key,
@@ -1245,20 +1260,23 @@ class Canada360AssistantService:
                     type(exc).__name__,
                 )
             if base_response is not None:
+                answer_path = "structured"
                 logger.info("canada360_path=structured_answer")
 
         if base_response is None:
-            base_response = await _grounded_model_answer(
-                question=question,
-                lang=lang,
-                jurisdiction=effective_jurisdiction,
-                mode=mode,
-                topic=topic,
-                intent=intent,
-                profile=profile,
-                history=state.history,
-                document_text=document_text,
-            )
+            try:
+                base_response = await asyncio.wait_for(
+                    _grounded_model_answer(
+                        question=question, lang=lang,
+                        jurisdiction=effective_jurisdiction, mode=mode,
+                        topic=topic, intent=intent, profile=profile,
+                        history=state.history, document_text=document_text,
+                        telemetry=telemetry,
+                    ),
+                    timeout=max(0.01, deadline - (monotonic() - started)),
+                )
+            except TimeoutError:
+                logger.info("canada360_path=response_deadline")
             if base_response is not None:
                 logger.info("canada360_path=grounded_answer")
 
@@ -1293,7 +1311,7 @@ class Canada360AssistantService:
             *state.history,
             user_turn,
             assistant_turn,
-        ][-MAX_HISTORY_TURNS:]
+        ][-MAX_DISPLAY_HISTORY_TURNS:]
 
         next_state = Canada360AssistantConversation(
             conversation_id=state.conversation_id,
@@ -1305,6 +1323,15 @@ class Canada360AssistantService:
         )
 
         await conversation_store.save(next_state)
+
+        seconds = monotonic() - started
+        bucket = "<1s" if seconds < 1 else "<5s" if seconds < 5 else "<15s" if seconds < 15 else "<40s" if seconds < 40 else ">=40s"
+        logger.info(
+            "canada360_response latency_bucket=%s path=%s provider=%s fallback=%s precision_retry=%s provider_attempts=%s",
+            bucket, answer_path,
+            telemetry["provider"], telemetry["fallback"],
+            telemetry["precision_retry"], telemetry["attempts"][0],
+        )
 
         return base_response.model_copy(
             update={

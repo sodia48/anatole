@@ -417,9 +417,12 @@ class Canada360ProviderRouter:
     async def generate(
         self, provider: Canada360Provider, *, prompt: str, domains: list[str],
         max_output_tokens: int = 1800,
+        attempts: list[int] | None = None,
     ) -> ProviderResult:
         last = _failure(provider.name, provider.model, "unavailable")
         for attempt in range(settings.canada360_provider_retries + 1):
+            if attempts is not None:
+                attempts[0] += 1
             started = time.monotonic()
             logger.info("canada360_path=provider_attempt provider=%s model=%s", provider.name, provider.model)
             try:
@@ -446,6 +449,9 @@ class Canada360ProviderRouter:
                 self._cooldown.pop(provider.name, None)
                 self._timeouts.pop(provider.name, None)
                 return last
+            # Technical failures are more likely to recover on another provider.
+            if last.error_category in {"timeout", "rate_limit", "server_error", "transport"}:
+                break
             if last.retryable and attempt < settings.canada360_provider_retries:
                 await asyncio.sleep(0.4 * (attempt + 1))
                 continue

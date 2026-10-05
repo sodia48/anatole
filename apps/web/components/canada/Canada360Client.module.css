@@ -1026,13 +1026,13 @@ a.sourceLink:hover {
 
 .assistantFrame{
   width:100%;
-  min-height:430px;
+  height:clamp(540px,78dvh,900px);
   border:0;
   border-radius:16px;
   background:var(--panel);
 }
 @media(max-width:760px){
   .assistantFrame{
-    min-height:520px;
+    height:clamp(500px,82dvh,850px);
   }
 }
