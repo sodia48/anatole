@@ -67,13 +67,25 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-      - key: CANADA360_ASSISTANT_MODEL
-        value: "gpt-5.4-mini"
-      - key: CANADA360_ASSISTANT_FALLBACK_MODEL
-        value: "gpt-4.1-mini"
-      - key: CANADA360_ASSISTANT_RETRIES
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CANADA360_PROVIDER_ORDER
+        value: "anthropic,gemini,openai"
+      - key: CANADA360_ANTHROPIC_MODEL
+        value: "claude-sonnet-5-5"
+      - key: CANADA360_GEMINI_MODEL
+        value: "gemini-3.8-flash"
+      - key: CANADA360_OPENAI_MODEL
+        value: "gpt-6.1-sol"
+      - key: CANADA360_OPENAI_FALLBACK_MODEL
+        value: "gpt-6-luna"
+      - key: CANADA360_PROVIDER_RETRIES
         value: "1"
-      - key: CANADA360_ASSISTANT_TIMEOUT_SECONDS
+      - key: CANADA360_PROVIDER_TIMEOUT_SECONDS
+        value: "30"
+      - key: CANADA360_PROVIDER_CIRCUIT_BREAKER_SECONDS
         value: "30"
       - key: SEC_USER_AGENT
         sync: false

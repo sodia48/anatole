@@ -8,9 +8,6 @@ from time import monotonic
 from urllib.parse import urlparse
 from uuid import UUID, uuid4
 
-import httpx
-
-from app.core.config import settings
 from app.core.distributed_cache import redis_snapshot_store
 from app.schemas.canada_360 import (
     Canada360AssistantConversation,
@@ -28,6 +25,7 @@ from app.services.canada_360_precision import (
     audit_grounded_answer,
     build_precision_instructions,
 )
+from app.services.canada_360_providers import ProviderEvidence, provider_router
 from app.services.canada_360_sources import (
     REGIONAL_DOMAINS as PROVINCE_DOMAINS,
     identify_official_source,
@@ -35,7 +33,6 @@ from app.services.canada_360_sources import (
 )
 from app.services.provincial_statistics import provincial_statistics_service
 
-OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
 CONVERSATION_TTL_SECONDS = 2 * 60 * 60
 MAX_HISTORY_TURNS = 16
 logger = logging.getLogger(__name__)
@@ -917,93 +914,23 @@ def _source_level(url: str) -> str:
     return "provincial"
 
 
-def _extract_model_response(
-    payload: dict,
-    *,
-    domains: list[str],
-) -> tuple[str, list[Canada360AssistantLink]]:
-    text_parts: list[str] = []
-    source_rows: list[tuple[str, str]] = []
-
-    for item in payload.get("output", []):
-        if not isinstance(item, dict):
-            continue
-
-        if item.get("type") == "message":
-            for content in item.get("content", []):
-                if not isinstance(content, dict):
-                    continue
-                text = content.get("text")
-                if content.get("type") == "output_text" and isinstance(text, str):
-                    text_parts.append(text.strip())
-
-                for annotation in content.get("annotations", []):
-                    if not isinstance(annotation, dict):
-                        continue
-                    url = annotation.get("url")
-                    title = annotation.get("title")
-                    if isinstance(url, str):
-                        source_rows.append(
-                            (
-                                str(
-                                    title
-                                    or urlparse(url).hostname
-                                    or "Source"
-                                ),
-                                url,
-                            )
-                        )
-
-        if item.get("type") == "web_search_call":
-            action = item.get("action")
-            if not isinstance(action, dict):
-                continue
-
-            sources = action.get("sources", [])
-            if not sources and isinstance(action.get("search"), dict):
-                sources = action["search"].get("sources", [])
-
-            for source in sources or []:
-                if not isinstance(source, dict):
-                    continue
-                url = source.get("url")
-                title = source.get("title")
-                if isinstance(url, str):
-                    source_rows.append(
-                        (
-                            str(
-                                title
-                                or urlparse(url).hostname
-                                or "Source"
-                            ),
-                            url,
-                        )
-                    )
-
-    answer = "\n\n".join(
-        part for part in text_parts if part
-    ).strip()
-
+def _links_from_evidence(
+    evidence: tuple[ProviderEvidence, ...], *, domains: list[str],
+) -> tuple[list[Canada360AssistantLink], bool]:
     links: list[Canada360AssistantLink] = []
-    seen: set[str] = set()
-
-    for title, url in source_rows:
-        if url in seen or not _allowed_source(url, domains):
+    invalid_citation = False
+    for item in evidence:
+        source = identify_official_source(item.url)
+        if not source or not _allowed_source(item.url, domains):
+            invalid_citation = True
             continue
-        seen.add(url)
-        links.append(
-            Canada360AssistantLink(
-                label=title[:180],
-                url=url,
-                level=_source_level(url),
-                agency=(identify_official_source(url).agency if identify_official_source(url) else None),
-                jurisdiction=(identify_official_source(url).jurisdiction if identify_official_source(url) else None),
-            )
-        )
-        if len(links) >= 6:
-            break
-
-    return answer, links
+        if any(link.url == item.url for link in links):
+            continue
+        links.append(Canada360AssistantLink(
+            label=item.title[:180], url=item.url, level=_source_level(item.url),
+            agency=source.agency, jurisdiction=source.jurisdiction,
+        ))
+    return links[:6], invalid_citation
 
 
 def _history_for_prompt(
@@ -1077,7 +1004,7 @@ Critical routing rule:
 - Use statistical data only when the user explicitly asks for a statistic, number, rate, trend, comparison, history or similar measurement.
 
 Answer rules:
-- Use only information found through the provided web search tool, which is restricted to official Canadian federal and provincial government domains.
+- Use only cited official Canadian government sources. Search tools may return other domains; those citations are rejected by the application.
 - If a PDF is attached, you may describe what its text says as a claim in the user-supplied document. Distinguish that content from verified government facts and check any general program or legal claim against official web pages.
 - Search the relevant province as well as federal sources when the question depends on province.
 - Lead with the answer, not with links.
@@ -1090,96 +1017,6 @@ Answer rules:
 - Do not output raw URLs. The interface displays official sources below the answer.
 - If official sources are insufficient or conflicting, say what can and cannot be confirmed instead of guessing.
 """
-
-
-def _provider_error_code(response: httpx.Response) -> str | None:
-    try:
-        error = response.json().get("error", {})
-    except (ValueError, TypeError, AttributeError):
-        return None
-    return error.get("code") if isinstance(error, dict) else None
-
-
-async def _responses_request(payload: dict) -> dict | None:
-    api_key = settings.openai_api_key.strip()
-    if not api_key:
-        logger.warning("canada360_path=provider_unavailable reason=key_missing")
-        return None
-
-    timeout = httpx.Timeout(
-        settings.canada360_assistant_timeout_seconds,
-        connect=min(8.0, settings.canada360_assistant_timeout_seconds),
-    )
-    models = list(dict.fromkeys(filter(None, (
-        settings.canada360_assistant_model.strip(),
-        settings.canada360_assistant_fallback_model.strip(),
-    ))))
-    if not models:
-        logger.warning("canada360_path=provider_unavailable reason=model_missing")
-        return None
-
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        for model in models:
-            request_payload = {**payload, "model": model}
-            if model.startswith(("gpt-4.", "gpt-4o")):
-                request_payload.pop("reasoning", None)
-            for attempt in range(settings.canada360_assistant_retries + 1):
-                try:
-                    response = await client.post(
-                        OPENAI_RESPONSES_URL,
-                        headers={
-                            "Authorization": f"Bearer {api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json=request_payload,
-                    )
-                    if response.is_success:
-                        result = response.json()
-                        if isinstance(result, dict):
-                            return result
-                        logger.warning("canada360_path=provider_unavailable reason=invalid_payload")
-                        return None
-
-                    status = response.status_code
-                    code = _provider_error_code(response)
-                    if status in {400, 404} and code in {
-                        "model_not_found", "invalid_model",
-                    }:
-                        logger.warning(
-                            "canada360_path=provider_unavailable reason=invalid_model model=%s status=%s",
-                            model, status,
-                        )
-                        break
-                    if status in {429, 500, 502, 503, 504}:
-                        if attempt < settings.canada360_assistant_retries:
-                            await asyncio.sleep(0.4 * (attempt + 1))
-                            continue
-                        logger.warning(
-                            "canada360_path=provider_unavailable reason=transient_http status=%s",
-                            status,
-                        )
-                        break
-                    logger.warning(
-                        "canada360_path=provider_unavailable reason=http_status status=%s",
-                        status,
-                    )
-                    return None
-                except (httpx.TimeoutException, httpx.TransportError) as exc:
-                    if attempt < settings.canada360_assistant_retries:
-                        await asyncio.sleep(0.4 * (attempt + 1))
-                        continue
-                    logger.warning(
-                        "canada360_path=provider_unavailable reason=%s",
-                        type(exc).__name__,
-                    )
-                    break
-                except (ValueError, TypeError) as exc:
-                    logger.warning(
-                        "canada360_path=provider_unavailable reason=%s",
-                        type(exc).__name__,
-                    )
-                    return None
-    return None
 
 
 def _targeted_retrieval_query(
@@ -1220,111 +1057,78 @@ async def _grounded_model_answer(
     document_text: str | None = None,
 ) -> Canada360AssistantResponse | None:
     domains = _official_domains(
-        question=question,
-        jurisdiction=jurisdiction,
-        history=history,
+        question=question, jurisdiction=jurisdiction, history=history,
     )
-
-    payload = {
-        "reasoning": {"effort": "low"},
-        "tools": [
-            {
-                "type": "web_search",
-                "search_context_size": "high",
-                "filters": {
-                    "allowed_domains": domains,
-                },
-            }
-        ],
-        "tool_choice": "required",
-        "include": ["web_search_call.action.sources"],
-        "input": _model_prompt(
-            question=question,
-            lang=lang,
-            jurisdiction=jurisdiction,
-            topic=topic,
-            intent=intent,
-            profile=profile,
-            history=history,
-            document_text=document_text,
-        ),
-        "max_output_tokens": 1800,
-        "store": False,
-    }
-    for draft in (1, 2):
-        result = await _responses_request(payload)
-        if result is None:
-            return None
-        answer, links = _extract_model_response(result, domains=domains)
-        if not answer or not links:
-            reason = "no official source"
-            logger.info("canada360_path=retrieval_unavailable draft=%s", draft)
-        else:
-            audit = audit_grounded_answer(
-                answer=answer,
-                source_urls=[link.url for link in links],
-                question=question,
-                topic=topic,
-                jurisdiction=jurisdiction,
-                profile=profile,
-                history=history,
-            )
-            if audit.accepted:
-                return Canada360AssistantResponse(
-                    answer=answer,
-                    links=links,
-                    source_line=audit.source_line(lang),
-                    mode=mode,
-                    jurisdiction=jurisdiction,
-                )
-            reason = audit.reason
+    original_prompt = _model_prompt(
+        question=question, lang=lang, jurisdiction=jurisdiction,
+        topic=topic, intent=intent, profile=profile, history=history,
+        document_text=document_text,
+    )
+    providers = provider_router.available()
+    for index, provider in enumerate(providers):
+        if index:
             logger.info(
-                "canada360_path=precision_rejected draft=%s reason=%s",
-                draft, reason,
+                "canada360_path=provider_fallback provider=%s model=%s",
+                provider.name, provider.model,
             )
-        if draft == 1:
-            query = _targeted_retrieval_query(
-                question=question, jurisdiction=jurisdiction, topic=topic,
-                reason=reason,
+        prompt = original_prompt
+        for draft in (1, 2):
+            result = await provider_router.generate(
+                provider, prompt=prompt, domains=domains,
             )
-            logger.info("canada360_path=precision_retry reason=%s", reason)
-            payload["input"] = (
-                f"{payload['input']}\n\nPrecision audit rejected draft #1: {reason}.\n"
-                f"Perform a NEW official-government web search targeted to: {query}\n"
-                "Use detailed program, eligibility, amount, deadline or procedure pages. "
-                "For provincial assistance, retrieve detailed federal and provincial pages. "
-                "Write a fresh answer grounded in those pages. Do not assert eligibility "
-                "when material personal facts are missing."
+            if not result.success:
+                break
+            links, invalid_citation = _links_from_evidence(
+                result.evidence, domains=domains,
             )
+            if invalid_citation or not result.answer or not links:
+                reason = "no official source"
+            else:
+                audit = audit_grounded_answer(
+                    answer=result.answer,
+                    source_urls=[link.url for link in links],
+                    question=question,
+                    topic=topic,
+                    jurisdiction=jurisdiction,
+                    profile=profile,
+                    history=history,
+                )
+                if audit.accepted:
+                    return Canada360AssistantResponse(
+                        answer=result.answer,
+                        links=links,
+                        source_line=audit.source_line(lang),
+                        mode=mode,
+                        jurisdiction=jurisdiction,
+                    )
+                reason = audit.reason
+            logger.info(
+                "canada360_path=precision_rejected provider=%s draft=%s reason=%s",
+                provider.name, draft, reason,
+            )
+            if draft == 1:
+                query = _targeted_retrieval_query(
+                    question=question, jurisdiction=jurisdiction,
+                    topic=topic, reason=reason,
+                )
+                logger.info(
+                    "canada360_path=precision_retry provider=%s reason=%s",
+                    provider.name, reason,
+                )
+                prompt = (
+                    f"{original_prompt}\n\nPrecision audit rejected draft #1: {reason}.\n"
+                    f"Perform a NEW official-government web search targeted to: {query}\n"
+                    "Use detailed program, eligibility, amount, deadline or procedure pages. "
+                    "For provincial assistance, retrieve detailed federal and provincial pages. "
+                    "Write a fresh answer grounded in those pages. Do not assert eligibility "
+                    "when material personal facts are missing."
+                )
+    logger.info("canada360_path=all_providers_unavailable")
     return None
 
 
-async def check_provider_health() -> dict[str, bool]:
-    if not settings.openai_api_key.strip():
-        return {
-            "key_configured": False,
-            "model_reachable": False,
-            "web_search_reachable": False,
-        }
-    result = await _responses_request({
-        "reasoning": {"effort": "low"},
-        "tools": [{"type": "web_search", "filters": {
-            "allowed_domains": ["canada.ca"],
-        }}],
-        "tool_choice": "required",
-        "input": "Find the official Government of Canada services page. Answer briefly.",
-        "max_output_tokens": 180,
-        "store": False,
-    })
-    return {
-        "key_configured": True,
-        "model_reachable": result is not None,
-        "web_search_reachable": bool(result and any(
-            item.get("type") == "web_search_call"
-            and item.get("status") != "failed"
-            for item in result.get("output", []) if isinstance(item, dict)
-        )),
-    }
+async def check_provider_health() -> dict:
+    return await provider_router.health()
 
 
 class Canada360AssistantService:
@@ -1462,12 +1266,13 @@ class Canada360AssistantService:
             logger.info("canada360_path=retrieval_unavailable reason=no_verified_answer")
             base_response = Canada360AssistantResponse(
                 answer=(
-                    "Le service de recherche gouvernementale est momentanément "
-                    "indisponible. Je ne peux pas vérifier cette réponse maintenant. "
-                    "Réessaie plus tard."
+                    "Canada 360 ne peut pas accéder à son moteur d’analyse pour le moment. "
+                    "Tes données gouvernementales structurées restent disponibles; "
+                    "réessaie cette question dans quelques instants."
                     if lang == "fr" else
-                    "The government search service is temporarily unavailable. "
-                    "I can't verify this answer right now. Please try again later."
+                    "Canada 360 cannot access its analysis engine right now. "
+                    "Your structured government data remains available; "
+                    "please retry this question shortly."
                 ),
                 jurisdiction=effective_jurisdiction,
                 mode=mode,

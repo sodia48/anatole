@@ -119,7 +119,9 @@ def official_domains(jurisdictions: list[str] | tuple[str, ...]) -> list[str]:
 def identify_official_source(url: str) -> OfficialSource | None:
     try:
         parsed = urlparse(url)
-        if parsed.scheme != "https" or not parsed.hostname:
+        if (parsed.scheme != "https" or not parsed.hostname
+                or parsed.username or parsed.password
+                or parsed.port not in (None, 443)):
             return None
         host = parsed.hostname.lower().rstrip(".")
         path = parsed.path.lower()
