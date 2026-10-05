@@ -17,6 +17,7 @@
 .assistantTurn { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
 .userTurn p, .assistantTurn p { margin: 0 0 7px; }
 .assistantTurn p:last-child { margin-bottom: 0; }
+.skillChip { display: inline-block; margin-bottom: 8px; padding: 3px 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted, #91a6b5); font-size: .7rem; font-weight: 700; }
 .assistantTurn details { margin: 10px 0; font-size: .78rem; color: var(--text-muted, #91a6b5); }
 .assistantTurn summary { cursor: pointer; }
 .source { margin-top: 5px !important; }

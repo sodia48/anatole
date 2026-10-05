@@ -57,7 +57,137 @@ type AssistantTurn = {
   links: AssistantLink[];
   source_line: string | null;
   feedback?: "up" | "down" | null;
+  skill?: string;
+  evidence?: Array<{ sources?: Array<{ label: string; url?: string | null; freshness?: string; timestamp?: string | null }>; missing_data?: string[]; limitations?: string[] }>;
+  actions?: Array<{ label: string; href: string }>;
+  government_feedback?: { conversation_id: string; turn_index: number } | null;
 };
+
+type UnifiedReply = {
+  answer: string;
+  intent: string;
+  conversation_id: string;
+  permission_required: boolean;
+  evidence: NonNullable<AssistantTurn["evidence"]>;
+  actions: NonNullable<AssistantTurn["actions"]>;
+  government_feedback?: AssistantTurn["government_feedback"];
+  government_profile?: AssistantProfile | null;
+};
+
+function clientHistory(raw: FormDataEntryValue | null): AssistantTurn[] {
+  if (typeof raw !== "string" || raw.length > 80_000) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(-20).filter((turn): turn is AssistantTurn =>
+      typeof turn === "object" && turn !== null &&
+      (turn.role === "user" || turn.role === "assistant") &&
+      typeof turn.text === "string" && turn.text.length <= 1200).map((turn) => ({
+        role: turn.role, text: turn.text,
+        links: Array.isArray(turn.links) ? turn.links.slice(0, 10).filter((link) =>
+          link && typeof link.url === "string" && typeof link.label === "string")
+          .map((link) => ({ label: link.label.slice(0, 200), url: link.url.slice(0, 500),
+            level: ["federal", "provincial", "statistics"].includes(link.level) ? link.level : "federal",
+            agency: typeof link.agency === "string" ? link.agency.slice(0, 120) : null,
+            jurisdiction: typeof link.jurisdiction === "string" ? link.jurisdiction.slice(0, 10) : null,
+            updated_at: typeof link.updated_at === "string" ? link.updated_at.slice(0, 80) : null })) : [],
+        source_line: typeof turn.source_line === "string" ? turn.source_line.slice(0, 500) : null,
+        skill: typeof turn.skill === "string" ? turn.skill.slice(0, 40) : undefined,
+        evidence: Array.isArray(turn.evidence) ? turn.evidence.slice(0, 4) : undefined,
+        actions: Array.isArray(turn.actions) ? turn.actions.slice(0, 5).filter((action) =>
+          action && typeof action.href === "string" && typeof action.label === "string") : undefined,
+        government_feedback: turn.government_feedback &&
+          validConversationId(turn.government_feedback.conversation_id) &&
+          Number.isInteger(turn.government_feedback.turn_index) &&
+          turn.government_feedback.turn_index >= 0 && turn.government_feedback.turn_index <= 39
+          ? turn.government_feedback : null,
+      }));
+  } catch { return []; }
+}
+
+async function renderUnified(request: NextRequest, params: URLSearchParams, question: string, form: FormData,
+  options: { documentBase64?: string; uploadError?: string } = {}): Promise<Response> {
+  const language = params.get("lang") === "en" ? "en" : "fr";
+  const jurisdiction = JURISDICTIONS.has((params.get("jurisdiction") ?? "CA").toUpperCase())
+    ? (params.get("jurisdiction") ?? "CA").toUpperCase() : "CA";
+  const requestedId = validConversationId(params.get("conversation_id")) ??
+    validConversationId(request.cookies.get(CONVERSATION_COOKIE)?.value ?? null);
+  const turns = clientHistory(form.get("history"));
+  const consent = form.get("portfolio_consent") === "on";
+  let positions: unknown[] = [];
+  if (consent && typeof form.get("portfolio_positions") === "string") {
+    try {
+      const parsed: unknown = JSON.parse(String(form.get("portfolio_positions")));
+      if (Array.isArray(parsed) && parsed.length <= 30) positions = parsed;
+    } catch { /* Invalid positions are rejected by the API if sent. */ }
+  }
+  let failed = false;
+  let uploadError = options.uploadError ?? "";
+  let permissionRequired = false;
+  let profile: AssistantProfile | null = null;
+  let conversationId = requestedId ?? randomUUID();
+  if (question && !uploadError) {
+    try {
+      if (options.documentBase64) {
+        const upstream = await fetch(`${API_URL}/api/v1/canada/assistant/document`, {
+          method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
+          body: JSON.stringify({ question, lang: language, jurisdiction,
+            conversation_id: validConversationId(String(form.get("government_conversation_id") ?? "")),
+            document_base64: options.documentBase64, document_consent: true }), cache: "no-store",
+        });
+        if (!upstream.ok) {
+          if ([413, 422].includes(upstream.status)) uploadError = language === "fr"
+            ? "PDF invalide, protégé ou sans texte lisible. Choisis un PDF de 2 Mo et 10 pages maximum."
+            : "Invalid, protected, or unreadable PDF. Choose a PDF up to 2 MB and 10 pages.";
+          else failed = true;
+        } else {
+          const result = await upstream.json() as AssistantResponse;
+          profile = result.profile;
+          turns.push({ role: "user", text: question, links: [], source_line: null });
+          turns.push({ role: "assistant", text: result.answer, links: result.links, source_line: result.source_line,
+            skill: "canada360", government_feedback: { conversation_id: result.conversation_id,
+              turn_index: result.history.length - 1 } });
+        }
+      } else {
+      const upstream = await fetch(`${API_URL}/api/v1/assistant/chat`, {
+        method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, conversation_id: conversationId,
+          government_conversation_id: validConversationId(String(form.get("government_conversation_id") ?? "")),
+          context: { surface: "canada360", route: "/canada", language,
+            metadata: { region: jurisdiction }, portfolio_scope: { authorized: consent, position_count: positions.length } },
+          portfolio_consent: consent && positions.length > 0, portfolio_positions: positions }),
+        cache: "no-store",
+      });
+      if (!upstream.ok) throw new Error(`assistant ${upstream.status}`);
+      const result = await upstream.json() as UnifiedReply;
+      profile = result.government_profile ?? null;
+      conversationId = result.conversation_id || conversationId;
+      permissionRequired = result.permission_required;
+      if (form.get("resume") !== "on" || turns.at(-1)?.role !== "user" || turns.at(-1)?.text !== question) {
+        turns.push({ role: "user", text: question, links: [], source_line: null });
+      }
+      if (!permissionRequired) turns.push({ role: "assistant", text: result.answer,
+        links: [], source_line: null, skill: result.intent, evidence: result.evidence,
+        actions: result.actions, government_feedback: result.government_feedback });
+      }
+    } catch { failed = true; }
+  }
+  const wantsJson = request.headers.get("accept")?.includes("application/json");
+  const response = new Response(wantsJson ? JSON.stringify({ conversation_id: conversationId,
+    turns: turns.slice(-20), profile, failed, permission_required: permissionRequired, upload_error: uploadError })
+    : renderPage({ language, jurisdiction, conversationId,
+      conversation: { conversation_id: conversationId, lang: language, jurisdiction, topic: "", profile: profile ?? {
+        age: null, family_status: null, employment_status: null, children: null, province: null, objective: null,
+      }, history: turns }, failed, uploadError }), {
+      headers: { "Content-Type": wantsJson ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
+        "Cache-Control": "no-store, max-age=0", "Content-Security-Policy":
+        "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
+        "X-Content-Type-Options": "nosniff" },
+    });
+  const secure = request.nextUrl.protocol === "https:" ? "; Secure" : "";
+  response.headers.append("Set-Cookie", `${CONVERSATION_COOKIE}=${conversationId}; Path=/api/canada-assistant; Max-Age=${CONVERSATION_TTL_SECONDS}; HttpOnly; SameSite=Lax${secure}`);
+  return response;
+}
 
 type AssistantConversation = {
   conversation_id: string;
@@ -204,15 +334,27 @@ function turnMarkup(
   const sourceLine = !isUser && turn.source_line
     ? `<small>${escapeHtml(turn.source_line)}</small>`
     : "";
+  const evidenceSources = !isUser && Array.isArray(turn.evidence)
+    ? turn.evidence.flatMap((row) => Array.isArray(row?.sources) ? row.sources : []) : [];
+  const evidenceMarkup = evidenceSources.length
+    ? `<details class="sources"><summary>${language === "fr" ? "Sources et données utilisées" : "Sources and data used"}</summary><div class="links">${evidenceSources.map((source) => {
+      if (typeof source.label !== "string") return "";
+      const label = escapeHtml(source.label);
+      const href = typeof source.url === "string" ? safeUrl(source.url) : null;
+      return href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`
+        : `<span>${label}</span>`;
+    }).join("")}</div></details>` : "";
   const speak = !isUser
     ? `<button type="button" class="speak" data-voice-speak hidden>${language === "fr" ? "Écouter la réponse" : "Listen to answer"}</button>`
     : "";
 
-  const feedback = !isUser
+  const feedbackId = turn.government_feedback?.conversation_id ?? conversationId;
+  const feedbackIndex = turn.government_feedback?.turn_index ?? index;
+  const feedback = !isUser && (!turn.skill || turn.government_feedback)
     ? `<form class="feedback" method="post" action="/api/canada-assistant">
 <input type="hidden" name="action" value="feedback">
-<input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
-<input type="hidden" name="turn_index" value="${index}">
+<input type="hidden" name="conversation_id" value="${escapeHtml(feedbackId)}">
+<input type="hidden" name="turn_index" value="${escapeHtml(String(feedbackIndex))}">
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <span>${language === "fr" ? "Utile ?" : "Helpful?"}</span>
@@ -221,7 +363,10 @@ function turnMarkup(
 </form>`
     : "";
 
-  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "CANADA 360"}</b><p>${escapeHtml(turn.text)}</p>${sources}${sourceLine}${speak}${feedback}</article>`;
+  const skill = !isUser && turn.skill ? `<small class="skillChip">${escapeHtml(turn.skill)}</small>` : "";
+  const actions = !isUser ? (turn.actions ?? []).filter((action) => /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/.test(action.href))
+    .map((action) => `<a class="assistantAction" href="${escapeHtml(action.href)}" target="_parent">${escapeHtml(action.label)} →</a>`).join("") : "";
+  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "ANATOLE"}</b>${skill}<p>${escapeHtml(turn.text)}</p>${evidenceMarkup || sources}${sourceLine}${actions}${speak}${feedback}</article>`;
 }
 
 function renderPage({
@@ -310,6 +455,7 @@ header{flex:0 0 auto;align-items:center}.headerActions{flex-wrap:nowrap}.trust{w
 .message.error{border:1px solid #95505a;border-radius:12px;padding:12px;background:#351b27}
 .message p{font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.message b{color:#98cfff}.message.user b{color:#c8e2f6}
 .sources{display:block;margin-top:12px;border-top:1px solid #294257;padding-top:10px}.sources summary{width:fit-content;cursor:pointer;color:#acd5f3;font-size:11px;font-weight:750}.links{margin-top:10px}
+.links span{display:block;padding:7px 3px;color:#b7c9d6;font-size:11px}.assistantAction{display:inline-block;margin:9px 8px 0 0;padding:6px 9px;border:1px solid #385b73;border-radius:8px;color:#b9dfff;text-decoration:none;font-size:11px}.skillChip{display:inline-block;margin-left:8px;padding:3px 7px;border:1px solid #385b73;border-radius:999px;color:#acd5f3;font-size:10px}.permission{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border:1px solid #385b73;border-radius:12px}.permission strong{width:100%;font-size:12px}.permission button{padding:7px 10px;background:#17324a;color:#fff}
 .pending p{color:#b8d8ee}.dots::after{content:'…';animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}
 .emptyHero{flex:1;min-height:0;display:grid;place-content:end center;text-align:center;padding:25px 10px 12px}.emptyHero h1{font-size:clamp(23px,4vw,38px);line-height:1.2;margin:0 0 8px;color:#f3f9ff;letter-spacing:-.035em}.emptyHero p{font-size:12px;color:#b8c8d5;margin:0}
 .composerWrap{position:relative;flex:0 0 auto;width:min(100%,950px);margin:0 auto}.composerWrap.empty{margin-bottom:auto}
@@ -342,13 +488,13 @@ html[data-theme="blue"] .feedback button,html[data-theme="blue"] .speak{backgrou
 <body>
 <main data-testid="canada360-assistant-shell">
 <header>
-<span class="eyebrow">CANADA 360 ASSISTANT</span>
-<div class="headerActions"><span class="trustChip">${fr ? "Sources gouvernementales vérifiées" : "Verified government sources"}</span><span class="trust">13 · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
+<span class="eyebrow">ANATOLE ASSISTANT · CANADA 360</span>
+<div class="headerActions"><span class="trustChip">${fr ? "Sources adaptées à la réponse" : "Sources for each answer"}</span><span class="trust">13 · ${escapeHtml(jurisdiction)}</span><a class="newChat" href="${resetHref}" data-testid="canada360-new-conversation">${fr ? "Nouvelle conversation" : "New conversation"}</a></div>
 </header>
 <div class="disclaimer">${fr ? "Canada 360 est un produit Anatole indépendant, pas un service officiel du gouvernement du Canada." : "Canada 360 is an independent Anatole product, not an official Government of Canada service."}</div>
 <div id="conversation-memory">${profile}</div>
 <div class="chatShell ${history.length ? "" : "empty"}" id="chat-shell">
-<div class="emptyHero" id="empty-hero" ${history.length ? "hidden" : ""}><h1>${fr ? "Que veux-tu savoir sur le Canada ?" : "What would you like to know about Canada?"}</h1><p>${fr ? "Statistiques, services publics et programmes, avec des sources officielles." : "Statistics, public services and programs, backed by official sources."}</p></div>
+<div class="emptyHero" id="empty-hero" ${history.length ? "hidden" : ""}><h1>${fr ? "Que veux-tu savoir sur le Canada ?" : "What would you like to know about Canada?"}</h1><p>${fr ? "Statistiques, services publics, titres et portefeuille, avec les sources propres à chaque sujet." : "Statistics, public services, stocks and portfolio, with sources for each topic."}</p></div>
 <section class="chat" data-testid="canada360-assistant-chat" ${history.length || failed || uploadError ? "" : "hidden"}>
 ${chatMarkup}
 ${failedMarkup}
@@ -361,6 +507,11 @@ ${uploadErrorMarkup}
 <input type="hidden" name="lang" value="${language}">
 <input type="hidden" name="jurisdiction" value="${escapeHtml(jurisdiction)}">
 <input type="hidden" name="conversation_id" value="${escapeHtml(conversationId)}">
+<input type="hidden" name="history" value="${escapeHtml(JSON.stringify(history.slice(-20)))}">
+<input type="hidden" name="resume" value="">
+<input type="hidden" name="portfolio_consent" value="">
+<input type="hidden" name="portfolio_positions" value="">
+<input type="hidden" name="government_conversation_id" value="">
 <div class="tools"><button type="button" class="composerButton" id="tools-toggle" aria-label="${fr ? "Outils et PDF" : "Tools and PDF"}" aria-expanded="false" aria-controls="tools-panel">+</button><div class="toolsPanel" id="tools-panel" hidden>
 <label class="attachment">${fr ? "Joindre un PDF officiel (2 Mo max)" : "Attach an official PDF (2 MB max)"}<input type="file" name="pdf" accept="application/pdf,.pdf"></label>
 <label class="consent"><input type="checkbox" name="document_consent" value="on">${fr ? "Je comprends que le texte du PDF sera envoyé au service d’analyse; je masque d’abord NAS, carte et mot de passe." : "I understand the PDF text will be sent for analysis; I remove SIN, card and password details first."}</label></div></div>
@@ -404,8 +555,6 @@ async function loadConversation(
 async function renderAssistant(
   request: NextRequest,
   params: URLSearchParams,
-  question: string,
-  options: { documentBase64?: string; uploadError?: string } = {},
 ): Promise<Response> {
   const language = params.get("lang") === "en" ? "en" : "fr";
 
@@ -424,90 +573,22 @@ async function renderAssistant(
     request.cookies.get(CONVERSATION_COOKIE)?.value ?? null,
   );
 
-  let conversationId = reset
+  const conversationId = reset
     ? randomUUID()
     : requestedId ?? cookieId ?? randomUUID();
 
-  let conversation: AssistantConversation | null = null;
-  let failed = false;
-  let uploadError = options.uploadError ?? "";
-
-  if (question) {
-    try {
-      const upstream = await fetch(
-        `${API_URL}/api/v1/canada/assistant${options.documentBase64 ? "/document" : ""}`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            question,
-            lang: language,
-            jurisdiction,
-            conversation_id: conversationId,
-            ...(options.documentBase64
-              ? { document_base64: options.documentBase64, document_consent: true }
-              : {}),
-          }),
-          cache: "no-store",
-        },
-      );
-
-      if (!upstream.ok) {
-        if (options.documentBase64 && [413, 422].includes(upstream.status)) {
-          uploadError = language === "fr"
-            ? "PDF invalide, protégé ou sans texte lisible. Choisis un PDF de 2 Mo et 10 pages maximum."
-            : "Invalid, protected, or unreadable PDF. Choose a PDF up to 2 MB and 10 pages.";
-        } else {
-          failed = true;
-        }
-        conversation = await loadConversation(
-          conversationId,
-          language,
-          jurisdiction,
-        );
-      } else {
-        const result = (await upstream.json()) as AssistantResponse;
-        conversationId = result.conversation_id || conversationId;
-        conversation = result;
-      }
-    } catch {
-      failed = true;
-      conversation = await loadConversation(
-        conversationId,
-        language,
-        jurisdiction,
-      );
-    }
-  } else if (!reset) {
-    conversation = await loadConversation(
-      conversationId,
-      language,
-      jurisdiction,
-    );
-  }
-
-  const wantsJson = request.method === "POST" && request.headers.get("accept")?.includes("application/json");
-  const response = new Response(
-    wantsJson ? JSON.stringify({
-      conversation_id: conversationId,
-      turns: conversation?.history ?? [],
-      profile: conversation?.profile ?? null,
-      failed,
-      upload_error: uploadError,
-    }) : renderPage({
+  const conversation = reset ? null : await loadConversation(conversationId, language, jurisdiction);
+  const response = new Response(renderPage({
       language,
       jurisdiction,
       conversationId,
       conversation,
-      failed,
-      uploadError,
+      failed: false,
+      uploadError: "",
     }),
     {
       headers: {
-        "Content-Type": wantsJson ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
+        "Content-Type": "text/html; charset=utf-8",
         "Cache-Control": "no-store, max-age=0",
         "Content-Security-Policy":
           "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'",
@@ -526,7 +607,7 @@ async function renderAssistant(
 }
 
 export async function GET(request: NextRequest): Promise<Response> {
-  return renderAssistant(request, request.nextUrl.searchParams, "");
+  return renderAssistant(request, request.nextUrl.searchParams);
 }
 
 export async function POST(request: NextRequest): Promise<Response> {
@@ -567,6 +648,9 @@ export async function POST(request: NextRequest): Promise<Response> {
       cache: "no-store",
     });
     if (!upstream.ok) return new Response("Feedback unavailable", { status: 502 });
+    if (request.headers.get("accept")?.includes("application/json")) {
+      return Response.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+    }
     const destination = new URLSearchParams({
       lang: params.get("lang") === "en" ? "en" : "fr",
       jurisdiction: params.get("jurisdiction") ?? "CA",
@@ -585,12 +669,12 @@ export async function POST(request: NextRequest): Promise<Response> {
   if (pdf instanceof File && pdf.size > 0) {
     const french = params.get("lang") !== "en";
     if (pdf.size > PDF_MAX_BYTES) {
-      return renderAssistant(request, params, "", {
+      return renderUnified(request, params, "", form, {
         uploadError: french ? "Le PDF dépasse la limite de 2 Mo." : "The PDF exceeds the 2 MB limit.",
       });
     }
     if (form.get("document_consent") !== "on") {
-      return renderAssistant(request, params, "", {
+      return renderUnified(request, params, "", form, {
         uploadError: french
           ? "Confirme l’avertissement sur les données sensibles avant de joindre le PDF."
           : "Confirm the sensitive-data notice before attaching the PDF.",
@@ -598,15 +682,15 @@ export async function POST(request: NextRequest): Promise<Response> {
     }
     const bytes = Buffer.from(await pdf.arrayBuffer());
     if (bytes.subarray(0, 5).toString("ascii") !== "%PDF-") {
-      return renderAssistant(request, params, "", {
+      return renderUnified(request, params, "", form, {
         uploadError: french ? "Le fichier joint n’est pas un PDF valide." : "The attachment is not a valid PDF.",
       });
     }
-    return renderAssistant(
+    return renderUnified(
       request, params,
       question || (french ? "Explique-moi ce document officiel." : "Explain this official document."),
-      { documentBase64: bytes.toString("base64") },
+      form, { documentBase64: bytes.toString("base64") },
     );
   }
-  return renderAssistant(request, params, question);
+  return renderUnified(request, params, question, form);
 }

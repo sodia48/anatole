@@ -34,6 +34,7 @@ import {
   readLastGoodJson,
   resilientFetch,
 } from "@/lib/resilient-fetch";
+import { readAssistantPortfolio } from "@/lib/assistant-context";
 
 type Freshness =
   | "live"
@@ -601,6 +602,21 @@ export function Canada360Client() {
   const [comparisonMode, setComparisonMode] =
     useState<ComparisonMode>("level");
   const provinceHydrationAttempts = useRef(0);
+  const assistantFrame = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const onPortfolioRequest = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== assistantFrame.current?.contentWindow) return;
+      if (event.data?.type !== "anatole:portfolio-request" ||
+          typeof event.data.id !== "string" || event.data.id.length > 80) return;
+      assistantFrame.current.contentWindow?.postMessage({
+        type: "anatole:portfolio-response", id: event.data.id,
+        positions: readAssistantPortfolio(),
+      }, window.location.origin);
+    };
+    window.addEventListener("message", onPortfolioRequest);
+    return () => window.removeEventListener("message", onPortfolioRequest);
+  }, []);
 
   const load = useCallback(
     async (
@@ -1067,6 +1083,7 @@ export function Canada360Client() {
       ) : null}
 
       <iframe
+        ref={assistantFrame}
         className={styles.assistantFrame}
         allow="microphone"
         src={`/api/canada-assistant?lang=${language}&jurisdiction=${selectedProvinceCode ?? "CA"}`}

@@ -191,6 +191,63 @@ async def test_government_and_mixed_macro_stock(unit, stock_tools, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_canada360_switches_to_portfolio_then_back_to_government(unit, monkeypatch):
+    government_questions: list[str] = []
+    portfolio_calls: list[int] = []
+
+    async def canada(**kwargs):
+        government_questions.append(kwargs["question"])
+        return SimpleNamespace(answer="Réponse officielle sourcée.",
+                               conversation_id="00000000-0000-4000-8000-000000000001", history=[],
+                               links=[SimpleNamespace(label="Canada", agency="Canada", url="https://www.canada.ca")])
+
+    async def analyze(payload):
+        portfolio_calls.append(len(payload.positions))
+        return SimpleNamespace(positions=[SimpleNamespace(symbol="SHOP", weight_percent=70, market="CA")],
+                               risk=SimpleNamespace(top_position_percent=70, volatility_percent=20),
+                               sector_allocation=[], stress_tests=[], generated_at=NOW, benchmark="^GSPTSE")
+
+    monkeypatch.setattr(canada_360_assistant_service, "answer", canada)
+    monkeypatch.setattr(portfolio_service, "analyze", analyze)
+    first = await unit.answer(request("Quel est le taux de chômage au Canada ?", surface="canada360"))
+    prompt = await unit.answer(request("je parle de mon portefeuille personnel de placement dans anatole",
+                                       surface="canada360", conversation_id=first.conversation_id))
+    assert prompt.intent == "portfolio_analysis" and prompt.permission_required
+    assert government_questions == ["Quel est le taux de chômage au Canada ?"]
+    assert portfolio_calls == []
+    granted = await unit.answer(request("je parle de mon portefeuille personnel de placement dans anatole",
+                                        surface="canada360", conversation_id=prompt.conversation_id,
+                                        consent=True, positions=POSITIONS))
+    followup = await unit.answer(request("penses-tu que la repartition est bien faite ?", surface="canada360",
+                                         conversation_id=granted.conversation_id, consent=True, positions=POSITIONS))
+    assert granted.intent == followup.intent == "portfolio_analysis"
+    assert "horizon" in followup.answer and portfolio_calls == [1, 1]
+    province = await unit.answer(request("Et au Québec ?", surface="canada360",
+                                         conversation_id=followup.conversation_id))
+    assert province.intent == "canada360" and len(government_questions) == 2
+
+
+@pytest.mark.asyncio
+async def test_canada360_explicit_etf_beats_government_surface(unit, monkeypatch):
+    async def forbidden(**_kwargs):
+        raise AssertionError("government service must not receive an ETF question")
+
+    async def snapshot(_symbol, limit=10):
+        return SimpleNamespace(name="XIC", provider="iShares", category="Canada", exposure="TSX",
+                               holdings=[], top_holdings_weight_percent=None, sectors=[], regions=[],
+                               source_name="Fund data", source_url=None, stale=False, generated_at=NOW)
+
+    async def quote(_symbol):
+        return unit._simple("ticker", "XIC", "Prix indisponible")
+
+    monkeypatch.setattr(canada_360_assistant_service, "answer", forbidden)
+    monkeypatch.setattr(etf_holdings_service, "snapshot", snapshot)
+    monkeypatch.setattr(assistant_service, "_ticker", quote)
+    result = await unit.answer(request("Quels sont les risques de l'ETF XIC ?", surface="canada360"))
+    assert result.intent == "etf_analysis"
+
+
+@pytest.mark.asyncio
 async def test_news_surface_uses_sourced_feed_only(unit, monkeypatch):
     async def snapshot(_language):
         return SimpleNamespace(items=[SimpleNamespace(title="Décision de taux publiée", source="Banque du Canada",

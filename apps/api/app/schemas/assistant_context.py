@@ -130,6 +130,7 @@ class UnifiedAssistantRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1200)
     context: AssistantContext = Field(default_factory=AssistantContext)
     conversation_id: UUID | None = None
+    government_conversation_id: UUID | None = None
     portfolio_consent: bool = False
     portfolio_positions: list[PortfolioPositionInput] = Field(default_factory=list, max_length=30)
 
@@ -147,3 +148,5 @@ class UnifiedAssistantResponse(AssistantResponse):
     actions: list[NavigationAction] = Field(default_factory=list)
     evidence: list[AnatoleEvidenceBundle] = Field(default_factory=list)
     permission_required: bool = False
+    government_feedback: dict[str, str | int] | None = None
+    government_profile: dict[str, str | int | None] | None = None

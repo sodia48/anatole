@@ -83,6 +83,12 @@ test("Portefeuille demande une autorisation par conversation puis transmet les p
   await page.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
   await expect(page.getByText("La position SHOP concentre le portefeuille.")).toBeVisible();
   expect((calls[1].portfolio_positions as unknown[]).length).toBe(1);
+  await expect(page.getByRole("dialog", { name: "Anatole Assistant" }).getByText("Quels sont mes principaux risques ?")).toHaveCount(1);
+  await page.getByLabel("Votre question").fill("penses-tu que la repartition est bien faite ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await expect.poll(() => calls.length).toBe(3);
+  expect(calls[2].portfolio_consent).toBe(true);
+  expect((calls[2].portfolio_positions as unknown[]).length).toBe(1);
 });
 
 test("Refus du portefeuille et Canada 360 gardent leurs contextes", async ({ page }) => {
