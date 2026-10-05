@@ -39,6 +39,7 @@ import type {
   CompanyRelationshipPath,
 } from "./types";
 import { readLastGoodJson, resilientFetch } from "./resilient-fetch";
+import type { UnifiedAssistantRequest, UnifiedAssistantResponse } from "./assistant-context";
 
 const DEFAULT_API_URL = "https://anatole-api.onrender.com";
 
@@ -860,6 +861,13 @@ export function askAnatole(
     signal,
     60_000,
   );
+}
+
+export function askUnifiedAssistant(request: UnifiedAssistantRequest, signal?: AbortSignal): Promise<UnifiedAssistantResponse> {
+  return apiRequest<UnifiedAssistantResponse>("/api/v1/assistant/chat", {
+    method: "POST",
+    body: JSON.stringify(request),
+  }, signal, 45_000);
 }
 
 export function getDataQuality(

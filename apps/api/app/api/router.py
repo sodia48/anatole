@@ -4,6 +4,7 @@ from app.api.routes import (
     accounts,
     admin,
     analysis,
+    assistant_chat,
     backtest,
     canada_360,
     company_network,
@@ -146,6 +147,12 @@ api_router.include_router(
     workspace.router,
     prefix="/api/v1/workspace",
     tags=["workspace"],
+)
+
+api_router.include_router(
+    assistant_chat.router,
+    prefix="/api/v1/assistant",
+    tags=["assistant"],
 )
 
 

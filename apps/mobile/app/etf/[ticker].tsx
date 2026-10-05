@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ChartWebView } from "@/src/components/ChartWebView";
 import { EtfRiskPanel, EtfXRay } from "@/src/components/etf/EtfXRay";
+import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
 import { compactNumberOrNd, moneyOrNd, percentOrNd, valueOrNd } from "@/src/components/focus/format";
 import { Card, QueryState, Screen, ScreenHeader } from "@/src/components/ui";
 import { marketApi } from "@/src/lib/api/market";
@@ -73,7 +74,7 @@ export default function EtfDetailScreen() {
 
   return <Screen onRefresh={() => { void holdings.refetch(); void history.refetch(); }} refreshing={holdings.isRefetching || history.isRefetching} testID="etf-detail-screen">
     <ScreenHeader
-      action={<Pressable accessibilityLabel={watched ? pick("Retirer de la Watchlist", "Remove from Watchlist") : pick("Ajouter à la Watchlist", "Add to Watchlist")} accessibilityRole="button" onPress={() => void toggleWatchlist()} style={styles.star}><Text style={styles.starText}>{watched ? "★" : "☆"}</Text></Pressable>}
+      action={<View style={{ flexDirection: "row", alignItems: "center" }}><IntelligenceActions symbol={ticker} surface="etf" /><Pressable accessibilityLabel={watched ? pick("Retirer de la Watchlist", "Remove from Watchlist") : pick("Ajouter à la Watchlist", "Add to Watchlist")} accessibilityRole="button" onPress={() => void toggleWatchlist()} style={styles.star}><Text style={styles.starText}>{watched ? "★" : "☆"}</Text></Pressable></View>}
       eyebrow={`${snapshot?.provider ?? "ETF"} · ${status}`}
       subtitle={snapshot ? `${snapshot.category} · ${snapshot.exposure}` : undefined}
       title={`${ticker}${snapshot?.name ? ` · ${snapshot.name}` : ""}`}

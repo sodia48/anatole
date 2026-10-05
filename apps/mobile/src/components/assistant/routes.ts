@@ -10,6 +10,10 @@ export function mobileAssistantHref(href: string): MobileAssistantHref | null {
     const ticker = path.slice("/focus/".length).trim().toUpperCase();
     return ticker ? { pathname: "/focus/[ticker]", params: { ticker } } : null;
   }
+  if (path?.startsWith("/etf/")) {
+    const ticker = path.slice("/etf/".length).trim().toUpperCase();
+    return /^[A-Z0-9.^-]{1,15}$/.test(ticker) ? { pathname: "/etf/[ticker]", params: { ticker } } : null;
+  }
   if (["/terminal", "/screener", "/assistant", "/discover", "/etf"].includes(path ?? "")) return path ?? null;
   return null;
 }
