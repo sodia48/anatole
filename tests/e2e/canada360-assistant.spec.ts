@@ -63,7 +63,7 @@ test(
 
     const firstAnswer = frame.locator(".message").last();
     await expect(firstAnswer).toContainText(
-      /Alberta|momentanément indisponible/,
+      /Alberta|moteur d’analyse/,
     );
     if ((await firstAnswer.innerText()).includes("Alberta")) {
       await expect(firstAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -88,7 +88,7 @@ test(
     await expect(chat).toContainText("Et l'Ontario ?");
     const followupAnswer = frame.locator(".message").last();
     await expect(followupAnswer).toContainText(
-      /Ontario|momentanément indisponible/,
+      /Ontario|moteur d’analyse/,
     );
     if ((await followupAnswer.innerText()).includes("Ontario")) {
       await expect(followupAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -130,8 +130,8 @@ test("Canada 360 traite la question dentaire avec des sources ou signale une pan
   if (isMobile) await input.evaluate((element) => (element as HTMLInputElement).blur());
   await frame.getByRole("button", { name: "Envoyer" }).click();
   const answer = frame.locator(".message").last();
-  await expect(answer).toContainText(/soins dentaires|momentanément indisponible/i);
-  if (!(await answer.innerText()).includes("momentanément indisponible")) {
+  await expect(answer).toContainText(/soins dentaires|moteur d’analyse/i);
+  if (!(await answer.innerText()).includes("moteur d’analyse")) {
     await expect(answer).toContainText(/admissib|couverture|revenu/i);
     await expect(answer.locator(".sources a")).not.toHaveCount(0);
     await expect(answer.locator(".sources a").first()).toContainText(/canada\.ca/i);

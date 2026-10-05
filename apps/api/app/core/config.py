@@ -1,7 +1,8 @@
 from functools import lru_cache
+from typing import Annotated
 
-from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -22,25 +23,41 @@ class Settings(BaseSettings):
         default="",
         validation_alias="OPENAI_API_KEY",
     )
-    canada360_assistant_model: str = Field(
-        default="gpt-5.4-mini",
-        validation_alias="CANADA360_ASSISTANT_MODEL",
+    anthropic_api_key: str = Field(default="", validation_alias="ANTHROPIC_API_KEY")
+    gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
+    canada360_provider_order: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("anthropic", "gemini", "openai"),
+        validation_alias="CANADA360_PROVIDER_ORDER",
     )
-    canada360_assistant_fallback_model: str = Field(
-        default="gpt-4.1-mini",
-        validation_alias="CANADA360_ASSISTANT_FALLBACK_MODEL",
+    canada360_anthropic_model: str = Field(
+        default="claude-sonnet-5-5", validation_alias="CANADA360_ANTHROPIC_MODEL",
     )
-    canada360_assistant_retries: int = Field(
+    canada360_gemini_model: str = Field(
+        default="gemini-3.8-flash", validation_alias="CANADA360_GEMINI_MODEL",
+    )
+    canada360_openai_model: str = Field(
+        default="gpt-6.1-sol", validation_alias="CANADA360_OPENAI_MODEL",
+    )
+    canada360_openai_fallback_model: str = Field(
+        default="gpt-6-luna", validation_alias="CANADA360_OPENAI_FALLBACK_MODEL",
+    )
+    canada360_provider_retries: int = Field(
         default=1,
-        validation_alias="CANADA360_ASSISTANT_RETRIES",
+        validation_alias="CANADA360_PROVIDER_RETRIES",
         ge=0,
-        le=2,
+        le=1,
     )
-    canada360_assistant_timeout_seconds: float = Field(
+    canada360_provider_timeout_seconds: float = Field(
         default=30.0,
-        validation_alias="CANADA360_ASSISTANT_TIMEOUT_SECONDS",
+        validation_alias="CANADA360_PROVIDER_TIMEOUT_SECONDS",
         ge=10.0,
         le=90.0,
+    )
+    canada360_provider_circuit_breaker_seconds: float = Field(
+        default=30.0,
+        validation_alias="CANADA360_PROVIDER_CIRCUIT_BREAKER_SECONDS",
+        ge=5.0,
+        le=600.0,
     )
     sec_user_agent: str = "Anatole contact@anatole.app"
     company_network_build_concurrency: int = Field(
@@ -72,6 +89,19 @@ class Settings(BaseSettings):
     notification_app_url: str = "https://anatole-mu.vercel.app/aujourdhui"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("canada360_provider_order", mode="before")
+    @classmethod
+    def normalize_provider_order(cls, value: object) -> tuple[str, ...]:
+        names = value.split(",") if isinstance(value, str) else value
+        if not isinstance(names, (tuple, list)):
+            return ("anthropic", "gemini", "openai")
+        valid = {"anthropic", "gemini", "openai"}
+        order = tuple(dict.fromkeys(
+            name.strip().lower() for name in names
+            if isinstance(name, str) and name.strip().lower() in valid
+        ))
+        return order or ("anthropic", "gemini", "openai")
 
 
     @property

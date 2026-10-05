@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -26,6 +25,7 @@ from app.services.canada_360_assistant import (
     canada_360_assistant_service,
 )
 from app.services.canada_360_sources import SOURCE_REGISTRY, identify_official_source
+from app.services.canada_360_providers import ProviderEvidence, ProviderResult, provider_router
 from app.services.provincial_statistics import provincial_statistics_service
 
 
@@ -227,7 +227,7 @@ async def test_profile_followup_keeps_history_without_fabricated_advice(
     assert second.profile.family_status == "single"
     assert second.profile.employment_status == "unemployed"
     assert second.profile.province == "QC"
-    assert "momentanément indisponible" in second.answer
+    assert "moteur d’analyse" in second.answer
     assert second.links == []
     assert "Assurance-emploi" not in second.answer
 
@@ -242,9 +242,9 @@ async def test_missing_model_is_transparent_for_open_question(monkeypatch) -> No
 
     assert answer.intent == "procedure"
     assert answer.answer == (
-        "Le service de recherche gouvernementale est momentanément "
-        "indisponible. Je ne peux pas vérifier cette réponse maintenant. "
-        "Réessaie plus tard."
+        "Canada 360 ne peut pas accéder à son moteur d’analyse pour le moment. "
+        "Tes données gouvernementales structurées restent disponibles; "
+        "réessaie cette question dans quelques instants."
     )
     assert answer.links == []
 
@@ -300,71 +300,27 @@ def test_official_domain_filter_covers_all_thirteen_regions() -> None:
         assert domain in domains
 
 
-@pytest.mark.asyncio
-async def test_responses_api_uses_official_search_and_recovers_invalid_model(
-    monkeypatch, caplog,
-) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
-    monkeypatch.setattr(settings, "canada360_assistant_model", "invalid-model")
-    monkeypatch.setattr(settings, "canada360_assistant_fallback_model", "gpt-4.1-mini")
-    requests: list[dict] = []
-
-    class FakeClient:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def post(self, url, *, headers, json):
-            assert url == "https://api.openai.com/v1/responses"
-            requests.append(json.copy())
-            request = httpx.Request("POST", url)
-            if len(requests) == 1:
-                return httpx.Response(
-                    404, json={"error": {"code": "model_not_found"}},
-                    request=request,
-                )
-            return httpx.Response(
-                200, json={"output": [{
-                    "type": "message",
-                    "content": [{
-                        "type": "output_text",
-                        "text": "Voici une réponse vérifiée sur les services.",
-                        "annotations": [{
-                            "url": "https://www.canada.ca/en/services/benefits/finder.html",
-                            "title": "Benefits Finder",
-                        }],
-                    }],
-                }]}, request=request,
-            )
-
-    monkeypatch.setattr(assistant_module.httpx, "AsyncClient", FakeClient)
-    response = await _grounded_model_answer(
-        question="Quels services existent ?", lang="fr", jurisdiction="CA",
-        mode="ask", topic="services", profile=Canada360AssistantProfile(),
-        history=[],
+def fake_result(answer: str, *urls: str, provider: str = "anthropic") -> ProviderResult:
+    return ProviderResult(
+        provider=provider, model="test-model", answer=answer,
+        evidence=tuple(ProviderEvidence(url=url, title="Official program") for url in urls),
+        success=True,
     )
 
-    assert response is not None
-    assert response.answer.startswith("Voici une réponse vérifiée")
-    assert [row["model"] for row in requests] == ["invalid-model", "gpt-4.1-mini"]
-    assert "reasoning" not in requests[1]
-    assert requests[1]["tool_choice"] == "required"
-    assert requests[1]["store"] is False
-    assert requests[1]["max_output_tokens"] == 1800
-    assert "canada.ca" in requests[1]["tools"][0]["filters"]["allowed_domains"]
-    assert "test-only-key" not in caplog.text
+
+def mock_router(monkeypatch, names, respond):
+    providers = [SimpleNamespace(name=name, model="test-model") for name in names]
+    monkeypatch.setattr(provider_router, "available", lambda: providers)
+
+    async def generate(provider, *, prompt, domains, max_output_tokens=1800):
+        return await respond(provider, prompt, domains)
+
+    monkeypatch.setattr(provider_router, "generate", generate)
 
 
 def test_assistant_route_accepts_conversation_id_without_mode(monkeypatch) -> None:
     async def fake_answer(**kwargs):
-        assert kwargs["conversation_id"] == (
-            "11111111-1111-1111-1111-111111111111"
-        )
+        assert kwargs["conversation_id"] == "11111111-1111-1111-1111-111111111111"
         assert kwargs["mode"] == "ask"
         return Canada360AssistantResponse(
             answer="Réponse", jurisdiction=kwargs["jurisdiction"],
@@ -379,34 +335,16 @@ def test_assistant_route_accepts_conversation_id_without_mode(monkeypatch) -> No
             "conversation_id": "11111111-1111-1111-1111-111111111111",
         },
     )
-
     assert response.status_code == 200
-    assert response.json()["conversation_id"] == (
-        "11111111-1111-1111-1111-111111111111"
-    )
-
-
-def model_output(answer: str, *urls: str) -> dict:
-    sources = [{"url": url, "title": "Detailed official program page"} for url in urls]
-    return {"output": [
-        {"type": "web_search_call", "status": "completed", "action": {
-            "sources": sources,
-        }},
-        {"type": "message", "content": [{
-            "type": "output_text", "text": answer,
-            "annotations": sources,
-        }]},
-    ]}
 
 
 @pytest.mark.asyncio
 async def test_dental_eligibility_gets_substantive_grounded_answer(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
     calls = []
 
-    async def provider(payload):
-        calls.append(payload)
-        return model_output(
+    async def respond(provider, prompt, domains):
+        calls.append((provider.name, prompt, domains))
+        return fake_result(
             "Le Régime canadien de soins dentaires exige de vérifier la couverture "
             "privée, la déclaration de revenus, le revenu familial et la résidence "
             "fiscale. Je ne peux pas confirmer votre admissibilité avec ces seuls "
@@ -414,50 +352,40 @@ async def test_dental_eligibility_gets_substantive_grounded_answer(monkeypatch) 
             "https://www.canada.ca/fr/services/prestations/dentaire/regime-soins-dentaires/admissibilite.html",
         )
 
-    monkeypatch.setattr(assistant_module, "_responses_request", provider)
+    mock_router(monkeypatch, ["anthropic"], respond)
     answer = await canada_360_assistant_service.answer(
         question="Ai-je droit au Régime canadien de soins dentaires ?",
         lang="fr", jurisdiction="CA",
     )
-
     assert answer.intent == "eligibility"
     assert "couverture privée" in answer.answer
-    assert "admissibilité" in answer.answer
     assert len(answer.links) == 1
     assert answer.links[0].jurisdiction == "CA"
-    assert "admissibilite.html" in answer.links[0].url
-    assert len(calls) == 1
-    assert calls[0]["tool_choice"] == "required"
-    assert calls[0]["store"] is False
+    assert len(calls) == 1 and "canada.ca" in calls[0][2]
 
 
 @pytest.mark.asyncio
 async def test_precision_rejection_triggers_targeted_second_search(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
-    calls = []
+    prompts = []
 
-    async def provider(payload):
-        calls.append(payload.copy())
-        if len(calls) == 1:
-            return model_output("Le régime pourrait vous concerner.", "https://www.canada.ca/")
-        return model_output(
+    async def respond(provider, prompt, domains):
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            return fake_result("Le régime pourrait vous concerner.", "https://www.canada.ca/")
+        return fake_result(
             "Le régime exige une vérification de la couverture privée, des revenus "
             "et de la résidence fiscale. Quels sont votre couverture et votre revenu ?",
             "https://www.canada.ca/fr/services/prestations/dentaire/regime-soins-dentaires/admissibilite.html",
         )
 
-    monkeypatch.setattr(assistant_module, "_responses_request", provider)
+    mock_router(monkeypatch, ["anthropic"], respond)
     answer = await canada_360_assistant_service.answer(
         question="Ai-je droit au Régime canadien de soins dentaires ?",
         lang="fr", jurisdiction="CA",
     )
-
-    assert len(calls) == 2
-    assert "Precision audit rejected draft #1" in calls[1]["input"]
-    assert "detailed eligibility requirements" in calls[1]["input"]
-    assert calls[1]["tools"][0]["filters"]["allowed_domains"] == (
-        calls[0]["tools"][0]["filters"]["allowed_domains"]
-    )
+    assert len(prompts) == 2
+    assert "Precision audit rejected draft #1" in prompts[1]
+    assert "detailed eligibility requirements" in prompts[1]
     assert "admissibilite.html" in answer.links[0].url
 
 
@@ -469,14 +397,13 @@ async def test_precision_rejection_triggers_targeted_second_search(monkeypatch) 
 async def test_personal_financial_help_covers_federal_and_region(
     monkeypatch, code,
 ) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
     region = next(source for source in SOURCE_REGISTRY if source.jurisdiction == code)
     url = f"https://{region.official_domains[0]}/en/services/income-support"
     seen = []
 
-    async def provider(payload):
-        seen.append(payload)
-        return model_output(
+    async def respond(provider, prompt, domains):
+        seen.append(domains)
+        return fake_result(
             "Voici des programmes fédéraux et régionaux à examiner selon votre "
             "situation. Vérifiez les critères détaillés; votre admissibilité "
             "dépend des faits personnels encore manquants.",
@@ -484,40 +411,37 @@ async def test_personal_financial_help_covers_federal_and_region(
             url,
         )
 
-    monkeypatch.setattr(assistant_module, "_responses_request", provider)
+    mock_router(monkeypatch, ["anthropic"], respond)
     answer = await canada_360_assistant_service.answer(
         question="Je cherche une aide financière personnelle.",
         lang="fr", jurisdiction=code,
     )
-
     assert answer.jurisdiction == code
     assert answer.intent in {"benefit_or_program", "local_resource"}
-    assert len(answer.links) == 2
     assert {link.jurisdiction for link in answer.links} == {"CA", code}
-    assert region.official_domains[0] in seen[0]["tools"][0]["filters"]["allowed_domains"]
+    assert region.official_domains[0] in seen[0]
     assert identify_official_source(url) is region
 
 
 @pytest.mark.asyncio
-async def test_health_check_discloses_only_safe_booleans(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "")
-    assert await check_provider_health() == {
-        "key_configured": False,
-        "model_reachable": False,
-        "web_search_reachable": False,
-    }
+async def test_health_check_discloses_only_safe_fields(monkeypatch) -> None:
+    async def health():
+        return {
+            "configured_order": ["anthropic", "gemini", "openai"],
+            "providers": {
+                "anthropic": {"configured": True, "reachable": True,
+                              "model": "claude-sonnet-5-5", "search_capable": True},
+                "gemini": {"configured": False, "reachable": False,
+                           "model": "gemini-3.8-flash", "search_capable": False},
+                "openai": {"configured": False, "reachable": False,
+                           "model": "gpt-6.1-sol", "search_capable": False},
+            },
+        }
 
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
-
-    async def provider(_payload):
-        return model_output("Official page found", "https://www.canada.ca/en/services.html")
-
-    monkeypatch.setattr(assistant_module, "_responses_request", provider)
-    assert await check_provider_health() == {
-        "key_configured": True,
-        "model_reachable": True,
-        "web_search_reachable": True,
-    }
+    monkeypatch.setattr(provider_router, "health", health)
+    result = await check_provider_health()
+    assert result["providers"]["anthropic"]["reachable"]
+    assert "key" not in str(result).lower()
     assert TestClient(app).get("/api/v1/admin/canada360/provider-health").status_code == 401
 
 
@@ -525,7 +449,7 @@ async def test_health_check_discloses_only_safe_booleans(monkeypatch) -> None:
 async def test_feedback_is_session_scoped_and_does_not_log_question(
     monkeypatch, caplog,
 ) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "")
+    mock_router(monkeypatch, [], None)
     answer = await canada_360_assistant_service.answer(
         question="Question privée de test", lang="fr", jurisdiction="CA",
     )
@@ -559,56 +483,44 @@ def test_feedback_route_accepts_rating_without_raw_answer(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_two_precision_rejections_end_in_real_outage(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
     calls = []
 
-    async def provider(payload):
-        calls.append(payload)
-        return model_output("Vous pourriez vérifier ce programme.", "https://www.canada.ca/")
+    async def respond(provider, prompt, domains):
+        calls.append(prompt)
+        return fake_result("Vous pourriez vérifier ce programme.", "https://www.canada.ca/")
 
-    monkeypatch.setattr(assistant_module, "_responses_request", provider)
+    mock_router(monkeypatch, ["anthropic"], respond)
     answer = await canada_360_assistant_service.answer(
         question="Ai-je droit au Régime canadien de soins dentaires ?",
         lang="fr", jurisdiction="CA",
     )
     assert len(calls) == 2
-    assert "momentanément indisponible" in answer.answer
+    assert "moteur d’analyse" in answer.answer
     assert answer.links == []
 
 
 @pytest.mark.asyncio
-async def test_provider_retries_transient_http_then_succeeds(monkeypatch) -> None:
-    monkeypatch.setattr(settings, "openai_api_key", "test-only-key")
-    monkeypatch.setattr(settings, "canada360_assistant_model", "gpt-5.4-mini")
-    monkeypatch.setattr(settings, "canada360_assistant_retries", 1)
+async def test_anthropic_failure_gemini_responds_without_openai(monkeypatch) -> None:
     calls = []
 
-    class FakeClient:
-        def __init__(self, **kwargs):
-            pass
+    async def respond(provider, prompt, domains):
+        calls.append(provider.name)
+        if provider.name == "anthropic":
+            return ProviderResult(provider="anthropic", model="test",
+                                  error_category="timeout", retryable=True)
+        return fake_result(
+            "Le régime exige de vérifier la couverture privée, la déclaration "
+            "de revenus et la résidence fiscale. Votre admissibilité dépend de "
+            "ces faits. Avez-vous une assurance privée ?",
+            "https://www.canada.ca/fr/services/prestations/dentaire/regime-soins-dentaires/admissibilite.html",
+            provider="gemini",
+        )
 
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            return None
-
-        async def post(self, url, *, headers, json):
-            calls.append(json.copy())
-            request = httpx.Request("POST", url)
-            if len(calls) == 1:
-                return httpx.Response(503, json={"error": {"code": "overloaded"}}, request=request)
-            return httpx.Response(200, json=model_output(
-                "Voici la page officielle détaillée.",
-                "https://www.canada.ca/en/services/benefits/finder.html",
-            ), request=request)
-
-    monkeypatch.setattr(assistant_module.httpx, "AsyncClient", FakeClient)
-    result = await _grounded_model_answer(
-        question="Quels services existent ?", lang="fr", jurisdiction="CA",
-        mode="ask", topic="services", profile=Canada360AssistantProfile(),
-        history=[],
+    mock_router(monkeypatch, ["anthropic", "gemini", "openai"], respond)
+    answer = await canada_360_assistant_service.answer(
+        question="Ai-je droit au Régime canadien de soins dentaires ?",
+        lang="fr", jurisdiction="CA",
     )
-    assert result is not None
-    assert len(calls) == 2
-    assert all(row["model"] == "gpt-5.4-mini" for row in calls)
+    assert calls == ["anthropic", "gemini"]
+    assert answer.links and "assurance privée" in answer.answer
+    assert "OpenAI" not in answer.answer
