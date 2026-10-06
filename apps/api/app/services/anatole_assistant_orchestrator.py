@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from time import monotonic
+from typing import Literal
 from uuid import UUID, uuid4
 
 from app.data.etf_catalog import ETF_CATALOG
@@ -63,6 +64,26 @@ def _bucket(seconds: float) -> str:
 
 def _action(label: str, href: str) -> NavigationAction:
     return NavigationAction(label=label, href=href)
+
+
+LegacySourceStatus = Literal["live", "delayed", "fallback", "internal"]
+
+
+def _assistant_source_status(freshness: str) -> LegacySourceStatus:
+    """Keep the legacy response contract while evidence retains detailed freshness."""
+    status: dict[str, LegacySourceStatus] = {
+        "live": "live", "delayed": "delayed", "internal": "internal",
+        "stale": "fallback", "fallback": "fallback",
+    }
+    return status.get(freshness, "fallback")
+
+
+def _evidence_source_to_assistant_source(source: EvidenceSource) -> AssistantSource:
+    return AssistantSource(
+        label=source.label,
+        detail=source.url or (source.timestamp.isoformat() if source.timestamp else ""),
+        status=_assistant_source_status(source.freshness),
+    )
 
 
 def _explicit_symbols(message: str) -> list[str]:
@@ -243,28 +264,29 @@ class AnatoleAssistantOrchestrator:
             return_exceptions=True,
         )
         focus, fundamentals, news = tasks
+        fundamental_snapshot = None if isinstance(fundamentals, Exception) else fundamentals
+        news_snapshot = None if isinstance(news, Exception) else news
         if isinstance(focus, Exception):
             logger.info("assistant_tool_failed skill=stock_analysis tool=focus latency_bucket=%s", _bucket(monotonic() - started))
-            try:
-                base = await assistant_service._ticker(symbol)
-            except Exception:
-                base = self._simple("stock_analysis", symbol, "Les données Focus ne sont pas disponibles pour ce titre.")
-            bundle = _bundle_from_response("stock_analysis", base, [symbol])
-            if any(source.freshness == "fallback" for source in bundle.sources):
-                base = self._simple("stock_analysis", symbol,
-                                    "La cotation disponible est une donnée de démonstration; je ne la présente pas comme un prix réel.")
-                bundle.facts.clear()
-                bundle.missing_data.append("Cotation réelle indisponible")
-            return base, bundle
-        bundle = build_stock_research_bundle(symbol, focus,
-            None if isinstance(fundamentals, Exception) else fundamentals,
-            None if isinstance(news, Exception) else news)
+            if fundamental_snapshot is None and news_snapshot is None:
+                try:
+                    base = await assistant_service._ticker(symbol)
+                except Exception:
+                    base = self._simple("stock_analysis", symbol, "Les données Focus ne sont pas disponibles pour ce titre.")
+                bundle = _bundle_from_response("stock_analysis", base, [symbol])
+                if any(source.freshness == "fallback" for source in bundle.sources):
+                    base = self._simple("stock_analysis", symbol,
+                                        "La cotation disponible est une donnée de démonstration; je ne la présente pas comme un prix réel.")
+                    bundle.facts.clear()
+                    bundle.missing_data.append("Cotation réelle indisponible")
+                return base, bundle
+            focus = None
+        bundle = build_stock_research_bundle(symbol, focus, fundamental_snapshot, news_snapshot)
         answer = await generate_stock_research_from_evidence(bundle, question, provider_router)
         base = self._simple("stock_analysis", symbol, answer,
             confidence="moyenne" if bundle.facts else "limitée",
             facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts[:12]],
-            sources=[AssistantSource(label=s.label, detail=s.url or (s.timestamp.isoformat() if s.timestamp else ""),
-                                     status=s.freshness) for s in bundle.sources[:12]])
+            sources=[_evidence_source_to_assistant_source(s) for s in bundle.sources[:12]])
         logger.info("assistant_tool_completed skill=stock_analysis tool=focus latency_bucket=%s source_count=%s", _bucket(monotonic() - started), len(bundle.sources))
         return base, bundle
 

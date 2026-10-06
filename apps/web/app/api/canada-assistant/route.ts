@@ -127,6 +127,15 @@ async function renderUnified(request: NextRequest, params: URLSearchParams, ques
   let profile: AssistantProfile | null = null;
   let conversationId = requestedId ?? randomUUID();
   if (question && !uploadError) {
+    const diagnostic = {
+      endpoint: options.documentBase64 ? "/api/v1/canada/assistant/document" : "/api/v1/assistant/chat",
+      surface: "canada360",
+      skill: options.documentBase64 ? "canada360" : "unknown",
+      upstreamStatus: null as number | null,
+      requestId: safeCorrelationId(request.headers.get("x-request-id")) ?? randomUUID(),
+      upstreamRequestId: null as string | null,
+      errorCategory: "network" as "network" | "upstream_http" | "invalid_response" | "unexpected",
+    };
     try {
       if (options.documentBase64) {
         const upstream = await fetch(`${API_URL}/api/v1/canada/assistant/document`, {
@@ -135,13 +144,17 @@ async function renderUnified(request: NextRequest, params: URLSearchParams, ques
             conversation_id: validConversationId(String(form.get("government_conversation_id") ?? "")),
             document_base64: options.documentBase64, document_consent: true }), cache: "no-store",
         });
+        diagnostic.upstreamStatus = upstream.status;
+        diagnostic.upstreamRequestId = safeCorrelationId(upstream.headers.get("x-request-id"));
         if (!upstream.ok) {
           if ([413, 422].includes(upstream.status)) uploadError = language === "fr"
             ? "PDF invalide, protégé ou sans texte lisible. Choisis un PDF de 2 Mo et 10 pages maximum."
             : "Invalid, protected, or unreadable PDF. Choose a PDF up to 2 MB and 10 pages.";
-          else failed = true;
+          else { diagnostic.errorCategory = "upstream_http"; throw new Error("upstream_http"); }
         } else {
+          diagnostic.errorCategory = "invalid_response";
           const result = await upstream.json() as AssistantResponse;
+          diagnostic.errorCategory = "unexpected";
           profile = result.profile;
           turns.push({ role: "user", text: question, links: [], source_line: null });
           turns.push({ role: "assistant", text: result.answer, links: result.links, source_line: result.source_line,
@@ -158,8 +171,12 @@ async function renderUnified(request: NextRequest, params: URLSearchParams, ques
           portfolio_consent: consent && positions.length > 0, portfolio_positions: positions }),
         cache: "no-store",
       });
-      if (!upstream.ok) throw new Error(`assistant ${upstream.status}`);
+      diagnostic.upstreamStatus = upstream.status;
+      diagnostic.upstreamRequestId = safeCorrelationId(upstream.headers.get("x-request-id"));
+      if (!upstream.ok) { diagnostic.errorCategory = "upstream_http"; throw new Error("upstream_http"); }
+      diagnostic.errorCategory = "invalid_response";
       const result = await upstream.json() as UnifiedReply;
+      diagnostic.errorCategory = "unexpected";
       profile = result.government_profile ?? null;
       conversationId = result.conversation_id || conversationId;
       permissionRequired = result.permission_required;
@@ -170,7 +187,10 @@ async function renderUnified(request: NextRequest, params: URLSearchParams, ques
         links: [], source_line: null, skill: result.intent, evidence: result.evidence,
         actions: result.actions, government_feedback: result.government_feedback });
       }
-    } catch { failed = true; }
+    } catch {
+      console.error("canada_assistant_upstream_failure", diagnostic);
+      failed = true;
+    }
   }
   const wantsJson = request.headers.get("accept")?.includes("application/json");
   const response = new Response(wantsJson ? JSON.stringify({ conversation_id: conversationId,
@@ -213,6 +233,37 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function safeCorrelationId(value: string | null): string | null {
+  return value && /^[A-Za-z0-9._:-]{1,100}$/.test(value) ? value : null;
+}
+
+function structuredAnswerMarkup(text: string, collapseSources: boolean): string {
+  const blocks: string[] = [];
+  let bullets: string[] = [];
+  let inSourceSection = false;
+  const flushBullets = () => {
+    if (bullets.length) blocks.push(`<ul>${bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
+    bullets = [];
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.startsWith("## ")) inSourceSection = collapseSources && line.slice(3) === "Sources et fraîcheur";
+    if (inSourceSection) continue;
+    if (!line) { flushBullets(); continue; }
+    if (line.startsWith("## ")) {
+      flushBullets();
+      blocks.push(`<h3>${escapeHtml(line.slice(3))}</h3>`);
+    } else if (line.startsWith("- ")) {
+      bullets.push(line.slice(2));
+    } else {
+      flushBullets();
+      blocks.push(`<p>${escapeHtml(line)}</p>`);
+    }
+  }
+  flushBullets();
+  return `<div class="researchText">${blocks.join("")}</div>`;
 }
 
 function validConversationId(value: string | null): string | null {
@@ -366,7 +417,10 @@ function turnMarkup(
   const skill = !isUser && turn.skill ? `<small class="skillChip">${escapeHtml(turn.skill)}</small>` : "";
   const actions = !isUser ? (turn.actions ?? []).filter((action) => /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/.test(action.href))
     .map((action) => `<a class="assistantAction" href="${escapeHtml(action.href)}" target="_parent">${escapeHtml(action.label)} →</a>`).join("") : "";
-  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "ANATOLE"}</b>${skill}<p>${escapeHtml(turn.text)}</p>${evidenceMarkup || sources}${sourceLine}${actions}${speak}${feedback}</article>`;
+  const answerMarkup = !isUser && turn.skill && turn.skill !== "canada360"
+    ? structuredAnswerMarkup(turn.text, evidenceSources.length > 0)
+    : `<p>${escapeHtml(turn.text)}</p>`;
+  return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "ANATOLE"}</b>${skill}${answerMarkup}${evidenceMarkup || sources}${sourceLine}${actions}${speak}${feedback}</article>`;
 }
 
 function renderPage({
@@ -454,6 +508,7 @@ header{flex:0 0 auto;align-items:center}.headerActions{flex-wrap:nowrap}.trust{w
 .message.user{width:fit-content;max-width:min(80%,720px);align-self:flex-end;margin-right:max(0px,calc((100% - 920px)/2));padding:11px 16px;border-radius:18px 18px 5px 18px;background:#183650}
 .message.error{border:1px solid #95505a;border-radius:12px;padding:12px;background:#351b27}
 .message p{font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.message b{color:#98cfff}.message.user b{color:#c8e2f6}
+.researchText{overflow-wrap:anywhere}.researchText h3{margin:17px 0 7px;font-size:15px;line-height:1.35;color:#d8edff}.researchText p{white-space:normal;margin:6px 0}.researchText ul{margin:5px 0 12px;padding-left:21px}.researchText li{margin:4px 0;line-height:1.55;font-size:13px}
 .sources{display:block;margin-top:12px;border-top:1px solid #294257;padding-top:10px}.sources summary{width:fit-content;cursor:pointer;color:#acd5f3;font-size:11px;font-weight:750}.links{margin-top:10px}
 .links span{display:block;padding:7px 3px;color:#b7c9d6;font-size:11px}.assistantAction{display:inline-block;margin:9px 8px 0 0;padding:6px 9px;border:1px solid #385b73;border-radius:8px;color:#b9dfff;text-decoration:none;font-size:11px}.skillChip{display:inline-block;margin-left:8px;padding:3px 7px;border:1px solid #385b73;border-radius:999px;color:#acd5f3;font-size:10px}.permission{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border:1px solid #385b73;border-radius:12px}.permission strong{width:100%;font-size:12px}.permission button{padding:7px 10px;background:#17324a;color:#fff}
 .pending p{color:#b8d8ee}.dots::after{content:'…';animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}
