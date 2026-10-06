@@ -25,6 +25,8 @@ from app.services.assistant import DISCLAIMER, _symbols, assistant_service
 from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.etf_holdings import etf_holdings_service
 from app.services.fundamentals import fundamentals_service
+from app.services.market_data import market_data_service
+from app.services.stock_research import build_stock_research_bundle, generate_stock_research_from_evidence
 from app.services.portfolio import portfolio_service
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
@@ -231,70 +233,38 @@ class AnatoleAssistantOrchestrator:
                                  confidence=confidence, disclaimer=DISCLAIMER,
                                  generated_at=datetime.now(UTC))
 
-    async def _stock(self, symbol: str, language: str) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
+    async def _stock(self, symbol: str, language: str, question: str = "") -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
         started = monotonic()
         logger.info("assistant_tool_started skill=stock_analysis tool=focus")
         tasks = await asyncio.gather(
-            assistant_service._ticker(symbol),
+            market_data_service.get_focus_snapshot(symbol, range_="1y", interval="1d"),
             fundamentals_service.get_snapshot(symbol),
             stock_news_service.get_snapshot(symbol, language=language),
             return_exceptions=True,
         )
-        base, fundamentals, news = tasks
-        if isinstance(base, Exception):
+        focus, fundamentals, news = tasks
+        if isinstance(focus, Exception):
             logger.info("assistant_tool_failed skill=stock_analysis tool=focus latency_bucket=%s", _bucket(monotonic() - started))
-            base = self._simple("stock_analysis", symbol, "Les données Focus ne sont pas disponibles pour ce titre.")
-        bundle = _bundle_from_response("stock_analysis", base, [symbol])
-        if any(source.freshness == "fallback" for source in bundle.sources):
-            base = self._simple("stock_analysis", symbol,
-                                "La cotation disponible est une donnée de démonstration; je ne la présente pas comme un prix réel.")
-            bundle.missing_data.append("Cotation réelle indisponible")
-            bundle.facts.clear()
-        if not isinstance(fundamentals, Exception) and fundamentals.status != "unavailable":
-            metric = fundamentals.metrics
-            extras = [("P/E", metric.trailing_pe), ("Croissance du revenu", metric.revenue_growth),
-                      ("Dette/capitaux", metric.debt_to_equity)]
-            rows = [(label, value) for label, value in extras if value is not None]
-            for label, value in rows:
-                bundle.facts.append(EvidenceFact(label=label, value=f"{value:.2f}",
-                                                 source=fundamentals.source,
-                                                 timestamp=fundamentals.generated_at,
-                                                 freshness="stale" if fundamentals.stale else "delayed"))
-            bundle.sources.append(EvidenceSource(label=fundamentals.source, type="fundamentals",
-                                                freshness="stale" if fundamentals.stale else "delayed",
-                                                timestamp=fundamentals.generated_at))
-            base.sources.append(AssistantSource(label=fundamentals.source,
-                                                detail=f"Fondamentaux {fundamentals.generated_at.isoformat()}",
-                                                status="delayed"))
-            if rows:
-                base.answer += "\n\nFondamentaux disponibles : " + ", ".join(f"{label} {value:.2f}" for label, value in rows) + "."
-            if fundamentals.analysts.analyst_count and fundamentals.analysts.target_mean is not None:
-                base.answer += (f" Cible moyenne publiée par {fundamentals.analysts.analyst_count} analystes : "
-                                f"{fundamentals.analysts.target_mean:.2f} (ce n'est pas une prévision Anatole).")
-                bundle.facts.append(EvidenceFact(label="Cible moyenne analystes",
-                                                value=f"{fundamentals.analysts.target_mean:.2f}",
-                                                source=fundamentals.source, timestamp=fundamentals.generated_at,
-                                                freshness="stale" if fundamentals.stale else "delayed"))
-            future_events = sorted(date if date.tzinfo else date.replace(tzinfo=UTC)
-                                   for date in fundamentals.events.earnings_dates
-                                   if (date if date.tzinfo else date.replace(tzinfo=UTC)) >= datetime.now(UTC))
-            if future_events:
-                base.answer += f" Prochain résultat annoncé : {future_events[0].date()}."
-                bundle.facts.append(EvidenceFact(label="Prochain résultat", value=str(future_events[0].date()),
-                                                source=fundamentals.source, timestamp=fundamentals.generated_at,
-                                                freshness="stale" if fundamentals.stale else "delayed"))
-        else:
-            bundle.missing_data.append("Fondamentaux indisponibles")
-        if not isinstance(news, Exception) and news.items:
-            item = news.items[0]
-            base.answer += f"\n\nActualité récente : {item.title} ({item.publisher}, {item.published_at.date()}). Le lien de causalité avec le cours n’est pas établi."
-            bundle.sources.append(EvidenceSource(label=item.publisher, type="news", freshness="delayed",
-                                                timestamp=item.published_at, url=item.url))
-            base.sources.append(AssistantSource(label=item.publisher, detail=item.url, status="delayed"))
-        else:
-            bundle.missing_data.append("Actualités du titre indisponibles")
-        if bundle.missing_data:
-            base.answer += "\n\nDonnées manquantes : " + ", ".join(bundle.missing_data) + "."
+            try:
+                base = await assistant_service._ticker(symbol)
+            except Exception:
+                base = self._simple("stock_analysis", symbol, "Les données Focus ne sont pas disponibles pour ce titre.")
+            bundle = _bundle_from_response("stock_analysis", base, [symbol])
+            if any(source.freshness == "fallback" for source in bundle.sources):
+                base = self._simple("stock_analysis", symbol,
+                                    "La cotation disponible est une donnée de démonstration; je ne la présente pas comme un prix réel.")
+                bundle.facts.clear()
+                bundle.missing_data.append("Cotation réelle indisponible")
+            return base, bundle
+        bundle = build_stock_research_bundle(symbol, focus,
+            None if isinstance(fundamentals, Exception) else fundamentals,
+            None if isinstance(news, Exception) else news)
+        answer = await generate_stock_research_from_evidence(bundle, question, provider_router)
+        base = self._simple("stock_analysis", symbol, answer,
+            confidence="moyenne" if bundle.facts else "limitée",
+            facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts[:12]],
+            sources=[AssistantSource(label=s.label, detail=s.url or (s.timestamp.isoformat() if s.timestamp else ""),
+                                     status=s.freshness) for s in bundle.sources[:12]])
         logger.info("assistant_tool_completed skill=stock_analysis tool=focus latency_bucket=%s source_count=%s", _bucket(monotonic() - started), len(bundle.sources))
         return base, bundle
 
@@ -545,7 +515,7 @@ class AnatoleAssistantOrchestrator:
                                                                       context_symbol=symbols[0] if symbols else None))
             bundle = _bundle_from_response(skill, base, symbols)
         elif skill == "stock_analysis" and symbols:
-            base, bundle = await self._stock(symbols[0], context.language)
+            base, bundle = await self._stock(symbols[0], context.language, request.message)
         elif skill == "etf_analysis" and symbols:
             base, bundle = await self._etf(symbols[0])
         elif skill == "portfolio_analysis":
@@ -560,7 +530,7 @@ class AnatoleAssistantOrchestrator:
             bundle = _bundle_from_response(skill, base, [])
         elif skill == "news_context":
             if symbols:
-                base, bundle = await self._stock(symbols[0], context.language)
+                base, bundle = await self._stock(symbols[0], context.language, request.message)
                 bundle.skill = "news_context"
             else:
                 base, bundle = await self._news(context.language)
@@ -588,7 +558,7 @@ class AnatoleAssistantOrchestrator:
             actions.append(_action(f"Comparer {symbols[0]} et {symbols[1]}",
                                    f"/comparateur?symbols={symbols[0]},{symbols[1]}"))
         elif skill == "stock_analysis" and symbols:
-            actions.append(_action(f"Ouvrir {symbols[0]} dans Focus", f"/focus/{symbols[0]}"))
+            actions.append(_action(f"Ouvrir l’analyse complète de {symbols[0]} dans Focus", f"/focus/{symbols[0]}"))
         elif skill == "etf_analysis" and symbols:
             actions.append(_action(f"Voir {symbols[0]} dans ETF", f"/etf/{symbols[0]}"))
         elif skill == "portfolio_analysis":
@@ -603,7 +573,7 @@ class AnatoleAssistantOrchestrator:
             actions.append(_action("Ouvrir Qualité des données", "/qualite"))
         bundle.navigation_actions.extend(actions)
         base.intent = skill
-        if skill in {"stock_analysis", "etf_analysis", "compare", "market_analysis"}:
+        if skill in {"etf_analysis", "compare", "market_analysis"}:
             base = await self._synthesize(base, bundle, request.message)
         state.symbols = symbols[:2]
         state.skill = skill

@@ -40,6 +40,32 @@ test("Focus SHOP nourrit le tiroir et le suivi compare SHOP à LSPD", async ({ p
   expect(calls.every((call) => (call.portfolio_positions as unknown[]).length === 0)).toBe(true);
 });
 
+test("Focus RY affiche une analyse profonde lisible et des sources repliées", async ({ page }) => {
+  const answer = ["Analyse technique et fondamentale de RY", "", "## Vue d’ensemble", "- Cours : 277.59 CAD.",
+    "", "## Analyse fondamentale", "- ROE : 17.00 %.", "", "## Valorisation", "- P/E courant : 15.00 x.",
+    "", "## Analyse technique", "- RSI 14 : 39.50.", "", "## Risques", "- Volatilité observée.",
+    "", "## Ce qu’il faut surveiller", "- Prochains résultats annoncés : 2026-12-01.",
+    "", "## Sources et fraîcheur", "- RBC Investor Relations : delayed, 2026-09-30."].join("\n");
+  await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
+    const response = reply("stock_analysis", "RY", answer,
+      [{ label: "Ouvrir l’analyse complète de RY dans Focus", href: "/focus/RY", kind: "navigate" }]);
+    response.evidence = [{ sources: [{ label: "RBC Investor Relations", type: "issuer_official_document",
+      freshness: "delayed", timestamp: generated }], missing_data: [] }] as typeof response.evidence;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(response) });
+  });
+  await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
+  await openGlobalAssistant(page);
+  await page.getByLabel("Votre question").fill("Fais une analyse technique et fondamentale de RY");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
+  for (const heading of ["Vue d’ensemble", "Analyse fondamentale", "Valorisation", "Analyse technique", "Risques", "Ce qu’il faut surveiller"])
+    await expect(dialog.getByRole("heading", { name: heading })).toBeVisible();
+  await expect(dialog.getByText("RBC Investor Relations · delayed")).toBeHidden();
+  await expect(dialog.getByRole("link", { name: /Ouvrir l’analyse complète de RY/ })).toBeVisible();
+  await expect(dialog.getByLabel("Votre question")).toBeVisible();
+  expect((await dialog.textContent())?.toLowerCase()).not.toMatch(/buy the dip|\bdca\b|achète|vends/);
+});
+
 test("ETF XIC et le Comparateur publient leurs entités sans positions", async ({ page }) => {
   const calls: Record<string, unknown>[] = [];
   await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {

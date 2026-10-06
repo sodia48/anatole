@@ -17,6 +17,7 @@ from app.services.canada_360_providers import provider_router
 from app.services.canada_360_providers import ProviderResult
 from app.services.etf_holdings import etf_holdings_service
 from app.services.fundamentals import fundamentals_service
+from app.services.market_data import market_data_service
 from app.services.portfolio import portfolio_service
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
@@ -59,6 +60,7 @@ def stock_tools(monkeypatch: pytest.MonkeyPatch, unit: AnatoleAssistantOrchestra
         raise RuntimeError("upstream unavailable")
 
     monkeypatch.setattr(assistant_service, "_ticker", ticker)
+    monkeypatch.setattr(market_data_service, "get_focus_snapshot", unavailable)
     monkeypatch.setattr(fundamentals_service, "get_snapshot", unavailable)
     monkeypatch.setattr(stock_news_service, "get_snapshot", unavailable)
     return seen

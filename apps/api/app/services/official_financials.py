@@ -752,6 +752,8 @@ class OfficialFinancialsService:
             discovery_url=discovery_url,
             message=message,
         )
+        if issuer_result is not None and issuer_result.sector_metrics:
+            data["sector_metrics"] = issuer_result.sector_metrics
         data["status"] = public_status
         data["message"] = public_message
         source_parts: list[str] = []

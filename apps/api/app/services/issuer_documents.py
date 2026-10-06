@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
@@ -29,6 +29,8 @@ from app.schemas.fundamentals import (
 from app.services.issuer_document_parser import (
     financial_document_parser,
 )
+from app.schemas.fundamentals import SectorMetric
+from app.services.stock_sector_analysis import extract_official_bank_metrics
 
 
 DATA_DIRECTORY = (
@@ -126,6 +128,7 @@ class IssuerFinancialsResult:
     quarterly: list[FinancialPeriod]
     documents: list[IssuerDocumentCandidate]
     parsed_documents: int
+    sector_metrics: list[SectorMetric] = field(default_factory=list)
     error: str | None = None
 
 
@@ -885,6 +888,7 @@ class IssuerFinancialDocumentsService:
 
         all_periods: list[FinancialPeriod] = []
         parsed_documents = 0
+        sector_metrics: list[SectorMetric] = []
 
         async with await asyncio.to_thread(httpx.AsyncClient,
             headers=self.headers,
@@ -915,6 +919,16 @@ class IssuerFinancialDocumentsService:
                 if periods:
                     parsed_documents += 1
                     all_periods.extend(periods)
+
+                if ticker.upper().removesuffix(".TO") in {"RY", "TD", "BMO", "BNS", "CM", "NA"}:
+                    try:
+                        document_text = await asyncio.to_thread(
+                            financial_document_parser.extract_text, content, document, max_pdf_pages=8)
+                        sector_metrics.extend(extract_official_bank_metrics(
+                            document_text, source_url=document.url, source_name=document.title,
+                            filed_at=document.published_at))
+                    except Exception:  # noqa: BLE001
+                        pass
 
                 # Enough for a useful quarterly balance, income statement
                 # and cash-flow view; avoid unnecessary issuer traffic.
@@ -956,6 +970,7 @@ class IssuerFinancialDocumentsService:
             quarterly=quarterly,
             documents=documents,
             parsed_documents=parsed_documents,
+            sector_metrics=list({metric.key: metric for metric in reversed(sector_metrics)}.values()),
             error=(
                 None
                 if annual or quarterly

@@ -117,6 +117,8 @@ class AnatoleEvidenceBundle(BaseModel):
     skill: Skill
     entities: list[str] = Field(default_factory=list)
     facts: list[EvidenceFact] = Field(default_factory=list)
+    metric_groups: dict[str, list[EvidenceFact]] = Field(default_factory=dict)
+    sector_metrics: list[EvidenceFact] = Field(default_factory=list)
     time_series_summary: str | None = None
     sources: list[EvidenceSource] = Field(default_factory=list)
     freshness: str = "unknown"

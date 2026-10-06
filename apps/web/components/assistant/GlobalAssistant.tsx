@@ -14,6 +14,29 @@ const EXPLICIT_SWITCH = /gouvernement|province|canada 360|qu[eé]bec|ontario|alb
 const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/;
 
+function AssistantText({ text, collapseSources = false }: { text: string; collapseSources?: boolean }) {
+  const blocks: Array<{ kind: "heading" | "paragraph" | "list"; lines: string[] }> = [];
+  let inSourceSection = false;
+  for (const line of text.split("\n")) {
+    const value = line.trim();
+    if (!value) continue;
+    if (value.startsWith("## ")) inSourceSection = collapseSources && value.slice(3) === "Sources et fraîcheur";
+    if (inSourceSection) continue;
+    if (value.startsWith("## ")) { blocks.push({ kind: "heading", lines: [value.slice(3)] }); continue; }
+    if (value.startsWith("- ")) {
+      const last = blocks[blocks.length - 1];
+      if (last?.kind === "list") last.lines.push(value.slice(2));
+      else blocks.push({ kind: "list", lines: [value.slice(2)] });
+      continue;
+    }
+    blocks.push({ kind: "paragraph", lines: [value] });
+  }
+  return <div className={styles.richText}>{blocks.map((block, index) =>
+    block.kind === "heading" ? <h3 key={index}>{block.lines[0]}</h3> :
+    block.kind === "list" ? <ul key={index}>{block.lines.map((line, i) => <li key={i}>{line}</li>)}</ul> :
+    <p key={index}>{block.lines[0]}</p>)}</div>;
+}
+
 export function GlobalAssistant() {
   const { context, label } = useAssistantContext();
   const [open, setOpen] = useState(false);
@@ -26,11 +49,13 @@ export function GlobalAssistant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const history = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
   const activeContext: AssistantContext = removedForRoute === context.route
     ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown" }
     : context;
 
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns, loading, pendingPermission]);
+  useEffect(() => { if (nearBottom.current) bottom.current?.scrollIntoView({ block: "end" }); }, [turns, loading, pendingPermission]);
 
   async function submit(text: string, consent = authorized, positions?: ReturnType<typeof readAssistantPortfolio>, resume = false) {
     if (!text.trim() || loading) return;
@@ -42,6 +67,7 @@ export function GlobalAssistant() {
     setError(null);
     setPendingPermission(null);
     if (!resume) setTurns((current) => [...current, { role: "user", text }]);
+    nearBottom.current = true;
     try {
       const result = await askUnifiedAssistant({ message: text, context: {
         ...activeContext, portfolio_scope: { authorized: consent, position_count: consent ? selectedPositions.length : 0 },
@@ -90,13 +116,19 @@ export function GlobalAssistant() {
           {removedForRoute !== context.route && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(context.route)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
           <button type="button" className={styles.reset} onClick={() => { setTurns([]); setConversationId(undefined); setAuthorized(false); setPendingPermission(null); }}>Nouvelle conversation</button>
         </div>
-        <div className={styles.history} aria-live="polite">
+        <div className={styles.history} aria-live="polite" ref={history} onScroll={() => {
+          const node = history.current;
+          if (node) nearBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 90;
+        }}>
           {turns.length === 0 && <p className={styles.intro}>Posez une question sur cette page, un titre, un ETF, votre portefeuille ou Canada 360.</p>}
           {turns.map((turn, index) => <article key={index} className={turn.role === "user" ? styles.userTurn : styles.assistantTurn}>
             {turn.result && <span className={styles.skillChip}>{SKILL_LABELS[turn.result.intent] ?? turn.result.intent}</span>}
-            <p>{turn.text}</p>
+            {turn.role === "assistant" ? <AssistantText text={turn.text} collapseSources={Boolean(turn.result?.evidence.some((row) => row.sources.length > 0))} /> : <p>{turn.text}</p>}
             {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>Sources et données utilisées</summary>
-              {turn.result.evidence.flatMap((row) => row.sources).map((source, i) => <p key={`${source.label}-${i}`} className={styles.source}>{source.label} · {source.freshness}{source.timestamp ? ` · ${new Date(source.timestamp).toLocaleDateString("fr-CA")}` : ""}</p>)}
+              {turn.result.evidence.flatMap((row) => row.sources).map((source, i) => <p key={`${source.label}-${i}`} className={styles.source}>
+                {source.url && /^https:\/\/[^\s]+$/i.test(source.url)
+                  ? <a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a>
+                  : source.label} · {source.freshness}{source.timestamp ? ` · ${new Date(source.timestamp).toLocaleDateString("fr-CA")}` : ""}</p>)}
               {turn.result.evidence.flatMap((row) => row.missing_data).map((missing, i) => <p key={`missing-${i}`} className={styles.source}>Donnée manquante · {missing}</p>)}
             </details>}
             {turn.result?.actions.filter((action) => SAFE_HREF.test(action.href)).map((action) => <Link className={styles.action} key={action.href} href={action.href} onClick={() => setOpen(false)}>{action.label} →</Link>)}

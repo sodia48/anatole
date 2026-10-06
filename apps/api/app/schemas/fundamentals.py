@@ -62,6 +62,15 @@ class FinancialSource(BaseModel):
     confidence: Literal["official", "secondary"] = "official"
 
 
+class SectorMetric(BaseModel):
+    key: str
+    label: str
+    value: float
+    unit: str
+    source: FinancialSource
+    period_end: datetime | None = None
+
+
 class OfficialCoverage(BaseModel):
     is_tsx_composite: bool = False
     status: Literal[
@@ -330,6 +339,7 @@ class FundamentalSnapshot(BaseModel):
     official_coverage: OfficialCoverage = Field(
         default_factory=OfficialCoverage
     )
+    sector_metrics: list[SectorMetric] = Field(default_factory=list)
     source: str
     generated_at: datetime
     refresh_after_seconds: int = 1800
