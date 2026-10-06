@@ -40,6 +40,47 @@ test("Canada 360 affiche le message et l'attente avant la réponse asynchrone", 
   await expect(frame.locator("details.sources")).not.toHaveAttribute("open", "");
 });
 
+test("Canada 360 rend l'analyse RY V10 avec source stale et action Focus", async ({ page }) => {
+  const question = "Fais une analyse technique et fondamentale pour RY";
+  const answer = ["Analyse technique et fondamentale de RY", "", "## Vue d’ensemble", "- Cours : 277.59 CAD.",
+    "", "## Analyse fondamentale", "- ROE : 17.00 %.", "", "## Valorisation", "- P/E courant : 15.",
+    "", "## Analyse technique", "- RSI 14 : 39.50.", "- Titre externe : <script>bad()</script>.",
+    "", "## Niveaux techniques", "- Support observé : 269.00 CAD.",
+    "", "## Données manquantes et limites", "- Fondamentaux en cache périmé; actualisation en cours.",
+    "", "## Sources et fraîcheur", "- RBC Investor Relations : stale, 2026-09-30."].join("\n");
+  await page.route("**/api/canada-assistant", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      conversation_id: conversationId, profile: null, failed: false, permission_required: false,
+      turns: [
+        { role: "user", text: question, links: [], source_line: null },
+        { role: "assistant", text: answer, skill: "stock_analysis", links: [], source_line: null,
+          evidence: [{ sources: [{ label: "RBC Investor Relations", freshness: "stale",
+            timestamp: "2026-09-30T12:00:00Z", url: "https://www.rbc.com/investor-relations/report.pdf" }],
+            missing_data: [] }],
+          actions: [{ label: "Ouvrir l’analyse complète de RY dans Focus", href: "/focus/RY" }] },
+      ],
+    }) });
+  });
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  const input = frame.getByLabel("Question à Canada 360");
+  await input.fill(question);
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect(frame.locator(".message.user")).toContainText(question);
+  await expect(frame.locator(".message.error")).toHaveCount(0);
+  await expect(frame.getByRole("heading", { name: "Analyse fondamentale" })).toBeVisible();
+  await expect(frame.getByRole("heading", { name: "Analyse technique" })).toBeVisible();
+  await expect(frame.locator(".researchText script")).toHaveCount(0);
+  await expect(frame.locator(".researchText")).toContainText("<script>bad()</script>");
+  const sources = frame.locator("details.sources");
+  await expect(sources).toBeVisible();
+  await expect(sources).not.toHaveAttribute("open", "");
+  await expect(frame.getByRole("link", { name: /Ouvrir l’analyse complète de RY dans Focus/ })).toBeVisible();
+  await expect(input).toBeVisible();
+  await expect(frame.getByRole("button", { name: "Envoyer" })).toBeEnabled();
+});
+
 test("Canada 360 garde vingt tours dans un seul défilement et retrouve le dernier message", async ({ page }) => {
   const turns = Array.from({ length: 20 }, (_, index) => ({
     role: index % 2 ? "assistant" : "user",

@@ -11,12 +11,17 @@ from app.schemas.fundamentals import (
 from app.schemas.stocks import Candle, FocusSnapshot, Quote, StockNewsItem, StockNewsSnapshot, StockProfile, Technicals
 from app.services.stock_research import build_stock_research_bundle, format_stock_research, generate_stock_research_from_evidence
 from app.services.stock_sector_analysis import extract_official_bank_metrics, select_sector_metrics
-from app.services.anatole_assistant_orchestrator import AnatoleAssistantOrchestrator
+from app.services.anatole_assistant_orchestrator import (
+    AnatoleAssistantOrchestrator, _assistant_source_status, _evidence_source_to_assistant_source,
+)
+from app.schemas.assistant_context import EvidenceSource
 from app.schemas.assistant_context import AssistantContext, UnifiedAssistantRequest
 from app.services.market_data import market_data_service
 from app.services.fundamentals import fundamentals_service
 from app.services.stock_news import stock_news_service
 from app.services.canada_360_providers import provider_router
+from fastapi.testclient import TestClient
+from app.main import app
 
 
 NOW = datetime(2026, 9, 30, 20, tzinfo=UTC)
@@ -200,3 +205,115 @@ async def test_ry_question_routes_to_complete_research(monkeypatch):
         "Rendement du dividende", "RSI 14", "MACD", "SMA 20", "SMA 50", "SMA 200"))
     assert result.actions[0].href == "/focus/RY"
     assert len(result.evidence[0].sector_metrics) == 5
+
+
+def _mock_ry_services(monkeypatch, *, stale=False, fundamentals_available=True,
+                      news_available=True, provider_answer=None):
+    focus, fundamentals, news = fixtures()
+    fundamentals.stale = stale
+    fundamentals.refresh_in_progress = stale
+
+    async def focus_snapshot(*_args, **_kwargs):
+        return focus
+
+    async def fundamental_snapshot(*_args, **_kwargs):
+        if not fundamentals_available:
+            raise RuntimeError("fundamentals unavailable")
+        return fundamentals
+
+    async def news_snapshot(*_args, **_kwargs):
+        if not news_available:
+            raise RuntimeError("news unavailable")
+        return news
+
+    async def provider(**_kwargs):
+        if provider_answer is None:
+            return None
+        return type("Result", (), {"success": True, "answer": provider_answer})()
+
+    monkeypatch.setattr(market_data_service, "get_focus_snapshot", focus_snapshot)
+    monkeypatch.setattr(fundamentals_service, "get_snapshot", fundamental_snapshot)
+    monkeypatch.setattr(stock_news_service, "get_snapshot", news_snapshot)
+    monkeypatch.setattr(provider_router, "generate_internal_evidence", provider)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface,route", [("stock", "/focus/RY"), ("canada360", "/canada")])
+async def test_stale_ry_research_preserves_evidence_and_legacy_source_contract(monkeypatch, surface, route):
+    _mock_ry_services(monkeypatch, stale=True)
+    result = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
+        message="Fais une analyse technique et fondamentale de RY",
+        context=AssistantContext(surface=surface, route=route, symbol="RY")))
+    assert result.intent == "stock_analysis"
+    assert all(section in result.answer for section in ("## Vue d’ensemble", "## Analyse fondamentale",
+        "## Valorisation", "## Analyse technique", "## Niveaux techniques", "## Données manquantes et limites"))
+    assert "cache périmé" in result.answer
+    assert any(source.freshness == "stale" for source in result.evidence[0].sources)
+    assert all(source.status in {"live", "delayed", "fallback", "internal"} for source in result.sources)
+    assert "achète" not in result.answer and "vends" not in result.answer
+
+
+def test_http_canada_stock_question_with_stale_fundamentals(monkeypatch):
+    _mock_ry_services(monkeypatch, stale=True)
+    response = TestClient(app).post("/api/v1/assistant/chat", json={
+        "message": "Fais une analyse technique et fondamentale de RY",
+        "context": {"surface": "canada360", "route": "/canada", "language": "fr",
+                    "metadata": {"region": "CA"},
+                    "portfolio_scope": {"authorized": False, "position_count": 0}},
+    })
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intent"] == "stock_analysis"
+    assert any(source["freshness"] == "stale" for source in body["evidence"][0]["sources"])
+
+
+@pytest.mark.parametrize("freshness,expected", [
+    ("live", "live"), ("delayed", "delayed"), ("stale", "fallback"),
+    ("fallback", "fallback"), ("internal", "internal"), ("unknown", "fallback"),
+])
+def test_evidence_source_conversion_is_total(freshness, expected):
+    evidence = EvidenceSource(label="Source", type="test", freshness=freshness, timestamp=NOW)
+    legacy = _evidence_source_to_assistant_source(evidence)
+    assert legacy.status == expected == _assistant_source_status(freshness)
+    assert evidence.freshness == freshness
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface,route", [("stock", "/focus/RY"), ("canada360", "/canada")])
+@pytest.mark.parametrize("case", ["fresh", "stale", "fundamentals_unavailable", "news_unavailable",
+                                  "provider_unavailable", "provider_success"])
+async def test_stock_research_degrades_per_source(monkeypatch, surface, route, case):
+    _mock_ry_services(monkeypatch, stale=case == "stale",
+                      fundamentals_available=case != "fundamentals_unavailable",
+                      news_available=case != "news_unavailable",
+                      provider_answer="[0, 2]" if case == "provider_success" else None)
+    result = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
+        message="Fais une analyse technique et fondamentale de RY",
+        context=AssistantContext(surface=surface, route=route, symbol="RY")))
+    assert result.intent == "stock_analysis"
+    assert "## Analyse technique" in result.answer
+    assert "## Niveaux techniques" in result.answer
+    assert all(source.status in {"live", "delayed", "fallback", "internal"} for source in result.sources)
+    if case == "fundamentals_unavailable":
+        assert "Fondamentaux indisponibles" in result.answer
+    if case == "news_unavailable":
+        assert "Actualités du titre indisponibles" in result.answer
+    if case == "provider_success":
+        assert "## Points saillants" in result.answer
+
+
+@pytest.mark.asyncio
+async def test_focus_unavailable_keeps_available_fundamentals(monkeypatch):
+    _mock_ry_services(monkeypatch)
+
+    async def unavailable(*_args, **_kwargs):
+        raise RuntimeError("focus unavailable")
+
+    monkeypatch.setattr(market_data_service, "get_focus_snapshot", unavailable)
+    result = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
+        message="Fais une analyse technique et fondamentale de RY",
+        context=AssistantContext(surface="stock", route="/focus/RY", symbol="RY")))
+    assert result.intent == "stock_analysis"
+    assert "Cotation Focus réelle indisponible" in result.answer
+    assert "## Analyse fondamentale" in result.answer
+    assert "Cours : 277.59" not in result.answer

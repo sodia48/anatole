@@ -90,6 +90,24 @@
     chat.append(node);
     return node;
   };
+  const structuredAnswer = (value, collapseSources) => {
+    const body = document.createElement("div");
+    body.className = "researchText";
+    let list = null;
+    let inSourceSection = false;
+    for (const raw of value.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (line.startsWith("## ")) inSourceSection = collapseSources && line.slice(3) === "Sources et fraîcheur";
+      if (inSourceSection) continue;
+      if (!line) { list = null; continue; }
+      if (line.startsWith("## ")) { list = null; body.append(text("h3", line.slice(3))); }
+      else if (line.startsWith("- ")) {
+        if (!list) { list = document.createElement("ul"); body.append(list); }
+        list.append(text("li", line.slice(2)));
+      } else { list = null; body.append(text("p", line)); }
+    }
+    return body;
+  };
   const addSources = (node, links) => {
     const valid = (links || []).filter((link) => {
       try { return new URL(link.url).protocol === "https:"; } catch { return false; }
@@ -188,6 +206,10 @@
       const node = article(turn.role, turn.text || "");
       if (turn.role === "assistant") {
         if (turn.skill) node.insertBefore(text("small", skillLabels[turn.skill] || turn.skill, "skillChip"), node.querySelector("p"));
+        if (turn.skill && turn.skill !== "canada360") {
+          const hasSources = (turn.evidence || []).some((row) => (row.sources || []).length > 0);
+          node.querySelector("p").replaceWith(structuredAnswer(turn.text || "", hasSources));
+        }
         if (turn.evidence) addUnifiedEvidence(node, turn);
         else addSources(node, turn.links);
         if (turn.source_line) node.append(text("small", turn.source_line));
