@@ -21,6 +21,7 @@ test("Canada 360 affiche le message et l'attente avant la réponse asynchrone", 
     }) });
   });
   await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-nextjs-dialog]")).toHaveCount(0);
   const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
   await expect(frame.getByRole("heading", { name: "Que veux-tu savoir sur le Canada ?" })).toBeVisible();
   const input = frame.getByLabel("Question à Canada 360");
@@ -83,4 +84,63 @@ test("Canada 360 conserve le formulaire HTML sans JavaScript", async ({ browser,
   await page.getByRole("button", { name: "Envoyer" }).click();
   await expect(page.getByTestId("canada360-assistant-chat")).toContainText("Quel est le taux de chômage en Alberta ?");
   await context.close();
+});
+
+test("Canada 360 reprend le portefeuille après consentement sans doubler la question", async ({ page }) => {
+  const calls: Record<string, string>[] = [];
+  await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([
+    { symbol: "SHOP", quantity: 2, average_cost: 30 },
+  ])));
+  await page.route("**/api/canada-assistant", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const submitted = Object.fromEntries(
+      [...(route.request().postData() ?? "").matchAll(/name="([^"]+)"\r\n\r\n([\s\S]*?)\r\n--/g)]
+        .map((match) => [match[1], match[2]]),
+    ) as Record<string, string>;
+    calls.push(submitted);
+    const question = submitted.q;
+    const history = JSON.parse(submitted.history || "[]") as Array<{ role: string; text: string; skill?: string }>;
+    const resumed = submitted.resume === "on";
+    if (!resumed) history.push({ role: "user", text: question });
+    const permission = question.includes("portefeuille") && submitted.portfolio_consent !== "on";
+    if (!permission) history.push({ role: "assistant", text: "Analyse du portefeuille SHOP.", skill: "portfolio_analysis" });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      conversation_id: conversationId, turns: history, profile: null, failed: false, permission_required: permission,
+    }) });
+  });
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  await frame.getByLabel("Question à Canada 360").fill("je parle de mon portefeuille personnel de placement dans anatole");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect(frame.getByRole("button", { name: "Autoriser pour cette conversation" })).toBeVisible();
+  expect(JSON.parse(String(calls[0].portfolio_positions))).toEqual([]);
+  await frame.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
+  await expect(frame.getByText("Analyse du portefeuille SHOP.")).toBeVisible();
+  await expect(frame.locator(".message.user")).toHaveCount(1);
+  expect(JSON.parse(String(calls[1].portfolio_positions))).toHaveLength(1);
+  await frame.getByLabel("Question à Canada 360").fill("penses-tu que la repartition est bien faite ?");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect.poll(() => calls.length).toBe(3);
+  expect(JSON.parse(String(calls[2].portfolio_positions))).toHaveLength(1);
+  await expect(frame.locator(".message.user")).toHaveCount(2);
+});
+
+test("Canada 360 passe réellement par V9 pour une question de portefeuille", async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([
+    { symbol: "SHOP", quantity: 2, average_cost: 30 },
+  ])));
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  await frame.getByLabel("Question à Canada 360").fill("je parle de mon portefeuille personnel de placement dans anatole");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect(frame.getByRole("button", { name: "Autoriser pour cette conversation" })).toBeVisible();
+  await frame.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
+  await expect(frame.locator(".skillChip").last()).toContainText("Portefeuille", { timeout: 60_000 });
+  await expect(frame.locator(".message.user")).toHaveCount(1);
+  await frame.getByLabel("Question à Canada 360").fill("penses-tu que la repartition est bien faite ?");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect(frame.locator(".message").last()).toContainText("horizon", { timeout: 60_000 });
+  await expect(frame.locator(".message.user")).toHaveCount(2);
+  await expect(frame.getByRole("button", { name: "Autoriser pour cette conversation" })).toHaveCount(0);
 });

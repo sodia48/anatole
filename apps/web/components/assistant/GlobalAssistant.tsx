@@ -10,6 +10,8 @@ import styles from "./GlobalAssistant.module.css";
 
 type Turn = { role: "user" | "assistant"; text: string; result?: UnifiedAssistantResponse };
 const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|chevauch|overlap|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
+const EXPLICIT_SWITCH = /gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\b(?:analyse|cours|prix|compare)\b/i;
+const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/;
 
 export function GlobalAssistant() {
@@ -30,17 +32,21 @@ export function GlobalAssistant() {
 
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [turns, loading, pendingPermission]);
 
-  async function submit(text: string, consent = authorized, positions = consent && (PORTFOLIO_CUE.test(text) || activeContext.surface === "portfolio" && /risqu|secteur|concentr|performance|nouvell/i.test(text)) ? readAssistantPortfolio() : []) {
+  async function submit(text: string, consent = authorized, positions?: ReturnType<typeof readAssistantPortfolio>, resume = false) {
     if (!text.trim() || loading) return;
+    const lastSkill = [...turns].reverse().find((turn) => turn.result)?.result?.intent;
+    const needsPortfolio = PORTFOLIO_CUE.test(text) ||
+      !EXPLICIT_SWITCH.test(text) && (lastSkill === "portfolio_analysis" || activeContext.surface === "portfolio");
+    const selectedPositions = positions ?? (consent && needsPortfolio ? readAssistantPortfolio() : []);
     setLoading(true);
     setError(null);
     setPendingPermission(null);
-    setTurns((current) => [...current, { role: "user", text }]);
+    if (!resume) setTurns((current) => [...current, { role: "user", text }]);
     try {
       const result = await askUnifiedAssistant({ message: text, context: {
-        ...activeContext, portfolio_scope: { authorized: consent, position_count: consent ? positions.length : 0 },
-      }, conversation_id: conversationId, portfolio_consent: consent && positions.length > 0,
-      portfolio_positions: positions });
+        ...activeContext, portfolio_scope: { authorized: consent, position_count: consent ? selectedPositions.length : 0 },
+      }, conversation_id: conversationId, portfolio_consent: consent && selectedPositions.length > 0,
+      portfolio_positions: selectedPositions });
       setConversationId(result.conversation_id);
       if (result.permission_required) { setAuthorized(false); setPendingPermission(text); }
       else setTurns((current) => [...current, { role: "assistant", text: result.answer, result }]);
@@ -55,7 +61,7 @@ export function GlobalAssistant() {
     const positions = readAssistantPortfolio();
     if (!positions.length) { setPendingPermission(null); setError("Aucune position locale valide à analyser."); return; }
     setAuthorized(true);
-    await submit(text, true, positions);
+    await submit(text, true, positions, true);
   }
 
   function declinePortfolio() {
@@ -87,6 +93,7 @@ export function GlobalAssistant() {
         <div className={styles.history} aria-live="polite">
           {turns.length === 0 && <p className={styles.intro}>Posez une question sur cette page, un titre, un ETF, votre portefeuille ou Canada 360.</p>}
           {turns.map((turn, index) => <article key={index} className={turn.role === "user" ? styles.userTurn : styles.assistantTurn}>
+            {turn.result && <span className={styles.skillChip}>{SKILL_LABELS[turn.result.intent] ?? turn.result.intent}</span>}
             <p>{turn.text}</p>
             {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>Sources et données utilisées</summary>
               {turn.result.evidence.flatMap((row) => row.sources).map((source, i) => <p key={`${source.label}-${i}`} className={styles.source}>{source.label} · {source.freshness}{source.timestamp ? ` · ${new Date(source.timestamp).toLocaleDateString("fr-CA")}` : ""}</p>)}

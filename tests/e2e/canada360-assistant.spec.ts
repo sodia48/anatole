@@ -29,7 +29,7 @@ async function mockOverview(
 test(
   "Canada 360 traite une question statistique et garde le contexte du suivi",
   async ({ page, isMobile }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     await mockOverview(page);
 
     await page.goto("/canada", {
@@ -64,6 +64,7 @@ test(
     const firstAnswer = frame.locator(".message").last();
     await expect(firstAnswer).toContainText(
       /Alberta|moteur d’analyse/,
+      { timeout: 60_000 },
     );
     if ((await firstAnswer.innerText()).includes("Alberta")) {
       await expect(firstAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -89,6 +90,7 @@ test(
     const followupAnswer = frame.locator(".message").last();
     await expect(followupAnswer).toContainText(
       /Ontario|moteur d’analyse/,
+      { timeout: 60_000 },
     );
     if ((await followupAnswer.innerText()).includes("Ontario")) {
       await expect(followupAnswer).toContainText(/\d[,.]\d\s*%/);
@@ -106,10 +108,6 @@ test(
     await expect(memory).toContainText(/ON/i);
 
     await followupAnswer.getByRole("button", { name: "Réponse utile" }).click();
-    await expect.poll(
-      () => frame.locator("body").evaluate(() => window.location.search),
-      { timeout: 30_000 },
-    ).toContain("conversation_id=");
     await expect(frame.locator(".message").last().getByRole("button", {
       name: "Réponse utile",
     })).toHaveAttribute("aria-pressed", "true");

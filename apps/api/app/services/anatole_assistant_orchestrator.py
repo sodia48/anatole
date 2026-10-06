@@ -38,7 +38,7 @@ SESSION_SECONDS = 2 * 60 * 60
 _ETF_SYMBOLS = {item["ticker"] for item in ETF_CATALOG}
 _ALIASES = {"shopify": "SHOP", "lightspeed": "LSPD"}
 _PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap")
-_GOVERNMENT_CUES = ("canada 360", "gouvernement", "statistique canad", "statistique canada", "province", "prestation", "soins dentaires", "impôt", "assurance emploi", "government", "benefit", "dental", "unemployment rate", "taux de chômage", "inflation canad", "inflation au canada", "macro canadien")
+_GOVERNMENT_CUES = ("canada 360", "gouvernement", "statistique canad", "statistique canada", "province", "prestation", "soins dentaires", "impôt", "assurance emploi", "government", "benefit", "dental", "unemployment rate", "taux de chômage", "inflation canad", "inflation au canada", "macro canadien", "passeport", "quebec", "québec", "ontario", "alberta")
 _MACRO_CUES = ("inflation", "taux directeur", "pétrole", "cad", "macro", "interest rate", "oil price")
 _NEWS_CUES = ("nouvelle", "actualité", "news", "aujourd'hui", "today", "baisse aujourd", "down today")
 _GUARDRAIL_CUES = ("quoi acheter", "dois-je acheter", "que dois-je acheter", "quoi vendre", "dois-je vendre", "quelle action acheter", "which stock should i buy", "what should i buy", "buy for me", "recommend me")
@@ -50,6 +50,7 @@ class _Session:
     symbols: list[str] = field(default_factory=list)
     skill: Skill | None = None
     canada_id: str | None = None
+    canada_turn_index: int | None = None
     portfolio_authorized: bool = False
     expires_at: float = 0.0
 
@@ -62,8 +63,14 @@ def _action(label: str, href: str) -> NavigationAction:
     return NavigationAction(label=label, href=href)
 
 
+def _explicit_symbols(message: str) -> list[str]:
+    # French elisions such as "l'ETF" must not resolve to the listed ticker L.
+    without_elisions = re.sub(r"\b[ldjcmnstqu]['’](?=\w)", "", message, flags=re.IGNORECASE)
+    return _symbols(without_elisions, None)
+
+
 def _clean_symbols(message: str, context: AssistantContext, previous: list[str]) -> list[str]:
-    found = _symbols(message, None)
+    found = _explicit_symbols(message)
     lowered = message.casefold()
     for name, symbol in _ALIASES.items():
         if name in lowered and symbol not in found:
@@ -73,7 +80,7 @@ def _clean_symbols(message: str, context: AssistantContext, previous: list[str])
     broad_topic = (any(cue in lowered for cue in _MARKET_CUES + _GOVERNMENT_CUES)
                    or any(cue in lowered for cue in ("qualité des données", "data quality"))) and not referential
     seed = context.symbol or (context.symbols[0] if context.symbols else None)
-    if not seed and previous and (referential or comparing) and context.surface not in {"market", "news", "canada360"}:
+    if not seed and previous and (referential or comparing) and context.surface not in {"market", "news"}:
         seed = previous[0]
     if comparing and seed and seed not in found and found:
         found.insert(0, seed)
@@ -86,27 +93,34 @@ def _clean_symbols(message: str, context: AssistantContext, previous: list[str])
     return found[:5]
 
 
-def _select_skill(message: str, context: AssistantContext, symbols: list[str]) -> tuple[Skill, bool]:
+def _select_skill(message: str, context: AssistantContext, symbols: list[str], previous: Skill | None = None) -> tuple[Skill, bool]:
     text = message.casefold()
     if any(cue in text for cue in _GUARDRAIL_CUES):
         return "guardrail", False
     portfolio = (any(cue in text for cue in _PORTFOLIO_CUES)
                  or bool(re.search(r"\b(?:mon|mes|my)\b.{0,40}\brisqu", text))
                  or context.surface == "portfolio" and any(word in text for word in ("mon", "mes", "my", "risqu", "secteur", "concentr", "performance", "nouvell")))
-    government = (any(cue in text for cue in _GOVERNMENT_CUES)
-                  or context.surface == "canada360" and not re.search(r"\b(?:analyse|cours|prix|compare)\b", text))
+    explicit_government = any(cue in text for cue in _GOVERNMENT_CUES)
+    explicit_market = any(cue in text for cue in _MARKET_CUES)
+    explicit_news = any(cue in text for cue in _NEWS_CUES)
+    explicit_instrument = bool(symbols) and (bool(_explicit_symbols(message)) or bool(re.search(r"\b(?:analyse|cours|prix|etf|ticker|action|titre|holdings)\b", text)))
+    government = explicit_government or (context.surface == "canada360" or previous == "canada360") and not (portfolio or explicit_instrument or explicit_market or explicit_news)
     mixed_macro = (government and bool(symbols) and any(cue in text for cue in _MACRO_CUES)
                    or portfolio and any(cue in text for cue in _MACRO_CUES))
     if portfolio:
         return "portfolio_analysis", mixed_macro
     if any(cue in text for cue in ("compare", "compar", "versus", " vs ")) and len(symbols) >= 2:
         return "compare", False
+    if previous == "portfolio_analysis" and not (explicit_government or explicit_instrument or explicit_market or explicit_news):
+        return "portfolio_analysis", False
     if government:
         return "canada360", mixed_macro
     if any(cue in text for cue in ("qualité", "qualite", "source de donnée", "data quality", "source health")):
         return "data_quality", False
     if any(cue in text for cue in _NEWS_CUES) and not symbols:
         return "news_context", False
+    if explicit_market and not explicit_instrument:
+        return "market_analysis", False
     if symbols:
         return ("etf_analysis" if symbols[0] in _ETF_SYMBOLS or context.surface == "etf" and symbols[0] == context.symbol else "stock_analysis"), False
     if context.surface == "news":
@@ -169,10 +183,14 @@ class AnatoleAssistantOrchestrator:
     @staticmethod
     def _response(base: AssistantResponse, *, context: AssistantContext,
                   conversation_id: UUID, bundles: list[AnatoleEvidenceBundle],
-                  actions: list[NavigationAction], permission_required: bool = False) -> UnifiedAssistantResponse:
+                  actions: list[NavigationAction], permission_required: bool = False,
+                  government_feedback: dict[str, str | int] | None = None,
+                  government_profile: dict[str, str | int | None] | None = None) -> UnifiedAssistantResponse:
         return UnifiedAssistantResponse(
             **base.model_dump(), context=context, conversation_id=conversation_id,
             evidence=bundles, actions=actions, permission_required=permission_required,
+            government_feedback=government_feedback,
+            government_profile=government_profile,
         )
 
     @staticmethod
@@ -367,6 +385,10 @@ class AnatoleAssistantOrchestrator:
             "; ".join(f"{fact.label} {fact.value}" for fact in bundle.facts) if bundle.facts
             else "les données disponibles ne suffisent pas à quantifier la concentration ou la volatilité"
         ) + "."
+        if "répartition" in text or "repartition" in text or "allocation" in text:
+            answer += (" Cette répartition montre les concentrations ci-dessus. Son adéquation dépend de votre horizon, "
+                       "de votre tolérance au risque et de vos besoins de liquidité; ces positions seules ne permettent pas "
+                       "de conclure qu'elle est bonne ou mauvaise.")
         if "sous-perform" in text or "underperform" in text:
             weights = [PortfolioPerformanceWeight(symbol=row.symbol, weight_percent=row.weight_percent, market=row.market)
                        for row in snapshot.positions if row.weight_percent > 0]
@@ -444,13 +466,15 @@ class AnatoleAssistantOrchestrator:
                     len(bundle.sources), "partial" if bundle.missing_data else "complete")
         return base, bundle
 
-    async def _canada(self, request: UnifiedAssistantRequest, state: _Session) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
+    async def _canada(self, request: UnifiedAssistantRequest, state: _Session) -> tuple[AssistantResponse, AnatoleEvidenceBundle, dict[str, str | int | None] | None]:
         logger.info("assistant_tool_started skill=canada360 tool=canada360")
         result = await canada_360_assistant_service.answer(
             question=request.message, lang=request.context.language,
-            jurisdiction="CA", conversation_id=state.canada_id,
+            jurisdiction=request.context.metadata.get("region", "CA") if request.context.metadata.get("region", "CA") in {"CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"} else "CA",
+            conversation_id=state.canada_id,
         )
         state.canada_id = result.conversation_id
+        state.canada_turn_index = len(result.history) - 1 if getattr(result, "history", None) else None
         sources = [AssistantSource(label=link.agency or link.label,
                                    detail=link.url, status="delayed") for link in result.links]
         base = self._simple("canada360", "Canada 360", result.answer,
@@ -464,7 +488,8 @@ class AnatoleAssistantOrchestrator:
             freshness="delayed", generated_at=datetime.now(UTC),
         )
         logger.info("assistant_tool_completed skill=canada360 tool=canada360 source_count=%s", len(sources))
-        return base, bundle
+        profile = getattr(result, "profile", None)
+        return base, bundle, profile.model_dump() if profile is not None and hasattr(profile, "model_dump") else None
 
     async def _news(self, language: str) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
         logger.info("assistant_tool_started skill=news_context tool=news_feed")
@@ -496,11 +521,14 @@ class AnatoleAssistantOrchestrator:
     async def answer(self, request: UnifiedAssistantRequest) -> UnifiedAssistantResponse:
         started = monotonic()
         conversation_id, state, expired_session = await self._session(request.conversation_id)
+        if not state.canada_id and request.government_conversation_id:
+            state.canada_id = str(request.government_conversation_id)
         context = request.context
         symbols = _clean_symbols(request.message, context, state.symbols)
-        skill, mixed_macro = _select_skill(request.message, context, symbols)
+        skill, mixed_macro = _select_skill(request.message, context, symbols, state.skill)
         logger.info("assistant_skill_selected skill=%s", skill)
         if skill == "portfolio_analysis" and (expired_session or not (request.portfolio_consent and request.portfolio_positions)):
+            state.skill = skill
             context.portfolio_scope.authorized = False
             base = self._simple(skill, "Autorisation du portefeuille",
                                 "Autoriser Anatole Assistant à analyser les positions de ce portefeuille pour cette conversation ? Sans autorisation, je peux seulement expliquer les risques généraux.")
@@ -510,6 +538,7 @@ class AnatoleAssistantOrchestrator:
                                   permission_required=True)
         if skill == "portfolio_analysis":
             state.portfolio_authorized = True
+        government_profile = None
         if skill == "guardrail":
             logger.info("assistant_guardrail skill=guardrail")
             base = await assistant_service._guardrail(AssistantRequest(message=request.message,
@@ -522,7 +551,7 @@ class AnatoleAssistantOrchestrator:
         elif skill == "portfolio_analysis":
             base, bundle = await self._portfolio(request, symbols)
         elif skill == "canada360":
-            base, bundle = await self._canada(request, state)
+            base, bundle, government_profile = await self._canada(request, state)
         elif skill == "compare" and len(symbols) >= 2:
             base = await assistant_service._compare(symbols[:2])
             bundle = _bundle_from_response(skill, base, symbols[:2])
@@ -540,7 +569,7 @@ class AnatoleAssistantOrchestrator:
             bundle = _bundle_from_response("market_analysis", base, [])
         bundles = [bundle]
         if mixed_macro and skill == "portfolio_analysis":
-            macro, macro_bundle = await self._canada(request, state)
+            macro, macro_bundle, _ = await self._canada(request, state)
             bundles.append(macro_bundle)
             base.answer += ("\n\nContexte macro canadien : " + macro.answer +
                             "\nScénario, pas prévision : les expositions du portefeuille ci-dessus "
@@ -583,7 +612,10 @@ class AnatoleAssistantOrchestrator:
                     skill, _bucket(monotonic() - started), sum(len(row.sources) for row in bundles),
                     "partial" if any(row.missing_data for row in bundles) else "complete")
         return self._response(base, context=context, conversation_id=conversation_id,
-                              bundles=bundles, actions=actions)
+                              bundles=bundles, actions=actions,
+                              government_feedback={"conversation_id": state.canada_id, "turn_index": state.canada_turn_index}
+                              if skill == "canada360" and state.canada_id and state.canada_turn_index is not None else None,
+                              government_profile=government_profile)
 
 
 anatole_assistant_orchestrator = AnatoleAssistantOrchestrator()
