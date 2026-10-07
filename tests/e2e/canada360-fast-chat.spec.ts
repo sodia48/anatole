@@ -71,12 +71,54 @@ test("Canada 360 rend l'analyse RY V10 avec source stale et action Focus", async
   await expect(frame.locator(".message.error")).toHaveCount(0);
   await expect(frame.getByRole("heading", { name: "Analyse fondamentale" })).toBeVisible();
   await expect(frame.getByRole("heading", { name: "Analyse technique" })).toBeVisible();
+  await expect(frame.locator(".researchText ul")).toHaveCount(6);
+  await expect(frame.locator(".researchText")).not.toContainText("## ");
   await expect(frame.locator(".researchText script")).toHaveCount(0);
   await expect(frame.locator(".researchText")).toContainText("<script>bad()</script>");
   const sources = frame.locator("details.sources");
   await expect(sources).toBeVisible();
   await expect(sources).not.toHaveAttribute("open", "");
   await expect(frame.getByRole("link", { name: /Ouvrir l’analyse complète de RY dans Focus/ })).toBeVisible();
+  await expect(input).toBeVisible();
+  await expect(frame.getByRole("button", { name: "Envoyer" })).toBeEnabled();
+});
+
+test("Canada 360 affiche une réponse dentaire structurée sans markdown brut", async ({ page }) => {
+  const question = "Je suis un réfugié, sans emploi qui habite au Québec. Puis-je avoir droit à l'assurance dentaire ?";
+  const answer = ["**Réponse préliminaire :** Oui, une couverture peut être disponible selon votre statut exact.",
+    "", "## 1. Si vous êtes demandeur d’asile", "Le PFSI peut être pertinent.",
+    "- **Couverture :** PFSI", "- **Soins dentaires :** certains soins couverts", "-", "",
+    "## 2. Si vous êtes personne protégée", "Vérifiez les conditions du programme applicable.",
+    "## Ce que cela signifie pour vous", "Votre statut exact reste à confirmer.",
+    "## Pour être plus précis", "1. Êtes-vous demandeur d’asile ?", "2. Avez-vous une assurance privée ?",
+    "## Sources", "- Canada.ca"].join("\n");
+  await page.route("**/api/canada-assistant", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      conversation_id: conversationId, profile: null, failed: false,
+      turns: [
+        { role: "user", text: question, links: [], source_line: null },
+        { role: "assistant", text: answer, skill: "canada360", links: [source], source_line: null },
+      ],
+    }) });
+  });
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  const input = frame.getByLabel("Question à Canada 360");
+  await expect(frame.getByTestId("canada360-message-form")).toHaveAttribute("data-assistant-ready", "true");
+  await input.fill(question);
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  const answerNode = frame.locator(".message").last();
+  await expect(answerNode.locator(".researchText p").first()).toHaveText("Oui, une couverture peut être disponible selon votre statut exact.");
+  await expect(answerNode.getByRole("heading", { name: "1. Si vous êtes demandeur d’asile" })).toBeVisible();
+  await expect(answerNode.getByRole("heading", { name: "Ce que cela signifie pour vous" })).toBeVisible();
+  await expect(answerNode.getByRole("list")).toHaveCount(2);
+  await expect(answerNode.locator("ul li strong").first()).toHaveText("Couverture :");
+  await expect(answerNode.locator("ol li")).toHaveCount(2);
+  await expect(answerNode.locator(".researchText")).not.toContainText(/\*\*|##|Réponse préliminaire|Canada\.ca/);
+  await expect(answerNode.locator("li").filter({ hasText: /^-$/ })).toHaveCount(0);
+  await expect(answerNode.locator("details.sources summary")).toHaveText("Sources officielles (1)");
+  await expect(answerNode.locator("details.sources")).not.toHaveAttribute("open", "");
   await expect(input).toBeVisible();
   await expect(frame.getByRole("button", { name: "Envoyer" })).toBeEnabled();
 });

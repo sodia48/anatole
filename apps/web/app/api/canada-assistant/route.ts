@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { NextRequest } from "next/server";
+import { parseAssistantRichText, type AssistantInline } from "../../../public/assistant-rich-text.mjs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -240,29 +241,15 @@ function safeCorrelationId(value: string | null): string | null {
 }
 
 function structuredAnswerMarkup(text: string, collapseSources: boolean): string {
-  const blocks: string[] = [];
-  let bullets: string[] = [];
-  let inSourceSection = false;
-  const flushBullets = () => {
-    if (bullets.length) blocks.push(`<ul>${bullets.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
-    bullets = [];
-  };
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (line.startsWith("## ")) inSourceSection = collapseSources && line.slice(3) === "Sources et fraîcheur";
-    if (inSourceSection) continue;
-    if (!line) { flushBullets(); continue; }
-    if (line.startsWith("## ")) {
-      flushBullets();
-      blocks.push(`<h3>${escapeHtml(line.slice(3))}</h3>`);
-    } else if (line.startsWith("- ")) {
-      bullets.push(line.slice(2));
-    } else {
-      flushBullets();
-      blocks.push(`<p>${escapeHtml(line)}</p>`);
-    }
-  }
-  flushBullets();
+  const inline = (segments: AssistantInline[]) => segments.map((segment) =>
+    segment.strong ? `<strong>${escapeHtml(segment.text)}</strong>` : escapeHtml(segment.text)).join("");
+  const blocks = parseAssistantRichText(text, { collapseSources }).map((block) => {
+    if (block.type === "heading") return `<h3>${inline(block.content)}</h3>`;
+    if (block.type === "subheading") return `<h4>${inline(block.content)}</h4>`;
+    if (block.type === "paragraph") return `<p>${inline(block.content)}</p>`;
+    const tag = block.type === "ordered_list" ? "ol" : "ul";
+    return `<${tag}>${block.items.map((item) => `<li>${inline(item)}</li>`).join("")}</${tag}>`;
+  });
   return `<div class="researchText">${blocks.join("")}</div>`;
 }
 
@@ -417,8 +404,8 @@ function turnMarkup(
   const skill = !isUser && turn.skill ? `<small class="skillChip">${escapeHtml(turn.skill)}</small>` : "";
   const actions = !isUser ? (turn.actions ?? []).filter((action) => /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/.test(action.href))
     .map((action) => `<a class="assistantAction" href="${escapeHtml(action.href)}" target="_parent">${escapeHtml(action.label)} →</a>`).join("") : "";
-  const answerMarkup = !isUser && turn.skill && turn.skill !== "canada360"
-    ? structuredAnswerMarkup(turn.text, evidenceSources.length > 0)
+  const answerMarkup = !isUser
+    ? structuredAnswerMarkup(turn.text, evidenceSources.length > 0 || turn.links?.length > 0)
     : `<p>${escapeHtml(turn.text)}</p>`;
   return `<article class="message ${isUser ? "user" : ""}"><b>${isUser ? (language === "fr" ? "TOI" : "YOU") : "ANATOLE"}</b>${skill}${answerMarkup}${evidenceMarkup || sources}${sourceLine}${actions}${speak}${feedback}</article>`;
 }
@@ -508,7 +495,7 @@ header{flex:0 0 auto;align-items:center}.headerActions{flex-wrap:nowrap}.trust{w
 .message.user{width:fit-content;max-width:min(80%,720px);align-self:flex-end;margin-right:max(0px,calc((100% - 920px)/2));padding:11px 16px;border-radius:18px 18px 5px 18px;background:#183650}
 .message.error{border:1px solid #95505a;border-radius:12px;padding:12px;background:#351b27}
 .message p{font-size:14px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}.message b{color:#98cfff}.message.user b{color:#c8e2f6}
-.researchText{overflow-wrap:anywhere}.researchText h3{margin:17px 0 7px;font-size:15px;line-height:1.35;color:#d8edff}.researchText p{white-space:normal;margin:6px 0}.researchText ul{margin:5px 0 12px;padding-left:21px}.researchText li{margin:4px 0;line-height:1.55;font-size:13px}
+.researchText{max-width:860px;overflow-wrap:anywhere;line-height:1.6}.researchText h3{margin:16px 0 6px;font-size:15px;line-height:1.35;color:#d8edff}.researchText h4{margin:11px 0 4px;font-size:14px;line-height:1.4;color:#d8edff}.researchText>:first-child{margin-top:0}.researchText p{white-space:normal;margin:0 0 9px}.researchText ul,.researchText ol{margin:5px 0 10px;padding-left:22px}.researchText li{margin:2px 0;line-height:1.6;font-size:14px}.researchText strong{color:#eaf5ff;font-weight:750}
 .sources{display:block;margin-top:12px;border-top:1px solid #294257;padding-top:10px}.sources summary{width:fit-content;cursor:pointer;color:#acd5f3;font-size:11px;font-weight:750}.links{margin-top:10px}
 .links span{display:block;padding:7px 3px;color:#b7c9d6;font-size:11px}.assistantAction{display:inline-block;margin:9px 8px 0 0;padding:6px 9px;border:1px solid #385b73;border-radius:8px;color:#b9dfff;text-decoration:none;font-size:11px}.skillChip{display:inline-block;margin-left:8px;padding:3px 7px;border:1px solid #385b73;border-radius:999px;color:#acd5f3;font-size:10px}.permission{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px;border:1px solid #385b73;border-radius:12px}.permission strong{width:100%;font-size:12px}.permission button{padding:7px 10px;background:#17324a;color:#fff}
 .pending p{color:#b8d8ee}.dots::after{content:'…';animation:pulse 1.2s ease-in-out infinite}@keyframes pulse{50%{opacity:.35}}
@@ -534,6 +521,7 @@ html[data-theme="blue"] textarea[name="q"]{color:#15324b}html[data-theme="blue"]
 html[data-theme="blue"] .composerButton{background:#e2f0fa;color:#164f79}html[data-theme="blue"] .sendButton{background:#1269ad;color:#fff}
 html[data-theme="blue"] #voice-start.composerButton{background:#e2f0fa;color:#164f79}
 html[data-theme="blue"] .message.user{background:#dceffc;color:#15324b}html[data-theme="blue"] .message b,html[data-theme="blue"] .sources summary{color:#145f99}
+html[data-theme="blue"] .researchText h3,html[data-theme="blue"] .researchText h4,html[data-theme="blue"] .researchText strong{color:#173e67}
 html[data-theme="blue"] .message.error{background:#fff1f1;color:#602b32}html[data-theme="blue"] .links a{background:#fff;color:#15324b;border-color:#c6dbe9}
 html[data-theme="blue"] .feedback button,html[data-theme="blue"] .speak{background:#e6f2fa;color:#15324b}html[data-theme="blue"] .lastMessage{background:#fff;color:#145078;border-color:#a8c8de}
 @media(max-width:640px){header{display:flex;align-items:center}.trust{display:none}.chat{padding:10px 2px 20px}.message.user{max-width:86%;margin-right:0}.composerButton,#voice-start.composerButton{min-width:36px;height:36px;min-height:36px}.sendButton{font-size:11px}[data-testid="canada360-message-form"]{gap:4px;padding:7px}.emptyHero{padding-top:16px}}
@@ -580,7 +568,7 @@ ${uploadErrorMarkup}
 <footer>${fr ? "Le contexte de cette conversation est conservé temporairement pendant environ 2 heures; il n’est pas enregistré comme mémoire permanente de ton compte. Canada 360 ne remplace pas une décision administrative." : "This conversation context is kept temporarily for about 2 hours; it is not saved as permanent account memory. Canada 360 does not replace an administrative decision."}</footer>
 </main>
 <script defer src="/canada-assistant-voice.js"></script>
-<script defer src="/canada-assistant-chat.js"></script>
+<script type="module" src="/canada-assistant-chat.js"></script>
 </body>
 </html>`;
 }

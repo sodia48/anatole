@@ -60,10 +60,39 @@ test("Focus RY affiche une analyse profonde lisible et des sources repliées", a
   const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
   for (const heading of ["Vue d’ensemble", "Analyse fondamentale", "Valorisation", "Analyse technique", "Risques", "Ce qu’il faut surveiller"])
     await expect(dialog.getByRole("heading", { name: heading })).toBeVisible();
+  await expect(dialog.locator("ul li")).toHaveCount(6);
+  await expect(dialog).not.toContainText("## ");
   await expect(dialog.getByText("RBC Investor Relations · delayed")).toBeHidden();
   await expect(dialog.getByRole("link", { name: /Ouvrir l’analyse complète de RY/ })).toBeVisible();
   await expect(dialog.getByLabel("Votre question")).toBeVisible();
   expect((await dialog.textContent())?.toLowerCase()).not.toMatch(/buy the dip|\bdca\b|achète|vends/);
+});
+
+test("Le tiroir global partage les titres, listes et labels de Canada 360", async ({ page }) => {
+  const answer = ["**Réponse préliminaire :** Une couverture peut être disponible selon votre statut.",
+    "", "## Si vous êtes demandeur d’asile", "- **Couverture :** PFSI", "- **À vérifier :** le statut exact",
+    "", "### Pour être plus précis", "1. Quel est votre statut ?", "2. Avez-vous une assurance privée ?",
+    "", "## Sources", "- Canada.ca"].join("\n");
+  await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ...reply("canada360", "Canada 360", answer),
+      evidence: [{ sources: [{ label: "Gouvernement du Canada", freshness: "live",
+        url: "https://www.canada.ca/fr/services.html" }], missing_data: [] }],
+    }) });
+  });
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  await openGlobalAssistant(page);
+  await page.getByLabel("Votre question").fill("Quels soins dentaires sont couverts ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
+  await expect(dialog.locator('[class*="richText"] p').first()).toHaveText("Une couverture peut être disponible selon votre statut.");
+  await expect(dialog.getByRole("heading", { name: "Si vous êtes demandeur d’asile" })).toBeVisible();
+  await expect(dialog.getByRole("heading", { name: "Pour être plus précis" })).toBeVisible();
+  await expect(dialog.locator("ul li strong").first()).toHaveText("Couverture :");
+  await expect(dialog.locator("ol li")).toHaveCount(2);
+  await expect(dialog.locator('[class*="richText"]')).not.toContainText(/\*\*|##|Réponse préliminaire|Canada\.ca/);
+  await expect(dialog.getByText("Sources officielles (1)")).toBeVisible();
+  await expect(dialog.locator("details")).not.toHaveAttribute("open", "");
 });
 
 test("ETF XIC et le Comparateur publient leurs entités sans positions", async ({ page }) => {
