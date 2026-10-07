@@ -1,3 +1,5 @@
+import { parseAssistantRichText } from "/assistant-rich-text.mjs";
+
 (() => {
   document.documentElement.classList.remove("no-js");
   const form = document.querySelector('[data-testid="canada360-message-form"]');
@@ -93,18 +95,20 @@
   const structuredAnswer = (value, collapseSources) => {
     const body = document.createElement("div");
     body.className = "researchText";
-    let list = null;
-    let inSourceSection = false;
-    for (const raw of value.split(/\r?\n/)) {
-      const line = raw.trim();
-      if (line.startsWith("## ")) inSourceSection = collapseSources && line.slice(3) === "Sources et fraîcheur";
-      if (inSourceSection) continue;
-      if (!line) { list = null; continue; }
-      if (line.startsWith("## ")) { list = null; body.append(text("h3", line.slice(3))); }
-      else if (line.startsWith("- ")) {
-        if (!list) { list = document.createElement("ul"); body.append(list); }
-        list.append(text("li", line.slice(2)));
-      } else { list = null; body.append(text("p", line)); }
+    const inline = (node, segments) => {
+      for (const segment of segments) node.append(segment.strong ? text("strong", segment.text) : document.createTextNode(segment.text));
+    };
+    for (const block of parseAssistantRichText(value, { collapseSources })) {
+      if (block.type === "bullet_list" || block.type === "ordered_list") {
+        const list = document.createElement(block.type === "ordered_list" ? "ol" : "ul");
+        for (const item of block.items) { const row = document.createElement("li"); inline(row, item); list.append(row); }
+        body.append(list);
+      } else {
+        const tag = block.type === "heading" ? "h3" : block.type === "subheading" ? "h4" : "p";
+        const node = document.createElement(tag);
+        inline(node, block.content);
+        body.append(node);
+      }
     }
     return body;
   };
@@ -206,10 +210,8 @@
       const node = article(turn.role, turn.text || "");
       if (turn.role === "assistant") {
         if (turn.skill) node.insertBefore(text("small", skillLabels[turn.skill] || turn.skill, "skillChip"), node.querySelector("p"));
-        if (turn.skill && turn.skill !== "canada360") {
-          const hasSources = (turn.evidence || []).some((row) => (row.sources || []).length > 0);
-          node.querySelector("p").replaceWith(structuredAnswer(turn.text || "", hasSources));
-        }
+        const hasSources = (turn.evidence || []).some((row) => (row.sources || []).length > 0) || Boolean(turn.links?.length);
+        node.querySelector("p").replaceWith(structuredAnswer(turn.text || "", hasSources));
         if (turn.evidence) addUnifiedEvidence(node, turn);
         else addSources(node, turn.links);
         if (turn.source_line) node.append(text("small", turn.source_line));
@@ -357,6 +359,7 @@
       input.focus({ preventScroll: true });
     }
   });
+  form.dataset.assistantReady = "true";
   goBottom();
   updateLast();
 })();

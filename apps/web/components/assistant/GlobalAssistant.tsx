@@ -5,6 +5,7 @@ import { Bot, Send, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { askUnifiedAssistant } from "@/lib/api";
 import { readAssistantPortfolio, type AssistantContext, type UnifiedAssistantResponse } from "@/lib/assistant-context";
+import { parseAssistantRichText, type AssistantInline } from "../../public/assistant-rich-text.mjs";
 import { useAssistantContext } from "./AssistantContextProvider";
 import styles from "./GlobalAssistant.module.css";
 
@@ -15,26 +16,15 @@ const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", portfoli
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/;
 
 function AssistantText({ text, collapseSources = false }: { text: string; collapseSources?: boolean }) {
-  const blocks: Array<{ kind: "heading" | "paragraph" | "list"; lines: string[] }> = [];
-  let inSourceSection = false;
-  for (const line of text.split("\n")) {
-    const value = line.trim();
-    if (!value) continue;
-    if (value.startsWith("## ")) inSourceSection = collapseSources && value.slice(3) === "Sources et fraîcheur";
-    if (inSourceSection) continue;
-    if (value.startsWith("## ")) { blocks.push({ kind: "heading", lines: [value.slice(3)] }); continue; }
-    if (value.startsWith("- ")) {
-      const last = blocks[blocks.length - 1];
-      if (last?.kind === "list") last.lines.push(value.slice(2));
-      else blocks.push({ kind: "list", lines: [value.slice(2)] });
-      continue;
-    }
-    blocks.push({ kind: "paragraph", lines: [value] });
-  }
+  const blocks = parseAssistantRichText(text, { collapseSources });
+  const inline = (segments: AssistantInline[]) => segments.map((segment, index) =>
+    segment.strong ? <strong key={index}>{segment.text}</strong> : segment.text);
   return <div className={styles.richText}>{blocks.map((block, index) =>
-    block.kind === "heading" ? <h3 key={index}>{block.lines[0]}</h3> :
-    block.kind === "list" ? <ul key={index}>{block.lines.map((line, i) => <li key={i}>{line}</li>)}</ul> :
-    <p key={index}>{block.lines[0]}</p>)}</div>;
+    block.type === "heading" ? <h3 key={index}>{inline(block.content)}</h3> :
+    block.type === "subheading" ? <h4 key={index}>{inline(block.content)}</h4> :
+    block.type === "bullet_list" ? <ul key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ul> :
+    block.type === "ordered_list" ? <ol key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ol> :
+    <p key={index}>{inline(block.content)}</p>)}</div>;
 }
 
 export function GlobalAssistant() {
@@ -124,7 +114,9 @@ export function GlobalAssistant() {
           {turns.map((turn, index) => <article key={index} className={turn.role === "user" ? styles.userTurn : styles.assistantTurn}>
             {turn.result && <span className={styles.skillChip}>{SKILL_LABELS[turn.result.intent] ?? turn.result.intent}</span>}
             {turn.role === "assistant" ? <AssistantText text={turn.text} collapseSources={Boolean(turn.result?.evidence.some((row) => row.sources.length > 0))} /> : <p>{turn.text}</p>}
-            {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>Sources et données utilisées</summary>
+            {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>{turn.result.intent === "canada360"
+              ? `Sources officielles (${turn.result.evidence.flatMap((row) => row.sources).length})`
+              : "Sources et données utilisées"}</summary>
               {turn.result.evidence.flatMap((row) => row.sources).map((source, i) => <p key={`${source.label}-${i}`} className={styles.source}>
                 {source.url && /^https:\/\/[^\s]+$/i.test(source.url)
                   ? <a href={source.url} target="_blank" rel="noopener noreferrer">{source.label}</a>
