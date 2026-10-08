@@ -208,6 +208,56 @@ test("Canada 360 reprend le portefeuille après consentement sans doubler la que
   await expect(frame.locator(".message.user")).toHaveCount(2);
 });
 
+test("Canada 360 rend Radiographie V12 et un stress portefeuille après consentement", async ({ page }) => {
+  const calls: Record<string, string>[] = [];
+  await page.route("**/api/anatole/api/v1/canada/overview?*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      language: "fr", status: "ok", macro: [], rates: [], markets: [], provinces: [],
+      sources: [], issues: [], generated_at: "2026-10-07T12:00:00Z", refresh_after_seconds: 60,
+    }) });
+  });
+  await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([
+    { symbol: "RY", quantity: 2, average_cost: 100 },
+  ])));
+  await page.route("**/api/canada-assistant", async (route) => {
+    if (route.request().method() !== "POST") return route.continue();
+    const submitted = Object.fromEntries(
+      [...(route.request().postData() ?? "").matchAll(/name="([^"]+)"\r\n\r\n([\s\S]*?)\r\n--/g)]
+        .map((match) => [match[1], match[2]]),
+    ) as Record<string, string>;
+    calls.push(submitted);
+    const permission = submitted.portfolio_consent !== "on";
+    const stress = submitted.q.includes("pétrole");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      conversation_id: conversationId, profile: null, failed: false, permission_required: permission,
+      turns: permission ? [{ role: "user", text: submitted.q, links: [], source_line: null }] : [
+        { role: "user", text: submitted.q, links: [], source_line: null },
+        { role: "assistant", skill: "portfolio_analysis", links: [], source_line: null,
+          text: stress
+            ? "## Stress et sensibilités\n- WTI -20 % : impact estimé -4 %; scénario, pas prévision."
+            : "## Radiographie\n- Positions valorisées : 1.\n## Où se trouve réellement le risque\n- RY : contribution 60 %.",
+          evidence: [{ sources: [{ label: "Portefeuille Anatole", freshness: "internal",
+            timestamp: "2026-10-07T12:00:00Z", url: null }], missing_data: [] }],
+          actions: [{ label: "Ouvrir Portefeuille", href: "/portefeuille" }] },
+      ],
+    }) });
+  });
+  await page.goto("/canada", { waitUntil: "domcontentloaded" });
+  const frame = page.frameLocator('[data-testid="canada360-assistant-frame"]');
+  const input = frame.getByLabel("Question à Canada 360");
+  await input.fill("Que penses-tu de mon portefeuille ?");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await frame.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
+  await expect(frame.getByRole("heading", { name: "Radiographie" })).toBeVisible();
+  await input.fill("Et si le pétrole chute de 20 % ?");
+  await frame.getByRole("button", { name: "Envoyer" }).click();
+  await expect(frame.getByRole("heading", { name: "Stress et sensibilités" })).toBeVisible();
+  await expect(frame.getByRole("link", { name: /Ouvrir Portefeuille/ })).toBeVisible();
+  expect(JSON.parse(String(calls[0].portfolio_positions))).toEqual([]);
+  expect(JSON.parse(String(calls[1].portfolio_positions))).toHaveLength(1);
+  expect(JSON.parse(String(calls[2].portfolio_positions))).toHaveLength(1);
+});
+
 test("Canada 360 passe réellement par V9 pour une question de portefeuille", async ({ page }) => {
   test.setTimeout(90_000);
   await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([

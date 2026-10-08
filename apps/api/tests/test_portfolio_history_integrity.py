@@ -298,7 +298,8 @@ async def test_portfolio_uses_quote_normalization_for_core_history_and_logs_cove
     assert snapshot.portfolio_score is not None
     assert len(snapshot.performance) == 80
     assert snapshot.performance[0].portfolio == 100
-    assert "portfolio_history ticker=RY.TO points=80 status=ok" in caplog.text
+    assert "portfolio_history positions_requested=3 histories_available=3" in caplog.text
+    assert "ticker=RY.TO" not in caplog.text
     assert "weighted_coverage=100.00%" in caplog.text
 
 @pytest.mark.asyncio
