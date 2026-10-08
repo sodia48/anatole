@@ -9,7 +9,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.schemas.workspace import AssistantResponse, PortfolioPositionInput
+from app.schemas.workspace import (
+    AssistantResponse, PortfolioAttributionHorizon, PortfolioCorrelationCluster,
+    PortfolioPositionInput, PortfolioRiskContributionSnapshot, PortfolioScenarioResult,
+)
 
 
 Surface = Literal["stock", "etf", "portfolio", "market", "news", "canada360", "compare", "other"]
@@ -111,6 +114,107 @@ class PortfolioEvidencePosition(BaseModel):
     freshness: str
 
 
+class PortfolioXRay(BaseModel):
+    total_market_value: float | None = None
+    total_cost_basis: float | None = None
+    unrealized_pnl: float | None = None
+    unrealized_pnl_percent: float | None = None
+    day_pnl: float | None = None
+    day_change_percent: float | None = None
+    position_count: int = 0
+    quote_coverage_percent: float = 0
+    top_position_percent: float | None = None
+    top_three_percent: float | None = None
+    top_five_percent: float | None = None
+    hhi: float | None = None
+    effective_positions: float | None = None
+    diversification_score: float | None = None
+    sector_coverage_percent: float | None = None
+    currency_coverage_percent: float | None = None
+    history_coverage_percent: float | None = None
+    etf_lookthrough_coverage_percent: float | None = None
+    risk_contribution_coverage_percent: float | None = None
+    attribution_coverage_percent: float | None = None
+    correlation_coverage_percent: float | None = None
+    stress_coverage_percent: float | None = None
+    analysis_quality: Literal["élevée", "partielle", "limitée"] = "limitée"
+
+
+class PortfolioLookThroughHolding(BaseModel):
+    symbol: str
+    direct_weight_percent: float = 0
+    indirect_observed_weight_percent: float = 0
+    combined_observed_weight_percent: float = 0
+    source_etfs: list[str] = Field(default_factory=list)
+    holdings_coverage_percent: float = 0
+    source: str
+    as_of: datetime | None = None
+
+
+class PortfolioLookThroughOverlap(BaseModel):
+    kind: Literal["direct_etf", "etf_etf"]
+    symbol: str
+    source_etfs: list[str]
+    observed_weight_percent: float
+
+
+class PortfolioLookThroughSummary(BaseModel):
+    holdings: list[PortfolioLookThroughHolding] = Field(default_factory=list)
+    overlaps: list[PortfolioLookThroughOverlap] = Field(default_factory=list)
+    etf_count: int = 0
+    holdings_coverage_percent: float = 0
+    status: Literal["observed", "partial", "unavailable"] = "unavailable"
+    sector_exposures_observed: dict[str, float] = Field(default_factory=dict)
+
+
+class PortfolioConcentrationMap(BaseModel):
+    direct_top_three_percent: float | None = None
+    observed_economic_top: list[PortfolioLookThroughHolding] = Field(default_factory=list)
+    sector_weights: dict[str, float] = Field(default_factory=dict)
+    currency_weights: dict[str, float] = Field(default_factory=dict)
+    top_cluster_weight_percent: float | None = None
+    factor_exposures: dict[str, float] = Field(default_factory=dict)
+    coverage: dict[str, float] = Field(default_factory=dict)
+
+
+class PortfolioMacroExposure(BaseModel):
+    factor: Literal["tsx", "wti", "cad_usd", "canada_10y"]
+    weighted_sensitivity: float | None = None
+    coverage_percent: float = 0
+    source_freshness: str = "unknown"
+    context_only: bool = False
+
+
+class PortfolioWatchtowerAggregate(BaseModel):
+    timestamp: datetime
+    total_market_value: float | None = None
+    top_position_weight_percent: float | None = None
+    top_three_percent: float | None = None
+    hhi: float | None = None
+    effective_positions: float | None = None
+    volatility_percent: float | None = None
+    beta: float | None = None
+    max_drawdown_percent: float | None = None
+    sharpe_ratio: float | None = None
+    diversification_score: float | None = None
+    sector_coverage_percent: float | None = None
+    top_known_sector: str | None = None
+    top_currency: str | None = None
+    average_correlation: float | None = None
+    top_cluster_weight_percent: float | None = None
+    top_risk_contributor: str | None = None
+    benchmark_gap: dict[str, float] = Field(default_factory=dict)
+    coverage_fingerprints: dict[str, float] = Field(default_factory=dict)
+
+
+class PortfolioWatchtowerDelta(BaseModel):
+    previous_at: datetime | None = None
+    current_at: datetime
+    elapsed_seconds: float | None = None
+    changes: dict[str, float] = Field(default_factory=dict)
+    previous_available: bool = False
+
+
 class NavigationAction(BaseModel):
     label: str
     href: str
@@ -133,11 +237,21 @@ class NavigationAction(BaseModel):
 
 class AnatoleEvidenceBundle(BaseModel):
     skill: Skill
+    portfolio_focus: Literal["overview", "diversification", "risk_contribution", "attribution", "correlation", "stress", "macro", "watchtower", "news", "lookthrough"] | None = None
     entities: list[str] = Field(default_factory=list)
     facts: list[EvidenceFact] = Field(default_factory=list)
     metric_groups: dict[str, list[EvidenceFact]] = Field(default_factory=dict)
     sector_metrics: list[EvidenceFact] = Field(default_factory=list)
     position_rows: list[PortfolioEvidencePosition] = Field(default_factory=list)
+    portfolio_xray: PortfolioXRay | None = None
+    lookthrough: PortfolioLookThroughSummary | None = None
+    concentration_map: PortfolioConcentrationMap | None = None
+    risk_contributions: PortfolioRiskContributionSnapshot | None = None
+    attribution: list[PortfolioAttributionHorizon] = Field(default_factory=list)
+    correlation_clusters: list[PortfolioCorrelationCluster] = Field(default_factory=list)
+    scenarios: list[PortfolioScenarioResult] = Field(default_factory=list)
+    macro_exposures: list[PortfolioMacroExposure] = Field(default_factory=list)
+    watchtower: PortfolioWatchtowerDelta | None = None
     time_series_summary: str | None = None
     sources: list[EvidenceSource] = Field(default_factory=list)
     freshness: str = "unknown"

@@ -10,7 +10,8 @@ from app.schemas.workspace import (
     PortfolioAllocation, PortfolioContributor, PortfolioCorrelationMatrix,
     PortfolioCoverage, PortfolioHorizonContribution, PortfolioHorizonResult,
     PortfolioContributionResult, PortfolioPositionSnapshot, PortfolioRisk,
-    PortfolioSnapshot, PortfolioStressTest,
+    PortfolioSnapshot, PortfolioStressTest, PortfolioCorrelationCluster,
+    PortfolioFactorSensitivity,
 )
 from app.services.anatole_assistant_orchestrator import AnatoleAssistantOrchestrator
 from app.services.canada_360_providers import provider_router
@@ -19,6 +20,12 @@ from app.services.portfolio import portfolio_service
 from app.services.stock_news import stock_news_service
 from app.services.portfolio_research import build_portfolio_research_bundle, format_portfolio_research
 from app.services.portfolio_research import generate_portfolio_research_from_evidence
+from app.services.portfolio_intelligence_v12 import build_attribution, build_risk_contributions
+from app.services.portfolio_research_v12 import (
+    build_lookthrough_summary, build_portfolio_xray, build_watchtower_delta,
+)
+from app.schemas.assistant_context import PortfolioWatchtowerAggregate
+from app.schemas.stocks import Candle
 
 NOW = datetime(2026, 10, 7, tzinfo=UTC)
 SYMBOLS = ["MU", "VFV", "IMG", "MDA", "XEG", "VNP", "TD", "RY", "XIC", "SHOP", "T"]
@@ -185,3 +192,127 @@ async def test_deep_portfolio_and_followups_use_one_snapshot_each(monkeypatch):
         assert reply.intent == "portfolio_analysis"
         assert expected in reply.answer
     assert len(calls) == 6
+
+
+def test_v12_lookthrough_aggregates_direct_and_two_etfs_without_claiming_full_coverage():
+    positions = [SimpleNamespace(symbol="RY", weight_percent=20),
+                 SimpleNamespace(symbol="XIC", weight_percent=30),
+                 SimpleNamespace(symbol="VFV", weight_percent=50)]
+    def holdings(rows):
+        return SimpleNamespace(
+            holdings=[SimpleNamespace(display_symbol=symbol, weight_percent=weight)
+                      for symbol, weight in rows],
+            sectors=[], source_name="ETF officiel", generated_at=NOW, stale=False, official=True,
+        )
+    summary = build_lookthrough_summary(positions, {"XIC", "VFV"}, {
+        "XIC": holdings([("RY", 6), ("TD", 4)]),
+        "VFV": holdings([("RY", 2), ("AAPL", 8)]),
+    })
+    ry = next(row for row in summary.holdings if row.symbol == "RY")
+    assert ry.direct_weight_percent == 20
+    assert ry.indirect_observed_weight_percent == pytest.approx(2.8)
+    assert ry.combined_observed_weight_percent == pytest.approx(22.8)
+    assert ry.source_etfs == ["VFV", "XIC"]
+    assert summary.holdings_coverage_percent == 10
+    assert summary.status == "partial"
+    assert {row.kind for row in summary.overlaps if row.symbol == "RY"} == {"direct_etf", "etf_etf"}
+    assert sum(row.indirect_observed_weight_percent for row in summary.holdings) == pytest.approx(8)
+    missing = build_lookthrough_summary(positions, {"XIC", "VFV"}, {"XIC": holdings([("RY", 6)])})
+    assert missing.holdings_coverage_percent == pytest.approx(2.25)
+
+
+def test_v12_watchtower_delta_is_aggregate_only_and_session_bounded():
+    earlier = PortfolioWatchtowerAggregate(timestamp=NOW, total_market_value=100000,
+        top_three_percent=60, volatility_percent=18, top_cluster_weight_percent=40,
+        coverage_fingerprints={"history": 90})
+    later = PortfolioWatchtowerAggregate(timestamp=NOW.replace(hour=1), total_market_value=101000,
+        top_three_percent=72, volatility_percent=24, top_cluster_weight_percent=55,
+        coverage_fingerprints={"history": 95})
+    delta = build_watchtower_delta(earlier, later)
+    assert delta.previous_available and delta.elapsed_seconds == 3600
+    assert delta.changes["top_three_percent"] == 12
+    assert delta.changes["volatility_percent"] == 6
+    assert delta.changes["top_cluster_weight_percent"] == 15
+    assert delta.changes["coverage_history"] == 5
+    assert not any(key in earlier.model_dump() for key in ("positions", "quantities", "average_cost", "cost_basis"))
+    assert not build_watchtower_delta(None, earlier).previous_available
+
+
+@pytest.mark.asyncio
+async def test_v12_full_portfolio_conversation_macro_custom_stress_and_privacy(monkeypatch):
+    snapshot = sample_snapshot()
+    positions = snapshot.positions
+    history = {}
+    for index, row in enumerate(positions):
+        price = 100.0
+        candles = []
+        for day in range(95):
+            price *= 1 + .002 + .008 * __import__("math").sin(day * .2 + index * .4)
+            candles.append(Candle(time=1_700_000_000 + day * 86_400, open=price,
+                                  high=price, low=price, close=price, volume=1000))
+        history[row.symbol] = candles
+    risk = build_risk_contributions(positions, history)
+    assert risk.items
+    snapshot = snapshot.model_copy(update={
+        "risk_contributions": risk,
+        "factor_sensitivities": [
+            PortfolioFactorSensitivity(symbol=row.symbol, factor="wti", beta=1, observations=80)
+            for row in positions
+        ],
+        "correlation_clusters": [PortfolioCorrelationCluster(
+            label="Cluster corrélé 1", symbols=["MU", "VFV", "IMG"],
+            combined_weight_percent=63, average_internal_correlation=.78,
+            observations=80, coverage_percent=100)],
+        "attribution": build_attribution(positions, snapshot.performance_horizons,
+                                         snapshot.contribution_horizons),
+    })
+    calls = []
+    async def analyze(_request):
+        calls.append("snapshot")
+        return snapshot
+    async def no_provider(**_kwargs):
+        return None
+    async def holdings(symbol, limit=25):
+        rows = [SimpleNamespace(display_symbol="RY", weight_percent=6),
+                SimpleNamespace(display_symbol="TD", weight_percent=4)] if symbol == "XIC" else [
+                    SimpleNamespace(display_symbol="MU", weight_percent=3)]
+        return SimpleNamespace(holdings=rows, sectors=[], source_name="ETF mock",
+            source_url=None, stale=False, generated_at=NOW, official=True)
+    async def canada(**_kwargs):
+        return SimpleNamespace(answer="Inflation et taux publiés par les sources officielles.",
+            conversation_id="00000000-0000-4000-8000-000000000001", history=[],
+            links=[SimpleNamespace(agency="Banque du Canada", label="Taux", url="https://www.banqueducanada.ca")])
+    monkeypatch.setattr(portfolio_service, "analyze", analyze)
+    monkeypatch.setattr(provider_router, "generate_internal_evidence", no_provider)
+    monkeypatch.setattr(etf_holdings_service, "snapshot", holdings)
+    from app.services.canada_360_assistant import canada_360_assistant_service
+    monkeypatch.setattr(canada_360_assistant_service, "answer", canada)
+    orchestrator = AnatoleAssistantOrchestrator()
+    questions = [
+        ("Que penses-tu de mon portefeuille ?", "overview", "Radiographie"),
+        ("Pourquoi ?", "overview", "Radiographie"),
+        ("Et ma diversification ?", "diversification", "Diversification et clusters"),
+        ("Quelle position explique le plus mon risque ?", "risk_contribution", "Où se trouve réellement le risque"),
+        ("Et si le pétrole chute de 20 % ?", "stress", "wti -20.0 %"),
+        ("Quels risques macro canadiens touchent mes positions ?", "macro", "Contexte macro Canada 360"),
+        ("Qu’est-ce qui a changé depuis la dernière analyse ?", "watchtower", "Ce qui a changé"),
+    ]
+    conversation_id = None
+    for message, focus, marker in questions:
+        reply = await orchestrator.answer(ask(message, conversation_id))
+        conversation_id = reply.conversation_id
+        assert reply.intent == "portfolio_analysis"
+        assert reply.evidence[0].portfolio_focus == focus
+        assert marker in reply.answer
+    assert len(calls) == len(questions)
+    assert reply.evidence[0].watchtower.previous_available
+    assert "quantities" not in str(orchestrator._sessions[conversation_id].portfolio_previous.model_dump())
+    assert "average_cost" not in str(orchestrator._sessions[conversation_id].portfolio_previous.model_dump())
+    fresh = await orchestrator.answer(ask("Que penses-tu de mon portefeuille ?"))
+    assert not fresh.evidence[0].watchtower.previous_available
+    macro_reply = await orchestrator.answer(ask("Quels risques macro canadiens touchent mes positions ?", conversation_id))
+    assert any(row.skill == "canada360" for row in macro_reply.evidence)
+    assert any(source.label == "Banque du Canada" for row in macro_reply.evidence
+               for source in row.sources)
+    assert all(exposure.factor in {"tsx", "wti", "cad_usd", "canada_10y"}
+               for exposure in macro_reply.evidence[0].macro_exposures)

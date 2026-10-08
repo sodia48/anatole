@@ -19,7 +19,8 @@ from uuid import UUID, uuid4
 from app.data.etf_catalog import ETF_CATALOG
 from app.schemas.assistant_context import (
     AnatoleEvidenceBundle, AssistantContext, EvidenceFact, EvidenceSource,
-    NavigationAction, Skill, UnifiedAssistantRequest, UnifiedAssistantResponse,
+    NavigationAction, PortfolioWatchtowerAggregate, Skill, UnifiedAssistantRequest,
+    UnifiedAssistantResponse,
 )
 from app.schemas.workspace import AssistantFact, AssistantLink, AssistantRequest, AssistantResponse, AssistantSource
 from app.services.assistant import DISCLAIMER, _symbols, assistant_service
@@ -33,6 +34,14 @@ from app.services.portfolio_research import (
     add_etf_lookthrough, build_portfolio_research_bundle,
     generate_portfolio_research_from_evidence,
 )
+from app.services.portfolio_intelligence_v12 import (
+    run_portfolio_scenarios, scenario_request_from_question,
+)
+from app.services.portfolio_research_v12 import (
+    PortfolioConversationFocus, build_concentration_map, build_lookthrough_summary,
+    build_macro_exposures, build_portfolio_xray, build_watchtower_aggregate,
+    build_watchtower_delta, portfolio_focus_from_question,
+)
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
 from app.services.canada_360_providers import provider_router
@@ -43,7 +52,7 @@ logger = logging.getLogger(__name__)
 SESSION_SECONDS = 2 * 60 * 60
 _ETF_SYMBOLS = {item["ticker"] for item in ETF_CATALOG}
 _ALIASES = {"shopify": "SHOP", "lightspeed": "LSPD"}
-_PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap", "diversification", "sous-perform", "sous perform", "underperform")
+_PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap", "diversification", "sous-perform", "sous perform", "underperform", "doublonn", "cluster", "contribue au risque")
 _GOVERNMENT_CUES = ("canada 360", "gouvernement", "statistique canad", "statistique canada", "province", "prestation", "soins dentaires", "impôt", "assurance emploi", "government", "benefit", "dental", "unemployment rate", "taux de chômage", "inflation canad", "inflation au canada", "macro canadien", "passeport", "quebec", "québec", "ontario", "alberta")
 _MACRO_CUES = ("inflation", "taux directeur", "pétrole", "cad", "macro", "interest rate", "oil price")
 _NEWS_CUES = ("nouvelle", "actualité", "news", "aujourd'hui", "today", "baisse aujourd", "down today")
@@ -58,6 +67,8 @@ class _Session:
     canada_id: str | None = None
     canada_turn_index: int | None = None
     portfolio_authorized: bool = False
+    portfolio_focus: PortfolioConversationFocus | None = None
+    portfolio_previous: PortfolioWatchtowerAggregate | None = None
     expires_at: float = 0.0
 
 
@@ -132,7 +143,8 @@ def _select_skill(message: str, context: AssistantContext, symbols: list[str], p
     explicit_instrument = bool(symbols) and (bool(_explicit_symbols(message)) or bool(re.search(r"\b(?:analyse|cours|prix|etf|ticker|action|titre|holdings)\b", text)))
     government = explicit_government or (context.surface == "canada360" or previous == "canada360") and not (portfolio or explicit_instrument or explicit_market or explicit_news)
     mixed_macro = (government and bool(symbols) and any(cue in text for cue in _MACRO_CUES)
-                   or portfolio and any(cue in text for cue in _MACRO_CUES))
+                   or (portfolio or previous == "portfolio_analysis")
+                   and any(cue in text for cue in ("macro", "inflation", "chômage", "taux directeur", "contexte de taux", "sensible au pétrole", "sensibles au pétrole")))
     if portfolio:
         return "portfolio_analysis", mixed_macro
     if any(cue in text for cue in ("compare", "compar", "versus", " vs ")) and len(symbols) >= 2:
@@ -346,32 +358,58 @@ class AnatoleAssistantOrchestrator:
         logger.info("assistant_tool_completed skill=etf_analysis tool=holdings source_count=%s", len(bundle.sources))
         return base, bundle
 
-    async def _portfolio(self, request: UnifiedAssistantRequest, symbols: list[str]) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
+    async def _portfolio(self, request: UnifiedAssistantRequest, symbols: list[str],
+                         state: _Session) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
         logger.info("assistant_tool_started skill=portfolio_analysis tool=portfolio")
         snapshot = await portfolio_service.analyze(PortfolioAnalyzeRequest(positions=request.portfolio_positions))
         bundle = build_portfolio_research_bundle(snapshot, requested_count=len(request.portfolio_positions))
         text = request.message.casefold()
+        focus = portfolio_focus_from_question(request.message, state.portfolio_focus)
+        bundle.portfolio_focus = focus
 
         etfs = [(row.symbol, row.weight_percent) for row in snapshot.positions if row.symbol in _ETF_SYMBOLS]
         explicit = next((symbol for symbol in symbols if symbol in _ETF_SYMBOLS), None)
-        if explicit and explicit not in {symbol for symbol, _ in etfs}:
-            etfs.insert(0, (explicit, 0.0))
-        if "chevauch" in text or "overlap" in text:
-            etfs = sorted(etfs, key=lambda row: row[0] != explicit)
-        else:
-            etfs.sort(key=lambda row: row[1], reverse=True)
-        etfs = etfs[:2]
+        if explicit and explicit not in {symbol for symbol, _ in etfs} and any(cue in text for cue in ("chevauch", "overlap")):
+            etfs.append((explicit, 0.0))
+        holdings_snapshots: dict[str, object] = {}
         if etfs:
+            limit = asyncio.Semaphore(6)
+            async def fetch_holdings(symbol: str) -> object:
+                async with limit:
+                    return await asyncio.wait_for(etf_holdings_service.snapshot(symbol, limit=25), timeout=4)
             results = await asyncio.gather(
-                *(asyncio.wait_for(etf_holdings_service.snapshot(symbol, limit=25), timeout=4)
-                  for symbol, _ in etfs), return_exceptions=True,
+                *(fetch_holdings(symbol) for symbol, _ in etfs), return_exceptions=True,
             )
             direct = {row.symbol.upper().removesuffix(".TO") for row in snapshot.positions}
             for (symbol, weight), result in zip(etfs, results, strict=True):
                 if isinstance(result, Exception):
                     bundle.missing_data.append(f"Participations {symbol} indisponibles pour le look-through")
                 else:
+                    holdings_snapshots[symbol] = result
                     add_etf_lookthrough(bundle, symbol, weight, result, direct)
+        bundle.lookthrough = build_lookthrough_summary(snapshot.positions, _ETF_SYMBOLS, holdings_snapshots)
+        bundle.macro_exposures = build_macro_exposures(snapshot)
+        bundle.portfolio_xray = build_portfolio_xray(snapshot, len(request.portfolio_positions), bundle.lookthrough)
+        bundle.concentration_map = build_concentration_map(snapshot, bundle.lookthrough, bundle.macro_exposures)
+        custom = scenario_request_from_question(request.message)
+        if custom:
+            bundle.scenarios = run_portfolio_scenarios(
+                custom, snapshot.positions, getattr(snapshot, "factor_sensitivities", []))
+            logger.info("portfolio_stress_custom coverage_bucket=%s position_count=%s",
+                        "high" if all(row.coverage.coverage_percent >= 90 for row in bundle.scenarios) else "partial",
+                        len(snapshot.positions))
+        current_aggregate = build_watchtower_aggregate(bundle, snapshot)
+        bundle.watchtower = build_watchtower_delta(state.portfolio_previous, current_aggregate)
+        state.portfolio_previous = current_aggregate
+        state.portfolio_focus = focus
+        logger.info("portfolio_xray_built coverage_bucket=%s position_count=%s",
+                    bundle.portfolio_xray.analysis_quality, len(snapshot.positions))
+        logger.info("portfolio_lookthrough_built coverage_bucket=%s etf_count=%s",
+                    "high" if bundle.lookthrough.holdings_coverage_percent >= 90 else "partial",
+                    bundle.lookthrough.etf_count)
+        if bundle.watchtower.previous_available:
+            logger.info("portfolio_watchtower_delta coverage_bucket=%s position_count=%s",
+                        bundle.portfolio_xray.analysis_quality, len(snapshot.positions))
 
         if any(cue in text for cue in _NEWS_CUES):
             tickers = [row.symbol for row in snapshot.positions[:5]]
@@ -489,7 +527,7 @@ class AnatoleAssistantOrchestrator:
         elif skill == "etf_analysis" and symbols:
             base, bundle = await self._etf(symbols[0])
         elif skill == "portfolio_analysis":
-            base, bundle = await self._portfolio(request, symbols)
+            base, bundle = await self._portfolio(request, symbols, state)
         elif skill == "canada360":
             base, bundle, government_profile = await self._canada(request, state)
         elif skill == "compare" and len(symbols) >= 2:
@@ -509,12 +547,19 @@ class AnatoleAssistantOrchestrator:
             bundle = _bundle_from_response("market_analysis", base, [])
         bundles = [bundle]
         if mixed_macro and skill == "portfolio_analysis":
-            macro, macro_bundle, _ = await self._canada(request, state)
-            bundles.append(macro_bundle)
-            base.answer += ("\n\nContexte macro canadien : " + macro.answer +
-                            "\nScénario, pas prévision : les expositions du portefeuille ci-dessus "
-                            "peuvent être comparées à ces données, mais aucun impact causal précis n'est calculé.")
-            base.sources.extend(macro.sources)
+            try:
+                macro, macro_bundle, _ = await self._canada(request, state)
+                bundles.append(macro_bundle)
+                base.answer += ("\n\n## Contexte macro Canada 360\n" + macro.answer +
+                                "\nLes séries officielles d’inflation et de chômage restent du contexte; "
+                                "aucune sensibilité à ces séries n’est inférée.")
+                base.sources.extend(macro.sources)
+                logger.info("portfolio_macro_context source_count=%s coverage_bucket=%s",
+                            len(macro_bundle.sources), "high" if macro_bundle.sources else "low")
+            except Exception:
+                bundle.missing_data.append("Contexte officiel Canada 360 temporairement indisponible")
+                base.answer += "\n\n## Contexte macro Canada 360\nDonnées officielles indisponibles pour cette question."
+                logger.info("portfolio_macro_context source_count=0 coverage_bucket=low")
         if mixed_macro and symbols and skill == "canada360":
             for symbol in symbols[:2]:
                 stock, stock_bundle = await self._stock(symbol, context.language)

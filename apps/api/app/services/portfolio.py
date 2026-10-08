@@ -30,6 +30,10 @@ from app.services.portfolio_intelligence import (
     build_portfolio_risk_reading,
     build_stress_tests,
 )
+from app.services.portfolio_intelligence_v12 import (
+    build_attribution, build_correlation_clusters, build_factor_sensitivities,
+    build_risk_contributions,
+)
 from app.services.tsx60 import TSX60
 
 logger = logging.getLogger(__name__)
@@ -450,14 +454,9 @@ class PortfolioService:
                 core_histories.get(request.benchmark, []),
             )
             histories.update(optional_histories)
-            for symbol, ticker in history_tickers.items():
-                points = len(histories.get(symbol, []))
-                logger.info(
-                    "portfolio_history ticker=%s points=%s status=%s",
-                    ticker,
-                    points,
-                    "ok" if points >= 2 else "unavailable",
-                )
+            available_histories = sum(len(histories.get(symbol, [])) >= 2 for symbol in history_tickers)
+            logger.info("portfolio_history positions_requested=%s histories_available=%s",
+                        len(history_tickers), available_histories)
             benchmark_points = len(histories.get(request.benchmark, []))
             logger.info(
                 "portfolio_history benchmark=%s points=%s status=%s",
@@ -691,6 +690,10 @@ class PortfolioService:
         )
         correlation = build_correlation_matrix(positions, histories)
         stress_tests = build_stress_tests(positions, histories, canada_10y)
+        risk_contributions = build_risk_contributions(positions, histories)
+        factor_sensitivities = build_factor_sensitivities(positions, histories, canada_10y)
+        correlation_clusters = build_correlation_clusters(correlation, positions, risk_contributions)
+        attribution = build_attribution(positions, performance_horizons, contribution_horizons)
         sector_allocation = _allocation(positions, "sector")
         risk_reading = build_portfolio_risk_reading(
             positions,
@@ -765,6 +768,10 @@ class PortfolioService:
             contribution_horizons=contribution_horizons,
             correlation=correlation,
             stress_tests=stress_tests,
+            risk_contributions=risk_contributions,
+            factor_sensitivities=factor_sensitivities,
+            correlation_clusters=correlation_clusters,
+            attribution=attribution,
             risk_reading=risk_reading,
             methodology="Les horizons supérieurs à un jour reconstituent la performance des positions actuelles en supposant les quantités constantes. Les corrélations et sensibilités utilisent uniquement des historiques stricts réellement disponibles.",
             notes=notes,
@@ -779,6 +786,14 @@ class PortfolioService:
             len(histories),
             round((monotonic() - started_at) * 1000),
         )
+        logger.info("portfolio_risk_contribution_built coverage_bucket=%s position_count=%s",
+                    "high" if risk_contributions.coverage.coverage_percent >= 90 else
+                    "partial" if risk_contributions.coverage.coverage_percent >= 70 else "low",
+                    len(positions))
+        logger.info("portfolio_attribution_built position_count=%s horizon_count=%s",
+                    len(positions), len(attribution))
+        logger.info("portfolio_clusters_built position_count=%s cluster_count=%s",
+                    len(positions), len(correlation_clusters))
         return snapshot
 
 

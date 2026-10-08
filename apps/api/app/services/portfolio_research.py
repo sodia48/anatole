@@ -7,8 +7,12 @@ from datetime import UTC
 
 from app.schemas.assistant_context import (
     AnatoleEvidenceBundle, EvidenceFact, EvidenceSource, PortfolioEvidencePosition,
+    PortfolioLookThroughSummary,
 )
 from app.schemas.workspace import PortfolioSnapshot
+from app.services.portfolio_research_v12 import (
+    build_concentration_map, build_macro_exposures, build_portfolio_xray,
+)
 
 
 SOURCE = "Portefeuille Anatole"
@@ -233,6 +237,13 @@ def build_portfolio_research_bundle(snapshot: PortfolioSnapshot,
     if getattr(risk, "history_coverage_percent", 0) >= 90:
         _add(bundle, "strengths", "Historique couvert", _percent(risk.history_coverage_percent))
     bundle.time_series_summary = getattr(snapshot, "methodology", "") or None
+    bundle.risk_contributions = getattr(snapshot, "risk_contributions", None)
+    bundle.attribution = getattr(snapshot, "attribution", [])
+    bundle.correlation_clusters = getattr(snapshot, "correlation_clusters", [])
+    bundle.lookthrough = PortfolioLookThroughSummary()
+    bundle.macro_exposures = build_macro_exposures(snapshot)
+    bundle.portfolio_xray = build_portfolio_xray(snapshot, requested_count, bundle.lookthrough)
+    bundle.concentration_map = build_concentration_map(snapshot, bundle.lookthrough, bundle.macro_exposures)
     return bundle
 
 
@@ -252,9 +263,10 @@ def add_etf_lookthrough(bundle: AnatoleEvidenceBundle, etf_symbol: str, etf_weig
         _add(bundle, "lookthrough", f"{etf_symbol} titres communs",
              ", ".join(row.display_symbol for row in common[:5]))
     sectors = getattr(holdings, "sectors", [])
-    for sector in sectors[:3]:
-        _add(bundle, "lookthrough", f"{etf_symbol} secteur implicite {sector.label}",
-             f"{_percent(etf_weight * sector.weight_percent / 100)} du portefeuille observé")
+    if getattr(holdings, "official", False) and not getattr(holdings, "stale", False):
+        for sector in sectors[:3]:
+            _add(bundle, "lookthrough", f"{etf_symbol} secteur implicite {sector.label}",
+                 f"{_percent(etf_weight * sector.weight_percent / 100)} du portefeuille observé")
     if coverage < 99.5:
         bundle.limitations.append(f"Look-through {etf_symbol} partiel : {_percent(coverage)} des participations publiées; aucun chevauchement total inféré")
     bundle.sources.append(EvidenceSource(label=holdings.source_name, type="etf_holdings",
@@ -272,6 +284,93 @@ def format_portfolio_research(bundle: AnatoleEvidenceBundle, snapshot: Portfolio
     else:
         opening = "Voici une lecture descriptive des données de portefeuille disponibles; certaines valorisations restent indisponibles."
     lines = [opening]
+    xray = bundle.portfolio_xray
+    if xray:
+        lines.extend(["", "## Radiographie",
+                      f"- **Positions valorisées :** {xray.position_count}; couverture des cotations {xray.quote_coverage_percent:.1f} %.",
+                      f"- **Qualité d’analyse :** {xray.analysis_quality}."])
+        if xray.effective_positions is not None:
+            lines.append(f"- **Nombre effectif de positions :** {xray.effective_positions:.2f}, calculé par 1 / somme des poids de marché au carré.")
+        for label, value in (("Couverture historique", xray.history_coverage_percent),
+                             ("Classification sectorielle", xray.sector_coverage_percent),
+                             ("Look-through ETF", xray.etf_lookthrough_coverage_percent),
+                             ("Contribution au risque", xray.risk_contribution_coverage_percent),
+                             ("Attribution", xray.attribution_coverage_percent),
+                             ("Corrélations", xray.correlation_coverage_percent),
+                             ("Stress", xray.stress_coverage_percent)):
+            if value is not None:
+                lines.append(f"- **{label} :** {value:.1f} % de couverture.")
+    risk_contributions = bundle.risk_contributions
+    if risk_contributions and risk_contributions.items:
+        lines.extend(["", "## Où se trouve réellement le risque",
+                      f"- Contribution calculée par covariance sur {risk_contributions.observations} observations synchronisées; couverture {risk_contributions.coverage.coverage_percent:.1f} %."])
+        for row in risk_contributions.items[:5]:
+            lines.append(f"- **{row.symbol} :** poids {row.portfolio_weight_percent:.1f} %; contribution au risque {row.risk_contribution_percent:.1f} %; volatilité isolée {row.standalone_volatility_percent:.1f} %.")
+        lines.append("- Il s’agit d’une contribution à la volatilité historique, pas d’une VaR marginale ni d’une prévision.")
+    concentration = bundle.concentration_map
+    if concentration:
+        details = []
+        if concentration.direct_top_three_percent is not None:
+            details.append(f"- Les trois plus grandes positions directes représentent {concentration.direct_top_three_percent:.1f} %.")
+        for row in concentration.observed_economic_top[:3]:
+            if row.direct_weight_percent > 0 and row.indirect_observed_weight_percent > 0:
+                details.append(f"- **{row.symbol} :** {row.direct_weight_percent:.1f} % direct + {row.indirect_observed_weight_percent:.1f} % indirect observé via {', '.join(row.source_etfs)}; le total reste partiel si les holdings le sont.")
+        if concentration.top_cluster_weight_percent is not None:
+            details.append(f"- Plus grand cluster corrélé : {concentration.top_cluster_weight_percent:.1f} % de poids de marché.")
+        if details:
+            lines.extend(["", "## Concentrations cachées", *details])
+    if bundle.correlation_clusters or xray and xray.effective_positions is not None:
+        lines.extend(["", "## Diversification et clusters"])
+        if xray and xray.effective_positions is not None:
+            lines.append(f"- {xray.position_count} lignes représentent {xray.effective_positions:.2f} positions effectives selon les poids.")
+        for cluster in bundle.correlation_clusters[:5]:
+            lines.append(f"- **{cluster.label} :** {', '.join(cluster.symbols)}; poids {cluster.combined_weight_percent:.1f} %; corrélation interne moyenne {cluster.average_internal_correlation:.2f}; {cluster.observations} observations, {cluster.coverage_percent:.0f} % des paires couvertes.")
+    if bundle.attribution:
+        rows = [row for row in bundle.attribution if row.portfolio_return_percent is not None]
+        if rows:
+            lines.extend(["", "## Performance et attribution"])
+            for row in rows:
+                label = HORIZON_LABELS.get(row.horizon, row.horizon.upper())
+                comparison = (f"; indice {row.benchmark_return_percent:+.2f} %; écart {row.excess_return_percent:+.2f} %"
+                              if row.benchmark_return_percent is not None and row.excess_return_percent is not None else
+                              "; indice et écart non calculables")
+                lines.append(f"- **{label} :** portefeuille {row.portfolio_return_percent:+.2f} %{comparison}; couverture {row.coverage.coverage_percent:.0f} %.")
+                if row.horizon in {"1d", "1m"}:
+                    for item in (row.top_contributors[:2] + row.top_detractors[:2]):
+                        lines.append(f"- {label} {item.symbol} : contribution {item.contribution_percent:+.2f} points; titre {item.security_return_percent:+.2f} %.")
+                    if row.sector_contributions:
+                        lines.append("- Secteurs connus observés : " + "; ".join(
+                            f"{sector} {value:+.2f} points" for sector, value in sorted(row.sector_contributions.items())) + ".")
+            lines.append("- Au-delà de 1D, cette attribution reconstitue les positions actuelles à quantités constantes; elle ne tient pas compte des transactions historiques.")
+    if bundle.scenarios or any(row.weighted_sensitivity is not None for row in bundle.macro_exposures):
+        lines.extend(["", "## Stress et sensibilités"])
+        for row in bundle.scenarios:
+            shock = f"{row.shock:+.0f} points de base" if row.shock_unit == "basis_points" else f"{row.shock:+.1f} %"
+            if row.estimated_portfolio_change_percent is not None:
+                lines.append(f"- **{row.factor} {shock} :** impact estimé {row.estimated_portfolio_change_percent:+.2f} %; couverture {row.coverage.coverage_percent:.0f} %; scénario, pas prévision.")
+                for position in sorted(row.positions, key=lambda item: abs(item.contribution_percent_points), reverse=True)[:3]:
+                    lines.append(f"- {position.symbol} : {position.contribution_percent_points:+.2f} points d’impact calculé.")
+            else:
+                lines.append(f"- **{row.factor} {shock} :** impact indisponible; couverture {row.coverage.coverage_percent:.0f} %.")
+        for row in bundle.macro_exposures:
+            if row.weighted_sensitivity is not None:
+                lines.append(f"- Sensibilité historique pondérée {row.factor} : {row.weighted_sensitivity:+.3f}; couverture {row.coverage_percent:.0f} %.")
+        lines.append("- Inflation et chômage servent uniquement de contexte officiel tant qu’aucune sensibilité directe n’est calculée.")
+    if bundle.watchtower:
+        delta = bundle.watchtower
+        lines.extend(["", "## Ce qui a changé"])
+        if not delta.previous_available:
+            lines.append("- Aucun snapshot antérieur dans cette conversation.")
+        else:
+            lines.append(f"- Entre {delta.previous_at.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} et {delta.current_at.astimezone(UTC).strftime('%Y-%m-%d %H:%M UTC')} ({delta.elapsed_seconds:.0f} secondes).")
+            if delta.changes:
+                for key, change in list(delta.changes.items())[:12]:
+                    lines.append(f"- {key.replace('_', ' ')} : {change:+.2f} par rapport au snapshot précédent.")
+            else:
+                lines.append("- Aucun agrégat comparable n’a changé.")
+    if xray:
+        lines.extend(["", "## Données manquantes et couverture",
+                      f"- Cotations {xray.quote_coverage_percent:.0f} %; historique {(xray.history_coverage_percent or 0):.0f} %; secteurs {(xray.sector_coverage_percent or 0):.0f} %; risque calculable {(xray.risk_contribution_coverage_percent or 0):.0f} %."])
     if selected_highlights:
         lines.extend(["", "## Points saillants"])
         lines.extend(f"- **{bundle.facts[index].label} :** {bundle.facts[index].value}" for index in selected_highlights[:5])

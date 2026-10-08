@@ -201,6 +201,59 @@ test("V11 affiche l'analyse portefeuille, les positions et les suivis sans perdr
   expect(calls[2].portfolio_consent).toBe(true);
 });
 
+test("V12 conserve le consentement pour stress personnalisé et Watchtower", async ({ page }) => {
+  const calls: Record<string, unknown>[] = [];
+  await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([
+    { symbol: "RY", quantity: 2, average_cost: 100 },
+    { symbol: "XIC", quantity: 3, average_cost: 30 },
+  ])));
+  await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    calls.push(body);
+    if (!body.portfolio_consent) {
+      await route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify(reply("portfolio_analysis", "Autorisation", "Autoriser le portefeuille ?", [], true)) });
+      return;
+    }
+    const question = String(body.message);
+    const answer = question.includes("pétrole")
+      ? "## Stress et sensibilités\n- **wti -20.0 % :** impact estimé -4.2 %; couverture 100 %; scénario, pas prévision."
+      : question.includes("changé")
+        ? "## Ce qui a changé\n- top trois positions : +12.0 points entre deux snapshots de cette conversation."
+        : "## Radiographie\n- **Positions valorisées :** 2.\n## Où se trouve réellement le risque\n- RY contribue à 60 % du risque.";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ...reply("portfolio_analysis", "Intelligence portefeuille", answer,
+        [{ label: "Ouvrir Portefeuille", href: "/portefeuille", kind: "navigate" }]),
+      evidence: [{ skill: "portfolio_analysis", sources: [{ label: "Portefeuille Anatole", type: "portfolio",
+        freshness: "internal", timestamp: generated, url: null }], missing_data: [], limitations: [],
+        portfolio_focus: question.includes("pétrole") ? "stress" : question.includes("changé") ? "watchtower" : "overview",
+        portfolio_xray: { position_count: 2, quote_coverage_percent: 100, effective_positions: 1.8,
+          top_three_percent: 100, sector_coverage_percent: 100, history_coverage_percent: 90,
+          risk_contribution_coverage_percent: 100, attribution_coverage_percent: 100,
+          analysis_quality: "élevée" } }],
+    }) });
+  });
+  await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+  await openGlobalAssistant(page);
+  const input = page.getByLabel("Votre question");
+  await input.fill("Que penses-tu de mon portefeuille ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await page.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
+  const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
+  await expect(dialog.getByRole("heading", { name: "Radiographie" })).toBeVisible();
+  await input.fill("Et si le pétrole chute de 20 % ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await expect(dialog.getByRole("heading", { name: "Stress et sensibilités" })).toBeVisible();
+  await expect(dialog).toContainText("wti -20.0 %");
+  await input.fill("Qu’est-ce qui a changé depuis la dernière analyse ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await expect(dialog.getByRole("heading", { name: "Ce qui a changé" })).toBeVisible();
+  await expect(input).toBeVisible();
+  expect(calls[0].portfolio_positions).toEqual([]);
+  expect(calls.slice(1).every((call) => call.portfolio_consent === true
+    && (call.portfolio_positions as unknown[]).length === 2)).toBe(true);
+});
+
 test("Refus du portefeuille et Canada 360 gardent leurs contextes", async ({ page }) => {
   const calls: Record<string, unknown>[] = [];
   await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {

@@ -217,6 +217,84 @@ class PortfolioStressTest(BaseModel):
     methodology: str
 
 
+class PortfolioRiskContribution(BaseModel):
+    symbol: str
+    portfolio_weight_percent: float
+    standalone_volatility_percent: float
+    component_risk: float
+    risk_contribution_percent: float
+    observations: int = Field(ge=0)
+
+
+class PortfolioRiskContributionSnapshot(BaseModel):
+    items: list[PortfolioRiskContribution] = Field(default_factory=list)
+    portfolio_volatility_percent: float | None = None
+    coverage: PortfolioCoverage
+    observations: int = Field(ge=0)
+    methodology: str = "Covariance des rendements quotidiens synchronisés; volatilité annualisée."
+
+
+class PortfolioFactorSensitivity(BaseModel):
+    symbol: str
+    factor: Literal["tsx", "wti", "cad_usd", "canada_10y"]
+    beta: float
+    observations: int = Field(ge=0)
+
+
+class PortfolioScenarioRequest(BaseModel):
+    tsx_percent: float | None = Field(default=None, ge=-80, le=80)
+    wti_percent: float | None = Field(default=None, ge=-80, le=80)
+    cad_usd_percent: float | None = Field(default=None, ge=-80, le=80)
+    canada_10y_bps: float | None = Field(default=None, ge=-500, le=500)
+
+    @model_validator(mode="after")
+    def has_shock(self) -> "PortfolioScenarioRequest":
+        if all(value is None for value in self.model_dump().values()):
+            raise ValueError("Au moins un choc doit être fourni.")
+        return self
+
+
+class PortfolioScenarioPositionImpact(BaseModel):
+    symbol: str
+    contribution_percent_points: float
+    sensitivity: float
+    observations: int
+
+
+class PortfolioScenarioResult(BaseModel):
+    factor: Literal["tsx", "wti", "cad_usd", "canada_10y"]
+    shock: float
+    shock_unit: Literal["percent", "basis_points"]
+    estimated_portfolio_change_percent: float | None = None
+    positions: list[PortfolioScenarioPositionImpact] = Field(default_factory=list)
+    coverage: PortfolioCoverage
+    methodology: str = "Sensibilités historiques observées; scénario, pas prévision."
+    limitations: list[str] = Field(default_factory=list)
+
+
+class PortfolioCorrelationCluster(BaseModel):
+    label: str
+    symbols: list[str]
+    combined_weight_percent: float
+    average_internal_correlation: float
+    observations: int
+    coverage_percent: float
+    top_risk_contributors: list[str] = Field(default_factory=list)
+
+
+class PortfolioAttributionHorizon(BaseModel):
+    horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
+    portfolio_return_percent: float | None = None
+    benchmark_return_percent: float | None = None
+    excess_return_percent: float | None = None
+    contributions: list[PortfolioHorizonContribution] = Field(default_factory=list)
+    top_contributors: list[PortfolioHorizonContribution] = Field(default_factory=list)
+    top_detractors: list[PortfolioHorizonContribution] = Field(default_factory=list)
+    sector_contributions: dict[str, float] = Field(default_factory=dict)
+    coverage: PortfolioCoverage
+    methodology: Literal["observed_day", "current_positions_reconstructed"]
+
+
 class PortfolioSnapshot(BaseModel):
     base_currency: str
     benchmark: str
@@ -239,6 +317,10 @@ class PortfolioSnapshot(BaseModel):
     contribution_horizons: list[PortfolioContributionResult] = Field(default_factory=list)
     correlation: PortfolioCorrelationMatrix | None = None
     stress_tests: list[PortfolioStressTest] = Field(default_factory=list)
+    risk_contributions: PortfolioRiskContributionSnapshot | None = None
+    factor_sensitivities: list[PortfolioFactorSensitivity] = Field(default_factory=list)
+    correlation_clusters: list[PortfolioCorrelationCluster] = Field(default_factory=list)
+    attribution: list[PortfolioAttributionHorizon] = Field(default_factory=list)
     risk_reading: list[str] = Field(default_factory=list)
     methodology: str = ""
     notes: list[str]

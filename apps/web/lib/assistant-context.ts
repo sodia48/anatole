@@ -17,12 +17,47 @@ export type AssistantPortfolioPosition = {
   unrealized_pnl: number; unrealized_pnl_percent: number | null;
   base_currency: string; freshness: string;
 };
+export type PortfolioCoverage = { symbols_expected: number; symbols_available: number; coverage_percent: number };
+export type PortfolioXRay = {
+  position_count: number; quote_coverage_percent: number; effective_positions: number | null;
+  top_three_percent: number | null; sector_coverage_percent: number | null;
+  history_coverage_percent: number | null; risk_contribution_coverage_percent: number | null;
+  attribution_coverage_percent: number | null; analysis_quality: "élevée" | "partielle" | "limitée";
+};
+export type PortfolioRiskContribution = {
+  symbol: string; portfolio_weight_percent: number; standalone_volatility_percent: number;
+  component_risk: number; risk_contribution_percent: number; observations: number;
+};
+export type PortfolioScenario = {
+  factor: "tsx" | "wti" | "cad_usd" | "canada_10y"; shock: number;
+  shock_unit: "percent" | "basis_points"; estimated_portfolio_change_percent: number | null;
+  coverage: PortfolioCoverage; positions: { symbol: string; contribution_percent_points: number }[];
+};
 export type AssistantEvidence = {
   skill: string;
   sources: { label: string; type: string; freshness: string; timestamp: string | null; url: string | null }[];
   missing_data: string[];
   limitations: string[];
   position_rows?: AssistantPortfolioPosition[];
+  portfolio_focus?: string | null;
+  portfolio_xray?: PortfolioXRay | null;
+  risk_contributions?: { items: PortfolioRiskContribution[]; coverage: PortfolioCoverage; observations: number } | null;
+  lookthrough?: { holdings_coverage_percent: number; status: "observed" | "partial" | "unavailable";
+    holdings: { symbol: string; direct_weight_percent: number; indirect_observed_weight_percent: number;
+      combined_observed_weight_percent: number; source_etfs: string[] }[] } | null;
+  concentration_map?: { direct_top_three_percent: number | null; top_cluster_weight_percent: number | null;
+    sector_weights: Record<string, number>; currency_weights: Record<string, number>;
+    factor_exposures: Record<string, number>; coverage: Record<string, number> } | null;
+  attribution?: { horizon: string; portfolio_return_percent: number | null;
+    benchmark_return_percent: number | null; excess_return_percent: number | null;
+    coverage: PortfolioCoverage; methodology: "observed_day" | "current_positions_reconstructed" }[];
+  correlation_clusters?: { label: string; symbols: string[]; combined_weight_percent: number;
+    average_internal_correlation: number; coverage_percent: number }[];
+  scenarios?: PortfolioScenario[];
+  macro_exposures?: { factor: string; weighted_sensitivity: number | null;
+    coverage_percent: number; source_freshness: string; context_only: boolean }[];
+  watchtower?: { previous_available: boolean; previous_at: string | null; current_at: string;
+    elapsed_seconds: number | null; changes: Record<string, number> } | null;
 };
 export type UnifiedAssistantResponse = AssistantResponse & {
   context: AssistantContext;
