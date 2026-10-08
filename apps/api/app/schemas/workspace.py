@@ -177,6 +177,8 @@ class PortfolioCoverage(BaseModel):
 class PortfolioHorizonResult(BaseModel):
     horizon: Literal["1d", "1w", "1m", "3m", "ytd", "1y"]
     return_percent: float | None = None
+    benchmark_return_percent: float | None = None
+    excess_return_percent: float | None = None
     coverage: PortfolioCoverage
     methodology: Literal["observed_day", "current_positions_reconstructed"]
 

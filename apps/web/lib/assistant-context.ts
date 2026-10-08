@@ -12,11 +12,17 @@ export type AssistantContext = {
   metadata: Record<string, string>;
 };
 export type AssistantAction = { label: string; href: string; kind: "navigate" };
+export type AssistantPortfolioPosition = {
+  symbol: string; name: string; market_value: number; weight_percent: number;
+  unrealized_pnl: number; unrealized_pnl_percent: number | null;
+  base_currency: string; freshness: string;
+};
 export type AssistantEvidence = {
   skill: string;
   sources: { label: string; type: string; freshness: string; timestamp: string | null; url: string | null }[];
   missing_data: string[];
   limitations: string[];
+  position_rows?: AssistantPortfolioPosition[];
 };
 export type UnifiedAssistantResponse = AssistantResponse & {
   context: AssistantContext;

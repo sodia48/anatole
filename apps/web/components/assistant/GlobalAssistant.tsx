@@ -10,7 +10,7 @@ import { useAssistantContext } from "./AssistantContextProvider";
 import styles from "./GlobalAssistant.module.css";
 
 type Turn = { role: "user" | "assistant"; text: string; result?: UnifiedAssistantResponse };
-const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|chevauch|overlap|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
+const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|diversification|sous.perform|underperform|chevauch|overlap|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
 const EXPLICIT_SWITCH = /gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\b(?:analyse|cours|prix|compare)\b/i;
 const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/;
@@ -25,6 +25,23 @@ function AssistantText({ text, collapseSources = false }: { text: string; collap
     block.type === "bullet_list" ? <ul key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ul> :
     block.type === "ordered_list" ? <ol key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ol> :
     <p key={index}>{inline(block.content)}</p>)}</div>;
+}
+
+function PortfolioPositionSummary({ evidence }: { evidence: UnifiedAssistantResponse["evidence"] }) {
+  const rows = evidence.flatMap((bundle) => bundle.position_rows ?? []);
+  if (!rows.length) return null;
+  const money = (value: number, currency: string) => `${value.toLocaleString("fr-CA", { maximumFractionDigits: 2 })} ${currency}`;
+  return <div className={styles.positions} aria-label="Principales positions du portefeuille">
+    <strong>Positions observées</strong>
+    <div className={styles.positionsGrid}>
+      {rows.slice(0, 10).map((row) => <div className={styles.position} key={row.symbol}>
+        <strong>{row.symbol}</strong><span>{row.weight_percent.toFixed(1)} %</span>
+        <small>{money(row.market_value, row.base_currency)}</small>
+        <small>P&amp;L latent {money(row.unrealized_pnl, row.base_currency)}</small>
+      </div>)}
+    </div>
+    {rows.length > 10 && <small>+ {rows.length - 10} autres positions dans Portefeuille</small>}
+  </div>;
 }
 
 export function GlobalAssistant() {
@@ -114,6 +131,7 @@ export function GlobalAssistant() {
           {turns.map((turn, index) => <article key={index} className={turn.role === "user" ? styles.userTurn : styles.assistantTurn}>
             {turn.result && <span className={styles.skillChip}>{SKILL_LABELS[turn.result.intent] ?? turn.result.intent}</span>}
             {turn.role === "assistant" ? <AssistantText text={turn.text} collapseSources={Boolean(turn.result?.evidence.some((row) => row.sources.length > 0))} /> : <p>{turn.text}</p>}
+            {turn.result?.intent === "portfolio_analysis" && <PortfolioPositionSummary evidence={turn.result.evidence} />}
             {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>{turn.result.intent === "canada360"
               ? `Sources officielles (${turn.result.evidence.flatMap((row) => row.sources).length})`
               : "Sources et données utilisées"}</summary>

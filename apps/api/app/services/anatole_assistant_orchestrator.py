@@ -29,18 +29,21 @@ from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
 from app.services.stock_research import build_stock_research_bundle, generate_stock_research_from_evidence
 from app.services.portfolio import portfolio_service
+from app.services.portfolio_research import (
+    add_etf_lookthrough, build_portfolio_research_bundle,
+    generate_portfolio_research_from_evidence,
+)
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
 from app.services.canada_360_providers import provider_router
-from app.schemas.workspace import PortfolioAnalyzeRequest, PortfolioPerformanceRequest, PortfolioPerformanceWeight
-from app.services.portfolio_performance import portfolio_performance_service
+from app.schemas.workspace import PortfolioAnalyzeRequest
 
 
 logger = logging.getLogger(__name__)
 SESSION_SECONDS = 2 * 60 * 60
 _ETF_SYMBOLS = {item["ticker"] for item in ETF_CATALOG}
 _ALIASES = {"shopify": "SHOP", "lightspeed": "LSPD"}
-_PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap")
+_PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap", "diversification", "sous-perform", "sous perform", "underperform")
 _GOVERNMENT_CUES = ("canada 360", "gouvernement", "statistique canad", "statistique canada", "province", "prestation", "soins dentaires", "impôt", "assurance emploi", "government", "benefit", "dental", "unemployment rate", "taux de chômage", "inflation canad", "inflation au canada", "macro canadien", "passeport", "quebec", "québec", "ontario", "alberta")
 _MACRO_CUES = ("inflation", "taux directeur", "pétrole", "cad", "macro", "interest rate", "oil price")
 _NEWS_CUES = ("nouvelle", "actualité", "news", "aujourd'hui", "today", "baisse aujourd", "down today")
@@ -346,93 +349,32 @@ class AnatoleAssistantOrchestrator:
     async def _portfolio(self, request: UnifiedAssistantRequest, symbols: list[str]) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
         logger.info("assistant_tool_started skill=portfolio_analysis tool=portfolio")
         snapshot = await portfolio_service.analyze(PortfolioAnalyzeRequest(positions=request.portfolio_positions))
-        bundle = AnatoleEvidenceBundle(
-            skill="portfolio_analysis", entities=[row.symbol for row in snapshot.positions[:5]],
-            sources=[EvidenceSource(label="Portefeuille Anatole", type="portfolio",
-                                    freshness="internal", timestamp=snapshot.generated_at)],
-            freshness="internal", generated_at=snapshot.generated_at,
-            limitations=["Analyse éducative fondée sur les positions transmises pour cette requête; aucune transaction."],
-        )
-        if snapshot.risk and snapshot.risk.top_position_percent is not None:
-            bundle.facts.append(EvidenceFact(label="Plus grande position",
-                                            value=f"{snapshot.risk.top_position_percent:.1f} %",
-                                            source="Portefeuille Anatole", timestamp=snapshot.generated_at,
-                                            freshness="internal"))
-        if snapshot.sector_allocation:
-            sector = max(snapshot.sector_allocation, key=lambda row: row.weight_percent)
-            bundle.facts.append(EvidenceFact(label="Secteur dominant", value=f"{sector.label} {sector.weight_percent:.1f} %",
-                                            source="Portefeuille Anatole", timestamp=snapshot.generated_at,
-                                            freshness="internal"))
-        if snapshot.risk and snapshot.risk.volatility_percent is not None:
-            bundle.facts.append(EvidenceFact(label="Volatilité observée", value=f"{snapshot.risk.volatility_percent:.1f} %",
-                                            source="Moteur de risque Anatole", timestamp=snapshot.generated_at,
-                                            freshness="internal"))
-        if snapshot.positions:
-            top = max(snapshot.positions, key=lambda row: row.weight_percent)
-            bundle.facts.append(EvidenceFact(label="Position dominante", value=f"{top.symbol} {top.weight_percent:.1f} %",
-                                            source="Portefeuille Anatole", timestamp=snapshot.generated_at,
-                                            freshness="internal"))
+        bundle = build_portfolio_research_bundle(snapshot, requested_count=len(request.portfolio_positions))
         text = request.message.casefold()
-        answer = "Diagnostic des risques observés : " + (
-            "; ".join(f"{fact.label} {fact.value}" for fact in bundle.facts) if bundle.facts
-            else "les données disponibles ne suffisent pas à quantifier la concentration ou la volatilité"
-        ) + "."
-        if "répartition" in text or "repartition" in text or "allocation" in text:
-            answer += (" Cette répartition montre les concentrations ci-dessus. Son adéquation dépend de votre horizon, "
-                       "de votre tolérance au risque et de vos besoins de liquidité; ces positions seules ne permettent pas "
-                       "de conclure qu'elle est bonne ou mauvaise.")
-        if "sous-perform" in text or "underperform" in text:
-            weights = [PortfolioPerformanceWeight(symbol=row.symbol, weight_percent=row.weight_percent, market=row.market)
-                       for row in snapshot.positions if row.weight_percent > 0]
-            if weights:
-                try:
-                    performance = await portfolio_performance_service.analyze(
-                        PortfolioPerformanceRequest(positions=weights, benchmark=snapshot.benchmark, range="1m")
-                    )
-                    if performance.portfolio_return_percent is not None and performance.benchmark_return_percent is not None:
-                        answer += (f" Sur un mois, le portefeuille reconstitué a varié de {performance.portfolio_return_percent:+.1f} % "
-                                   f"contre {performance.benchmark_return_percent:+.1f} % pour {performance.benchmark_name}. "
-                                   "Ces observations ne prouvent pas une cause unique de sous-performance.")
-                        bundle.facts.append(EvidenceFact(label="Écart au TSX sur un mois",
-                                                        value=f"{performance.excess_return_percent:+.1f} %" if performance.excess_return_percent is not None else "N/D",
-                                                        source="Performance Anatole", timestamp=performance.generated_at,
-                                                        freshness="internal"))
-                        bundle.sources.append(EvidenceSource(label="Performance Anatole", type="portfolio_performance",
-                                                            freshness="internal", timestamp=performance.generated_at))
-                    else:
-                        bundle.missing_data.append("Performance mensuelle comparable indisponible")
-                except Exception:
-                    bundle.missing_data.append("Performance mensuelle comparable indisponible")
-        if "pétrole" in text or "oil" in text:
-            stress = next((row for row in snapshot.stress_tests if row.key == "wti"), None)
-            if stress and stress.estimated_portfolio_change_percent is not None:
-                answer += (f" Le test existant {stress.label} estime une variation de {stress.estimated_portfolio_change_percent:+.1f} % "
-                           f"avec {stress.coverage.coverage_percent:.0f} % de couverture. "
-                           "Un choc de 20 % n'est pas calculé par ce moteur.")
-                bundle.sources.append(EvidenceSource(label="Stress tests Anatole", type="portfolio_risk",
-                                                    freshness="internal", timestamp=snapshot.generated_at))
-            else:
-                bundle.missing_data.append("Sensibilité au pétrole indisponible")
+
+        etfs = [(row.symbol, row.weight_percent) for row in snapshot.positions if row.symbol in _ETF_SYMBOLS]
+        explicit = next((symbol for symbol in symbols if symbol in _ETF_SYMBOLS), None)
+        if explicit and explicit not in {symbol for symbol, _ in etfs}:
+            etfs.insert(0, (explicit, 0.0))
         if "chevauch" in text or "overlap" in text:
-            etf = next((symbol for symbol in symbols if symbol in _ETF_SYMBOLS), None)
-            if etf:
-                try:
-                    holdings = await etf_holdings_service.snapshot(etf, limit=25)
-                    direct = {row.symbol.upper().removesuffix(".TO") for row in request.portfolio_positions}
-                    common = [row for row in holdings.holdings if row.display_symbol.upper().removesuffix(".TO") in direct]
-                    coverage = sum(row.weight_percent for row in holdings.holdings)
-                    answer += f" Chevauchement {etf} : {len(common)} position(s) commune(s) parmi les {len(holdings.holdings)} participations publiées."
-                    if common:
-                        answer += " Titres communs : " + ", ".join(row.display_symbol for row in common[:5]) + "."
-                    answer += f" Couverture observée des participations : {coverage:.1f} %; aucun pourcentage global de chevauchement n'est déduit si elle est incomplète."
-                    bundle.sources.append(EvidenceSource(label=holdings.source_name, type="etf_holdings",
-                                                        freshness="stale" if holdings.stale else "delayed",
-                                                        timestamp=holdings.generated_at, url=holdings.source_url))
-                except Exception:
-                    bundle.missing_data.append("Participations ETF indisponibles pour le chevauchement")
-                    answer += " Les participations de l’ETF sont indisponibles; le chevauchement ne peut pas être calculé."
+            etfs = sorted(etfs, key=lambda row: row[0] != explicit)
+        else:
+            etfs.sort(key=lambda row: row[1], reverse=True)
+        etfs = etfs[:2]
+        if etfs:
+            results = await asyncio.gather(
+                *(asyncio.wait_for(etf_holdings_service.snapshot(symbol, limit=25), timeout=4)
+                  for symbol, _ in etfs), return_exceptions=True,
+            )
+            direct = {row.symbol.upper().removesuffix(".TO") for row in snapshot.positions}
+            for (symbol, weight), result in zip(etfs, results, strict=True):
+                if isinstance(result, Exception):
+                    bundle.missing_data.append(f"Participations {symbol} indisponibles pour le look-through")
+                else:
+                    add_etf_lookthrough(bundle, symbol, weight, result, direct)
+
         if any(cue in text for cue in _NEWS_CUES):
-            tickers = [row.symbol for row in request.portfolio_positions[:5]]
+            tickers = [row.symbol for row in snapshot.positions[:5]]
             results = await asyncio.gather(
                 *(stock_news_service.get_snapshot(symbol, language=request.context.language) for symbol in tickers),
                 return_exceptions=True,
@@ -440,20 +382,26 @@ class AnatoleAssistantOrchestrator:
             found = [(symbol, item) for symbol, result in zip(tickers, results, strict=True)
                      if not isinstance(result, Exception) for item in result.items[:2]]
             if found:
-                answer += " Actualités des positions : " + "; ".join(
-                    f"{symbol} — {item.title} ({item.published_at.date()})" for symbol, item in found[:5]
-                ) + ". Aucun lien causal avec le cours n'est inféré."
-                bundle.sources.extend(EvidenceSource(label=item.publisher, type="news", freshness="delayed",
-                                                     timestamp=item.published_at, url=item.url) for _, item in found[:5])
+                for symbol, item in found[:5]:
+                    bundle.facts.append(EvidenceFact(label=f"Actualité {symbol}",
+                        value=f"{item.title} ({item.published_at.date()})", source=item.publisher,
+                        timestamp=item.published_at, freshness="delayed"))
+                    bundle.metric_groups.setdefault("news", []).append(bundle.facts[-1])
+                    bundle.sources.append(EvidenceSource(label=item.publisher, type="news",
+                        freshness="delayed", timestamp=item.published_at, url=item.url))
+                bundle.limitations.append("Aucun lien causal entre ces actualités et les cours n’est inféré.")
             else:
                 bundle.missing_data.append("Actualités des positions indisponibles")
         if "var" in text or "value at risk" in text:
-            answer += " La VaR marginale n'est pas calculée par ce diagnostic."
-        base = self._simple("portfolio_analysis", "Risques du portefeuille", answer,
+            bundle.missing_data.append("La VaR marginale n’est pas calculée par ce diagnostic")
+        if ("pétrole" in text or "oil" in text) and not any(row.key == "wti" and row.estimated_portfolio_change_percent is not None
+                                                           for row in snapshot.stress_tests):
+            bundle.missing_data.append("Sensibilité au pétrole indisponible")
+        answer = await generate_portfolio_research_from_evidence(bundle, snapshot, request.message, provider_router)
+        base = self._simple("portfolio_analysis", "Analyse du portefeuille", answer,
                             confidence="moyenne" if bundle.facts else "limitée",
-                            facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts],
-                            sources=[AssistantSource(label="Portefeuille Anatole",
-                                                     detail=f"Calculé {snapshot.generated_at.isoformat()}", status="internal")])
+                            facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts[:25]],
+                            sources=[_evidence_source_to_assistant_source(s) for s in bundle.sources[:12]])
         logger.info("assistant_tool_completed skill=portfolio_analysis tool=portfolio source_count=%s completeness=%s",
                     len(bundle.sources), "partial" if bundle.missing_data else "complete")
         return base, bundle
