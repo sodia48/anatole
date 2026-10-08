@@ -58,6 +58,7 @@ def build_horizon_results(
     positions: list[PortfolioPositionSnapshot],
     histories: dict[str, list[Candle]],
     now: datetime,
+    benchmark_history: list[Candle] | None = None,
 ) -> tuple[list[PortfolioHorizonResult], list[PortfolioContributionResult]]:
     performance: list[PortfolioHorizonResult] = []
     contributions: list[PortfolioContributionResult] = []
@@ -72,10 +73,23 @@ def build_horizon_results(
         coverage = _coverage(expected, len(values), available_weight)
         sufficient = coverage.coverage_percent >= MINIMUM_COVERAGE_PERCENT
         aggregate = sum(position.weight_percent / 100 * value for position, value in values) * 100 if sufficient else None
+        benchmark_return = None
+        if aggregate is not None and benchmark_history:
+            ordered_benchmark = sorted(benchmark_history, key=lambda item: item.time)
+            benchmark_return = (
+                ordered_benchmark[-1].close / ordered_benchmark[-2].close - 1
+                if horizon == "1d" and len(ordered_benchmark) >= 2 and ordered_benchmark[-2].close > 0
+                else period_return(ordered_benchmark, horizon, now)
+            )
         methodology = "observed_day" if horizon == "1d" else "current_positions_reconstructed"
+        portfolio_percent = round(aggregate, 2) if aggregate is not None else None
+        benchmark_percent = round(benchmark_return * 100, 2) if benchmark_return is not None else None
         performance.append(PortfolioHorizonResult(
             horizon=horizon,
-            return_percent=round(aggregate, 2) if aggregate is not None else None,
+            return_percent=portfolio_percent,
+            benchmark_return_percent=benchmark_percent,
+            excess_return_percent=round(portfolio_percent - benchmark_percent, 2)
+            if portfolio_percent is not None and benchmark_percent is not None else None,
             coverage=coverage,
             methodology=methodology,
         ))

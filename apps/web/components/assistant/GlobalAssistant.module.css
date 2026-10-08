@@ -29,6 +29,11 @@
 .assistantTurn details { margin: 10px 0; font-size: .78rem; color: var(--text-muted, #91a6b5); }
 .assistantTurn summary { cursor: pointer; }
 .source { margin-top: 5px !important; }
+.positions { margin: 12px 0; padding: 10px; border: 1px solid var(--border); border-radius: 9px; white-space: normal; }
+.positions > strong { display: block; margin-bottom: 7px; }
+.positionsGrid { display: grid; gap: 5px; }
+.position { display: grid; grid-template-columns: 1fr auto; gap: 0 7px; border-top: 1px solid var(--border); padding: 5px 0; }
+.position small { color: var(--text-muted, #91a6b5); font-size: .72rem; }
 .action { display: inline-block; margin: 7px 8px 0 0; padding: 6px 9px; border: 1px solid var(--border); border-radius: 8px; color: var(--text); text-decoration: none; font-size: .79rem; }
 .permission { border: 1px solid var(--border); border-radius: 12px; padding: 13px; font-size: .88rem; }
 .permission div { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }

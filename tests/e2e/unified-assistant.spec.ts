@@ -146,6 +146,61 @@ test("Portefeuille demande une autorisation par conversation puis transmet les p
   expect((calls[2].portfolio_positions as unknown[]).length).toBe(1);
 });
 
+test("V11 affiche l'analyse portefeuille, les positions et les suivis sans perdre le consentement", async ({ page }) => {
+  const calls: Record<string, unknown>[] = [];
+  await page.addInitScript(() => localStorage.setItem("anatole:portfolio:v1", JSON.stringify([
+    { symbol: "MU", quantity: 10, average_cost: 100 },
+    { symbol: "RY", quantity: 2, average_cost: 200 },
+  ])));
+  await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    calls.push(body);
+    if (!body.portfolio_consent) {
+      await route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify(reply("portfolio_analysis", "Autorisation", "Autoriser le portefeuille ?", [], true)) });
+      return;
+    }
+    const answer = ["Votre portefeuille vaut 10 000 CAD pour un coût de 5 000 CAD.",
+      "", "## Vue d’ensemble", "- **Valeur actuelle :** 10 000 CAD",
+      "", "## Répartition du portefeuille", "- **MU :** 70 % du portefeuille",
+      "", "## Concentration", "- **Top 3 :** 100 %",
+      "", "## Risque", "- **Volatilité :** 20 %",
+      "", "## Performance", "- **1M écart :** -2 %",
+      "", "## Points de vigilance", "- Couverture sectorielle partielle.",
+      "", "## Sources et fraîcheur", "- Portefeuille Anatole : internal."].join("\n");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      ...reply("portfolio_analysis", "Analyse du portefeuille", answer,
+        [{ label: "Ouvrir Portefeuille", href: "/portefeuille", kind: "navigate" }]),
+      evidence: [{ skill: "portfolio_analysis", sources: [{ label: "Portefeuille Anatole", type: "portfolio",
+        freshness: "internal", timestamp: generated, url: null }], missing_data: [], limitations: [],
+        position_rows: ["MU", "VFV", "IMG", "MDA", "XEG", "VNP", "TD", "RY", "XIC", "SHOP", "T"]
+          .map((symbol, index) => ({ symbol, name: symbol, market_value: index === 0 ? 7000 : 3000,
+            weight_percent: index === 0 ? 70 : 3, unrealized_pnl: index === 0 ? 3000 : 1000,
+            unrealized_pnl_percent: 50, base_currency: "CAD", freshness: "live" })) }],
+    }) });
+  });
+  await page.goto("/portefeuille", { waitUntil: "domcontentloaded" });
+  await openGlobalAssistant(page);
+  await page.getByLabel("Votre question").fill("Que penses-tu de mon portefeuille ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await page.getByRole("button", { name: "Autoriser pour cette conversation" }).click();
+  const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
+  for (const heading of ["Vue d’ensemble", "Répartition du portefeuille", "Concentration", "Risque", "Performance"])
+    await expect(dialog.getByRole("heading", { name: heading })).toBeVisible();
+  await expect(dialog.getByLabel("Principales positions du portefeuille")).toContainText("MU");
+  await expect(dialog.getByLabel("Principales positions du portefeuille")).toContainText("7 000");
+  await expect(dialog.getByLabel("Principales positions du portefeuille")).toContainText("+ 1 autres positions");
+  await expect(dialog.getByLabel("Principales positions du portefeuille").locator(":scope > div > div")).toHaveCount(10);
+  await expect(dialog.getByRole("link", { name: /Ouvrir Portefeuille/ })).toBeVisible();
+  await page.getByLabel("Votre question").fill("Pourquoi ai-je sous-performé le TSX ce mois-ci ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await expect.poll(() => calls.length).toBe(3);
+  expect(calls[0].portfolio_positions).toEqual([]);
+  expect((calls[1].portfolio_positions as unknown[]).length).toBe(2);
+  expect((calls[2].portfolio_positions as unknown[]).length).toBe(2);
+  expect(calls[2].portfolio_consent).toBe(true);
+});
+
 test("Refus du portefeuille et Canada 360 gardent leurs contextes", async ({ page }) => {
   const calls: Record<string, unknown>[] = [];
   await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {

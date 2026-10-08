@@ -46,6 +46,23 @@ def test_horizon_reconstruction_preserves_nd_below_70_percent_coverage() -> None
     assert next(item for item in performance if item.horizon == "1d").return_percent == 1
 
 
+def test_horizon_reports_observed_benchmark_and_excess_only_with_coverage() -> None:
+    performance, _ = build_horizon_results(
+        [position("RY", 100)], {"RY": candles(step=0.003)},
+        datetime(2026, 9, 3, tzinfo=UTC), benchmark_history=candles(step=0.001),
+    )
+    one_month = next(item for item in performance if item.horizon == "1m")
+    assert one_month.return_percent is not None
+    assert one_month.benchmark_return_percent is not None
+    assert one_month.excess_return_percent == round(
+        one_month.return_percent - one_month.benchmark_return_percent, 2)
+    uncovered, _ = build_horizon_results(
+        [position("RY", 60), position("TD", 40)], {"RY": candles(step=0.003)},
+        datetime(2026, 9, 3, tzinfo=UTC), benchmark_history=candles(step=0.001),
+    )
+    assert next(item for item in uncovered if item.horizon == "1m").excess_return_percent is None
+
+
 def test_period_return_requires_real_strict_history() -> None:
     assert period_return(candles(count=10), "1m", datetime(2026, 9, 3, tzinfo=UTC)) is None
     assert period_return(candles(count=30), "1m", datetime(2026, 9, 3, tzinfo=UTC)) is not None

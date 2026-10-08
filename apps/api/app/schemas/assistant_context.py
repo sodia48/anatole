@@ -93,6 +93,24 @@ class EvidenceSource(BaseModel):
     url: str | None = None
 
 
+class PortfolioEvidencePosition(BaseModel):
+    symbol: str
+    name: str
+    quantity: float
+    average_cost: float
+    price: float
+    market_value: float
+    weight_percent: float
+    unrealized_pnl: float
+    unrealized_pnl_percent: float | None = None
+    day_change_percent: float
+    sector: str
+    currency: str
+    base_currency: str
+    source: str
+    freshness: str
+
+
 class NavigationAction(BaseModel):
     label: str
     href: str
@@ -119,6 +137,7 @@ class AnatoleEvidenceBundle(BaseModel):
     facts: list[EvidenceFact] = Field(default_factory=list)
     metric_groups: dict[str, list[EvidenceFact]] = Field(default_factory=dict)
     sector_metrics: list[EvidenceFact] = Field(default_factory=list)
+    position_rows: list[PortfolioEvidencePosition] = Field(default_factory=list)
     time_series_summary: str | None = None
     sources: list[EvidenceSource] = Field(default_factory=list)
     freshness: str = "unknown"

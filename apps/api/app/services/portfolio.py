@@ -686,7 +686,9 @@ class PortfolioService:
             notes.append("Aucune position exploitable n'a été calculée.")
 
         observed_at = datetime.now(UTC)
-        performance_horizons, contribution_horizons = build_horizon_results(positions, histories, observed_at)
+        performance_horizons, contribution_horizons = build_horizon_results(
+            positions, histories, observed_at, histories.get(request.benchmark, []),
+        )
         correlation = build_correlation_matrix(positions, histories)
         stress_tests = build_stress_tests(positions, histories, canada_10y)
         sector_allocation = _allocation(positions, "sector")
