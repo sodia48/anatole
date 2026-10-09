@@ -213,10 +213,10 @@ def scenario_request_from_question(question: str) -> PortfolioScenarioRequest | 
     factor = ("wti_percent" if any(word in text for word in ("pétrole", "petrole", "wti", "oil")) else
               "tsx_percent" if "tsx" in text else
               "cad_usd_percent" if any(word in text for word in ("cad/usd", "dollar canadien")) else
-              "canada_10y_bps" if any(word in text for word in ("taux 10 ans", "10y", "points de base", "pdb", "bps")) else None)
+              "canada_10y_bps" if any(word in text for word in ("taux 10 ans", "10 ans", "10y", "points de base", "pdb", "bps", "pb du 10")) else None)
     if factor is None:
         return None
-    unit = r"(?:points? de base|pdb|bps)" if factor == "canada_10y_bps" else "%"
+    unit = r"(?:points? de base|pdb|bps|pb)" if factor == "canada_10y_bps" else "%"
     match = re.search(rf"([+-]?\d{{1,3}}(?:[.,]\d+)?)\s*{unit}", text)
     if not match:
         return None

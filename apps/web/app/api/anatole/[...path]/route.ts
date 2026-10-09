@@ -22,6 +22,7 @@ function publicCacheTtl(pathname: string): number {
   }
 
   if (pathname.includes("/api/v1/market/cockpit")) return 10;
+  if (pathname.includes("/api/v1/fixed-income/")) return 900;
   if (pathname.includes("/api/v1/discovery/psychology")) return 30;
   if (pathname.includes("/api/v1/analysis/terminal")) return 45;
   if (pathname.includes("/api/v1/options/")) return 20;

@@ -13,8 +13,8 @@ type Turn = { role: "user" | "assistant"; text: string; result?: UnifiedAssistan
 const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|diversification|sous.perform|underperform|chevauch|overlap|doublonn|cluster|contribu|watchtower|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
 const EXPLICIT_SWITCH = /gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\bcompare\b/i;
 const EXPLICIT_INSTRUMENT = /\b(?:analyse|cours|prix)\s+(?:de|du|pour)\s+[A-Z][A-Z0-9.^-]{0,9}\b/;
-const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
-const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/;
+const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
+const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/;
 
 function AssistantText({ text, collapseSources = false }: { text: string; collapseSources?: boolean }) {
   const blocks = parseAssistantRichText(text, { collapseSources });
@@ -67,6 +67,7 @@ export function GlobalAssistant() {
     stock: "Pose une question sur ce titre…",
     etf: "Pose une question sur cet ETF…",
     canada360: "Pose ta question à Canada 360…",
+    fixed_income: "Pose une question sur les taux et obligations…",
     market: "Pose une question sur le marché…",
   } as Partial<Record<AssistantContext["surface"], string>>)[activeContext.surface]
     ?? "Pose une question à Anatole…";

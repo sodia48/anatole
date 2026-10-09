@@ -24,6 +24,7 @@ const NAV_ENGLISH: Record<string, string> = {
   "Marchés": "Markets",
   "Aujourd’hui": "Today",
   "Canada 360": "Canada 360",
+  "Taux & obligations": "Rates & bonds",
   "Actualités": "News",
   "Calendrier": "Calendar",
   "IPO & insiders": "IPO & insiders",

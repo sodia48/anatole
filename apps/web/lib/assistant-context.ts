@@ -1,6 +1,6 @@
 import type { AssistantResponse, PortfolioPositionInput } from "./types";
 
-export type AssistantSurface = "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "compare" | "other";
+export type AssistantSurface = "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "fixed_income" | "compare" | "other";
 export type AssistantContext = {
   surface: AssistantSurface;
   route: string;
@@ -85,7 +85,7 @@ export function deriveAssistantContext(pathname: string, search: URLSearchParams
     ? (search.get("symbols") ?? "").split(",").map((value) => value.toUpperCase().replace(/\.TO$/, "")).filter((value) => SYMBOL.test(value)).slice(0, 5)
     : symbol && SYMBOL.test(symbol) ? [symbol] : [];
   const surface: AssistantSurface = focus ? "stock" : etf ? "etf" : route === "/portefeuille" ? "portfolio"
-    : route === "/comparateur" ? "compare" : route === "/actualites" ? "news" : route === "/canada" ? "canada360"
+    : route === "/comparateur" ? "compare" : route === "/actualites" ? "news" : route === "/canada" ? "canada360" : route === "/taux-obligations" ? "fixed_income"
     : route === "/terminal" || route === "/screener" ? "market" : "other";
   return { surface, route, symbol: symbols[0], symbols,
     instrument_type: focus ? "stock" : etf ? "etf" : "unknown",
@@ -98,6 +98,7 @@ export function assistantContextLabel(context: AssistantContext): string {
   if (context.surface === "portfolio") return "Mon portefeuille";
   if (context.surface === "compare") return `Comparateur${context.symbols.length ? ` · ${context.symbols.join(" / ")}` : ""}`;
   if (context.surface === "canada360") return "Canada 360";
+  if (context.surface === "fixed_income") return "Taux & Obligations";
   if (context.surface === "market") return "Marché";
   if (context.surface === "news") return "Actualités";
   return "Anatole";

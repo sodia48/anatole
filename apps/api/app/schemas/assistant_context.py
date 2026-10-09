@@ -15,10 +15,10 @@ from app.schemas.workspace import (
 )
 
 
-Surface = Literal["stock", "etf", "portfolio", "market", "news", "canada360", "compare", "other"]
-Skill = Literal["stock_analysis", "etf_analysis", "portfolio_analysis", "market_analysis", "compare", "news_context", "canada360", "data_quality", "guardrail"]
+Surface = Literal["stock", "etf", "portfolio", "market", "news", "canada360", "fixed_income", "compare", "other"]
+Skill = Literal["stock_analysis", "etf_analysis", "portfolio_analysis", "market_analysis", "compare", "news_context", "canada360", "fixed_income", "data_quality", "guardrail"]
 SYMBOL_RE = re.compile(r"^[A-Z^][A-Z0-9.^-]{0,14}$")
-ROUTE_RE = re.compile(r"^/(?:focus/[A-Za-z0-9.^-]{1,15}|etf(?:/[A-Za-z0-9.^-]{1,15})?|portefeuille|comparateur|actualites|canada|terminal|screener|assistant|qualite)?$")
+ROUTE_RE = re.compile(r"^/(?:focus/[A-Za-z0-9.^-]{1,15}|etf(?:/[A-Za-z0-9.^-]{1,15})?|portefeuille|comparateur|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)?$")
 CONTEXT_ROUTE_RE = re.compile(r"^/(?:[A-Za-z0-9^][A-Za-z0-9.^-]{0,29}(?:/[A-Za-z0-9^][A-Za-z0-9.^-]{0,29}){0,3})?$")
 
 

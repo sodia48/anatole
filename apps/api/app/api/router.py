@@ -10,6 +10,7 @@ from app.api.routes import (
     company_network,
     discovery,
     etf_holdings,
+    fixed_income,
     fundamentals,
     health,
     institutions,
@@ -60,6 +61,12 @@ api_router.include_router(
     canada_360.router,
     prefix="/api/v1/canada",
     tags=["canada-360"],
+)
+
+api_router.include_router(
+    fixed_income.router,
+    prefix="/api/v1/fixed-income",
+    tags=["fixed-income"],
 )
 
 # Recherche de symboles
