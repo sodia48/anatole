@@ -29,6 +29,17 @@ class Settings(BaseSettings):
         default=("anthropic", "gemini", "openai"),
         validation_alias="CANADA360_PROVIDER_ORDER",
     )
+    anatole_assistant_provider_order: Annotated[tuple[str, ...], NoDecode] = Field(
+        default=("anthropic", "gemini", "openai"),
+        validation_alias="ANATOLE_ASSISTANT_PROVIDER_ORDER",
+    )
+    anatole_assistant_anthropic_model: str = Field(
+        default="claude-sonnet-5-5", validation_alias="ANATOLE_ASSISTANT_ANTHROPIC_MODEL",
+    )
+    anatole_assistant_synthesis_timeout_seconds: float = Field(
+        default=18.0, validation_alias="ANATOLE_ASSISTANT_SYNTHESIS_TIMEOUT_SECONDS",
+        ge=3.0, le=45.0,
+    )
     canada360_anthropic_model: str = Field(
         default="claude-sonnet-5-5", validation_alias="CANADA360_ANTHROPIC_MODEL",
     )
@@ -96,7 +107,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    @field_validator("canada360_provider_order", mode="before")
+    @field_validator("canada360_provider_order", "anatole_assistant_provider_order", mode="before")
     @classmethod
     def normalize_provider_order(cls, value: object) -> tuple[str, ...]:
         names = value.split(",") if isinstance(value, str) else value

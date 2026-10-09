@@ -1,13 +1,12 @@
 """Ask → Analyze → Navigate using existing Anatole services and bounded context.
 
-Conversation state contains symbols and consent only. Positions and raw questions are
-never retained by this service or written to telemetry.
+Conversation state contains short routing context and consent. Positions and raw
+questions are never retained by this service or written to telemetry.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -28,12 +27,13 @@ from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.etf_holdings import etf_holdings_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
-from app.services.stock_research import build_stock_research_bundle, generate_stock_research_from_evidence
+from app.services.stock_research import build_stock_research_bundle, format_stock_research
 from app.services.portfolio import portfolio_service
 from app.services.portfolio_research import (
     add_etf_lookthrough, build_portfolio_research_bundle,
-    generate_portfolio_research_from_evidence,
+    format_portfolio_research,
 )
+from app.services.assistant_synthesis import SynthesisOutcome, synthesize_from_evidence
 from app.services.portfolio_intelligence_v12 import (
     run_portfolio_scenarios, scenario_request_from_question,
 )
@@ -69,6 +69,8 @@ class _Session:
     portfolio_authorized: bool = False
     portfolio_focus: PortfolioConversationFocus | None = None
     portfolio_previous: PortfolioWatchtowerAggregate | None = None
+    last_question_topic: str | None = None
+    last_answer_summary: str | None = None
     expires_at: float = 0.0
 
 
@@ -223,43 +225,18 @@ class AnatoleAssistantOrchestrator:
                   conversation_id: UUID, bundles: list[AnatoleEvidenceBundle],
                   actions: list[NavigationAction], permission_required: bool = False,
                   government_feedback: dict[str, str | int] | None = None,
-                  government_profile: dict[str, str | int | None] | None = None) -> UnifiedAssistantResponse:
+                  government_profile: dict[str, str | int | None] | None = None,
+                  synthesis: SynthesisOutcome | None = None) -> UnifiedAssistantResponse:
         return UnifiedAssistantResponse(
             **base.model_dump(), context=context, conversation_id=conversation_id,
             evidence=bundles, actions=actions, permission_required=permission_required,
             government_feedback=government_feedback,
             government_profile=government_profile,
+            synthesis_provider=synthesis.provider if synthesis else None,
+            synthesis_model=synthesis.model if synthesis else None,
+            synthesis_mode=synthesis.mode if synthesis else None,
+            synthesis_validated=synthesis.validated if synthesis else False,
         )
-
-    @staticmethod
-    async def _synthesize(base: AssistantResponse, bundle: AnatoleEvidenceBundle,
-                          question: str) -> AssistantResponse:
-        if not bundle.facts or bundle.skill in {"portfolio_analysis", "canada360", "guardrail"}:
-            logger.info("assistant_deterministic_fallback skill=%s reason=no_public_evidence", bundle.skill)
-            return base
-        evidence = [{"label": fact.label, "value": fact.value, "source": fact.source}
-                    for fact in bundle.facts[:10]]
-        prompt = ("Résume en français uniquement les faits JSON fournis. N'ajoute aucun fait, chiffre, "
-                  "cause, recommandation d'achat ou de vente. Si un fait manque, dis-le. "
-                  "Une ou deux phrases.\nQuestion : " + question[:300] +
-                  "\nFaits : " + json.dumps(evidence, ensure_ascii=False))
-        try:
-            result = await provider_router.generate_internal_evidence(prompt=prompt)
-        except Exception:
-            result = None
-        if result and result.success and len(result.answer) <= 900:
-            candidate = result.answer.strip()
-            evidence_numbers = set(re.findall(r"\d+(?:[.,]\d+)?", json.dumps(evidence, ensure_ascii=False)))
-            answer_numbers = set(re.findall(r"\d+(?:[.,]\d+)?", candidate))
-            if (answer_numbers <= evidence_numbers and not re.search(
-                r"\b(ach[eè]te[rz]?|vends?|recommande|buy|sell)\b|https?://", candidate, re.I
-            )):
-                base.answer += "\n\nLecture des faits : " + candidate
-                logger.info("assistant_provider_synthesis skill=%s provider=%s source_count=%s",
-                            bundle.skill, result.provider, len(bundle.sources))
-                return base
-        logger.info("assistant_deterministic_fallback skill=%s reason=provider_unavailable_or_unverified", bundle.skill)
-        return base
 
     @staticmethod
     def _simple(skill: Skill, title: str, answer: str, *, confidence: str = "limitée",
@@ -297,7 +274,7 @@ class AnatoleAssistantOrchestrator:
                 return base, bundle
             focus = None
         bundle = build_stock_research_bundle(symbol, focus, fundamental_snapshot, news_snapshot)
-        answer = await generate_stock_research_from_evidence(bundle, question, provider_router)
+        answer = format_stock_research(bundle, question=question)
         base = self._simple("stock_analysis", symbol, answer,
             confidence="moyenne" if bundle.facts else "limitée",
             facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts[:12]],
@@ -339,8 +316,16 @@ class AnatoleAssistantOrchestrator:
                 bundle.limitations.append("La couverture des participations n'est pas chiffrée")
         if snapshot.sectors:
             answer += " Secteurs principaux : " + ", ".join(f"{row.label} {row.weight_percent:.1f} %" for row in snapshot.sectors[:3]) + "."
+            for row in snapshot.sectors[:3]:
+                bundle.facts.append(EvidenceFact(label=f"Secteur {row.label}",
+                    value=f"{row.weight_percent:.1f} %", source=snapshot.source_name,
+                    timestamp=snapshot.generated_at, freshness=bundle.freshness))
         if snapshot.regions:
             answer += " Régions principales : " + ", ".join(f"{row.label} {row.weight_percent:.1f} %" for row in snapshot.regions[:3]) + "."
+            for row in snapshot.regions[:3]:
+                bundle.facts.append(EvidenceFact(label=f"Région {row.label}",
+                    value=f"{row.weight_percent:.1f} %", source=snapshot.source_name,
+                    timestamp=snapshot.generated_at, freshness=bundle.freshness))
         if not isinstance(quote, Exception) and quote.sources and quote.sources[0].status != "fallback" and quote.facts:
             answer = quote.answer.split("\n\n")[0] + "\n\n" + answer
             quote_bundle = _bundle_from_response("etf_analysis", quote, [symbol])
@@ -435,7 +420,7 @@ class AnatoleAssistantOrchestrator:
         if ("pétrole" in text or "oil" in text) and not any(row.key == "wti" and row.estimated_portfolio_change_percent is not None
                                                            for row in snapshot.stress_tests):
             bundle.missing_data.append("Sensibilité au pétrole indisponible")
-        answer = await generate_portfolio_research_from_evidence(bundle, snapshot, request.message, provider_router)
+        answer = format_portfolio_research(bundle, snapshot, question=request.message)
         base = self._simple("portfolio_analysis", "Analyse du portefeuille", answer,
                             confidence="moyenne" if bundle.facts else "limitée",
                             facts=[AssistantFact(label=f.label, value=f.value) for f in bundle.facts[:25]],
@@ -483,6 +468,8 @@ class AnatoleAssistantOrchestrator:
             skill="news_context", freshness="delayed", generated_at=snapshot.generated_at,
             sources=[EvidenceSource(label=item.source, type="news", freshness="delayed",
                                     timestamp=item.published_at, url=item.url) for item in items],
+            facts=[EvidenceFact(label="Actualité", value=item.title, source=item.source,
+                                timestamp=item.published_at, freshness="delayed") for item in items],
             missing_data=[] if items else ["Actualités sourcées indisponibles"],
         )
         if items:
@@ -533,6 +520,20 @@ class AnatoleAssistantOrchestrator:
         elif skill == "compare" and len(symbols) >= 2:
             base = await assistant_service._compare(symbols[:2])
             bundle = _bundle_from_response(skill, base, symbols[:2])
+            compared = await asyncio.gather(*(
+                self._etf(symbol) if symbol in _ETF_SYMBOLS else
+                self._stock(symbol, context.language, request.message)
+                for symbol in symbols[:2]), return_exceptions=True)
+            for symbol, result in zip(symbols[:2], compared, strict=True):
+                if isinstance(result, Exception):
+                    bundle.missing_data.append(f"Données détaillées {symbol} indisponibles")
+                    continue
+                _, detail = result
+                for fact in detail.facts[:30]:
+                    linked = fact.model_copy(update={"label": f"{symbol} · {fact.label}"})
+                    bundle.facts.append(linked)
+                bundle.sources.extend(detail.sources[:10])
+                bundle.missing_data.extend(detail.missing_data[:5])
         elif skill == "data_quality":
             base = await assistant_service._quality()
             bundle = _bundle_from_response(skill, base, [])
@@ -588,10 +589,32 @@ class AnatoleAssistantOrchestrator:
             actions.append(_action("Ouvrir Qualité des données", "/qualite"))
         bundle.navigation_actions.extend(actions)
         base.intent = skill
-        if skill in {"etf_analysis", "compare", "market_analysis"}:
-            base = await self._synthesize(base, bundle, request.message)
+        synthesis = None
+        if skill not in {"canada360", "guardrail"}:
+            macro_suffix = ("\n\n## Contexte macro Canada 360" +
+                            base.answer.split("\n\n## Contexte macro Canada 360", 1)[1]
+                            if mixed_macro and skill == "portfolio_analysis"
+                            and "\n\n## Contexte macro Canada 360" in base.answer else "")
+            synthesis = await synthesize_from_evidence(
+                bundle, request.message, base.answer, provider_router,
+                conversation={
+                    "last_skill": state.skill,
+                    "symbols": symbols[:2],
+                    "portfolio_focus": bundle.portfolio_focus if skill == "portfolio_analysis" else None,
+                    "last_question_topic": state.last_question_topic,
+                    "last_answer_summary": state.last_answer_summary,
+                    "jurisdiction": context.metadata.get("region", "CA")[:4],
+                    "portfolio_permission_state": state.portfolio_authorized,
+                },
+            )
+            base.answer = synthesis.answer + (macro_suffix if synthesis.validated else "")
+            if synthesis.validated and synthesis.follow_up_prompts:
+                base.suggestions = list(synthesis.follow_up_prompts)
         state.symbols = symbols[:2]
         state.skill = skill
+        state.last_question_topic = bundle.portfolio_focus or skill
+        state.last_answer_summary = (f"Analyse portefeuille : {bundle.portfolio_focus}" if skill == "portfolio_analysis"
+                                     else base.answer[:160])
         logger.info("assistant_navigation_action skill=%s count=%s", skill, len(actions))
         logger.info("assistant_response skill=%s latency_bucket=%s source_count=%s completeness=%s",
                     skill, _bucket(monotonic() - started), sum(len(row.sources) for row in bundles),
@@ -600,7 +623,7 @@ class AnatoleAssistantOrchestrator:
                               bundles=bundles, actions=actions,
                               government_feedback={"conversation_id": state.canada_id, "turn_index": state.canada_turn_index}
                               if skill == "canada360" and state.canada_id and state.canada_turn_index is not None else None,
-                              government_profile=government_profile)
+                              government_profile=government_profile, synthesis=synthesis)
 
 
 anatole_assistant_orchestrator = AnatoleAssistantOrchestrator()

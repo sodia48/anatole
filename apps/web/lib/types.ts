@@ -710,6 +710,7 @@ export type PortfolioPerformancePoint = {
   time: number;
   portfolio: number;
   benchmark: number | null;
+  coverage_percent?: number | null;
 };
 
 export type PortfolioPerformanceRange =
@@ -725,9 +726,20 @@ export type PortfolioPerformanceRange =
 export type PortfolioPerformanceView = {
   range: PortfolioPerformanceRange;
   range_label: string;
+  requested_range?: PortfolioPerformanceRange | null;
   benchmark: string;
   benchmark_name: string;
   points: PortfolioPerformancePoint[];
+  strict_points?: PortfolioPerformancePoint[];
+  proxy_points?: PortfolioPerformancePoint[];
+  effective_start?: string | null;
+  effective_end?: string | null;
+  effective_days?: number | null;
+  effective_years?: number | null;
+  requested_days?: number | null;
+  effective_coverage_percent?: number | null;
+  requested_window_coverage_percent?: number | null;
+  history_status?: "full" | "partial" | "insufficient";
   portfolio_return_percent: number | null;
   benchmark_return_percent: number | null;
   excess_return_percent: number | null;

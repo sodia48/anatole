@@ -363,13 +363,19 @@ test.describe("Portfolio progressive degradation", () => {
       const body = route.request().postDataJSON() as { range: string; benchmark: string };
       requestedRanges.push(body.range);
 
-      const start = body.range === "max"
-        ? Date.UTC(1998, 0, 2) / 1000
-        : Date.UTC(2016, 0, 2) / 1000;
-      const points = Array.from({ length: 40 }, (_, index) => ({
-        time: start + index * 31 * 86_400,
+      const start = Date.UTC(2025, 4, 1) / 1000;
+      const points = Array.from({ length: 17 }, (_, index) => ({
+        time: start + index * 30 * 86_400,
         portfolio: 100 + index * 0.4,
         benchmark: 100 + index * 0.25,
+        coverage_percent: 100,
+      }));
+      const proxyStart = body.range === "max" ? Date.UTC(1998, 0, 2) / 1000
+        : body.range === "10y" ? Date.UTC(2016, 0, 2) / 1000 : Date.UTC(2021, 0, 2) / 1000;
+      const proxyMonths = body.range === "max" ? 340 : body.range === "10y" ? 124 : 64;
+      const proxyPoints = Array.from({ length: proxyMonths }, (_, index) => ({
+        time: proxyStart + index * 30 * 86_400, portfolio: 100 + index * 0.2,
+        benchmark: 100 + index * 0.15, coverage_percent: 58,
       }));
 
       await route.fulfill({
@@ -381,6 +387,17 @@ test.describe("Portfolio progressive degradation", () => {
           benchmark: body.benchmark,
           benchmark_name: "S&P/TSX Composite",
           points,
+          strict_points: points,
+          proxy_points: proxyPoints,
+          requested_range: body.range,
+          effective_start: new Date(start * 1000).toISOString(),
+          effective_end: new Date(points.at(-1)!.time * 1000).toISOString(),
+          effective_days: 480,
+          effective_years: 1.31,
+          requested_days: body.range === "max" ? null : body.range === "10y" ? 3653 : 1826,
+          effective_coverage_percent: 100,
+          requested_window_coverage_percent: body.range === "10y" ? 13 : 26,
+          history_status: "partial",
           portfolio_return_percent: 15.6,
           benchmark_return_percent: 9.75,
           excess_return_percent: 5.85,
@@ -413,13 +430,23 @@ test.describe("Portfolio progressive degradation", () => {
 
     await page.getByRole("button", { name: "5A", exact: true }).click();
     await expect.poll(() => requestedRanges).toContain("5y");
+    await expect(page.getByRole("button", { name: "5A", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText(/5A demandé · historique strict disponible depuis mai 2025/)).toBeVisible();
+    await expect(page.getByText(/Historique partiel · 1.3 an exploitable/)).toBeVisible();
 
     await page.getByRole("button", { name: "10A", exact: true }).click();
     await expect.poll(() => requestedRanges).toContain("10y");
+    await expect(page.getByRole("button", { name: "10A", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText(/10A demandé · historique strict disponible depuis mai 2025/)).toBeVisible();
+    await expect(page.getByText("Couverture de la fenêtre demandée : 13 %.")).toBeVisible();
+    await expect(page.getByRole("img", { name: /Performance du portefeuille/ }).locator("text").filter({ hasText: "2025" }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "MAX", exact: true }).click();
     await expect.poll(() => requestedRanges).toContain("max");
-    await expect(page.getByText("MAX : depuis 1998", { exact: true })).toBeVisible();
+    await expect(page.getByText(/MAX demandé · historique strict disponible depuis mai 2025/)).toBeVisible();
+    await page.getByRole("button", { name: "Étendre avec proxy partiel" }).click();
+    await expect(page.getByText(/MAX demandé · proxy disponible depuis janvier 1998/)).toBeVisible();
+    await expect(page.getByText(/Proxy historique des positions disponibles/)).toBeVisible();
   });
 
   test("adds a U.S. position with explicit market metadata", async ({ page }) => {
@@ -476,7 +503,7 @@ test.describe("Portfolio progressive degradation", () => {
 
     await page.getByRole("button", { name: /Ajouter|Add/, exact: true }).click();
 
-    const persisted = await page.evaluate(() => {
+    await expect.poll(() => page.evaluate(() => {
       const raw = localStorage.getItem("anatole:portfolio:v1");
       if (!raw) return false;
       try {
@@ -491,9 +518,7 @@ test.describe("Portfolio progressive degradation", () => {
       } catch {
         return false;
       }
-    });
-
-    expect(persisted).toBe(true);
+    }), { timeout: 15_000 }).toBe(true);
 
     await expect.poll(
       () =>

@@ -62,6 +62,14 @@ export function GlobalAssistant() {
   const activeContext: AssistantContext = removedForRoute === context.route
     ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown" }
     : context;
+  const composerPlaceholder = ({
+    portfolio: "Pose une question sur ton portefeuille…",
+    stock: "Pose une question sur ce titre…",
+    etf: "Pose une question sur cet ETF…",
+    canada360: "Pose ta question à Canada 360…",
+    market: "Pose une question sur le marché…",
+  } as Partial<Record<AssistantContext["surface"], string>>)[activeContext.surface]
+    ?? "Pose une question à Anatole…";
 
   useEffect(() => { if (nearBottom.current) bottom.current?.scrollIntoView({ block: "end" }); }, [turns, loading, pendingPermission]);
 
@@ -154,7 +162,7 @@ export function GlobalAssistant() {
           <div ref={bottom} />
         </div>
         <form className={styles.composer} onSubmit={onSubmit}><label htmlFor="global-assistant-question">Votre question</label>
-          <div><textarea id="global-assistant-question" value={message} maxLength={1200} onChange={(event) => setMessage(event.target.value)} placeholder="Analyse ce titre…" rows={2} />
+          <div><textarea id="global-assistant-question" value={message} maxLength={1200} onChange={(event) => setMessage(event.target.value)} placeholder={composerPlaceholder} rows={2} />
             <button type="submit" disabled={loading || !message.trim()} aria-label="Envoyer la question"><Send size={18} /></button></div>
         </form>
       </section>

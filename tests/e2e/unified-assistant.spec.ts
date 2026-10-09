@@ -40,6 +40,26 @@ test("Focus SHOP nourrit le tiroir et le suivi compare SHOP à LSPD", async ({ p
   expect(calls.every((call) => (call.portfolio_positions as unknown[]).length === 0)).toBe(true);
 });
 
+test("Terminal affiche le contexte marché et rend la synthèse structurée", async ({ page }) => {
+  const calls: Record<string, unknown>[] = [];
+  await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
+    calls.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(
+      reply("market_analysis", "Marché", "## Régime\n- La largeur observée est de 55 %.",
+        [{ label: "Ouvrir Terminal", href: "/terminal", kind: "navigate" }]),
+    ) });
+  });
+  await page.goto("/terminal", { waitUntil: "domcontentloaded" });
+  await openGlobalAssistant(page);
+  const composer = page.getByLabel("Votre question");
+  await expect(composer).toHaveAttribute("placeholder", "Pose une question sur le marché…");
+  await composer.fill("Quel est le régime du marché ?");
+  await page.getByRole("button", { name: "Envoyer la question" }).click();
+  await expect(page.getByRole("dialog", { name: "Anatole Assistant" }).getByRole("heading", { name: "Régime" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ouvrir Terminal" })).toBeVisible();
+  expect((calls[0].context as { surface: string }).surface).toBe("market");
+});
+
 test("Focus RY affiche une analyse profonde lisible et des sources repliées", async ({ page }) => {
   const answer = ["Analyse technique et fondamentale de RY", "", "## Vue d’ensemble", "- Cours : 277.59 CAD.",
     "", "## Analyse fondamentale", "- ROE : 17.00 %.", "", "## Valorisation", "- P/E courant : 15.00 x.",

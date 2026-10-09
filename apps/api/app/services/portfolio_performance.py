@@ -44,6 +44,8 @@ _BENCHMARK_NAMES = {
     "XIC": "iShares Core S&P/TSX Capped Composite ETF",
     "XIU": "iShares S&P/TSX 60 Index ETF",
 }
+STRICT_COVERAGE = 0.70
+PROXY_COVERAGE = 0.50
 
 
 def _benchmark_name(value: str) -> str:
@@ -91,6 +93,43 @@ def _downsample(
         for index in range(max_points)
     }
     return [points[index] for index in sorted(indexes)]
+
+
+def _series(
+    days: list[int], returns: dict[str, dict[int, float]], weights: dict[str, float],
+    benchmark: dict[int, float], *, threshold: float, renormalize: bool,
+) -> tuple[list[PortfolioPerformancePoint], list[float], float, float | None]:
+    included = [(day, [symbol for symbol in weights if day in returns[symbol]]) for day in days]
+    included = [(day, symbols, sum(weights[symbol] for symbol in symbols))
+                for day, symbols in included]
+    included = [(day, symbols, coverage) for day, symbols, coverage in included
+                if symbols and coverage >= threshold]
+    if not included:
+        return [], [], 100.0, None
+    # A benchmark without the first portfolio return cannot be rebased to the same start.
+    benchmark_complete = all(day in benchmark for day, _, _ in included)
+    level = benchmark_level = 100.0
+    first_day = included[0][0]
+    points = [PortfolioPerformancePoint(
+        time=max(0, (first_day - 1) * 86_400), portfolio=100.0,
+        benchmark=100.0 if benchmark_complete else None,
+        coverage_percent=round(included[0][2] * 100, 2),
+    )]
+    coverages: list[float] = []
+    for day, symbols, coverage in included:
+        daily_return = sum(weights[symbol] * returns[symbol][day] for symbol in symbols)
+        if renormalize:
+            daily_return /= coverage
+        level *= 1 + daily_return
+        if benchmark_complete:
+            benchmark_level *= 1 + benchmark[day]
+        coverages.append(coverage)
+        points.append(PortfolioPerformancePoint(
+            time=day * 86_400, portfolio=round(level, 4),
+            benchmark=round(benchmark_level, 4) if benchmark_complete else None,
+            coverage_percent=round(coverage * 100, 2),
+        ))
+    return points, coverages, level, benchmark_level if benchmark_complete else None
 
 
 class PortfolioPerformanceService:
@@ -226,63 +265,35 @@ class PortfolioPerformanceService:
             else set()
         )
 
-        level = 100.0
-        benchmark_level = 100.0
-        points: list[PortfolioPerformancePoint] = []
-        coverages: list[float] = []
-        benchmark_seen = False
-
-        for day in all_days:
-            available = [
-                symbol
-                for symbol, values in return_maps.items()
-                if day in values
-            ]
-            available_weight = sum(weights[symbol] for symbol in available)
-            coverages.append(available_weight)
-
-            if not available or available_weight < 0.70:
-                continue
-
-            if not points:
-                points.append(
-                    PortfolioPerformancePoint(
-                        time=max(0, (day - 1) * 86_400),
-                        portfolio=100.0,
-                        benchmark=100.0 if benchmark_map else None,
-                    )
-                )
-
-            daily_return = sum(
-                weights[symbol] * return_maps[symbol][day]
-                for symbol in available
-            )
-            level *= 1 + daily_return
-
-            benchmark_return = benchmark_map.get(day)
-            if benchmark_return is not None:
-                benchmark_level *= 1 + benchmark_return
-                benchmark_seen = True
-
-            points.append(
-                PortfolioPerformancePoint(
-                    time=day * 86_400,
-                    portfolio=round(level, 4),
-                    benchmark=(
-                        round(benchmark_level, 4)
-                        if benchmark_seen
-                        else None
-                    ),
-                )
-            )
-
-        coverage = (
-            sum(coverages) / len(coverages) * 100
-            if coverages
-            else 0.0
+        points, coverages, level, benchmark_level = _series(
+            all_days, return_maps, weights, benchmark_map,
+            threshold=STRICT_COVERAGE, renormalize=False,
         )
+        long_range = request.range in {"5y", "10y", "max"}
+        proxy, _, _, _ = _series(
+            all_days, return_maps, weights, benchmark_map,
+            threshold=PROXY_COVERAGE, renormalize=True,
+        ) if long_range else ([], [], 100.0, None)
+        if not points or not proxy or proxy[0].time >= points[0].time:
+            proxy = []
+        coverage = sum(coverages) / len(coverages) * 100 if coverages else 0.0
+        effective_start = datetime.fromtimestamp(points[0].time, UTC) if points else None
+        effective_end = datetime.fromtimestamp(points[-1].time, UTC) if points else None
+        effective_days = max(0, (points[-1].time - points[0].time) // 86_400) if points else None
+        requested_days = (None if request.range == "max" else
+                          max(1, int((now.timestamp() - cutoff) // 86_400)) if cutoff is not None else None)
+        # Dates below the strict threshold count as zero. Use the observed
+        # cadence to account for years with no price, including weekly fixtures.
+        observed_days = all_days[-1] - all_days[0] + 1 if all_days else 0
+        observed_fraction = (min(1.0, observed_days / requested_days)
+                             if requested_days else 1.0)
+        window_coverage = 100 * sum(coverages) / max(len(all_days), 1) * observed_fraction
+        history_status = ("insufficient" if len(points) < 2 else
+                          "partial" if requested_days and effective_days is not None
+                          and (effective_days < requested_days * .9 or window_coverage < 70) else
+                          "partial" if request.range == "max" and proxy else "full")
         portfolio_return = level - 100.0 if len(points) >= 2 else None
-        benchmark_return = benchmark_level - 100.0 if benchmark_seen else None
+        benchmark_return = benchmark_level - 100.0 if benchmark_level is not None else None
         excess = (
             portfolio_return - benchmark_return
             if portfolio_return is not None and benchmark_return is not None
@@ -295,6 +306,17 @@ class PortfolioPerformanceService:
             benchmark=request.benchmark,
             benchmark_name=_benchmark_name(request.benchmark),
             points=_downsample(points),
+            requested_range=request.range,
+            strict_points=_downsample(points),
+            proxy_points=_downsample(proxy),
+            effective_start=effective_start,
+            effective_end=effective_end,
+            effective_days=effective_days,
+            effective_years=round(effective_days / 365.25, 2) if effective_days is not None else None,
+            requested_days=requested_days,
+            effective_coverage_percent=round(coverage, 2),
+            requested_window_coverage_percent=round(window_coverage, 2),
+            history_status=history_status,
             portfolio_return_percent=(
                 round(portfolio_return, 2)
                 if portfolio_return is not None
@@ -314,7 +336,9 @@ class PortfolioPerformanceService:
             methodology=(
                 "Performance reconstituée avec les poids actuels du portefeuille. "
                 "Cette courbe ne tient pas encore compte des dates d'achat, "
-                "apports, retraits ou dividendes personnels."
+                "apports, retraits ou dividendes personnels. Historique strict: poids disponibles "
+                "≥70 %. Proxy partiel facultatif: poids disponibles ≥50 %, renormalisés chaque jour; "
+                "ce proxy n’est pas la performance réelle du portefeuille complet."
             ),
             generated_at=now,
             refresh_after_seconds=300,

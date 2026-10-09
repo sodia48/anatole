@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import math
 from datetime import UTC, datetime, timedelta
 
@@ -10,6 +9,7 @@ from app.schemas.assistant_context import AnatoleEvidenceBundle, EvidenceFact, E
 from app.schemas.fundamentals import FundamentalSnapshot
 from app.schemas.stocks import FocusSnapshot, StockNewsSnapshot
 from app.services.stock_sector_analysis import is_bank, select_sector_metrics
+from app.services.assistant_synthesis import synthesize_from_evidence
 
 
 GROUPS = (
@@ -295,19 +295,5 @@ def format_stock_research(bundle: AnatoleEvidenceBundle, *, question: str = "",
 
 async def generate_stock_research_from_evidence(bundle: AnatoleEvidenceBundle, question: str,
                                                 provider_router: object) -> str:
-    """Let a provider rank evidence; only exact stored facts can enter the response."""
-    if len(bundle.facts) < 4:
-        return format_stock_research(bundle, question=question)
-    evidence = [{"index": index, "label": fact.label, "value": fact.value}
-                for index, fact in enumerate(bundle.facts[:80])]
-    prompt = ("Choisis au plus cinq indices de faits importants pour la question. Réponds uniquement "
-              "par un tableau JSON d'entiers, sans prose. Aucune recommandation.\nQuestion : "
-              + question[:300] + "\nFaits : " + json.dumps(evidence, ensure_ascii=False))
-    try:
-        result = await provider_router.generate_internal_evidence(prompt=prompt)
-        indices = json.loads(result.answer) if result and result.success else []
-        if not isinstance(indices, list) or len(indices) > 5 or any(type(i) is not int or i < 0 or i >= len(evidence) for i in indices):
-            indices = []
-    except Exception:  # noqa: BLE001
-        indices = []
-    return format_stock_research(bundle, question=question, selected_highlights=list(dict.fromkeys(indices)))
+    fallback = format_stock_research(bundle, question=question)
+    return (await synthesize_from_evidence(bundle, question, fallback, provider_router)).answer
