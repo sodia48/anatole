@@ -105,6 +105,14 @@ class AssistantService:
                 AssistantFact(label="Score", value=f"{snapshot.regime_score:.0f}/100", tone="positive" if snapshot.regime_score >= 60 else "negative" if snapshot.regime_score < 45 else "neutral"),
                 AssistantFact(label="Risque", value=snapshot.risk_level, tone="negative" if snapshot.risk_level in {"Élevé", "Critique"} else "neutral"),
                 AssistantFact(label="Largeur", value=f"{snapshot.advance_ratio:.0f} %", tone="positive" if snapshot.advance_ratio >= 55 else "negative" if snapshot.advance_ratio < 45 else "neutral"),
+                AssistantFact(label="Au-dessus SMA50", value=f"{snapshot.above_sma50_percent:.0f} %", tone="info"),
+                *[AssistantFact(label=f"Secteur {item.sector}", value=f"{item.change_percent:+.1f} % · {item.state}", tone="info")
+                  for item in snapshot.sectors[:5]],
+                *[AssistantFact(label=f"Moteur {item.label}", value=f"{item.value:g} {item.unit}", tone="info")
+                  for item in snapshot.market_drivers[:4] if item.value is not None and item.status != "unavailable"],
+                *[AssistantFact(label=f"Anomalie {item.symbol or item.sector or item.type}", value=item.title, tone="info")
+                  for item in snapshot.anomalies[:4]],
+                AssistantFact(label="Couverture cotations", value=f"{snapshot.data_quality.coverage_percent:.0f} %", tone="info"),
             ],
             links=[
                 AssistantLink(label="Ouvrir Terminal Pro", href="/terminal"),
@@ -306,6 +314,8 @@ class AssistantService:
                 AssistantFact(label="Score", value=f"{snapshot.overall_score:.0f}/100", tone="positive" if snapshot.overall_score >= 80 else "negative" if snapshot.overall_score < 55 else "neutral"),
                 AssistantFact(label="État", value=snapshot.overall_status, tone="info"),
                 AssistantFact(label="Mode", value=snapshot.provider_mode, tone="neutral"),
+                *[AssistantFact(label=f"Source {item.label}", value=item.status, tone="info")
+                  for item in snapshot.sources[:8]],
             ],
             links=[AssistantLink(label="Ouvrir Qualité des données", href="/qualite")],
             sources=[AssistantSource(label="Observabilité Anatole", detail="Caches, couverture, retries et erreurs upstream.", status="internal")],

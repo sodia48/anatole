@@ -184,6 +184,7 @@ function PerformanceChart({
   loading,
   error,
   onRetry,
+  proxy,
 }: {
   points: PortfolioPerformancePoint[];
   benchmarkName: string;
@@ -192,6 +193,7 @@ function PerformanceChart({
   loading: boolean;
   error: string | null;
   onRetry: () => void;
+  proxy: boolean;
 }) {
   const width = 980;
   const height = 330;
@@ -332,6 +334,8 @@ function PerformanceChart({
             fill="none"
             stroke="#2d76ff"
             strokeWidth="3"
+            strokeDasharray={proxy ? "4 6" : undefined}
+            opacity={proxy ? 0.75 : 1}
             strokeLinejoin="round"
           />
           <path
@@ -379,6 +383,7 @@ export function PortfolioPerformancePanel({
   const [remote, setRemote] = useState<PortfolioPerformanceView | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showProxy, setShowProxy] = useState(false);
   const requestSequence = useRef(0);
   const cache = useRef(new Map<string, PortfolioPerformanceView>());
 
@@ -394,15 +399,20 @@ export function PortfolioPerformancePanel({
     : [];
   const key = `${range}:${currentBenchmark}`;
   const activeRemote = !useLocal && remoteKey === key ? remote : null;
-  const points = activeRemote?.points ?? localPoints;
+  const proxyActive = Boolean(showProxy && activeRemote?.proxy_points?.length);
+  const points = proxyActive ? activeRemote?.proxy_points ?? [] : activeRemote?.strict_points?.length
+    ? activeRemote.strict_points : activeRemote?.points ?? localPoints;
   const localReturns = returnsFromPoints(localPoints);
-  const portfolioReturn = activeRemote?.portfolio_return_percent
+  const proxyReturns = proxyActive ? returnsFromPoints(points) : null;
+  const portfolioReturn = proxyReturns?.portfolio ?? activeRemote?.portfolio_return_percent
     ?? localReturns.portfolio;
-  const benchmarkReturn = activeRemote?.benchmark_return_percent
+  const benchmarkReturn = proxyReturns?.benchmark ?? activeRemote?.benchmark_return_percent
     ?? localReturns.benchmark;
-  const excessReturn = activeRemote?.excess_return_percent
+  const excessReturn = proxyReturns?.excess ?? activeRemote?.excess_return_percent
     ?? localReturns.excess;
-  const coverage = activeRemote?.coverage_percent
+  const coverage = proxyActive
+    ? points.slice(1).reduce((sum, point) => sum + (point.coverage_percent ?? 0), 0) / Math.max(points.length - 1, 1)
+    : activeRemote?.effective_coverage_percent ?? activeRemote?.coverage_percent
     ?? snapshot.risk?.history_coverage_percent
     ?? 0;
   const historyStartYear = points.length
@@ -440,6 +450,7 @@ export function PortfolioPerformancePanel({
     const sequence = ++requestSequence.current;
     setLoading(true);
     setError(null);
+    setRemote(null);
     setRemoteKey(nextKey);
 
     try {
@@ -475,6 +486,7 @@ export function PortfolioPerformancePanel({
 
   function selectRange(nextRange: PortfolioPerformanceRange): void {
     setRange(nextRange);
+    setShowProxy(false);
     setError(null);
 
     if (
@@ -493,6 +505,7 @@ export function PortfolioPerformancePanel({
 
   function selectBenchmark(value: string): void {
     setBenchmarkChoice(value);
+    setShowProxy(false);
     setError(null);
 
     if (value === "custom") {
@@ -613,26 +626,34 @@ export function PortfolioPerformancePanel({
             {item.label}
           </button>
         ))}
-        {range === "max" ? (
+        {["5y", "10y", "max"].includes(range) ? (
           <span className={styles.performanceRangeMeta}>
-            {historyStartYear
+            {historyStartYear && activeRemote
               ? pick(
                   language,
-                  `MAX : depuis ${historyStartYear}`,
-                  `MAX: since ${historyStartYear}`,
+                  `${RANGE_OPTIONS.find((item) => item.value === range)?.label} demandé · ${proxyActive ? "proxy disponible" : "historique strict disponible"} depuis ${new Date(points[0].time * 1000).toLocaleDateString("fr-CA", { timeZone: "UTC", year: "numeric", month: "long" })}`,
+                  `${RANGE_OPTIONS.find((item) => item.value === range)?.label} requested · ${proxyActive ? "proxy available" : "strict history available"} since ${historyStartYear}`,
                 )
               : loading
                 ? pick(
                     language,
-                    "MAX : recherche du premier historique…",
-                    "MAX: finding earliest history…",
+                    "Recherche de l’historique…",
+                    "Finding available history…",
                   )
                 : pick(
                     language,
-                    "MAX : historique indisponible",
-                    "MAX: history unavailable",
+                    "Historique indisponible",
+                    "History unavailable",
                   )}
           </span>
+        ) : null}
+        {activeRemote?.history_status === "partial" && !proxyActive ? (
+          <span className={styles.performanceRangeMeta}>Historique partiel · {activeRemote.effective_years?.toFixed(1) ?? "N/D"} an exploitable</span>
+        ) : null}
+        {activeRemote?.proxy_points?.length ? (
+          <button type="button" aria-pressed={proxyActive} onClick={() => setShowProxy((value) => !value)}>
+            {proxyActive ? "Revenir à l’historique strict" : "Étendre avec proxy partiel"}
+          </button>
         ) : null}
       </div>
 
@@ -652,10 +673,15 @@ export function PortfolioPerformancePanel({
           <strong>{percent(excessReturn)}</strong>
         </div>
         <div>
-          <span>{pick(language, "Couverture", "Coverage")}</span>
+          <span>{pick(language, "Couverture de la série affichée", "Displayed series coverage")}</span>
           <strong>{coverage.toFixed(0)} %</strong>
         </div>
       </div>
+
+      {activeRemote?.requested_window_coverage_percent != null && !proxyActive ? (
+        <div className={styles.chartNotice}>Couverture de la fenêtre demandée : {activeRemote.requested_window_coverage_percent.toFixed(0)} %.</div>
+      ) : null}
+      {proxyActive ? <div className={styles.chartNotice}>Proxy historique des positions disponibles · poids renormalisés chaque jour; ce n’est pas la performance réelle du portefeuille complet.</div> : null}
 
       <div className={styles.legend}>
         <span style={{ color: "var(--accent-text)" }}>
@@ -672,6 +698,7 @@ export function PortfolioPerformancePanel({
         language={language}
         range={range}
         loading={loading}
+        proxy={proxyActive}
         onRetry={() => void loadRemote(range, currentBenchmark)}
         points={points}
       />

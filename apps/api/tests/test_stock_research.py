@@ -1,5 +1,6 @@
 """Deterministic RY research fixtures: no live market values or provider calls."""
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -143,14 +144,17 @@ def test_deterministic_formatter_scenarios_and_limits():
 
 
 @pytest.mark.asyncio
-async def test_provider_can_only_select_known_facts():
+async def test_provider_writes_grounded_stock_analysis():
+    result = bundle()
     class Provider:
         async def generate_internal_evidence(self, **_kwargs):
-            return type("Result", (), {"success": True, "answer": "[0, 2]"})()
-    result = bundle()
+            answer = json.dumps({"answer_markdown": f"## Analyse ciblée\n- {result.facts[0].label} : {result.facts[0].value}",
+                                 "used_fact_ids": ["F1"], "used_source_ids": [],
+                                 "missing_data_ids": [], "follow_up_prompts": []})
+            return type("Result", (), {"success": True, "answer": answer,
+                                       "provider": "anthropic", "model": "mock"})()
     text = await generate_stock_research_from_evidence(result, "Analyse RY", Provider())
-    assert "## Points saillants" in text
-    assert result.facts[0].value in text and result.facts[2].value in text
+    assert "## Analyse ciblée" in text and result.facts[0].value in text
 
 
 @pytest.mark.asyncio
@@ -229,7 +233,8 @@ def _mock_ry_services(monkeypatch, *, stale=False, fundamentals_available=True,
     async def provider(**_kwargs):
         if provider_answer is None:
             return None
-        return type("Result", (), {"success": True, "answer": provider_answer})()
+        return type("Result", (), {"success": True, "answer": provider_answer,
+                                   "provider": "anthropic", "model": "mock"})()
 
     monkeypatch.setattr(market_data_service, "get_focus_snapshot", focus_snapshot)
     monkeypatch.setattr(fundamentals_service, "get_snapshot", fundamental_snapshot)
@@ -286,7 +291,10 @@ async def test_stock_research_degrades_per_source(monkeypatch, surface, route, c
     _mock_ry_services(monkeypatch, stale=case == "stale",
                       fundamentals_available=case != "fundamentals_unavailable",
                       news_available=case != "news_unavailable",
-                      provider_answer="[0, 2]" if case == "provider_success" else None)
+                      provider_answer=json.dumps({"answer_markdown": "## Analyse technique\n- Les indicateurs observés sont disponibles.\n## Niveaux techniques\n- Les seuils observés sont sourcés.",
+                                                  "used_fact_ids": ["F1"], "used_source_ids": [],
+                                                  "missing_data_ids": [], "follow_up_prompts": []})
+                      if case == "provider_success" else None)
     result = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
         message="Fais une analyse technique et fondamentale de RY",
         context=AssistantContext(surface=surface, route=route, symbol="RY")))
@@ -299,7 +307,7 @@ async def test_stock_research_degrades_per_source(monkeypatch, surface, route, c
     if case == "news_unavailable":
         assert "Actualités du titre indisponibles" in result.answer
     if case == "provider_success":
-        assert "## Points saillants" in result.answer
+        assert result.synthesis_provider == "anthropic" and result.synthesis_validated
 
 
 @pytest.mark.asyncio

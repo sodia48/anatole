@@ -88,8 +88,9 @@ def _failure(name: ProviderName, model: str, category: str, retryable: bool = Fa
 async def _post_json(
     *, name: ProviderName, model: str, url: str,
     headers: dict[str, str], payload: dict,
+    timeout_seconds: float | None = None,
 ) -> dict | ProviderResult:
-    timeout = settings.canada360_provider_timeout_seconds
+    timeout = timeout_seconds or settings.canada360_provider_timeout_seconds
     try:
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(timeout, connect=min(8.0, timeout)),
@@ -416,15 +417,23 @@ class Canada360ProviderRouter:
 
     async def generate_internal_evidence(
         self, *, prompt: str, max_output_tokens: int = 450,
+        provider_order: tuple[str, ...] | None = None,
+        model_overrides: dict[str, str] | None = None,
+        timeout_seconds: float | None = None,
     ) -> ProviderResult | None:
         """Synthesize supplied evidence only, without a search tool or persistence."""
-        for provider in self.available():
+        providers = (self.available() if provider_order is None else
+                     [self._providers[name] for name in provider_order if name in self._providers
+                      and self._providers[name].configured and not self.circuit_open(self._providers[name])])
+        for provider in providers:
+            model = (model_overrides or {}).get(provider.name, provider.model)
             if provider.name == "anthropic":
                 result = await _post_json(
-                    name=provider.name, model=provider.model, url=ANTHROPIC_URL,
+                    name=provider.name, model=model, url=ANTHROPIC_URL,
                     headers={"x-api-key": provider.api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                    payload={"model": provider.model, "max_tokens": max_output_tokens,
+                    payload={"model": model, "max_tokens": max_output_tokens,
                              "messages": [{"role": "user", "content": prompt}]},
+                    timeout_seconds=timeout_seconds,
                 )
                 if isinstance(result, ProviderResult):
                     continue
@@ -434,11 +443,12 @@ class Canada360ProviderRouter:
                 answer = "\n".join(row.get("text", "") for row in parts if isinstance(row, dict) and row.get("type") == "text")
             elif provider.name == "gemini":
                 result = await _post_json(
-                    name=provider.name, model=provider.model,
-                    url=f"{GEMINI_BASE_URL}/{provider.model}:generateContent",
+                    name=provider.name, model=model,
+                    url=f"{GEMINI_BASE_URL}/{model}:generateContent",
                     headers={"x-goog-api-key": provider.api_key, "content-type": "application/json"},
                     payload={"contents": [{"role": "user", "parts": [{"text": prompt}]}],
                              "generationConfig": {"maxOutputTokens": max_output_tokens}},
+                    timeout_seconds=timeout_seconds,
                 )
                 if isinstance(result, ProviderResult):
                     continue
@@ -449,10 +459,11 @@ class Canada360ProviderRouter:
                 answer = "\n".join(row.get("text", "") for row in parts if isinstance(row, dict) and isinstance(row.get("text"), str))
             else:
                 result = await _post_json(
-                    name=provider.name, model=provider.model, url=OPENAI_URL,
+                    name=provider.name, model=model, url=OPENAI_URL,
                     headers={"authorization": f"Bearer {provider.api_key}", "content-type": "application/json"},
-                    payload={"model": provider.model, "input": prompt, "max_output_tokens": max_output_tokens,
+                    payload={"model": model, "input": prompt, "max_output_tokens": max_output_tokens,
                              "store": False},
+                    timeout_seconds=timeout_seconds,
                 )
                 if isinstance(result, ProviderResult):
                     continue
@@ -463,7 +474,7 @@ class Canada360ProviderRouter:
                     if isinstance(part, dict) and part.get("type") == "output_text"
                 )
             if answer.strip() and result.get("status") != "incomplete":
-                return ProviderResult(provider=provider.name, model=provider.model,
+                return ProviderResult(provider=provider.name, model=model,
                                       answer=answer.strip(), success=True)
         return None
 

@@ -285,3 +285,7 @@ class UnifiedAssistantResponse(AssistantResponse):
     permission_required: bool = False
     government_feedback: dict[str, str | int] | None = None
     government_profile: dict[str, str | int | None] | None = None
+    synthesis_provider: str | None = None
+    synthesis_model: str | None = None
+    synthesis_mode: Literal["internal_evidence", "deterministic"] | None = None
+    synthesis_validated: bool = False

@@ -92,6 +92,7 @@ class PortfolioPerformancePoint(BaseModel):
     time: int
     portfolio: float
     benchmark: float | None = None
+    coverage_percent: float | None = Field(default=None, ge=0, le=100)
 
 
 class PortfolioContributor(BaseModel):
@@ -145,6 +146,17 @@ class PortfolioPerformanceView(BaseModel):
     benchmark: str
     benchmark_name: str
     points: list[PortfolioPerformancePoint]
+    requested_range: PortfolioPerformanceRange | None = None
+    strict_points: list[PortfolioPerformancePoint] = Field(default_factory=list)
+    proxy_points: list[PortfolioPerformancePoint] = Field(default_factory=list)
+    effective_start: datetime | None = None
+    effective_end: datetime | None = None
+    effective_days: int | None = None
+    effective_years: float | None = None
+    requested_days: int | None = None
+    effective_coverage_percent: float | None = Field(default=None, ge=0, le=100)
+    requested_window_coverage_percent: float | None = Field(default=None, ge=0, le=100)
+    history_status: Literal["full", "partial", "insufficient"] = "insufficient"
     portfolio_return_percent: float | None = None
     benchmark_return_percent: float | None = None
     excess_return_percent: float | None = None

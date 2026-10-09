@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import UTC
 
 from app.schemas.assistant_context import (
@@ -416,27 +415,6 @@ def format_portfolio_research(bundle: AnatoleEvidenceBundle, snapshot: Portfolio
 async def generate_portfolio_research_from_evidence(bundle: AnatoleEvidenceBundle,
                                                     snapshot: PortfolioSnapshot, question: str,
                                                     provider_router: object) -> str:
-    """The provider selects fact indices only; prose and every number remain deterministic."""
-    if len(bundle.facts) < 4:
-        return format_portfolio_research(bundle, snapshot, question=question)
-    aggregates = [(index, fact) for index, fact in enumerate(bundle.facts)
-                  if fact not in bundle.metric_groups.get("allocation", [])][:80]
-    evidence = [{"index": index, "label": fact.label, "value": fact.value} for index, fact in aggregates]
-    topic = "performance" if any(cue in question.casefold() for cue in ("perform", "tsx", "rendement")) else (
-        "risque" if any(cue in question.casefold() for cue in ("risqu", "pétrole", "oil", "stress")) else (
-        "diversification" if any(cue in question.casefold() for cue in ("divers", "répart", "repart", "allocation"))
-        else "vue d’ensemble"))
-    prompt = ("Choisis au plus cinq indices de faits dérivés pertinents pour ce thème. "
-              "Réponds uniquement par un tableau JSON d'entiers sans prose, chiffre supplémentaire, "
-              "transaction ni recommandation. Aucun détail brut de position ni question complète n'est fourni.\nThème : "
-              + topic + "\nFaits : " + json.dumps(evidence, ensure_ascii=False))
-    try:
-        result = await provider_router.generate_internal_evidence(prompt=prompt)
-        indices = json.loads(result.answer) if result and result.success else []
-        valid = {index for index, _ in aggregates}
-        if not isinstance(indices, list) or len(indices) > 5 or any(type(index) is not int or index not in valid for index in indices):
-            indices = []
-    except Exception:  # noqa: BLE001
-        indices = []
-    return format_portfolio_research(bundle, snapshot, question=question,
-                                     selected_highlights=list(dict.fromkeys(indices)))
+    from app.services.assistant_synthesis import synthesize_from_evidence
+    fallback = format_portfolio_research(bundle, snapshot, question=question)
+    return (await synthesize_from_evidence(bundle, question, fallback, provider_router)).answer

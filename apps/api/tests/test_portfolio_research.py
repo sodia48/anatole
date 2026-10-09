@@ -1,5 +1,6 @@
 """Deep portfolio research uses observed snapshot values and degrades without a provider."""
 
+import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -134,18 +135,23 @@ def test_snapshot_bundle_separates_market_value_cost_and_unknown_sector():
 
 
 @pytest.mark.asyncio
-async def test_provider_can_only_select_existing_facts_and_sees_no_raw_positions():
+async def test_provider_writes_portfolio_analysis_without_raw_positions():
     snapshot = sample_snapshot()
     bundle = build_portfolio_research_bundle(snapshot)
     prompts = []
     async def provider(**kwargs):
         prompts.append(kwargs["prompt"])
-        return SimpleNamespace(success=True, answer="[0, 1, 2]")
+        return SimpleNamespace(success=True, provider="anthropic", model="mock",
+            answer=json.dumps({"answer_markdown": "## Radiographie\n- Les poids de marché sont calculés.",
+                               "used_fact_ids": ["F1"], "used_source_ids": [],
+                               "missing_data_ids": [], "follow_up_prompts": []}))
     answer = await generate_portfolio_research_from_evidence(
         bundle, snapshot, "Mon coût unitaire MU est de 100, que penses-tu de mon portefeuille ?", SimpleNamespace(generate_internal_evidence=provider))
-    assert "## Points saillants" in answer
+    assert "## Radiographie" in answer
     assert "Mon coût unitaire" not in prompts[0]
     assert "100, que penses-tu" not in prompts[0]
+    assert "total_cost_basis" not in prompts[0] and "average_cost" not in prompts[0]
+    assert '"quantity"' not in prompts[0]
     async def invalid(**_kwargs):
         return SimpleNamespace(success=True, answer="[999999]")
     fallback = await generate_portfolio_research_from_evidence(bundle, snapshot, "Portefeuille ?", SimpleNamespace(generate_internal_evidence=invalid))

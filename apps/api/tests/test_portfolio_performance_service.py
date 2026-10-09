@@ -114,3 +114,68 @@ async def test_portfolio_performance_long_horizons_use_matching_provider_range(
     assert result.points
     assert loader.await_args.kwargs["range_"] == provider_range
     assert loader.await_args.kwargs["deadline_seconds"] == 12.0
+
+
+@pytest.mark.parametrize("range_", ["5y", "10y", "max"])
+@pytest.mark.asyncio
+async def test_long_range_distinguishes_strict_and_partial_proxy(
+    monkeypatch: pytest.MonkeyPatch, range_: str,
+) -> None:
+    start = datetime.now(UTC) - timedelta(days=3_650)
+    def weekly(growth: float, count: int = 522) -> list[Candle]:
+        price = 100.0
+        output = []
+        for index in range(count):
+            price *= 1 + growth
+            stamp = int((start + timedelta(days=index * 7)).timestamp())
+            output.append(Candle(time=stamp, open=price, high=price, low=price,
+                                 close=price, volume=1000))
+        return output
+    histories = {"A.TO": weekly(.004)[-78:], "B.TO": weekly(.001),
+                 "C.TO": weekly(.002), "D.TO": weekly(.003),
+                 "^GSPTSE": weekly(.0015)}
+    monkeypatch.setattr(market_data_service, "get_history_many_strict", AsyncMock(return_value=histories))
+    monkeypatch.setattr(market_data_service, "get_quotes", AsyncMock(return_value=[]))
+    result = await PortfolioPerformanceService().analyze(PortfolioPerformanceRequest(
+        positions=[{"symbol": symbol, "weight_percent": weight} for symbol, weight in
+                   (("A", 42), ("B", 20), ("C", 20), ("D", 18))], range=range_,
+    ))
+    assert result.requested_range == range_
+    assert result.history_status == "partial"
+    assert result.effective_start is not None and result.effective_start.year >= 2025
+    assert result.points == result.strict_points
+    assert result.points[0].time > result.proxy_points[0].time
+    assert result.coverage_percent == result.effective_coverage_percent == 100
+    assert result.proxy_points[1].coverage_percent == pytest.approx(58)
+    expected = 100 * (1 + (.20 * .001 + .20 * .002 + .18 * .003) / .58)
+    assert result.proxy_points[1].portfolio == pytest.approx(expected, abs=.0001)
+    assert result.proxy_points[0].benchmark == 100
+    assert result.points[0].benchmark == 100
+    if range_ == "max":
+        assert result.requested_days is None
+    else:
+        assert result.requested_days is not None
+        assert result.requested_window_coverage_percent < 50
+
+
+@pytest.mark.parametrize("range_", ["5y", "10y"])
+@pytest.mark.asyncio
+async def test_long_range_is_full_when_eighty_percent_has_full_history(
+    monkeypatch: pytest.MonkeyPatch, range_: str,
+) -> None:
+    start = datetime.now(UTC) - timedelta(days=3_660)
+    def series(count: int) -> list[Candle]:
+        return [Candle(time=int((start + timedelta(days=index * 7)).timestamp()),
+                       open=100 + index, high=100 + index, low=100 + index,
+                       close=100 + index, volume=1000) for index in range(count)]
+    histories = {"A.TO": series(523), "B.TO": series(523)[-78:], "^GSPTSE": series(523)}
+    monkeypatch.setattr(market_data_service, "get_history_many_strict", AsyncMock(return_value=histories))
+    monkeypatch.setattr(market_data_service, "get_quotes", AsyncMock(return_value=[]))
+    result = await PortfolioPerformanceService().analyze(PortfolioPerformanceRequest(
+        positions=[{"symbol": "A", "weight_percent": 80},
+                   {"symbol": "B", "weight_percent": 20}], range=range_,
+    ))
+    assert result.history_status == "full"
+    assert result.effective_days >= result.requested_days * .9
+    assert result.points[1].coverage_percent == pytest.approx(80)
+    assert not result.proxy_points
