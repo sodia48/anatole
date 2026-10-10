@@ -3477,13 +3477,13 @@
   }
 
   /* Generic fallback: remaining tables fit the screen and wrap their values. */
-  .app-main table:not([data-mobile-cards]) {
+  .app-main table:not([data-mobile-cards], [data-mobile-scroll]) {
     width: 100% !important;
     min-width: 0 !important;
     table-layout: fixed !important;
   }
 
-  .app-main table:not([data-mobile-cards]) :is(th, td) {
+  .app-main table:not([data-mobile-cards], [data-mobile-scroll]) :is(th, td) {
     min-width: 0 !important;
     padding: 8px 5px !important;
     white-space: normal !important;

@@ -1,4 +1,22 @@
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+
+async function preferTheme(page: import("@playwright/test").Page, theme: "blue" | "dark") {
+  await page.addInitScript((theme) => {
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
+      theme, language: "fr", density: "comfortable", decimals: 2,
+      defaultRange: "1y", defaultUniverse: "tsx60",
+    }));
+    localStorage.setItem("anatole.appearance-choice.v1", "1");
+  }, theme);
+}
+
+async function painted(locator: import("@playwright/test").Locator) {
+  return locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, color: style.color, border: style.borderBottomColor };
+  });
+}
 
 const source = "https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/";
 const asOf = "2026-10-07T00:00:00Z";
@@ -123,3 +141,132 @@ test("Assistant explique la courbe et renvoie au hub", async ({ page }) => {
   await expect(dialog.getByRole("heading", { name: "Courbe du Canada" })).toBeVisible();
   await expect(dialog.getByRole("link", { name: /Voir Taux & Obligations/ })).toHaveAttribute("href", "/taux-obligations");
 });
+
+for (const theme of ["blue", "dark"] as const) {
+  test(`Taux & Obligations garde ses quatre onglets lisibles (${theme})`, async ({ page, isMobile }, testInfo) => {
+    test.setTimeout(120_000);
+    await preferTheme(page, theme);
+    await page.goto("/taux-obligations?tab=canada");
+    await page.reload();
+    const panel = theme === "blue" ? "rgb(255, 255, 255)" : "rgb(10, 26, 39)";
+    const text = theme === "blue" ? "rgb(8, 32, 51)" : "rgb(238, 247, 255)";
+    const muted = theme === "blue" ? "rgb(82, 97, 113)" : "rgb(141, 166, 186)";
+    const raised = theme === "blue" ? "rgb(239, 241, 244)" : "rgb(16, 40, 58)";
+    const link = theme === "blue" ? "rgb(0, 104, 83)" : "rgb(124, 226, 196)";
+    const border = theme === "blue" ? "rgb(212, 217, 224)" : "rgb(24, 59, 81)";
+
+    for (const tab of ["canada", "provinces", "municipalities", "issues"]) {
+      if (tab !== "canada") await page.goto(`/taux-obligations?tab=${tab}`);
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+      const hub = page.locator('main[class*="FixedIncomeClient"]');
+      const hero = await painted(hub.locator("header"));
+      expect(hero).toEqual({ background: panel, color: text, border });
+      expect(hero.background).not.toBe("rgb(19, 38, 56)");
+      for (const section of await hub.locator("section").all()) {
+        expect(await painted(section)).toEqual({ background: panel, color: text, border });
+      }
+      const tabs = hub.getByRole("navigation", { name: "Rates and bonds sections" });
+      expect((await painted(tabs.locator("a:not([aria-current])").first())).background).toBe(panel);
+      expect((await painted(tabs.locator("a:not([aria-current])").first())).color).toBe(text);
+      expect((await painted(tabs.locator("a[aria-current]"))).color).toBe(link);
+
+      if (tab === "canada") {
+        await expect(hub.getByRole("heading", { name: "Historique officiel" })).toBeVisible();
+        const periods = hub.getByRole("navigation", { name: "History period" });
+        await expect(periods.getByRole("link")).toHaveCount(7);
+        expect((await painted(periods.locator("a:not([aria-current])").first())).background).toBe(panel);
+        expect((await painted(periods.locator("a[aria-current]"))).color).toBe(link);
+        expect((await painted(hub.locator("header p"))).color).toBe(muted);
+      }
+      if (tab === "provinces" || tab === "municipalities") {
+        await expect(hub.locator("article")).toHaveCount(tab === "provinces" ? 13 : 9);
+        for (const card of await hub.locator("article").all()) {
+          expect((await painted(card)).background).toBe(raised);
+          expect((await painted(card.locator("h3"))).color).toBe(text);
+          expect((await painted(card.locator("p").first())).color).toBe(muted);
+          expect((await painted(card.getByRole("link"))).color).toBe(link);
+        }
+      }
+      if (tab === "issues") {
+        for (const control of await hub.locator('form input:not([type="hidden"]), form select, form button').all()) {
+          const style = await painted(control);
+          expect(style.background).toBe(raised);
+          expect(style.color).toBe(text);
+        }
+        const placeholder = await hub.locator('input[name="query"]').evaluate((element) => ({
+          color: getComputedStyle(element, "::placeholder").color,
+          opacity: getComputedStyle(element, "::placeholder").opacity,
+        }));
+        expect(placeholder).toEqual({ color: muted, opacity: "1" });
+      }
+      for (const cell of await hub.locator("th").all()) {
+        const style = await painted(cell);
+        expect(style.color).toBe(muted);
+        expect(style.border).toBe(border);
+        expect(await cell.evaluate((element) => getComputedStyle(element).fontSize)).toBe("12px");
+      }
+      if (isMobile && (tab === "canada" || tab === "issues")) {
+        const table = hub.locator("table");
+        const minimumWidth = await table.evaluate((element) => parseFloat(getComputedStyle(element).minWidth));
+        expect(minimumWidth).toBeGreaterThanOrEqual(600);
+        await expect(table.locator("..")).toHaveCSS("overflow-x", "auto");
+        const widths = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+        expect(widths[0]).toBeLessThanOrEqual(widths[1] + 1);
+      }
+      for (const cell of await hub.locator("td").all()) {
+        expect((await painted(cell)).color).toBe(text);
+      }
+      for (const value of await hub.locator('article strong span, [class*="metrics"] strong span').all()) {
+        expect((await painted(value)).color).toBe(text);
+      }
+      for (const sourceText of await hub.locator('a[href^="https:"] span').all()) {
+        expect((await painted(sourceText)).color).toBe(link);
+      }
+      const contrast = await new AxeBuilder({ page })
+        .include('main[class*="FixedIncomeClient"]').withRules(["color-contrast"]).analyze();
+      expect(contrast.violations).toEqual([]);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: testInfo.outputPath(`${tab}-${theme}.png`), fullPage: true });
+    }
+    await page.goto("/taux-obligations?tab=issues&query=no-matching-issue-contrast-test");
+    await expect(page.getByText("émissions correspondant aux filtres", { exact: true })).toBeVisible();
+    await expect(page.locator('main[class*="FixedIncomeClient"] tbody tr')).toHaveCount(0);
+    const emptyContrast = await new AxeBuilder({ page })
+      .include('main[class*="FixedIncomeClient"]').withRules(["color-contrast"]).analyze();
+    expect(emptyContrast.violations).toEqual([]);
+  });
+
+  test(`Cockpit Taux Canada conserve un contraste lisible (${theme})`, async ({ page }, testInfo) => {
+    await preferTheme(page, theme);
+    await page.goto("/cockpit");
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    const card = page.getByRole("region", { name: "Taux Canada" });
+    await expect(card.getByText("+3 pb", { exact: true })).toBeVisible();
+    const style = await card.evaluate((element) => ({
+      background: getComputedStyle(element).backgroundImage,
+      color: getComputedStyle(element).color,
+    }));
+    expect(style.color).toBe(theme === "blue" ? "rgb(8, 32, 51)" : "rgb(238, 247, 255)");
+    if (theme === "blue") expect(style.background).toContain("rgb(255, 255, 255)");
+    else {
+      // Mobile uses its own dark gradient; check every stop rather than a desktop-only color.
+      const stops = [...style.background.matchAll(/rgba?\((\d+), (\d+), (\d+)/g)];
+      expect(stops.length).toBeGreaterThan(0);
+      for (const stop of stops) {
+        expect(Number(stop[1]) * 0.2126 + Number(stop[2]) * 0.7152 + Number(stop[3]) * 0.0722).toBeLessThan(128);
+      }
+    }
+    const contrast = await new AxeBuilder({ page }).include(".canada-rates-card")
+      .withRules(["color-contrast"]).analyze();
+    expect(contrast.violations).toEqual([]);
+    await card.screenshot({ path: testInfo.outputPath(`cockpit-rates-${theme}.png`) });
+    await page.route("**/api/anatole/api/v1/fixed-income/canada/curve", (route) =>
+      route.fulfill({ status: 503, json: { detail: "Source unavailable" } }));
+    await page.reload();
+    await expect(card).toContainText("Source momentanément indisponible");
+    const unavailableContrast = await new AxeBuilder({ page }).include(".canada-rates-card")
+      .withRules(["color-contrast"]).analyze();
+    expect(unavailableContrast.violations).toEqual([]);
+  });
+}
