@@ -84,6 +84,12 @@ const groups: Array<{
         available: true,
       },
       {
+        href: "/taux-obligations",
+        label: "Taux & obligations",
+        icon: BarChart3,
+        available: true,
+      },
+      {
         href: "/cockpit",
         label: "Cockpit",
         icon: LayoutDashboard,

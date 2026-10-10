@@ -13,7 +13,7 @@ SourceStatus = Literal["ok", "partial", "unavailable"]
 class Canada360AssistantLink(BaseModel):
     label: str
     url: str
-    level: Literal["federal", "provincial", "statistics"]
+    level: Literal["federal", "provincial", "municipal", "statistics"]
     agency: str | None = None
     jurisdiction: str | None = None
     updated_at: str | None = None
@@ -116,6 +116,7 @@ class Canada360AssistantResponse(BaseModel):
         "tax",
         "health_admin",
         "local_resource",
+        "fixed_income",
     ] = "services"
 
 

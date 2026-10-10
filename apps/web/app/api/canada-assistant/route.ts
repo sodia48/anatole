@@ -402,7 +402,7 @@ function turnMarkup(
     : "";
 
   const skill = !isUser && turn.skill ? `<small class="skillChip">${escapeHtml(turn.skill)}</small>` : "";
-  const actions = !isUser ? (turn.actions ?? []).filter((action) => /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|terminal|screener|assistant|qualite)$/.test(action.href))
+  const actions = !isUser ? (turn.actions ?? []).filter((action) => /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/.test(action.href))
     .map((action) => `<a class="assistantAction" href="${escapeHtml(action.href)}" target="_parent">${escapeHtml(action.label)} →</a>`).join("") : "";
   const answerMarkup = !isUser
     ? structuredAnswerMarkup(turn.text, evidenceSources.length > 0 || turn.links?.length > 0)

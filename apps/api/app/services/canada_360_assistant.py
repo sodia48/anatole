@@ -33,11 +33,73 @@ from app.services.canada_360_sources import (
     official_domains,
 )
 from app.services.provincial_statistics import provincial_statistics_service
+from app.services.bank_of_canada import bank_of_canada_valet_service
+from app.services.provincial_debt_sources import provincial_profile
+from app.services.municipal_debt_sources import municipal_debt_service
 
 CONVERSATION_TTL_SECONDS = 2 * 60 * 60
 MAX_DISPLAY_HISTORY_TURNS = 40
 MAX_MODEL_HISTORY_TURNS = 10
 logger = logging.getLogger(__name__)
+
+
+def _fixed_income_question(question: str) -> bool:
+    text = question.casefold()
+    return any(cue in text for cue in ("courbe des taux", "yield curve", "courbe invers", "courbe est-elle invers", "10 ans canadien",
+                                    "obligataire", "bond issue", "provinces empruntent", "provincial borrowing",
+                                    "émissions de toronto", "emissions de toronto", "toronto bonds"))
+
+
+async def _official_fixed_income_answer(question: str, lang: str, jurisdiction: str,
+                                        mode: str) -> Canada360AssistantResponse:
+    text = question.casefold()
+    english = lang == "en"
+    links: list[Canada360AssistantLink] = []
+    if "toronto" in text:
+        profile = await municipal_debt_service.profile("toronto")
+        issues = profile.recent_issues[:5] if profile else []
+        answer = ("## Recently settled Toronto issues\n" if english else "## Dernières émissions de Toronto\n")
+        answer += "\n".join(f"- {row.settlement_date}: {row.cusip or 'N/D'}, coupon "
+                             f"{f'{row.coupon_percent:g} %' if row.coupon_percent is not None else 'N/D'}, "
+                             f"{f'{row.issue_amount:,.0f}' if row.issue_amount is not None else 'N/D'} "
+                             f"{row.currency or ''}, maturity {row.maturity_date}."
+                             for row in issues) if issues else ("Official issue data unavailable." if english else "Émissions officielles indisponibles.")
+        links.append(Canada360AssistantLink(label="Recently Settled Bond Issues", level="municipal",
+            agency="City of Toronto", jurisdiction="ON",
+            url="https://www.toronto.ca/city-government/budget-finances/city-finance/investor-relations/recently-settled-bond-issues/"))
+    elif any(word in text for word in ("province", "québec", "quebec", "ontario")) and any(
+        word in text for word in ("emprunt", "borrowing", "obligat", "bond")):
+        qc, on = await asyncio.gather(provincial_profile("QC"), provincial_profile("ON"))
+        answer = "## Provincial borrowing\n" if english else "## Emprunts provinciaux\n"
+        for profile in (qc, on):
+            if profile is None:
+                continue
+            amount = (f"{profile.borrowing_program_amount / 1_000_000_000:g} billion CAD ({profile.fiscal_year})"
+                      if profile.borrowing_program_amount is not None else "N/D")
+            answer += f"- {profile.name}: {amount}.\n"
+            if profile.borrowing_program_url:
+                links.append(Canada360AssistantLink(label=profile.name, level="provincial",
+                    agency=profile.issuer, jurisdiction=profile.code, url=profile.borrowing_program_url))
+        answer += ("Secondary-market yields and spreads are unavailable." if english else
+                   "Rendements secondaires et spreads : source de marché non configurée.")
+    else:
+        curve = await bank_of_canada_valet_service.curve()
+        answer = "## Government of Canada benchmark curve\n" if english else "## Courbe des taux du Canada\n"
+        answer += "\n".join(f"- {row.tenor}: {row.latest:.2f} %"
+                            + (f" ({row.bp_change:+g} bp)" if row.bp_change is not None else "")
+                            for row in curve.points if row.latest is not None)
+        if curve.spread_2s10s_bps is not None:
+            answer += f"\n- 2s10s: {curve.spread_2s10s_bps:+g} bp; {curve.curve_shape}."
+        if not any(row.latest is not None for row in curve.points):
+            answer += "Official rates unavailable." if english else "Taux officiels indisponibles."
+        links.append(Canada360AssistantLink(label="Selected bond yields", level="federal",
+            agency="Bank of Canada", jurisdiction="CA",
+            url="https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/"))
+    answer += ("\nCoupons are not secondary-market yields. Explore /taux-obligations for methodology."
+               if english else "\nLes coupons ne sont pas des rendements secondaires. Voir /taux-obligations pour la méthode.")
+    return Canada360AssistantResponse(answer=answer, links=links,
+        source_line=" · ".join(link.agency or link.label for link in links),
+        jurisdiction=jurisdiction, mode=mode, intent="fixed_income")
 
 PROVINCES = {
     "QC": (
@@ -1230,7 +1292,12 @@ class Canada360AssistantService:
         base_response: Canada360AssistantResponse | None = None
         answer_path = "provider"
 
-        if not document_text and intent in {"statistics", "compare_statistics"} and metric_key is not None:
+        if not document_text and _fixed_income_question(question):
+            base_response = await _official_fixed_income_answer(question, lang, effective_jurisdiction, mode)
+            intent = "fixed_income"
+            answer_path = "structured"
+
+        if base_response is None and not document_text and intent in {"statistics", "compare_statistics"} and metric_key is not None:
             targets = _named_provinces(question)
             previous_province = state.profile.province or (
                 state.jurisdiction if state.jurisdiction != "CA" else None

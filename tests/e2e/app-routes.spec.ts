@@ -933,6 +933,10 @@ test("Anatole demande le choix Particulier ou Institutionnel a l'ouverture", asy
 
 test("Le choix Institutionnel ouvre les 70 capacites d'Anatole Institutional", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForFunction(() =>
+    Object.keys(document.querySelector('[data-testid="persona-institutionnel"]') ?? {})
+      .some((key) => key.startsWith("__reactFiber")),
+  );
   await page.getByTestId("persona-institutionnel").click();
 
   await expect(page).toHaveURL(/\/institutionnel$/);

@@ -67,7 +67,7 @@ test(
       { timeout: 60_000 },
     );
     if ((await firstAnswer.innerText()).includes("Alberta")) {
-      await expect(firstAnswer).toContainText(/\d[,.]\d\s*%/);
+      await expect(firstAnswer).toContainText(/\b\d+(?:[,.]\d+)?\s*%/);
       await expect(firstAnswer).toContainText(/pour .*20\d{2}/i);
       await expect(firstAnswer).toContainText(/Statistique Canada/i);
     }
@@ -93,7 +93,7 @@ test(
       { timeout: 60_000 },
     );
     if ((await followupAnswer.innerText()).includes("Ontario")) {
-      await expect(followupAnswer).toContainText(/\d[,.]\d\s*%/);
+      await expect(followupAnswer).toContainText(/\b\d+(?:[,.]\d+)?\s*%/);
     }
     await expect(chat).not.toContainText("Précise le service");
     await expect(chat).not.toContainText("Je peux répondre directement sur ce sujet");

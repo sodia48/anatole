@@ -144,6 +144,11 @@ def validate_draft(raw: str, payload: dict[str, object]) -> SynthesisDraft:
                           if key not in {"question", "conversation"}}, ensure_ascii=False, default=str)
     if not _numeric_values(answer) <= _numeric_values(trusted):
         raise ValueError("unsupported_number")
+    if payload.get("skill") == "fixed_income":
+        stated_cusips = set(re.findall(r"\b[A-Z0-9]{9}\b", answer))
+        known_cusips = set(re.findall(r"\b[A-Z0-9]{9}\b", trusted))
+        if not stated_cusips <= known_cusips:
+            raise ValueError("unsupported_cusip")
     if any(len(prompt) > 160 or UNSAFE_LINK.search(prompt) or TRADING.search(prompt)
            for prompt in draft.follow_up_prompts):
         raise ValueError("unsafe_follow_up")
@@ -166,6 +171,8 @@ async def synthesize_from_evidence(bundle: AnatoleEvidenceBundle, question: str,
         "Markdown: paragraphes, titres ## et listes -; aucun lien.\nEvidence: "
         + json.dumps(payload, ensure_ascii=False, default=str)
     )
+    if bundle.skill == "fixed_income":
+        prompt += "\nObligations: ne crée aucun CUSIP, émission, rendement, spread ou valeur N/D. Le coupon n'est jamais un rendement de marché."
     timeout = settings.anatole_assistant_synthesis_timeout_seconds
     for attempt in range(2):
         try:

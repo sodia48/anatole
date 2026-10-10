@@ -9,6 +9,7 @@ import {
 import { MarketHeatmap } from "./MarketHeatmap";
 import { QuoteTape } from "./QuoteTape";
 import { MoversList } from "./MoversList";
+import { CanadaRatesCard } from "./CanadaRatesCard";
 import {
   getCockpitSnapshot,
   type CockpitUniverse,
@@ -331,6 +332,8 @@ export function CockpitClient() {
           </div>
         </section>
       </section>
+
+      <CanadaRatesCard language={language} />
 
       <footer className="status-footer">
         {pick(language, "Mis à jour", "Updated")} {new Date(snapshot.generated_at).toLocaleTimeString(localeFor(language))} · {snapshot.constituents.length} {pick(language, "titres", "securities")} · {pick(language, "Univers au", "Universe as of")} {snapshot.universe_as_of} ({snapshot.universe_source}) · {pick(language, "Cotations publiques potentiellement différées", "Public quotes may be delayed")}
