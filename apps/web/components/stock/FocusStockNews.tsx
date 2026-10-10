@@ -1,12 +1,21 @@
 "use client";
 
-import { ArrowUpRight, Newspaper, X } from "lucide-react";
+import {
+  ArrowUpRight,
+  BarChart3,
+  Eye,
+  Lightbulb,
+  LoaderCircle,
+  Newspaper,
+  Sparkles,
+  X,
+} from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { getStockNewsSnapshot } from "@/lib/api";
+import { getNewsBrief, getStockNewsSnapshot } from "@/lib/api";
 import { localeFor, pick } from "@/lib/i18n";
-import type { StockNewsSnapshot } from "@/lib/types";
+import type { NewsBriefResponse, StockNewsSnapshot } from "@/lib/types";
 
 import styles from "./FocusStockNews.module.css";
 
@@ -14,10 +23,14 @@ type NewsItem = StockNewsSnapshot["items"][number];
 
 function ArticleReader({
   item,
+  ticker,
+  company,
   language,
   onClose,
 }: {
   item: NewsItem;
+  ticker: string;
+  company: string;
   language: "fr" | "en";
   onClose: () => void;
 }) {
@@ -25,6 +38,9 @@ function ArticleReader({
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const previousFocus = useRef<HTMLElement | null>(null);
+  const [brief, setBrief] = useState<NewsBriefResponse | null>(null);
+  const [briefLoading, setBriefLoading] = useState(true);
+  const [briefError, setBriefError] = useState(false);
   const formatter = useMemo(
     () =>
       new Intl.DateTimeFormat(localeFor(language), {
@@ -34,6 +50,37 @@ function ArticleReader({
       }),
     [language],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getNewsBrief(
+      {
+        title: item.title,
+        summary: item.summary,
+        url: item.url,
+        source: item.publisher,
+        category: "Stock",
+        region: "Canada",
+        language,
+        context: "stock",
+        ticker,
+        company,
+      },
+      controller.signal,
+    )
+      .then((value) => {
+        if (controller.signal.aborted) return;
+        setBrief(value);
+        setBriefError(false);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setBriefError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBriefLoading(false);
+      });
+    return () => controller.abort();
+  }, [company, item, language, ticker]);
 
   useEffect(() => {
     previousFocus.current = document.activeElement instanceof HTMLElement
@@ -131,24 +178,113 @@ function ArticleReader({
                 ))}
               </div>
             ) : null}
-            <section aria-labelledby={`${titleId}-summary`} className={styles.readerSummary}>
-              <h3 id={`${titleId}-summary`}>
-                {pick(language, "Résumé", "Summary")}
-              </h3>
-              <p>{item.summary}</p>
-            </section>
-            <div className={styles.unavailable}>
-              <strong>
-                {pick(language, "Contenu complet non disponible", "Full article unavailable")}
-              </strong>
-              <span>
-                {pick(
-                  language,
-                  "Cette source ne fournit pas le texte intégral à Anatole. Vous pouvez consulter le résumé ci-dessus ou poursuivre la lecture sur le site de la source.",
-                  "This publisher does not provide the full article to Anatole. You can read the summary above or continue on the publisher’s website.",
-                )}
-              </span>
+            <div className={styles.briefHeading}>
+              <Sparkles aria-hidden="true" size={15} />
+              <span>{pick(language, "BRIEF ANATOLE", "ANATOLE BRIEF")}</span>
             </div>
+
+            {briefLoading ? (
+              <div className={styles.briefLoading} role="status">
+                <LoaderCircle aria-hidden="true" className={styles.briefSpinner} size={20} />
+                <div>
+                  <strong>{pick(language, "Analyse de la nouvelle…", "Analyzing the news…")}</strong>
+                  <span>
+                    {pick(
+                      language,
+                      "Anatole structure les faits, chiffres et éléments à surveiller pour ce titre.",
+                      "Anatole is structuring the facts, figures and watch items for this stock.",
+                    )}
+                  </span>
+                </div>
+              </div>
+            ) : brief ? (
+              <>
+                <div className={styles.provenance}>
+                  <strong>
+                    {brief.source_mode === "official_page"
+                      ? pick(language, "Page source analysée", "Source page analyzed")
+                      : pick(language, "Résumé du flux analysé", "Feed summary analyzed")}
+                  </strong>
+                  <span>{brief.source_note}</span>
+                </div>
+
+                <section className={styles.briefLead}>
+                  <span>{pick(language, "EN BREF", "IN SHORT")}</span>
+                  <p>{brief.summary}</p>
+                </section>
+
+                {brief.key_figures.length ? (
+                  <section className={styles.briefSection}>
+                    <header>
+                      <BarChart3 aria-hidden="true" size={16} />
+                      <strong>{pick(language, "Chiffres clés", "Key figures")}</strong>
+                    </header>
+                    <div className={styles.briefFigures}>
+                      {brief.key_figures.map((figure, index) => (
+                        <article key={`${figure.value}-${index}`}>
+                          <strong>{figure.value}</strong>
+                          <span>{figure.context}</span>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {brief.changes.length ? (
+                  <section className={styles.briefSection}>
+                    <header>
+                      <Eye aria-hidden="true" size={16} />
+                      <strong>{pick(language, "Ce qui change", "What changed")}</strong>
+                    </header>
+                    <ul>
+                      {brief.changes.map((change, index) => (
+                        <li key={`${index}-${change.slice(0, 24)}`}>{change}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                <section className={styles.briefInsight}>
+                  <div>
+                    <Lightbulb aria-hidden="true" size={16} />
+                    <span>{pick(language, "LECTURE ANATOLE", "ANATOLE READ")}</span>
+                  </div>
+                  <p>{brief.why_it_matters}</p>
+                  <small>
+                    {pick(
+                      language,
+                      "Mise en contexte analytique d’Anatole — distincte des faits publiés par la source.",
+                      "Anatole analytical context — separate from facts published by the source.",
+                    )}
+                  </small>
+                </section>
+
+                {brief.watch.length ? (
+                  <section className={styles.briefSection}>
+                    <header>
+                      <Eye aria-hidden="true" size={16} />
+                      <strong>{pick(language, "À surveiller", "What to watch")}</strong>
+                    </header>
+                    <ul>
+                      {brief.watch.map((watch, index) => (
+                        <li key={`${index}-${watch.slice(0, 24)}`}>{watch}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </>
+            ) : (
+              <section className={styles.briefLead}>
+                <span>
+                  {pick(
+                    language,
+                    briefError ? "RÉSUMÉ — MODE SECOURS" : "EN BREF",
+                    briefError ? "SUMMARY — FALLBACK" : "IN SHORT",
+                  )}
+                </span>
+                <p>{item.summary || pick(language, "Aucun résumé disponible.", "No summary available.")}</p>
+              </section>
+            )}
             <a
               className={styles.originalLink}
               href={item.url}
@@ -295,14 +431,21 @@ export function FocusStockNews({
               <h3>{item.title}</h3>
               <p className={styles.summary}>{item.summary}</p>
               <span className={styles.open}>
-                {pick(language, "Lire dans Anatole", "Read in Anatole")}
+                {pick(language, "Lire le résumé", "Read summary")}
               </span>
             </button>
           ))}
         </div>
       ) : null}
       {selected ? (
-        <ArticleReader item={selected} language={language} onClose={closeReader} />
+        <ArticleReader
+          company={company}
+          item={selected}
+          key={selected.id}
+          language={language}
+          onClose={closeReader}
+          ticker={ticker}
+        />
       ) : null}
     </section>
   );
