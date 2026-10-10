@@ -133,7 +133,8 @@ html[data-focus-embed="true"] .focus-page[data-focus-embedded="true"] { min-widt
 .canada-rates-card { padding: 18px 22px; min-width: 0; overflow: hidden; }
 .canada-rates-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .canada-rates-heading h2 { margin: 4px 0 0; font-size: 18px; }
-.canada-rates-heading a { color: var(--teal); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.canada-rates-heading .eyebrow { color: var(--accent-text); }
+.canada-rates-heading a { color: var(--positive-text); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .canada-rates-content { display: grid; grid-template-columns: minmax(0, 1fr) 260px; align-items: center; gap: 18px; margin-top: 16px; }
 .canada-rates-tenors { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .canada-rates-tenor { display: grid; gap: 5px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
