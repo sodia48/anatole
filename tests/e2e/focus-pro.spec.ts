@@ -87,23 +87,7 @@ test.describe("Focus Pro workstation", () => {
     })).toEqual({ background: "rgb(255, 255, 255)", color: "rgb(7, 27, 44)", opacity: "1" });
   });
 
-  test("chart, indicators, drawings, layout, comparison, markers, alerts and backtest", async ({ page }) => {
-    const visibleEarningsDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1_000).toISOString();
-    await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ticker: "RY",
-        source: "E2E official fixture",
-        quarterly_financials: [],
-        events: {
-          earnings_dates: [visibleEarningsDate],
-          ex_dividend_date: null,
-          dividend_date: null,
-        },
-        metrics: { dividend_rate: null, dividend_yield: null },
-      }),
-    }));
+  test("chart, indicators, drawings, layout and comparison", async ({ page }) => {
     await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     await expect(page.getByRole("region", { name: "Performance du titre" })).toBeVisible();
@@ -176,6 +160,29 @@ test.describe("Focus Pro workstation", () => {
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByText("1/50")).toBeVisible();
+  });
+
+  test("alerts, fundamental markers and backtest", async ({ page }) => {
+    const visibleEarningsDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1_000).toISOString();
+    await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ticker: "RY",
+        source: "E2E official fixture",
+        quarterly_financials: [],
+        events: {
+          earnings_dates: [visibleEarningsDate],
+          ex_dividend_date: null,
+          dividend_date: null,
+        },
+        metrics: { dividend_rate: null, dividend_yield: null },
+      }),
+    }));
+    await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
+    await expect(page.getByRole("region", { name: "Focus Pro chart" })).toBeVisible();
 
     await page.getByRole("button", { name: /^Alerte$|^Alert$/i }).click();
     await page.getByRole("button", { name: /Ajouter aux alertes|Add to alerts/i }).click();
@@ -189,6 +196,14 @@ test.describe("Focus Pro workstation", () => {
     const backtest = page.getByRole("region", { name: "Backtest" });
     await backtest.getByRole("button", { name: /Exécuter|Run/i }).click();
     await expect(backtest.getByText(/Résultat net|Net profit/i)).toBeVisible({ timeout: 45_000 });
+  });
+
+  test("workstation switches language after preferences reload", async ({ page }) => {
+    await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
+    await expect(page.getByRole("region", { name: "Focus Pro chart" })).toBeVisible();
+    await expect(page.getByText(/POSTE PROFESSIONNEL/).first()).toBeVisible();
 
     await page.evaluate(() => {
       const preferences = JSON.parse(localStorage.getItem("anatole.preferences.v0.4") ?? "{}");
