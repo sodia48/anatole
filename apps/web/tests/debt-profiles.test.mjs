@@ -16,8 +16,10 @@ function load(relative, overrides = {}) {
   return exports;
 }
 const formatting = load("../lib/debt-profile-format.ts");
+const directory = load("../lib/fixed-income-directory.ts");
 const Page = load("../app/taux-obligations/page.tsx", {
   "@/lib/debt-profile-format": formatting,
+  "@/lib/fixed-income-directory": directory,
   "@/components/fixed-income/FixedIncomeClient.module.css": { default: {} },
 }).default;
 const quality = { status: "limited", freshness: "unavailable", observed_at: null };
@@ -80,7 +82,7 @@ test("municipal SSR shows Toronto, Vancouver and Quebec facts without zero or mi
 test("unavailable sources are not labelled verified and model-like markup stays escaped", async (t) => {
   const html = await render(t, "provinces", [{ ...base, code: "QC", name: "<script>alert(1)</script>",
     coverage: "unavailable", quality: { ...quality, status: "unavailable" } }]);
-  assert.match(html, /Source officielle momentanément indisponible/);
+  assert.match(html, /Live profile data temporarily unavailable; consult the official source/);
   assert.doesNotMatch(html, /Source officielle vérifiée|<script>/);
   assert.match(html, /&lt;script&gt;/);
 });
