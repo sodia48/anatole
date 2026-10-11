@@ -36,3 +36,5 @@ The viewport tests also simulate a 420-pixel visual viewport for the virtual key
 ## Validation
 
 See the pull request for final counts. Automated coverage includes regional rankings, three-symbol follow-ups, all seven horizons, exact return/CAGR, partial history, upstream failure, currency and exchange verification, daily date semantics, stale cache, and real FastAPI routing. Browser tests cover long answers, tables, scroll retention, close/reopen, reset, viewport bounds and both themes. The JavaScript budget is unchanged.
+
+CI follow-up: the iPhone fixed-income contrast test previously reused one page for four documents and failed with `Execution context was destroyed` on the second navigation. Each tab/theme now runs in an independent browser context, retaining all computed-style, overflow, screenshot and axe contrast assertions, including the empty issues state. No timeouts or budgets were increased.
