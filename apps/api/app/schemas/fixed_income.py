@@ -99,6 +99,12 @@ class FixedIncomeIssuesResponse(BaseModel):
     quality: FixedIncomeDataQuality
 
 
+class DebtFieldSource(BaseModel):
+    official_url: str
+    observed_at: datetime | None = None
+    description: str
+
+
 class ProvincialDebtProfile(BaseModel):
     code: str
     name: str
@@ -119,6 +125,7 @@ class ProvincialDebtProfile(BaseModel):
     recent_issues: list[GovernmentBondIssue] = Field(default_factory=list)
     last_updated: datetime | None = None
     source_urls: list[str] = Field(default_factory=list)
+    field_sources: dict[str, DebtFieldSource] = Field(default_factory=dict)
     quality: FixedIncomeDataQuality
 
 
@@ -130,8 +137,11 @@ class MunicipalDebtProfile(BaseModel):
     coverage: Coverage = "unavailable"
     debt_outstanding: float | None = None
     borrowing_program_amount: float | None = None
+    fiscal_year: str | None = None
+    bond_programs: list[str] = Field(default_factory=list)
     green_social_sustainable_program: str | None = None
     recent_issues: list[GovernmentBondIssue] = Field(default_factory=list)
     last_updated: datetime | None = None
     source_urls: list[str] = Field(default_factory=list)
+    field_sources: dict[str, DebtFieldSource] = Field(default_factory=dict)
     quality: FixedIncomeDataQuality

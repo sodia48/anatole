@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { BondIssue, CanadaCurve, CurveHistory, DataQuality, MunicipalityProfile, ProvinceProfile } from "@/lib/fixed-income";
 import styles from "@/components/fixed-income/FixedIncomeClient.module.css";
+import { formatDebtAmount, hasDebtFacts, richestProfilesFirst } from "@/lib/debt-profile-format";
 
 export const dynamic = "force-dynamic";
 type Params = Record<string, string | string[] | undefined>;
@@ -24,7 +25,43 @@ function link(raw: string | null | undefined, fr: string, en: string) {
   return <a href={raw} target="_blank" rel="noopener noreferrer">{bi(fr, en)} ↗</a>;
 }
 function quality(q: DataQuality | null | undefined) {
-  return q ? <>{bi("Couverture", "Coverage")}: {label(q.status)} · {bi("Fraîcheur", "Freshness")}: {label(q.freshness)} · {q.observed_at?.slice(0, 10) ?? missing()}</> : bi("Source momentanément indisponible", "Source temporarily unavailable");
+  return q ? <>{bi("Couverture", "Coverage")}: {label(q.status)} · {bi("Fraîcheur", "Freshness")}: {label(q.freshness)}{q.observed_at && <> · {q.observed_at.slice(0, 10)}</>}</> : bi("Source momentanément indisponible", "Source temporarily unavailable");
+}
+function amount(value: number, currency = "CAD") { return bi(formatDebtAmount(value, "fr", currency), formatDebtAmount(value, "en", currency)); }
+function profileFallback(row: ProvinceProfile | MunicipalityProfile) {
+  if (row.quality.status === "unavailable") return bi("Source officielle momentanément indisponible; réessaie plus tard.", "Official source temporarily unavailable; try again later.");
+  return "code" in row
+    ? bi("Source officielle vérifiée; profil chiffré non encore structuré.", "Official source verified; structured numeric profile not yet available.")
+    : bi("Source officielle vérifiée; aucune donnée obligataire structurée exploitable pour le moment.", "Official source verified; no usable structured bond data yet.");
+}
+function latestIssue(issues: BondIssue[]) {
+  const row = [...issues].sort((a, b) => (b.issue_date ?? b.settlement_date ?? "").localeCompare(a.issue_date ?? a.settlement_date ?? ""))[0];
+  if (!row) return null;
+  return <div className={styles.latestIssue}>
+    <p>{bi("Dernière émission vérifiée", "Latest verified issue")}{(row.issue_date || row.settlement_date) && <> · {row.issue_date ?? row.settlement_date}</>}</p>
+    {row.issue_amount != null && <p>{bi("Montant", "Amount")}: <strong>{amount(row.issue_amount, row.currency ?? "")}</strong></p>}
+    {row.coupon_percent != null && <p>Coupon: <strong>{pct(row.coupon_percent)}</strong></p>}
+    {row.maturity_date && <p>{bi("Échéance", "Maturity")}: <strong>{row.maturity_date}</strong></p>}
+    {row.yield_percent != null && row.yield_source && <p>{bi("Rendement publié à l’émission", "Published yield at issuance")}: <strong>{pct(row.yield_percent)}</strong></p>}
+  </div>;
+}
+function profileCards(rows: ProvinceProfile[] | MunicipalityProfile[]) {
+  return <div className={styles.profileGrid}>{richestProfilesFirst<ProvinceProfile | MunicipalityProfile>(rows).map((row) => {
+    const provincial = "code" in row;
+    const programs = !provincial && row.bond_programs?.length ? row.bond_programs.join(" · ") : row.green_social_sustainable_program;
+    return <article key={provincial ? row.code : row.slug}>
+      <h3>{provincial ? row.name : row.city} <small>{provincial ? row.code : row.province}</small></h3>
+      <p>{quality(row.quality)}</p>
+      {row.borrowing_program_amount != null && <p>{bi("Programme d’emprunt", "Borrowing program")}: <strong>{amount(row.borrowing_program_amount)}</strong>{row.fiscal_year && <> · {row.fiscal_year}</>}</p>}
+      {row.debt_outstanding != null && <p>{bi("Dette en cours", "Debt outstanding")}: <strong>{amount(row.debt_outstanding)}</strong></p>}
+      {provincial && row.average_term != null && <p>{bi("Terme moyen", "Average term")}: <strong>{row.average_term} {bi("ans", "years")}</strong></p>}
+      {!provincial && row.recent_issues.length > 0 && <p>{bi("Émissions vérifiées", "Verified issues")}: <strong>{row.recent_issues.length}</strong></p>}
+      {latestIssue(row.recent_issues)}
+      {programs && <p>{bi("Programmes obligataires", "Bond programs")}: <strong>{programs}</strong></p>}
+      {!hasDebtFacts(row) && <p>{profileFallback(row)}</p>}
+      <div className={styles.profileSources}>{[...new Set(row.source_urls)].map((url) => <span key={url}>{link(url, "Source officielle", "Official source")}</span>)}</div>
+    </article>;
+  })}</div>;
 }
 async function api<T>(path: string): Promise<T | null> {
   const base = process.env.ANATOLE_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -63,8 +100,8 @@ export default async function FixedIncomePage({ searchParams }: { searchParams: 
       <section className={styles.section}><h2>{bi("Historique officiel", "Official history")}</h2><nav className={styles.periods} aria-label="History period">{PERIODS.map((item) => <a key={item} href={"/taux-obligations?tab=canada&period=" + item} aria-current={period === item ? "page" : undefined}>{item}</a>)}</nav><p>{history?.observations.length ?? 0} {bi("dates disponibles", "available dates")}</p><div className={styles.tableScroll}><table data-mobile-scroll><thead><tr><th>Date</th><th>2Y</th><th>5Y</th><th>10Y</th><th>Long</th></tr></thead><tbody>{history?.observations.slice(-12).reverse().map((row) => <tr key={row.observed_at}><td>{row.observed_at}</td>{["2Y", "5Y", "10Y", "Long"].map((key) => <td key={key}>{pct(row.yields_percent[key])}</td>)}</tr>)}</tbody></table></div></section>
       <p className={styles.notice}>{bi("Source : Banque du Canada Valet. Échéances approximatives, données de clôture différées. Classification 2s10s descriptive (±5 pb).", "Source: Bank of Canada Valet. Approximate tenors, delayed closing data. Descriptive 2s10s classification (±5 bp).")} {link(curve?.debt_management_url ?? "https://www.canada.ca/en/department-finance/services/publications/debt-management.html", "Gestion de la dette fédérale", "Federal debt management")}</p><p className={styles.notice}>{quality(curve?.quality)}</p>
     </>}
-    {tab === "provinces" && <section className={styles.section}><h2>{bi("Profils de dette provinciale", "Provincial debt profiles")}</h2><p>{bi("Rendements secondaires provinciaux : source de marché non configurée. Les champs absents restent N/D.", "Provincial secondary-market yields: no market source configured. Missing fields remain N/A.")}</p><div className={styles.profileGrid}>{provinces?.map((row) => <article key={row.code}><h3>{row.name} <small>{row.code}</small></h3><p>{quality(row.quality)}</p><p>{bi("Programme d’emprunt", "Borrowing program")}: <strong>{row.borrowing_program_amount == null ? missing() : (row.borrowing_program_amount / 1_000_000_000).toLocaleString() + " G CAD"}</strong> {row.fiscal_year ?? ""}</p><p>{bi("Dette en cours", "Debt outstanding")}: {row.debt_outstanding ?? missing()}</p><p>{bi("Terme moyen", "Average term")}: {row.average_term ?? missing()}</p><p>{bi("Dernière émission", "Latest issue")}: {row.recent_issues[0]?.settlement_date ?? missing()}</p><p>{bi("Programme durable", "Sustainable program")}: {row.green_social_sustainable_program ?? missing()}</p>{link(row.source_urls[0], "Source officielle", "Official source")}</article>)}</div>{!provinces && <p role="status">{quality(null)}</p>}</section>}
-    {tab === "municipalities" && <section className={styles.section}><h2>{bi("Dette municipale", "Municipal debt")}</h2><p>{bi("Toronto publie un tableau d’émissions ; les autres villes ont un profil limité lorsque la source est officielle.", "Toronto publishes an issues table; other cities show a limited profile when an official source exists.")}</p><div className={styles.profileGrid}>{municipalities?.map((row) => <article key={row.slug}><h3>{row.city} <small>{row.province}</small></h3><p>{quality(row.quality)}</p><p>{bi("Dette", "Debt")}: {row.debt_outstanding ?? missing()}</p><p>{bi("Émissions vérifiées", "Verified issues")}: {row.recent_issues.length}</p><p>{bi("Programme durable", "Sustainable program")}: {row.green_social_sustainable_program ?? missing()}</p>{link(row.source_urls[0], "Source officielle", "Official source")}</article>)}</div>{!municipalities && <p role="status">{quality(null)}</p>}</section>}
+    {tab === "provinces" && <section className={styles.section}><h2>{bi("Profils de dette provinciale", "Provincial debt profiles")}</h2><p>{bi("Rendements secondaires provinciaux : source de marché non configurée. Seules les données officielles vérifiées sont présentées.", "Provincial secondary-market yields: no market source configured. Only verified official data is shown.")}</p>{profileCards(provinces ?? [])}{!provinces && <p role="status">{quality(null)}</p>}</section>}
+    {tab === "municipalities" && <section className={styles.section}><h2>{bi("Dette municipale", "Municipal debt")}</h2><p>{bi("Programmes et émissions publiés par les villes. La couverture dépend des données officielles disponibles.", "Programs and issues published by cities. Coverage depends on available official data.")}</p>{profileCards(municipalities ?? [])}{!municipalities && <p role="status">{quality(null)}</p>}</section>}
     {tab === "issues" && <section className={styles.section}><h2>{bi("Émissions officielles", "Official issues")}</h2><p>{bi("Le coupon n’est pas un rendement de marché. Aucun spread sans source de prix secondaire.", "Coupon is not a market yield. No spread without a secondary pricing source.")}</p><form className={styles.filters} method="get" action="/taux-obligations"><input type="hidden" name="tab" value="issues" /><input name="query" aria-label="Search an issue" placeholder="Toronto 2036" defaultValue={param(params, "query")} /><select name="province" aria-label="Province" defaultValue={param(params, "province")}><option value="">Toutes les provinces / All provinces</option><option value="ON">Ontario</option><option value="QC">Québec</option></select><input name="city" aria-label="City" placeholder="Toronto" defaultValue={param(params, "city")} /><input name="maturity_year" aria-label="Maturity year" inputMode="numeric" placeholder="2036" defaultValue={param(params, "maturity_year")} /><select name="currency" aria-label="Currency" defaultValue={param(params, "currency")}><option value="">Toutes devises / All currencies</option><option value="CAD">CAD</option><option value="USD">USD</option></select><select name="type" aria-label="Type" defaultValue={param(params, "type")}><option value="">Tous types / All types</option><option value="green">Green</option><option value="social">Social</option></select><button type="submit">{bi("Filtrer", "Filter")}</button></form><p>{issues?.issues.length ?? 0} {bi("émissions correspondant aux filtres", "issues matching filters")} · {quality(issues?.quality)}</p>{issueTable(issues?.issues ?? [])}</section>}
   </main>;
 }
