@@ -25,6 +25,7 @@ from app.schemas.workspace import AssistantFact, AssistantLink, AssistantRequest
 from app.services.assistant import DISCLAIMER, _symbols, assistant_service
 from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.etf_holdings import etf_holdings_service
+from app.services.assistant_etf_history import EtfHistoryQuery, ETF_HISTORY_SKILLS, historical_answer, history_query
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
 from app.services.stock_research import build_stock_research_bundle, format_stock_research
@@ -69,6 +70,7 @@ _FIXED_INCOME_CUES = ("courbe des taux", "yield curve", "courbe invers", "courbe
 
 @dataclass
 class _Session:
+    etf_query: EtfHistoryQuery | None = None
     symbols: list[str] = field(default_factory=list)
     skill: Skill | None = None
     canada_id: str | None = None
@@ -618,6 +620,10 @@ class AnatoleAssistantOrchestrator:
         context = request.context
         symbols = _clean_symbols(request.message, context, state.symbols)
         skill, mixed_macro = _select_skill(request.message, context, symbols, state.skill)
+        etf_query = history_query(request.message, context, state.etf_query if state.skill in ETF_HISTORY_SKILLS else None)
+        if etf_query is not None and skill != "guardrail":
+            skill, mixed_macro = etf_query.skill, False
+            symbols = list(etf_query.symbols)
         logger.info("assistant_skill_selected skill=%s", skill)
         if skill == "portfolio_analysis" and (expired_session or not (request.portfolio_consent and request.portfolio_positions)):
             state.skill = skill
@@ -638,6 +644,12 @@ class AnatoleAssistantOrchestrator:
             bundle = _bundle_from_response(skill, base, symbols)
         elif skill == "stock_analysis" and symbols:
             base, bundle = await self._stock(symbols[0], context.language, request.message)
+        elif skill in ETF_HISTORY_SKILLS:
+            answer, bundle = await historical_answer(etf_query, context.language)
+            base = self._simple(skill, "Performance historique ETF", answer,
+                confidence="moyenne" if bundle.facts else "limitée",
+                sources=[_evidence_source_to_assistant_source(source) for source in bundle.sources])
+            state.etf_query = etf_query
         elif skill == "etf_analysis" and symbols:
             base, bundle = await self._etf(symbols[0])
         elif skill == "portfolio_analysis":
@@ -699,7 +711,12 @@ class AnatoleAssistantOrchestrator:
                                 stock.answer)
                 base.sources.extend(stock.sources)
         actions: list[NavigationAction] = []
-        if skill == "compare" and len(symbols) >= 2:
+        if skill in ETF_HISTORY_SKILLS:
+            actions.append(_action("Explorer les ETF" if context.language == "fr" else "Explore ETFs", "/etf"))
+            if symbols and all(symbol in _ETF_SYMBOLS for symbol in symbols):
+                actions.append(_action("Comparer les ETF" if context.language == "fr" else "Compare ETFs",
+                    "/comparateur?symbols=" + ",".join(symbols)))
+        elif skill == "compare" and len(symbols) >= 2:
             actions.append(_action(f"Comparer {symbols[0]} et {symbols[1]}",
                                    f"/comparateur?symbols={symbols[0]},{symbols[1]}"))
         elif skill == "stock_analysis" and symbols:
@@ -741,7 +758,7 @@ class AnatoleAssistantOrchestrator:
             base.answer = synthesis.answer + (macro_suffix if synthesis.validated else "")
             if synthesis.validated and synthesis.follow_up_prompts:
                 base.suggestions = list(synthesis.follow_up_prompts)
-        state.symbols = symbols[:2]
+        state.symbols = symbols[:5]
         state.skill = skill
         state.last_question_topic = bundle.portfolio_focus or skill
         state.last_answer_summary = (f"Analyse portefeuille : {bundle.portfolio_focus}" if skill == "portfolio_analysis"

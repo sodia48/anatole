@@ -2,30 +2,31 @@
 
 import Link from "next/link";
 import { Bot, Send, X } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { askUnifiedAssistant } from "@/lib/api";
 import { readAssistantPortfolio, type AssistantContext, type UnifiedAssistantResponse } from "@/lib/assistant-context";
-import { parseAssistantRichText, type AssistantInline } from "../../public/assistant-rich-text.mjs";
 import { useAssistantContext } from "./AssistantContextProvider";
 import styles from "./GlobalAssistant.module.css";
 
 type Turn = { role: "user" | "assistant"; text: string; result?: UnifiedAssistantResponse };
 const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|diversification|sous.perform|underperform|chevauch|overlap|doublonn|cluster|contribu|watchtower|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
-const EXPLICIT_SWITCH = /gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\bcompare\b/i;
+const EXPLICIT_SWITCH = /\b(?:ETF|FNB)\b|gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\bcompare\b/i;
 const EXPLICIT_INSTRUMENT = /\b(?:analyse|cours|prix)\s+(?:de|du|pour)\s+[A-Z][A-Z0-9.^-]{0,9}\b/;
-const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
+const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", etf_performance: "Performance ETF", etf_ranking: "Classement ETF", etf_comparison: "Comparaison ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/;
 
-function AssistantText({ text, collapseSources = false }: { text: string; collapseSources?: boolean }) {
-  const blocks = parseAssistantRichText(text, { collapseSources });
-  const inline = (segments: AssistantInline[]) => segments.map((segment, index) =>
-    segment.strong ? <strong key={index}>{segment.text}</strong> : segment.text);
-  return <div className={styles.richText}>{blocks.map((block, index) =>
-    block.type === "heading" ? <h3 key={index}>{inline(block.content)}</h3> :
-    block.type === "subheading" ? <h4 key={index}>{inline(block.content)}</h4> :
-    block.type === "bullet_list" ? <ul key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ul> :
-    block.type === "ordered_list" ? <ol key={index}>{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ol> :
-    <p key={index}>{inline(block.content)}</p>)}</div>;
+function AssistantText({ text, collapseSources = false, onReady }: { text: string; collapseSources?: boolean; onReady: () => void }) {
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let active = true;
+    const moduleUrl = "/assistant-rich-text.mjs";
+    void import(/* webpackIgnore: true */ /* turbopackIgnore: true */ moduleUrl).then((renderer) => {
+      if (active && host.current) host.current.replaceChildren(renderer.renderAssistantRichText(text, { collapseSources }));
+    }).catch(() => { if (active && host.current) host.current.textContent = text; })
+      .finally(() => { if (active) onReady(); });
+    return () => { active = false; };
+  }, [text, collapseSources, onReady]);
+  return <div className={styles.richText} ref={host} />;
 }
 
 function PortfolioPositionSummary({ evidence }: { evidence: UnifiedAssistantResponse["evidence"] }) {
@@ -56,9 +57,11 @@ export function GlobalAssistant() {
   const [pendingPermission, setPendingPermission] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  const backdrop = useRef<HTMLDivElement>(null);
   const history = useRef<HTMLDivElement>(null);
   const nearBottom = useRef(true);
+  const readingPosition = useRef(0);
+  const pending = useRef<AbortController | null>(null);
   const activeContext: AssistantContext = removedForRoute === context.route
     ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown" }
     : context;
@@ -72,31 +75,65 @@ export function GlobalAssistant() {
   } as Partial<Record<AssistantContext["surface"], string>>)[activeContext.surface]
     ?? "Pose une question à Anatole…";
 
-  useEffect(() => { if (nearBottom.current) bottom.current?.scrollIntoView({ block: "end" }); }, [turns, loading, pendingPermission]);
+  const keepReadingPosition = useCallback(() => {
+    const node = history.current;
+    if (node) node.scrollTop = nearBottom.current ? node.scrollHeight : readingPosition.current;
+  }, []);
+  useLayoutEffect(keepReadingPosition, [keepReadingPosition, open, turns, loading, pendingPermission, error]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const viewport = window.visualViewport;
+    const resize = () => {
+      const node = backdrop.current;
+      if (!node) return;
+      node.style.height = `${viewport?.height ?? window.innerHeight}px`;
+      node.style.top = `${viewport?.offsetTop ?? 0}px`;
+      requestAnimationFrame(keepReadingPosition);
+    };
+    resize();
+    viewport?.addEventListener("resize", resize);
+    viewport?.addEventListener("scroll", resize);
+    window.addEventListener("resize", resize);
+    backdrop.current?.querySelector<HTMLButtonElement>("header button")?.focus({ preventScroll: true });
+    return () => {
+      document.body.style.overflow = overflow;
+      viewport?.removeEventListener("resize", resize);
+      viewport?.removeEventListener("scroll", resize);
+      window.removeEventListener("resize", resize);
+      previous?.focus({ preventScroll: true });
+    };
+  }, [open, keepReadingPosition]);
 
   async function submit(text: string, consent = authorized, positions?: ReturnType<typeof readAssistantPortfolio>, resume = false) {
     if (!text.trim() || loading) return;
     const lastSkill = [...turns].reverse().find((turn) => turn.result)?.result?.intent;
     const needsPortfolio = PORTFOLIO_CUE.test(text) ||
       !EXPLICIT_SWITCH.test(text) && !EXPLICIT_INSTRUMENT.test(text) &&
-      (lastSkill === "portfolio_analysis" || activeContext.surface === "portfolio");
+      (lastSkill === "portfolio_analysis" || !lastSkill && activeContext.surface === "portfolio");
     const selectedPositions = positions ?? (consent && needsPortfolio ? readAssistantPortfolio() : []);
     setLoading(true);
+    const controller = new AbortController();
+    pending.current = controller;
     setError(null);
     setPendingPermission(null);
     if (!resume) setTurns((current) => [...current, { role: "user", text }]);
-    nearBottom.current = true;
     try {
       const result = await askUnifiedAssistant({ message: text, context: {
         ...activeContext, portfolio_scope: { authorized: consent, position_count: consent ? selectedPositions.length : 0 },
       }, conversation_id: conversationId, portfolio_consent: consent && selectedPositions.length > 0,
-      portfolio_positions: selectedPositions });
+      portfolio_positions: selectedPositions }, controller.signal);
+      if (pending.current !== controller) return;
       setConversationId(result.conversation_id);
       if (result.permission_required) { setAuthorized(false); setPendingPermission(text); }
       else setTurns((current) => [...current, { role: "assistant", text: result.answer, result }]);
     } catch (cause) {
+      if (pending.current !== controller) return;
       setError(cause instanceof Error ? cause.message : "Assistant indisponible.");
-    } finally { setLoading(false); }
+    } finally { if (pending.current === controller) setLoading(false); }
   }
 
   async function allowPortfolio() {
@@ -126,22 +163,28 @@ export function GlobalAssistant() {
     <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Ouvrir Anatole Assistant">
       <Bot size={19} aria-hidden="true" /><span>Anatole Assistant</span>
     </button>
-    {open && <div className={styles.backdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
+    {open && <div className={styles.backdrop} ref={backdrop} onKeyDown={(event) => {
+      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Tab") return;
+      const nodes = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), textarea, a[href], summary')];
+      const next = event.shiftKey ? nodes.at(-1) : nodes[0];
+      if (document.activeElement === (event.shiftKey ? nodes[0] : nodes.at(-1))) { event.preventDefault(); next?.focus({ preventScroll: true }); }
+    }} onMouseDown={(event) => { if (event.target === event.currentTarget) setOpen(false); }}>
       <section className={styles.drawer} role="dialog" aria-modal="true" aria-label="Anatole Assistant">
         <header className={styles.header}><div><strong>Anatole Assistant</strong><small>Ask → Analyze → Navigate</small></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Fermer l’assistant"><X size={20} /></button></header>
         <div className={styles.toolbar}>
           {removedForRoute !== context.route && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(context.route)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
-          <button type="button" className={styles.reset} onClick={() => { setTurns([]); setConversationId(undefined); setAuthorized(false); setPendingPermission(null); }}>Nouvelle conversation</button>
+          <button type="button" className={styles.reset} onClick={() => { pending.current?.abort(); pending.current = null; setLoading(false); setError(null); setMessage(""); nearBottom.current = true; readingPosition.current = 0; setTurns([]); setConversationId(undefined); setAuthorized(false); setPendingPermission(null); }}>Nouvelle conversation</button>
         </div>
-        <div className={styles.history} aria-live="polite" ref={history} onScroll={() => {
+        <div className={styles.history} aria-label="Historique de la conversation" role="log" aria-live="polite" ref={history} onScroll={() => {
           const node = history.current;
-          if (node) nearBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 90;
+          if (node) { readingPosition.current = node.scrollTop; nearBottom.current = node.scrollHeight - node.scrollTop - node.clientHeight < 90; }
         }}>
           {turns.length === 0 && <p className={styles.intro}>Posez une question sur cette page, un titre, un ETF, votre portefeuille ou Canada 360.</p>}
           {turns.map((turn, index) => <article key={index} className={turn.role === "user" ? styles.userTurn : styles.assistantTurn}>
             {turn.result && <span className={styles.skillChip}>{SKILL_LABELS[turn.result.intent] ?? turn.result.intent}</span>}
-            {turn.role === "assistant" ? <AssistantText text={turn.text} collapseSources={Boolean(turn.result?.evidence.some((row) => row.sources.length > 0))} /> : <p>{turn.text}</p>}
+            {turn.role === "assistant" ? <AssistantText onReady={keepReadingPosition} text={turn.text} collapseSources={Boolean(turn.result?.evidence.some((row) => row.sources.length > 0))} /> : <p>{turn.text}</p>}
             {turn.result?.intent === "portfolio_analysis" && <PortfolioPositionSummary evidence={turn.result.evidence} />}
             {turn.result?.evidence.some((row) => row.sources.length > 0) && <details><summary>{turn.result.intent === "canada360"
               ? `Sources officielles (${turn.result.evidence.flatMap((row) => row.sources).length})`
@@ -160,7 +203,6 @@ export function GlobalAssistant() {
             <div><button type="button" onClick={() => void allowPortfolio()}>Autoriser pour cette conversation</button><button type="button" onClick={declinePortfolio}>Pas maintenant</button></div>
           </div>}
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <div ref={bottom} />
         </div>
         <form className={styles.composer} onSubmit={onSubmit}><label htmlFor="global-assistant-question">Votre question</label>
           <div><textarea id="global-assistant-question" value={message} maxLength={1200} onChange={(event) => setMessage(event.target.value)} placeholder={composerPlaceholder} rows={2} />

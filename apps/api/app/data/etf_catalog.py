@@ -13,6 +13,14 @@ class EtfCatalogEntry(TypedDict):
 
 
 # Répertoire éditorial Anatole.
+# Separate US listings: never append .TO or substitute Canadian exposure funds.
+# Official identities, verified 2026-10-11; no returns or prices are stored here.
+US_ETF_LISTINGS = {
+    "SPY": "https://www.ssga.com/us/en/individual/etfs/state-street-spdr-sp-500-etf-trust-spy",
+    "QQQ": "https://www.invesco.com/qqq-etf/en/home.html",
+    "VOO": "https://advisors.vanguard.com/investments/products/voo/vanguard-sp-500-etf",
+}
+
 #
 # Les catégories sont volontairement utilisées comme groupes sectoriels dans
 # l'interface. Le cours, la variation et le volume proviennent du service de

@@ -43,3 +43,11 @@ test("a source section is omitted only when structured sources exist", () => {
     ["heading", "paragraph", "heading", "paragraph"]);
   assert.equal(parse(answer).length, 6);
 });
+
+test("tables keep cells as text, bound rows, and reject missing separators", () => {
+  const blocks = parse('| Rang | ETF |\n| --- | --- |\n| 1 | <img src=x onerror=alert(1)> |');
+  assert.equal(blocks[0].type, 'table');
+  assert.equal(blocks[0].rows[0][1][0].text, '<img src=x onerror=alert(1)>');
+  assert.equal(parse('| a | b |\n| x | y |')[0].type, 'paragraph');
+  assert.equal(parse('| a | b |\n| --- | --- |\n'+Array(60).fill('| a | b |').join('\n'))[0].rows.length,30);
+});

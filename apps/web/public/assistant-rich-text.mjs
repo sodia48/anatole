@@ -5,6 +5,7 @@ export function parseAssistantRichText(text, { collapseSources = false } = {}) {
   const blocks = [];
   let paragraph = [];
   let list = null;
+  let table = [];
   let inSourceSection = false;
   let hasAnswer = false;
 
@@ -36,9 +37,18 @@ export function parseAssistantRichText(text, { collapseSources = false } = {}) {
     if (list?.items.length) blocks.push({ type: list.type, items: list.items.map(inline) });
     list = null;
   };
+  const flushTable = () => {
+    if (table.length > 1 && /^\|(?:\s*:?-+:?\s*\|)+$/.test(table[1])) {
+      const cells = (row) => row.slice(1, -1).split("|").slice(0, 8).map((cell) => inline(cell.trim()));
+      blocks.push({ type: "table", headers: cells(table[0]), rows: table.slice(2, 32).map(cells) });
+    } else if (table.length) blocks.push({ type: "paragraph", content: inline(table.join(" ")) });
+    table = [];
+  };
 
   for (const raw of String(text).split(/\r?\n/)) {
     let line = raw.trim().replace(/[ \t]+/g, " ");
+    if (!inSourceSection && line.startsWith("|") && line.endsWith("|")) { flushParagraph(); flushList(); table.push(line); continue; }
+    flushTable();
     if (!line) { flushParagraph(); flushList(); continue; }
 
     const heading = /^(#{2,3})\s+(.+)$/.exec(line);
@@ -72,6 +82,37 @@ export function parseAssistantRichText(text, { collapseSources = false } = {}) {
     paragraph.push(line);
     hasAnswer = true;
   }
-  flushParagraph(); flushList();
+  flushTable(); flushParagraph(); flushList();
   return blocks;
+}
+
+// DOM rendering is shared by both chats; model text never becomes HTML.
+export function renderAssistantRichText(value, options) {
+  const body = document.createDocumentFragment();
+  const inline = (node, segments) => {
+    for (const segment of segments) {
+      if (segment.strong) { const strong = document.createElement("strong"); strong.textContent = segment.text; node.append(strong); }
+      else node.append(document.createTextNode(segment.text));
+    }
+  };
+  for (const block of parseAssistantRichText(value, options)) {
+    if (block.type === "table") {
+      const table = document.createElement("table");
+      const head = document.createElement("thead"), rows = document.createElement("tbody");
+      for (const [index, cells] of [block.headers, ...block.rows].entries()) {
+        const row = document.createElement("tr");
+        for (const cell of cells) { const node = document.createElement(index ? "td" : "th"); if (!index) node.scope = "col"; inline(node, cell); row.append(node); }
+        (index ? rows : head).append(row);
+      }
+      table.append(head, rows); body.append(table);
+    } else if (block.type === "bullet_list" || block.type === "ordered_list") {
+      const list = document.createElement(block.type === "ordered_list" ? "ol" : "ul");
+      for (const item of block.items) { const row = document.createElement("li"); inline(row, item); list.append(row); }
+      body.append(list);
+    } else {
+      const node = document.createElement(block.type === "heading" ? "h3" : block.type === "subheading" ? "h4" : "p");
+      inline(node, block.content); body.append(node);
+    }
+  }
+  return body;
 }
