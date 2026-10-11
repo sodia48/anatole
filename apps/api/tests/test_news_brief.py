@@ -50,3 +50,27 @@ def test_official_allowlist_blocks_arbitrary_hosts() -> None:
     assert service._allowed("https://www.bankofcanada.ca/test") is True
     assert service._allowed("http://127.0.0.1:8000/private") is False
     assert service._allowed("https://example.com/article") is False
+
+
+def test_stock_brief_uses_company_specific_context() -> None:
+    service = NewsBriefService()
+    request = make_request(
+        title="BlackBerry revenue jumps 26% as QNX unit hits record quarter",
+        summary=(
+            "BlackBerry reported second-quarter revenue of US$163.3 million, "
+            "up 26% from US$129.6 million a year earlier. QNX delivered record quarterly revenue."
+        ),
+        url="https://example.com/blackberry-results",
+        source="Publisher",
+        category="Stock",
+        context="stock",
+        ticker="BB",
+        company="BlackBerry Limited",
+    )
+    brief = service.build_from_text(request, request.summary, source_mode="feed_summary")
+    assert brief.key_figures
+    assert any("26" in figure.value for figure in brief.key_figures)
+    assert brief.changes
+    assert "BlackBerry" in brief.why_it_matters
+    assert brief.watch
+    assert "éditeur" in brief.source_note
