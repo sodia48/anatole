@@ -184,7 +184,12 @@ for (const theme of ["blue", "dark"] as const) {
           expect((await painted(card)).background).toBe(raised);
           expect((await painted(card.locator("h3"))).color).toBe(text);
           expect((await painted(card.locator("p").first())).color).toBe(muted);
-          expect((await painted(card.getByRole("link"))).color).toBe(link);
+          for (const source of await card.getByRole("link").all()) {
+            expect((await painted(source)).color).toBe(link);
+          }
+          await expect(card).not.toContainText("N/D");
+          await expect(card).not.toContainText("N/A");
+          await expect(card).not.toContainText(/Émissions vérifiées\s*:\s*0/);
         }
       }
       if (tab === "issues") {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from urllib.parse import urlparse
 
 import pytest
@@ -20,6 +21,26 @@ from app.services.municipal_debt_sources import MUNICIPALITIES, TORONTO_ISSUES_U
 from app.services.portfolio_intelligence_v12 import scenario_request_from_question
 from app.services.provincial_debt_sources import PROVINCES, parse_ontario_borrowing, provincial_profile
 from app.core.resilience import shared_http_client
+
+FIXTURES = Path(__file__).parent / "fixtures" / "debt_profiles"
+
+
+@pytest.fixture(autouse=True)
+def offline_debt_profiles(monkeypatch):
+    from app.services import provincial_debt_sources as provincial, municipal_debt_sources as municipal
+    files = {provincial.PROFILE_URLS[code]: code.lower() for code in provincial.PARSER_CODES}
+    files.update({provincial.PROVINCES["NL"][2]: "nl-debt", municipal.MUNICIPALITIES["vancouver"][2]: "vancouver",
+                  municipal.MUNICIPALITIES["quebec"][2]: "quebec-city", municipal.TORONTO_INVESTOR_URL: "toronto-profile"})
+    async def html(url):
+        text = (FIXTURES / f"{files[url]}.html").read_text(encoding="utf-8") if url in files else "<h1>Official issuer</h1>"
+        if files.get(url) == "nb":
+            text += (FIXTURES / "nb-issues.html").read_text(encoding="utf-8")
+        return text
+    async def toronto():
+        return parse_toronto_issues(TORONTO_FIXTURE)
+    monkeypatch.setattr(provincial, "official_html", html)
+    monkeypatch.setattr(municipal, "official_html", html)
+    monkeypatch.setattr(municipal_debt_service, "_toronto", toronto)
 
 
 def official_payload(days_old: int = 1) -> dict:
@@ -121,7 +142,7 @@ def test_each_province_has_an_official_source_without_claiming_parser_support(co
 async def test_each_priority_city_has_verified_official_source_and_honest_coverage(slug):
     _, _, url = MUNICIPALITIES[slug]
     assert url and urlparse(url).scheme == "https"
-    if slug != "toronto":
+    if slug not in {"toronto", "vancouver", "quebec"}:
         profile = await municipal_debt_service.profile(slug)
         assert profile.coverage == "limited"
         assert profile.recent_issues == []
@@ -144,7 +165,7 @@ def test_descriptive_rate_signals_have_source_and_timestamp(monkeypatch):
 @pytest.mark.asyncio
 async def test_province_registry_and_montreal_limited(monkeypatch):
     qc = await provincial_profile("QC")
-    assert qc.coverage == "limited" and qc.borrowing_program_amount is None
+    assert qc.coverage == "partial" and qc.borrowing_program_amount == 23_465_000_000
     assert qc.borrowing_program_url.startswith("https://www.finances.gouv.qc.ca/")
     assert qc.recent_issues == []
     montreal = await municipal_debt_service.profile("montreal")
@@ -204,3 +225,140 @@ def test_synthesis_rejects_invented_cusip():
     draft = '{"answer_markdown":"CUSIP ABCDEFGHI", "used_fact_ids":["F1"]}'
     with pytest.raises(ValueError, match="unsupported_cusip"):
         validate_draft(draft, payload)
+
+
+@pytest.mark.parametrize("code,amount,observed", [
+    ("QC", 23_465_000_000, "2026-06-29"), ("ON", 46_200_000_000, None),
+    ("AB", 6_882_000_000, None), ("SK", 5_335_500_000, None),
+    ("NB", 3_744_000_000, "2026-09-28"), ("NL", 3_900_000_000, "2026-10-01"),
+])
+@pytest.mark.asyncio
+async def test_official_provincial_plans_and_honest_dates(code, amount, observed):
+    profile = await provincial_profile(code)
+    assert profile.coverage == profile.quality.status == "partial"
+    assert profile.borrowing_program_amount == amount
+    assert profile.fiscal_year == "2026-27"
+    evidence = profile.field_sources["borrowing_program_amount"]
+    assert evidence.official_url in profile.source_urls
+    assert (evidence.observed_at.date().isoformat() if evidence.observed_at else None) == observed
+    assert profile.quality.freshness == ("delayed" if observed else "unavailable")
+    assert profile.average_term is None  # Historical/new-borrowing terms are not current debt maturity.
+    if code == "NB":
+        assert len(profile.recent_issues) == 4
+
+
+@pytest.mark.asyncio
+async def test_newfoundland_explicit_issue_yield_and_debt():
+    profile = await provincial_profile("NL")
+    row, = profile.recent_issues
+    assert row.issue_date.isoformat() == "2026-09-28"
+    assert row.maturity_date.isoformat() == "2032-06-02"
+    assert row.coupon_percent == 3.25 and row.yield_percent == 3.862
+    assert row.issue_amount == 600_000_000 and row.currency == "CAD"
+    assert row.yield_source == row.official_url
+    assert row.spread_to_canada_bps is None
+    assert profile.debt_outstanding == 25_318_000_000
+    assert profile.field_sources["debt_outstanding"].observed_at.date().isoformat() == "2026-10-01"
+
+
+@pytest.mark.asyncio
+async def test_municipal_enrichment_keeps_independent_program_and_issue_dates():
+    toronto = await municipal_debt_service.profile("toronto")
+    assert len(toronto.recent_issues) == 2
+    assert toronto.bond_programs == ["Green Debenture Program", "Social Debenture Program", "Sustainable Debenture Program"]
+    vancouver = await municipal_debt_service.profile("vancouver")
+    assert vancouver.coverage == "partial"
+    assert vancouver.bond_programs == ["Green Bond Program", "General Debenture Program"]
+    assert vancouver.field_sources["bond_programs"].observed_at is None
+    assert vancouver.recent_issues[0].settlement_date.isoformat() == "2018-09-21"
+    assert vancouver.recent_issues[0].currency is None  # '$' alone is ambiguous.
+    assert vancouver.recent_issues[0].yield_percent is None
+    quebec = await municipal_debt_service.profile("quebec")
+    assert quebec.borrowing_program_amount == 251_000_000  # Not the approximate 280M multi-year volume.
+    assert quebec.fiscal_year == "2026"
+    assert quebec.coverage == "partial" and quebec.quality.observed_at is None
+    assert quebec.quality.freshness == "unavailable"
+
+
+@pytest.mark.parametrize("html", ["", "<div>", "<table><tr><td>bad", "9" * 1_000_001,
+                                  "<script>Total borrowing requirements forecast as per 2026-27 Budget is $500 million</script>"],
+                         ids=["empty", "unclosed", "malformed-table", "oversized", "script-only"])
+def test_all_profile_parsers_fail_closed(html):
+    from app.services import provincial_debt_sources as p, municipal_debt_sources as m
+    for parser in (p.parse_quebec_borrowing, p.parse_alberta_borrowing, p.parse_saskatchewan_borrowing,
+                   p.parse_new_brunswick_borrowing, p.parse_newfoundland_borrowing, p.parse_newfoundland_debt):
+        assert parser(html) is None
+    assert p.parse_ontario_borrowing(html) == (None, None)
+    assert p.parse_newfoundland_issue(html) == []
+    assert p.parse_new_brunswick_issues(html) == []
+    assert m.parse_toronto_issues(html) == []
+    assert m.parse_vancouver_issue(html) == []
+    assert m.parse_vancouver_programs(html) == []
+    assert m.parse_quebec_city_financing(html) == (None, None)
+
+
+def test_invalid_numbers_and_dates_do_not_escape_parser():
+    from app.services.provincial_debt_sources import parse_newfoundland_issue, parse_new_brunswick_borrowing
+    assert parse_toronto_issues(TORONTO_FIXTURE.replace("$450 million", "$1,2.3.4 million"))[0].cusip == "891288DM1"
+    assert parse_toronto_issues(TORONTO_FIXTURE.replace("4.5%", "nan%").replace("3.5%", "inf%")) == []
+    html = (FIXTURES / "nl.html").read_text(encoding="utf-8")
+    assert parse_newfoundland_issue(html.replace("September 28, 2026", "September 99, 2026")) == []
+    assert parse_newfoundland_issue(html.replace("Yield: 3.862%", "Yield: unavailable")) == []
+    html = (FIXTURES / "nb.html").read_text(encoding="utf-8")
+    assert parse_new_brunswick_borrowing(html.replace("3,744", "3,7,44")) is None
+
+
+@pytest.mark.asyncio
+async def test_accessibility_and_parser_coverage_are_distinct(monkeypatch):
+    from app.services import provincial_debt_sources as p, municipal_debt_sources as m
+    async def offline(_url):
+        return None
+    monkeypatch.setattr(p, "official_html", offline)
+    monkeypatch.setattr(m, "official_html", offline)
+    for profile in [await p.provincial_profile("QC"), await m.municipal_debt_service.profile("vancouver")]:
+        assert profile.coverage == profile.quality.status == "unavailable"
+        assert profile.borrowing_program_amount is None and profile.recent_issues == []
+    async def changed(_url):
+        return "<h1>Official investor relations: redesigned page</h1>"
+    monkeypatch.setattr(p, "official_html", changed)
+    assert (await p.provincial_profile("QC")).quality.status == "limited"
+
+
+def test_new_brunswick_issues_reject_invalid_source_date_without_guessing():
+    from app.services.provincial_debt_sources import parse_new_brunswick_issues
+    rows = parse_new_brunswick_issues((FIXTURES / "nb-issues.html").read_text(encoding="utf-8"))
+    assert len(rows) == 4
+    assert rows[0].settlement_date.isoformat() == "2026-09-18"
+    assert rows[0].coupon_percent == 4.55
+    assert rows[0].issue_amount == 400_000_000 and rows[0].currency == "CAD"
+    assert all(row.yield_percent is None and row.spread_to_canada_bps is None for row in rows)
+
+
+def test_enriched_profile_http_contracts():
+    with TestClient(app) as client:
+        provinces = client.get("/api/v1/fixed-income/provinces")
+        assert provinces.status_code == 200
+        rows = provinces.json()
+        assert len(rows) == 13
+        assert {row["code"] for row in rows if row["quality"]["status"] == "partial"} == {"QC", "ON", "AB", "SK", "NB", "NL"}
+        municipalities = client.get("/api/v1/fixed-income/municipalities")
+        assert municipalities.status_code == 200
+        assert {row["slug"] for row in municipalities.json() if row["quality"]["status"] == "partial"} == {"toronto", "vancouver", "quebec"}
+
+
+@pytest.mark.parametrize("status,body,expected", [
+    (200, "<h1>Official issuer</h1>", "<h1>Official issuer</h1>"),
+    (403, "Access denied", None),
+    (200, "<title>Radware Page</title>Verifying your browser before proceeding...", None),
+    (200, "x" * 1_000_001, ""),
+], ids=["accessible", "forbidden", "browser-challenge", "oversized-source-only"])
+@pytest.mark.asyncio
+async def test_source_fetch_distinguishes_unavailable_from_unparsed(monkeypatch, status, body, expected):
+    import httpx
+    from app.services import debt_profile_parsing as parsing
+    parsing._pages._entries.clear()
+    async def request(_method, url, **_kwargs):
+        return httpx.Response(status, text=body, request=httpx.Request("GET", url))
+    monkeypatch.setattr(shared_http_client, "request", request)
+    assert await parsing.official_html("https://www.ofina.on.ca/borrowing_debt/borrowing.htm") == expected
+    parsing._pages._entries.clear()

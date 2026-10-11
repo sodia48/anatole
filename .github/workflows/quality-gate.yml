@@ -42,6 +42,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Typecheck
         run: pnpm typecheck:web
+      - name: Test web rendering
+        run: pnpm --dir apps/web test:unit
       - name: Lint web
         run: pnpm --filter @anatole/web lint
       - name: Build Next.js

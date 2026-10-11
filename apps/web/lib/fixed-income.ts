@@ -44,6 +44,7 @@ export type BondIssue = {
   cusip: string | null;
   maturity_date: string | null;
   settlement_date: string | null;
+  issue_date?: string | null;
   coupon_percent: number | null;
   issue_amount: number | null;
   currency: string | null;
@@ -52,6 +53,7 @@ export type BondIssue = {
   official_url: string;
   yield_percent: number | null;
   spread_to_canada_bps: number | null;
+  yield_source?: string | null;
 };
 
 export type ProvinceProfile = {
@@ -76,6 +78,8 @@ export type MunicipalityProfile = {
   coverage: DataQuality["status"];
   debt_outstanding: number | null;
   borrowing_program_amount: number | null;
+  fiscal_year?: string | null;
+  bond_programs?: string[];
   green_social_sustainable_program: string | null;
   recent_issues: BondIssue[];
   source_urls: string[];
