@@ -241,7 +241,7 @@ test("Anatole Conseil expose le plan vivant, le laboratoire et le lien Magasiner
 
   const command = page.getByTestId("advisor-command-center");
   await expect(command).toBeVisible();
-  await expect(command).toContainText(/Ton plan se met à jour|Your plan updates/i);
+  await expect(command).toContainText(/Voici où en est ton plan|Here is where your plan stands/i);
   await expect(command).toContainText(/Parcours propriété|Home-buying path/i);
 
   await page.getByTestId("advisor-tab-scenarios").click();
@@ -1120,7 +1120,8 @@ test("Anatole Institutional structure un pack de preuve gouvernance", async ({ p
 
   await expect(page).toHaveURL(/subject=RY/);
 
-  const pack = page.getByTestId("institutional-evidence-pack");
+  // During server navigation, WebKit can retain a hidden previous document.
+  const pack = page.getByTestId("institutional-evidence-pack").filter({ visible: true });
   await expect(pack).toBeVisible();
   await expect(pack).toContainText("RY");
   await expect(pack).toContainText("TMX");
@@ -1420,7 +1421,7 @@ test("Anatole Institutional evalue un trade contre les contraintes de mandat", a
 
   const results = page.getByTestId(
     "institutional-pretrade-results",
-  );
+  ).filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("+5.00 %");
