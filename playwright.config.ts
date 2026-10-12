@@ -85,7 +85,9 @@ export default defineConfig({
         },
         {
           command:
-            `${nextCommand} dev --hostname 127.0.0.1 --port 3000`,
+            process.env.CI
+              ? `${nextCommand} build && ${nextCommand} start --hostname 127.0.0.1 --port 3000`
+              : `${nextCommand} dev --hostname 127.0.0.1 --port 3000`,
           cwd: "apps/web",
           url: baseURL,
           reuseExistingServer: !process.env.CI,
