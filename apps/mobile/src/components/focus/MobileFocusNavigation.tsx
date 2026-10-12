@@ -4,11 +4,11 @@ import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 
-export type MobileFocusSection = "overview" | "pro" | "fundamentals" | "financials" | "analysts" | "ecosystem" | "insights";
+export type MobileFocusSection = "overview" | "pro" | "fundamentals" | "ecosystem" | "insights";
 const sections: { id: MobileFocusSection; fr: string; en: string }[] = [
   { id: "overview", fr: "Cours", en: "Price" }, { id: "pro", fr: "Pro", en: "Pro" },
-  { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" }, { id: "financials", fr: "Résultats", en: "Financials" },
-  { id: "analysts", fr: "Analystes", en: "Analysts" }, { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
+  { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" },
+  { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
   { id: "insights", fr: "Intelligence", en: "Insights" },
 ];
 

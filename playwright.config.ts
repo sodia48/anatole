@@ -2,7 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+// Production sets Secure session cookies. CI serves the built app through a
+// local TLS proxy so Chromium and WebKit exercise the same cookie policy.
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ??
+  (process.env.CI ? "https://localhost:3000" : "http://127.0.0.1:3000");
 const apiURL = process.env.PLAYWRIGHT_API_URL ?? "http://127.0.0.1:8000";
 const accountDatabaseURL =
   `sqlite:///file:anatole-e2e-${process.pid}` +
@@ -32,6 +35,7 @@ export default defineConfig({
     : [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
+    ignoreHTTPSErrors: Boolean(process.env.CI), // Ephemeral self-signed E2E certificate.
     storageState: {
       cookies: [],
       origins: [{
@@ -74,7 +78,7 @@ export default defineConfig({
           timeout: 120_000,
           env: {
             MARKET_DATA_PROVIDER: "demo",
-            CORS_ORIGINS: "http://127.0.0.1:3000",
+            CORS_ORIGINS: baseURL,
             PYTHONUNBUFFERED: "1",
             ACCOUNT_DATABASE_URL: accountDatabaseURL,
             ACCOUNT_REGISTRATION_ENABLED: "true",
@@ -85,15 +89,18 @@ export default defineConfig({
         },
         {
           command:
-            `${nextCommand} dev --hostname 127.0.0.1 --port 3000`,
+            process.env.CI
+              ? `"${process.execPath}" "${resolve("tests", "e2e", "start-secure-web.mjs")}"`
+              : `${nextCommand} dev --hostname ${new URL(baseURL).hostname} --port 3000`,
           cwd: "apps/web",
           url: baseURL,
+          ignoreHTTPSErrors: Boolean(process.env.CI),
           reuseExistingServer: !process.env.CI,
           timeout: 180_000,
           env: {
             ANATOLE_API_URL: apiURL,
             NEXT_PUBLIC_API_URL: apiURL,
-            NEXT_PUBLIC_WS_URL: "ws://127.0.0.1:8000",
+            NEXT_PUBLIC_WS_URL: process.env.CI ? "wss://localhost:3000" : "ws://127.0.0.1:8000",
           },
         },
       ],

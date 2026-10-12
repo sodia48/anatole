@@ -1,0 +1,50 @@
+/* Styling for results and statement tabs lives in CSS rather than client JavaScript. */
+.resultsNav,
+.statementNav {
+  display: flex;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.resultsNav {
+  align-items: center;
+  width: fit-content;
+  border-radius: 11px;
+}
+.statementNav { border-radius: 9px; }
+.resultsTab,
+.statementTab {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.resultsTab {
+  min-width: 105px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.statementTab {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 750;
+}
+.resultsTab[aria-pressed="true"] {
+  border-color: var(--interactive);
+}
+.resultsTab[aria-pressed="true"],
+.statementTab[aria-pressed="true"] {
+  background: var(--interactive);
+  color: var(--on-primary);
+}

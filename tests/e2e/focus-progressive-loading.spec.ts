@@ -23,7 +23,8 @@ test("Focus keeps analyst snapshot while refreshing and uses compact empty state
   });
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
-  await page.getByRole("button", { name: "Analystes", exact: true }).click();
+  await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Analystes", exact: true }).click();
   await expect(page.getByText("Consensus analystes temporairement indisponible.", { exact: true })).toBeVisible();
   await expect(page.getByText("Répartition des recommandations", { exact: true })).toHaveCount(0);
   consensus = true;

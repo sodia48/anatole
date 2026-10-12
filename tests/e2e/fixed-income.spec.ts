@@ -103,9 +103,17 @@ test("Cockpit place Taux Canada après les secteurs et avant le statut", async (
 test("hub affiche la courbe, les profils officiels et les émissions sans faux rendement", async ({ page }) => {
   await page.goto("/taux-obligations", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Courbe de référence du Canada" })).toBeVisible();
-  await page.evaluate(() => { document.documentElement.dataset.language = "en"; });
+  await page.evaluate(() => {
+    const preferences = JSON.parse(localStorage.getItem("anatole.preferences.v0.4") ?? "{}");
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({ ...preferences, language: "en" }));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Government of Canada benchmark curve" })).toBeVisible();
-  await page.evaluate(() => { document.documentElement.dataset.language = "fr"; });
+  await page.evaluate(() => {
+    const preferences = JSON.parse(localStorage.getItem("anatole.preferences.v0.4") ?? "{}");
+    localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({ ...preferences, language: "fr" }));
+  });
+  await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByText(/2s10s/).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Gestion de la dette fédérale/ })).toHaveAttribute("href", /canada\.ca/);
   await page.getByRole("link", { name: "Provinces" }).click();
@@ -119,7 +127,7 @@ test("hub affiche la courbe, les profils officiels et les émissions sans faux r
   await page.getByRole("textbox", { name: "Search an issue" }).fill("Toronto 2036");
   await page.getByRole("button", { name: "Filtrer" }).click();
   await expect(page).toHaveURL(/query=Toronto(\+|%20)2036/);
-  await expect(page.getByText(/Le coupon n’est pas un rendement de marché/)).toBeVisible();
+  await expect(page.getByText(/Le coupon n’est pas un rendement de marché/).filter({ visible: true })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Rendement marché" })).toBeVisible();
 });
 

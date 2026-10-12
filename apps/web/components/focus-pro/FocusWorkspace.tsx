@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, Network, WalletCards } from "lucide-react";
+import { FlaskConical, WalletCards } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -75,14 +75,14 @@ import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
 import styles from "./FocusPro.module.css";
 
 type Panel = "indicators" | "compare" | "alerts" | "layouts" | "strategy" | "paper" | null;
-type Section = "overview" | "chart" | "ecosystem" | Exclude<FundamentalView, "valuation">;
+type Section = "overview" | "chart" | "ecosystem" | "fundamentals";
 
 const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
   { id: "overview", fr: "Cours", en: "Price" },
   { id: "chart", fr: "Workstation pro", en: "Pro workstation" },
   { id: "fundamentals", fr: "Fondamentaux", en: "Fundamentals" },
-  { id: "financials", fr: "Résultats", en: "Financials" },
-  { id: "analysts", fr: "Analystes", en: "Analysts" },
+
+
   { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
 
@@ -92,6 +92,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : "overview");
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation">>("fundamentals");
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -389,16 +390,35 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   return (
     <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
       {!embedded ? <QuoteHeader quote={quote} liveState={liveState} /> : null}
-      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button><Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
-      {section === "overview" || section === "fundamentals" || section === "financials" || section === "analysts" ? (
+      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={styles.tabButton} aria-pressed={section === item.id} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
+      {section === "overview" || section === "fundamentals" ? (
         <>
           {section === "overview" ? (
             <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} />
           ) : null}
+          {section === "fundamentals" ? (
+            <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className={styles.fundamentalSubtabs}>
+              {([
+                { id: "fundamentals", fr: "Synthèse", en: "Overview" },
+                { id: "financials", fr: "Résultats", en: "Financials" },
+                { id: "analysts", fr: "Analystes", en: "Analysts" },
+              ] as const).map((item) => (
+                <button
+                  type="button"
+                  key={item.id}
+                  aria-pressed={fundamentalView === item.id}
+                  className={styles.tabButton}
+                  onClick={() => setFundamentalView(item.id)}
+                >
+                  {pick(language, item.fr, item.en)}
+                </button>
+              ))}
+            </nav>
+          ) : null}
           <FocusFundamentals
             key={ticker}
             ticker={ticker}
-            view={section === "overview" ? "valuation" : section}
+            view={section === "overview" ? "valuation" : fundamentalView}
           />
           {section === "overview" ? (
             <FocusStockNews
