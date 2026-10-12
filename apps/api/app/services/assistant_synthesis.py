@@ -158,6 +158,9 @@ def validate_draft(raw: str, payload: dict[str, object]) -> SynthesisDraft:
 async def synthesize_from_evidence(bundle: AnatoleEvidenceBundle, question: str,
                                    fallback: str, provider_router: object,
                                    *, conversation: dict[str, object] | None = None) -> SynthesisOutcome:
+    # Keep the computed ranking, exact dates and price/total distinction intact.
+    if bundle.skill in {"etf_performance", "etf_ranking", "etf_comparison"}:
+        return SynthesisOutcome(fallback)
     if not bundle.facts and not (bundle.skill == "portfolio_analysis" and bundle.portfolio_xray):
         return SynthesisOutcome(fallback)
     payload = evidence_payload(bundle, question, conversation)

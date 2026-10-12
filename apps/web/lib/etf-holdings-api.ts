@@ -72,9 +72,11 @@ export type EtfHoldingsSnapshot = {
 export type EtfHistoryRange =
   | "5d"
   | "1mo"
+  | "3mo"
   | "ytd"
   | "6mo"
   | "1y"
+  | "3y"
   | "5y"
   | "10y";
 

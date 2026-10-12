@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Any
@@ -15,6 +15,7 @@ from app.schemas.etf_history import (
     EtfHistorySnapshot,
 )
 from app.services.currency_conversion import currency_conversion_service
+from app.data.etf_catalog import US_ETF_LISTINGS
 
 
 REQUEST_TIMEOUT_SECONDS = 35
@@ -30,6 +31,8 @@ class HistoryRangeSpec:
 
 
 RANGE_SPECS: dict[EtfHistoryRange, HistoryRangeSpec] = {
+    "3mo": HistoryRangeSpec("3mo", "1d", "3 mois", 300, 300),
+    "3y": HistoryRangeSpec("5y", "1wk", "3 ans", 1800, 1800),
     "5d": HistoryRangeSpec(
         period="5d",
         interval="30m",
@@ -87,6 +90,9 @@ def normalize_etf_symbol(ticker: str) -> str:
 
     if not value:
         raise ValueError("ETF ticker cannot be empty")
+
+    if value in US_ETF_LISTINGS:
+        return value
 
     if value.endswith((".TO", ".V", ".NE", ".CN")):
         return value
@@ -269,7 +275,7 @@ def build_history_snapshot(
 def _fetch_history_sync(
     normalized_symbol: str,
     spec: HistoryRangeSpec,
-) -> tuple[pd.DataFrame, str]:
+) -> tuple[pd.DataFrame, str, str | None]:
     try:
         import yfinance as yf
     except ImportError as exc:
@@ -286,7 +292,8 @@ def _fetch_history_sync(
         actions=False,
     )
 
-    currency = "CAD"
+    currency = ""
+    exchange = None
 
     try:
         fast_info = ticker.fast_info
@@ -300,24 +307,29 @@ def _fetch_history_sync(
             currency = str(value).upper()
     except Exception:  # noqa: BLE001
         pass
-
-    return frame, currency
+    try:
+        metadata = ticker.get_history_metadata()
+        exchange = metadata.get("exchangeName")
+        currency = currency or metadata.get("currency", "")
+    except Exception:
+        pass
+    return frame, currency, exchange
 
 
 class EtfHistoryService:
     def __init__(self) -> None:
         self._cache: dict[
-            tuple[str, EtfHistoryRange],
+            tuple[str, EtfHistoryRange, bool],
             tuple[float, EtfHistorySnapshot],
         ] = {}
         self._locks: dict[
-            tuple[str, EtfHistoryRange],
+            tuple[str, EtfHistoryRange, bool],
             asyncio.Lock,
         ] = {}
 
     def _lock_for(
         self,
-        key: tuple[str, EtfHistoryRange],
+        key: tuple[str, EtfHistoryRange, bool],
     ) -> asyncio.Lock:
         lock = self._locks.get(key)
 
@@ -333,10 +345,15 @@ class EtfHistoryService:
         selected_range: EtfHistoryRange,
         *,
         force_refresh: bool = False,
+        native_currency: bool = False,
     ) -> EtfHistorySnapshot:
         normalized_symbol = normalize_etf_symbol(ticker)
         spec = RANGE_SPECS[selected_range]
-        key = (normalized_symbol, selected_range)
+        if native_currency and spec.interval == "1wk":
+            # Weekly candle timestamps identify the start of the week, not the
+            # observation date of its closing price. Rankings need daily dates.
+            spec = replace(spec, interval="1d")
+        key = (normalized_symbol, selected_range, native_currency)
         cached = self._cache.get(key)
         now = monotonic()
 
@@ -362,13 +379,17 @@ class EtfHistoryService:
                 async with asyncio.timeout(
                     REQUEST_TIMEOUT_SECONDS
                 ):
-                    frame, currency = await asyncio.to_thread(
+                    frame, currency, exchange = await asyncio.to_thread(
                         _fetch_history_sync,
                         normalized_symbol,
                         spec,
                     )
                 points = normalize_history_frame(frame)
-                if points and currency.upper() != "CAD":
+                if selected_range == "3y":
+                    cutoff = (pd.Timestamp.now(tz="UTC") - pd.DateOffset(years=3)).to_pydatetime()
+                    points = [point for point in points if point.timestamp >= cutoff]
+                original_currency = currency
+                if points and currency and currency.upper() != "CAD" and not native_currency:
                     timestamps = [
                         int(point.timestamp.timestamp())
                         for point in points
@@ -397,12 +418,16 @@ class EtfHistoryService:
                     points=points,
                     currency=currency,
                 )
+                snapshot.native_currency = original_currency or None
+                snapshot.exchange = exchange
+                snapshot.interval = spec.interval
             except Exception as exc:  # noqa: BLE001
                 stale = self._cache.get(key)
 
                 if stale is not None:
                     return stale[1].model_copy(
                         update={
+                            "stale": True,
                             "message": (
                                 "La dernière série disponible est affichée; "
                                 "la mise à jour a échoué."

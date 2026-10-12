@@ -143,20 +143,19 @@ test("Assistant explique la courbe et renvoie au hub", async ({ page }) => {
 });
 
 for (const theme of ["blue", "dark"] as const) {
-  test(`Taux & Obligations garde ses quatre onglets lisibles (${theme})`, async ({ page, isMobile }, testInfo) => {
-    test.setTimeout(120_000);
-    await preferTheme(page, theme);
-    await page.goto("/taux-obligations?tab=canada");
-    await page.reload();
-    const panel = theme === "blue" ? "rgb(255, 255, 255)" : "rgb(10, 26, 39)";
-    const text = theme === "blue" ? "rgb(8, 32, 51)" : "rgb(238, 247, 255)";
-    const muted = theme === "blue" ? "rgb(82, 97, 113)" : "rgb(141, 166, 186)";
-    const raised = theme === "blue" ? "rgb(239, 241, 244)" : "rgb(16, 40, 58)";
-    const link = theme === "blue" ? "rgb(0, 104, 83)" : "rgb(124, 226, 196)";
-    const border = theme === "blue" ? "rgb(212, 217, 224)" : "rgb(24, 59, 81)";
+  for (const tab of ["canada", "provinces", "municipalities", "issues"]) {
+    test(`Taux & Obligations garde son onglet ${tab} lisible (${theme})`, async ({ page, isMobile }, testInfo) => {
+      test.setTimeout(120_000);
+      await preferTheme(page, theme);
+      // A fresh page per tab keeps WebKit audits independent of previous documents.
+      await page.goto(`/taux-obligations?tab=${tab}`);
+      const panel = theme === "blue" ? "rgb(255, 255, 255)" : "rgb(10, 26, 39)";
+      const text = theme === "blue" ? "rgb(8, 32, 51)" : "rgb(238, 247, 255)";
+      const muted = theme === "blue" ? "rgb(82, 97, 113)" : "rgb(141, 166, 186)";
+      const raised = theme === "blue" ? "rgb(239, 241, 244)" : "rgb(16, 40, 58)";
+      const link = theme === "blue" ? "rgb(0, 104, 83)" : "rgb(124, 226, 196)";
+      const border = theme === "blue" ? "rgb(212, 217, 224)" : "rgb(24, 59, 81)";
 
-    for (const tab of ["canada", "provinces", "municipalities", "issues"]) {
-      if (tab !== "canada") await page.goto(`/taux-obligations?tab=${tab}`);
       await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
       const hub = page.locator('main[class*="FixedIncomeClient"]');
       const hero = await painted(hub.locator("header"));
@@ -232,14 +231,16 @@ for (const theme of ["blue", "dark"] as const) {
       expect(contrast.violations).toEqual([]);
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: testInfo.outputPath(`${tab}-${theme}.png`), fullPage: true });
-    }
-    await page.goto("/taux-obligations?tab=issues&query=no-matching-issue-contrast-test");
-    await expect(page.getByText("émissions correspondant aux filtres", { exact: true })).toBeVisible();
-    await expect(page.locator('main[class*="FixedIncomeClient"] tbody tr')).toHaveCount(0);
-    const emptyContrast = await new AxeBuilder({ page })
-      .include('main[class*="FixedIncomeClient"]').withRules(["color-contrast"]).analyze();
-    expect(emptyContrast.violations).toEqual([]);
-  });
+      if (tab === "issues") {
+        await page.goto("/taux-obligations?tab=issues&query=no-matching-issue-contrast-test");
+        await expect(page.getByText("émissions correspondant aux filtres", { exact: true })).toBeVisible();
+        await expect(page.locator('main[class*="FixedIncomeClient"] tbody tr')).toHaveCount(0);
+        const emptyContrast = await new AxeBuilder({ page })
+          .include('main[class*="FixedIncomeClient"]').withRules(["color-contrast"]).analyze();
+        expect(emptyContrast.violations).toEqual([]);
+      }
+    });
+  }
 
   test(`Cockpit Taux Canada conserve un contraste lisible (${theme})`, async ({ page }, testInfo) => {
     await preferTheme(page, theme);

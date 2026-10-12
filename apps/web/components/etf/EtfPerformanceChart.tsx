@@ -24,9 +24,11 @@ const RANGE_OPTIONS: Array<{
 }> = [
   { value: "5d", label: "5J" },
   { value: "1mo", label: "1M" },
+  { value: "3mo", label: "3M" },
   { value: "ytd", label: "YTD" },
   { value: "6mo", label: "6M" },
   { value: "1y", label: "1A" },
+  { value: "3y", label: "3A" },
   { value: "5y", label: "5A" },
   { value: "10y", label: "10A" },
 ];

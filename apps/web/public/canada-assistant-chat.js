@@ -1,4 +1,4 @@
-import { parseAssistantRichText } from "/assistant-rich-text.mjs";
+import { renderAssistantRichText } from "/assistant-rich-text.mjs";
 
 (() => {
   document.documentElement.classList.remove("no-js");
@@ -95,21 +95,7 @@ import { parseAssistantRichText } from "/assistant-rich-text.mjs";
   const structuredAnswer = (value, collapseSources) => {
     const body = document.createElement("div");
     body.className = "researchText";
-    const inline = (node, segments) => {
-      for (const segment of segments) node.append(segment.strong ? text("strong", segment.text) : document.createTextNode(segment.text));
-    };
-    for (const block of parseAssistantRichText(value, { collapseSources })) {
-      if (block.type === "bullet_list" || block.type === "ordered_list") {
-        const list = document.createElement(block.type === "ordered_list" ? "ol" : "ul");
-        for (const item of block.items) { const row = document.createElement("li"); inline(row, item); list.append(row); }
-        body.append(list);
-      } else {
-        const tag = block.type === "heading" ? "h3" : block.type === "subheading" ? "h4" : "p";
-        const node = document.createElement(tag);
-        inline(node, block.content);
-        body.append(node);
-      }
-    }
+    body.append(renderAssistantRichText(value, { collapseSources }));
     return body;
   };
   const addSources = (node, links) => {

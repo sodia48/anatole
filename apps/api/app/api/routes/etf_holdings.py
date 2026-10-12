@@ -63,7 +63,7 @@ async def etf_history(
     range: EtfHistoryRange = Query(  # noqa: A002
         default="1y",
         description=(
-            "Période : 5d, 1mo, ytd, 6mo, 1y, 5y ou 10y."
+            "Période : 5d, 1mo, 3mo, ytd, 6mo, 1y, 3y, 5y ou 10y."
         ),
     ),
     refresh: bool = Query(

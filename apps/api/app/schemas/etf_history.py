@@ -9,9 +9,11 @@ from pydantic import BaseModel, Field
 EtfHistoryRange = Literal[
     "5d",
     "1mo",
+    "3mo",
     "ytd",
     "6mo",
     "1y",
+    "3y",
     "5y",
     "10y",
 ]
@@ -32,6 +34,10 @@ class EtfHistorySnapshot(BaseModel):
     range: EtfHistoryRange
     range_label: str
     currency: str = "CAD"
+    native_currency: str | None = None
+    exchange: str | None = None
+    return_basis: Literal["price", "total"] = "price"
+    stale: bool = False
     interval: str
     points: list[EtfHistoryPoint] = Field(default_factory=list)
     first_close: float | None = None
