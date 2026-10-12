@@ -7,6 +7,7 @@ import { MobileFocusAnalysts } from "@/src/components/focus/MobileFocusAnalysts"
 import { MobileFocusEcosystem } from "@/src/components/focus/MobileFocusEcosystem";
 import { MobileFocusFinancials } from "@/src/components/focus/MobileFocusFinancials";
 import { MobileFocusFundamentals } from "@/src/components/focus/MobileFocusFundamentals";
+import { MobileFocusFundamentalTabs, type MobileFundamentalView } from "@/src/components/focus/MobileFocusFundamentalTabs";
 import { MobileFocusHeader } from "@/src/components/focus/MobileFocusHeader";
 import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights";
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
@@ -30,6 +31,7 @@ export default function StockDetailScreen() {
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [section, setSection] = useState<MobileFocusSection>("overview");
+  const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>("fundamentals");
   const [preloadedProTicker, setPreloadedProTicker] = useState<string | null>(null);
   const [period, setPeriod] = useState<FocusPeriod>(focusPeriods[0]);
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
@@ -45,7 +47,7 @@ export default function StockDetailScreen() {
     return () => task.cancel();
   }, [focus.data, ticker]);
   const news = useQuery({ queryKey: ["stock-news", ticker, language], queryFn: ({ signal }) => marketApi.stockNews(ticker, company, language, signal), enabled: Boolean(focus.data) && section === "overview", staleTime: 300_000 });
-  const needsFundamentals = ["overview", "fundamentals", "financials", "analysts"].includes(section);
+  const needsFundamentals = section === "overview" || section === "fundamentals";
   const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: Boolean(focus.data) && needsFundamentals, staleTime: 10 * 60_000 });
   const live = useLiveQuote(ticker, focus.data?.quote);
   const followed = workspace.data.watchlist.includes(ticker);
@@ -73,9 +75,14 @@ export default function StockDetailScreen() {
         ticker={ticker}
       /></> : null}
       {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
-      {section === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
-      {section === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
-      {section === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
+      {section === "fundamentals" ? <>
+        <MobileFocusFundamentalTabs view={fundamentalView} onChange={setFundamentalView} />
+        {fundamentalView === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
+        {fundamentalView === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
+        {fundamentalView === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
+      </> : null}
+
+
       {section === "ecosystem" ? <MobileFocusEcosystem ticker={ticker} /> : null}
       {section === "insights" ? <MobileFocusInsights snapshot={focus.data} ticker={ticker} /> : null}
       <MobileFocusActions />

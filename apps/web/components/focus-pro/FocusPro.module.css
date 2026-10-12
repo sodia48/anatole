@@ -572,3 +572,17 @@
     display: inline;
   }
 }
+
+/* Focus: results and analysts are subviews of Fundamentals. */
+.fundamentalSubtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  margin: 12px 0;
+}
+
+.fundamentalSubtabs .tabButton {
+  min-height: 44px;
+  padding: 0 14px;
+}

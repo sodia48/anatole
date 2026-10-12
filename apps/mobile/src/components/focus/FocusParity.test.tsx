@@ -5,6 +5,7 @@ import { MobileFocusFinancials } from "./MobileFocusFinancials";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
+import { MobileFocusFundamentalTabs } from "./MobileFocusFundamentalTabs";
 import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
@@ -47,8 +48,22 @@ describe("mobile Focus parity", () => {
   });
   it("keeps every functional Focus section in the native navigation", async () => {
     const onChange = jest.fn(); const view = await render(<MobileFocusNavigation onChange={onChange} section="overview" />);
-    expect(view.getByText("Fondamentaux")).toBeTruthy(); expect(view.getByText("Résultats")).toBeTruthy(); expect(view.getByText("Analystes")).toBeTruthy(); expect(view.getByText("Écosystème")).toBeTruthy(); expect(view.getByText("Intelligence")).toBeTruthy();
+    expect(view.getByText("Fondamentaux")).toBeTruthy();
+    expect(view.queryByText("Résultats")).toBeNull();
+    expect(view.queryByText("Analystes")).toBeNull();
+    expect(view.getByText("Écosystème")).toBeTruthy();
+    expect(view.getByText("Intelligence")).toBeTruthy();
     fireEvent.press(view.getByText("Pro")); expect(onChange).toHaveBeenCalledWith("pro");
+  });
+  it("nests Results and Analysts under Fundamentals", async () => {
+    const onChange = jest.fn();
+    const view = await render(<MobileFocusFundamentalTabs view="fundamentals" onChange={onChange} />);
+    expect(view.getByText("Résultats")).toBeTruthy();
+    expect(view.getByText("Analystes")).toBeTruthy();
+    fireEvent.press(view.getByText("Résultats"));
+    fireEvent.press(view.getByText("Analystes"));
+    expect(onChange).toHaveBeenCalledWith("financials");
+    expect(onChange).toHaveBeenCalledWith("analysts");
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
