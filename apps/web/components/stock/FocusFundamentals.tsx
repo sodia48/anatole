@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
+import styles from "./FocusFundamentals.module.css";
 import { localeFor, pick } from "@/lib/i18n";
 import { getFocusFundamentalOverlay } from "@/lib/api";
 
@@ -948,18 +949,7 @@ function Financials({
     <div style={{ display: "grid", gap: 14 }}>
       <nav
         aria-label={pick(language, "Vues des résultats financiers", "Financial results views")}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          width: "fit-content",
-          maxWidth: "100%",
-          padding: 4,
-          overflowX: "auto",
-          border: "1px solid var(--border)",
-          borderRadius: 11,
-          background: "var(--panel)",
-        }}
+        className={styles.resultsNav}
       >
         {resultTabs.map((tab) => {
           const active = subview === tab.key;
@@ -968,23 +958,8 @@ function Financials({
               type="button"
               key={tab.key}
               onClick={() => setSubview(tab.key)}
-              style={{
-                minWidth: 105,
-                height: 34,
-                padding: "0 12px",
-                border: active
-                  ? "1px solid var(--interactive)"
-                  : "1px solid transparent",
-                borderRadius: 8,
-                background: active
-                  ? "var(--interactive)"
-                  : "transparent",
-                color: active ? "var(--on-primary)" : "var(--text-secondary)",
-                fontSize: 10,
-                fontWeight: 800,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
+              aria-pressed={active}
+              className={styles.resultsTab}
             >
               {pick(language, tab.label[0], tab.label[1])}
             </button>
@@ -1140,16 +1115,7 @@ function Financials({
             </div>
 
             <div
-              style={{
-                display: "flex",
-                gap: 5,
-                padding: 4,
-                maxWidth: "100%",
-                overflowX: "auto",
-                border: "1px solid var(--border)",
-                borderRadius: 9,
-                background: "var(--panel)",
-              }}
+              className={styles.statementNav}
             >
               {statementTabs.map((tab) => {
                 const active = statementView === tab.key;
@@ -1158,20 +1124,8 @@ function Financials({
                     type="button"
                     key={tab.key}
                     onClick={() => setStatementView(tab.key)}
-                    style={{
-                      height: 30,
-                      padding: "0 10px",
-                      border: "none",
-                      borderRadius: 7,
-                      background: active
-                        ? "var(--interactive)"
-                        : "transparent",
-                      color: active ? "var(--on-primary)" : "var(--text-secondary)",
-                      fontSize: 9,
-                      fontWeight: 750,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
+                    aria-pressed={active}
+                    className={styles.statementTab}
                   >
                     {pick(language, tab.label[0], tab.label[1])}
                   </button>
