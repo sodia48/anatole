@@ -1041,7 +1041,7 @@ test("Anatole Institutional structure une these sans inventer de donnees", async
 
   await expect(page).toHaveURL(/symbol=RY/);
 
-  const memo = page.getByTestId("institutional-thesis-memo");
+  const memo = page.getByTestId("institutional-thesis-memo").filter({ visible: true });
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("RY");
   await expect(memo).toContainText(/Croissance des revenus/);
@@ -1082,7 +1082,7 @@ test("Anatole Institutional structure une decision de comite humaine", async ({ 
 
   await expect(page).toHaveURL(/symbol=RY/);
 
-  const memo = page.getByTestId("institutional-committee-memo");
+  const memo = page.getByTestId("institutional-committee-memo").filter({ visible: true });
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("RY");
   await expect(memo).toContainText("Décision différée");
@@ -1142,7 +1142,7 @@ test("Anatole Institutional compare deux scenarios pre-trade sans ordre", async 
   await page.locator('input[name="max_position"]').fill("6");
   await page.locator('input[name="cost_bps"]').fill("10");
   await page.getByRole("button", { name: "Comparer les scénarios" }).click();
-  const comparison = page.getByTestId("institutional-pretrade-comparison");
+  const comparison = page.getByTestId("institutional-pretrade-comparison").filter({ visible: true });
   await expect(comparison).toBeVisible();
   await expect(comparison).toContainText("Scénario A");
   await expect(comparison).toContainText("Scénario B");
@@ -1155,7 +1155,7 @@ test("Anatole Institutional structure un scenario macro hypothetique", async ({ 
   await page.locator('select[name="inflation"]').selectOption("up");
   await page.locator('textarea[name="evidence"]').fill("Validation dans Canada 360 requise.");
   await page.getByRole("button", { name: "Générer le mémo macro" }).click();
-  const memo = page.getByTestId("institutional-macro-memo");
+  const memo = page.getByTestId("institutional-macro-memo").filter({ visible: true });
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("Ralentissement inflationniste");
   await expect(memo).toContainText(/ne constitue pas une prévision/i);
@@ -1173,7 +1173,7 @@ test("Anatole Institutional calcule un post-mortem attribution", async ({ page }
   await page.locator('input[name="timing_bps"]').fill("15");
   await page.locator('input[name="fees_bps"]').fill("-10");
   await page.getByRole("button", { name: "Générer la revue" }).click();
-  const memo = page.getByTestId("institutional-attribution-memo");
+  const memo = page.getByTestId("institutional-attribution-memo").filter({ visible: true });
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("+300 bps");
   await expect(memo).toContainText("+290 bps");
@@ -1199,7 +1199,7 @@ test("Anatole Institutional calcule un FX overlay multi-actifs", async ({ page }
     name: "Calculer le scénario",
   }).click();
 
-  const results = page.getByTestId("institutional-multi-asset-results");
+  const results = page.getByTestId("institutional-multi-asset-results").filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("300000 CAD");
@@ -1232,7 +1232,7 @@ test("Anatole Institutional prepare une revue client sans PII", async ({ page })
     name: "Générer le mémo de revue",
   }).click();
 
-  const memo = page.getByTestId("institutional-client-review-memo");
+  const memo = page.getByTestId("institutional-client-review-memo").filter({ visible: true });
 
   await expect(memo).toBeVisible();
   await expect(memo).toContainText("CLIENT-042");
@@ -1301,7 +1301,7 @@ test("Anatole Institutional calcule facteurs dependances et budget de risque", a
 
   const results = page.getByTestId(
     "institutional-factor-xray-results",
-  );
+  ).filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("+0.20");
@@ -1336,7 +1336,7 @@ test("Anatole Institutional detecte un seuil de these et calcule le consensus", 
 
   const results = page.getByTestId(
     "institutional-thesis-monitor-results",
-  );
+  ).filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("Seuil d'invalidation franchi");
@@ -1362,7 +1362,7 @@ test("Anatole Institutional calcule une attribution BHB avancee", async ({ page 
 
   await page.getByRole("button", { name: "Calculer l'attribution" }).click();
 
-  const results = page.getByTestId("institutional-advanced-attribution-results");
+  const results = page.getByTestId("institutional-advanced-attribution-results").filter({ visible: true });
   await expect(results).toBeVisible();
   await expect(results).toContainText("+100 bps");
   await expect(results).toContainText("+60 bps");
@@ -1384,7 +1384,7 @@ test("Anatole Institutional calcule duration credit et stress obligataire", asyn
   await page.locator('input[name="mat_1"]').fill("1.5");
   await page.locator('input[name="coverage_1"]').fill("1.8");
   await page.getByRole("button", { name: "Calculer le scénario" }).click();
-  const r=page.getByTestId("institutional-fixed-income-results");
+  const r=page.getByTestId("institutional-fixed-income-results").filter({ visible: true });
   await expect(r).toBeVisible();
   await expect(r).toContainText("+50 bps");
   await expect(r).toContainText("-5.72 %");
@@ -1460,7 +1460,7 @@ test("Anatole Institutional calcule un X-Ray multi-gestionnaires", async ({ page
 
   const results = page.getByTestId(
     "institutional-multimanager-results",
-  );
+  ).filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("58.0 bps");
@@ -1501,7 +1501,7 @@ test("Anatole Institutional calcule un graphe commodities et actifs reels", asyn
 
   const results = page.getByTestId(
     "institutional-real-assets-results",
-  );
+  ).filter({ visible: true });
 
   await expect(results).toBeVisible();
   await expect(results).toContainText("+0.40");
