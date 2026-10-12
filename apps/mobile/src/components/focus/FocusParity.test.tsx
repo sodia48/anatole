@@ -53,15 +53,15 @@ describe("mobile Focus parity", () => {
     expect(view.queryByText("Analystes")).toBeNull();
     expect(view.getByText("Écosystème")).toBeTruthy();
     expect(view.getByText("Intelligence")).toBeTruthy();
-    fireEvent.press(view.getByText("Pro")); expect(onChange).toHaveBeenCalledWith("pro");
+    await fireEvent.press(view.getByText("Pro")); expect(onChange).toHaveBeenCalledWith("pro");
   });
   it("nests Results and Analysts under Fundamentals", async () => {
     const onChange = jest.fn();
     const view = await render(<MobileFocusFundamentalTabs view="fundamentals" onChange={onChange} />);
     expect(view.getByText("Résultats")).toBeTruthy();
     expect(view.getByText("Analystes")).toBeTruthy();
-    fireEvent.press(view.getByText("Résultats"));
-    fireEvent.press(view.getByText("Analystes"));
+    await fireEvent.press(view.getByText("Résultats"));
+    await fireEvent.press(view.getByText("Analystes"));
     expect(onChange).toHaveBeenCalledWith("financials");
     expect(onChange).toHaveBeenCalledWith("analysts");
   });

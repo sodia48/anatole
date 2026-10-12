@@ -1,6 +1,6 @@
 "use client";
 
-import { FlaskConical, Network, WalletCards } from "lucide-react";
+import { FlaskConical, WalletCards } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -390,7 +390,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   return (
     <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
       {!embedded ? <QuoteHeader quote={quote} liveState={liveState} /> : null}
-      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={`${styles.tabButton} ${section === item.id ? styles.buttonActive : ""}`} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<button className={styles.button} type="button" onClick={() => setSection("ecosystem")}><Network size={14} />{pick(language, "Voir le réseau", "View network")}</button><Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
+      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={styles.tabButton} aria-pressed={section === item.id} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
       {section === "overview" || section === "fundamentals" ? (
         <>
           {section === "overview" ? (
@@ -407,7 +407,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
                   type="button"
                   key={item.id}
                   aria-pressed={fundamentalView === item.id}
-                  className={`${styles.tabButton} ${fundamentalView === item.id ? styles.buttonActive : ""}`}
+                  className={styles.tabButton}
                   onClick={() => setFundamentalView(item.id)}
                 >
                   {pick(language, item.fr, item.en)}

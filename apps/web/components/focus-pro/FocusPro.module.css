@@ -586,3 +586,10 @@
   min-height: 44px;
   padding: 0 14px;
 }
+/* Focus tabs: selected state comes from aria-pressed (no JS class condition). */
+.bottomTabs .tabButton[aria-pressed="true"],
+.fundamentalSubtabs .tabButton[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: var(--primary-surface);
+  color: var(--text);
+}
