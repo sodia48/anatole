@@ -1,15 +1,5 @@
 "use client";
 
-import {
-  BellPlus,
-  ChartNoAxesCombined,
-  Columns3,
-  Expand,
-  Layers3,
-  FlaskConical,
-  WalletCards,
-  Save,
-} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -17,6 +7,7 @@ import { pick, type AnatoleLanguage } from "@/lib/i18n";
 
 import type { FocusChartType, FocusTimeframe } from "./types";
 import { TIMEFRAMES } from "./types";
+import { FocusGlyph } from "./FocusGlyph";
 import styles from "./FocusPro.module.css";
 
 const CHART_TYPES: Array<{
@@ -78,7 +69,7 @@ export function FocusToolbar({
   return (
     <nav className={styles.toolbar} aria-label="Focus Pro toolbar">
       <div className={styles.toolbarGroup}>
-        <ChartNoAxesCombined size={17} color="#65b8f5" aria-hidden="true" />
+        <FocusGlyph name="ChartNoAxesCombined" size={17} color="#65b8f5" />
         <input
           className={styles.tickerInput}
           aria-label={pick(language, "Symbole", "Ticker")}
@@ -112,28 +103,28 @@ export function FocusToolbar({
       </div>
       <div className={styles.toolbarActions}>
         <button className={styles.button} type="button" onClick={onToggleIndicators}>
-          <Layers3 size={14} /> {pick(language, "Indicateurs", "Indicators")}
+          <FocusGlyph name="Layers3" /> {pick(language, "Indicateurs", "Indicators")}
         </button>
         <button className={styles.button} type="button" onClick={onToggleCompare}>
-          <Columns3 size={14} /> {pick(language, "Comparer", "Compare")}
+          <FocusGlyph name="Columns3" /> {pick(language, "Comparer", "Compare")}
         </button>
         <button className={styles.button} type="button" onClick={onCreateAlert}>
-          <BellPlus size={14} /> {pick(language, "Alerte", "Alert")}
+          <FocusGlyph name="BellPlus" /> {pick(language, "Alerte", "Alert")}
         </button>
         <button className={styles.button} type="button" onClick={onToggleLayouts}>
-          <Save size={14} /> Layout
+          <FocusGlyph name="Save" /> Layout
         </button>
         <button className={styles.button} type="button" onClick={onToggleStrategy}>
-          <FlaskConical size={14} /> Strategy
+          <FocusGlyph name="FlaskConical" /> Strategy
         </button>
         <button className={styles.button} type="button" onClick={onTogglePaper}>
-          <WalletCards size={14} /> PAPER
+          <FocusGlyph name="WalletCards" /> PAPER
         </button>
         <button className={styles.iconButton} type="button" onClick={onSaveLayout} aria-label={pick(language, "Sauvegarder le layout", "Save layout")}>
-          <Save size={14} />
+          <FocusGlyph name="Save" />
         </button>
         <button className={styles.iconButton} type="button" onClick={fullscreen} aria-label={pick(language, "Plein écran", "Fullscreen")}>
-          <Expand size={14} />
+          <FocusGlyph name="Expand" />
         </button>
       </div>
     </nav>
