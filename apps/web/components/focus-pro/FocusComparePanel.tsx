@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2, X } from "lucide-react";
+import { FocusGlyph } from "./FocusGlyph";
 import { useState } from "react";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
@@ -41,12 +41,12 @@ export function FocusComparePanel({
     <section className={styles.panel} aria-label={pick(language, "Comparaisons", "Comparisons")}>
       <header className={styles.sectionHeader}>
         <div><span className={styles.eyebrow}>+ COMPARE</span><h2>{pick(language, "Comparer jusqu’à 5 actifs", "Compare up to 5 assets")}</h2></div>
-        <button className={styles.iconButton} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><X size={14} /></button>
+        <button className={styles.iconButton} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
       </header>
       <div className={styles.sectionBody}>
         <div className={styles.inlineActions}>
           <input className={styles.input} style={{ flex: 1 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") add(); }} placeholder="RY, XIU, ^GSPTSE…" />
-          <button className={styles.primaryButton} type="button" onClick={() => add()} disabled={comparisons.length >= 5}><Plus size={14} /></button>
+          <button className={styles.primaryButton} type="button" onClick={() => add()} disabled={comparisons.length >= 5}><FocusGlyph name="Plus" size={14} /></button>
         </div>
         <select className={styles.select} value={mode} onChange={(event) => setMode(event.target.value as FocusComparisonConfig["mode"])}>
           <option value="normalized_percent">{pick(language, "Normalisé · base 0 %", "Normalized · base 0%")}</option>
@@ -60,7 +60,7 @@ export function FocusComparePanel({
           {comparisons.map((item) => (
             <li className={styles.listItem} key={item.symbol}>
               <span><strong style={{ color: item.color }}>{item.symbol}</strong><small>{item.mode === "normalized_percent" ? "0 %" : pick(language, "Prix", "Price")}</small></span>
-              <button className={styles.iconButton} type="button" onClick={() => onChange(comparisons.filter((candidate) => candidate.symbol !== item.symbol))} aria-label={pick(language, "Retirer", "Remove")}><Trash2 size={13} /></button>
+              <button className={styles.iconButton} type="button" onClick={() => onChange(comparisons.filter((candidate) => candidate.symbol !== item.symbol))} aria-label={pick(language, "Retirer", "Remove")}><FocusGlyph name="Trash2" size={13} /></button>
             </li>
           ))}
         </ul>

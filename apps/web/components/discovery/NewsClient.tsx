@@ -17,7 +17,7 @@ import {
   Search,
   Sparkles,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import {
   usePreferences,

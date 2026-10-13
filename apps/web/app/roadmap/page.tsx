@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Clock3, Layers3 } from "lucide-react";
+import { CheckCircle2, Clock3, Layers3 } from "@/components/layout/AppIcons";
 
 const phases = [
   {

@@ -1,4 +1,4 @@
-import { Activity, Info } from "lucide-react";
+import { Activity, Info } from "@/components/layout/AppIcons";
 
 import styles from "./Canada360Freshness.module.css";
 import {

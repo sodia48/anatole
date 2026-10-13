@@ -16,7 +16,7 @@ import {
   Sparkles,
   Waves,
   Zap,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getTerminalSnapshot } from "@/lib/api";

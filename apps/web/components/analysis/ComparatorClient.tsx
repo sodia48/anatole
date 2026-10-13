@@ -12,7 +12,7 @@ import {
   Sparkles,
   Trophy,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useEffect,
   useMemo,

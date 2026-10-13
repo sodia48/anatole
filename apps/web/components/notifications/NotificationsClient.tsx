@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import styles from "./NotificationsClient.module.css";
 import { useAccount } from "@/components/providers/AccountProvider";

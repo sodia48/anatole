@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Settings2 } from "lucide-react";
+import { Search, Settings2 } from "@/components/layout/AppIcons";
 import { ApiStatus } from "@/components/status/ApiStatus";
 
 const titles: Array<[string, string]> = [

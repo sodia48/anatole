@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw } from "@/components/layout/AppIcons";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import type { AnatoleDensity, AnatoleTheme, AnatoleTimeRange } from "@/lib/preferences";
 

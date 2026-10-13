@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, Search } from "@/components/layout/AppIcons";
 import { useEffect, useRef, useState } from "react";
 
 import { findCompanyRelationshipPath, searchSymbols } from "@/lib/api";

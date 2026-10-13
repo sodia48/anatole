@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
+import { FocusGlyph } from "./FocusGlyph";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { FocusFundamentalOverlaySnapshot } from "@/lib/types";
@@ -106,7 +106,7 @@ export function FocusFundamentalOverlay({
     <section className={styles.panel}>
       <header className={styles.sectionHeader}>
         <div><span className={styles.eyebrow}>FUNDAMENTALS</span><h2>{pick(language, "Événements fondamentaux", "Fundamental events")}</h2></div>
-        <button className={`${styles.iconButton} ${enabled ? styles.buttonActive : ""}`} type="button" onClick={onToggle} aria-pressed={enabled} aria-label={pick(language, "Afficher les événements fondamentaux", "Show fundamental events")}>{enabled ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+        <button className={`${styles.iconButton} ${enabled ? styles.buttonActive : ""}`} type="button" onClick={onToggle} aria-pressed={enabled} aria-label={pick(language, "Afficher les événements fondamentaux", "Show fundamental events")}>{enabled ? <FocusGlyph name="Eye" size={14} /> : <FocusGlyph name="EyeOff" size={14} />}</button>
       </header>
       <div className={styles.sectionBody}>
         <span className={styles.muted}>{loading ? pick(language, "Chargement…", "Loading…") : `${markers.length} ${pick(language, "marqueurs officiels ou sourcés", "official or sourced markers")}`}</span>

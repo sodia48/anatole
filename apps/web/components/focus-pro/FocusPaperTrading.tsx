@@ -1,6 +1,6 @@
 "use client";
 
-import { RotateCw, Send } from "lucide-react";
+import { FocusGlyph } from "./FocusGlyph";
 import { useEffect, useState } from "react";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
@@ -124,7 +124,7 @@ export function FocusPaperTrading({
     <section className={styles.panel} aria-label="Paper trading ticket">
       <header className={styles.sectionHeader}>
         <div><span className={styles.paperBadge}>PAPER</span><h2>{pick(language, "Ticket d’ordre simulé", "Simulated order ticket")}</h2></div>
-        <button className={styles.iconButton} type="button" onClick={refresh} disabled={!authenticated || busy} aria-label={pick(language, "Actualiser", "Refresh")}><RotateCw size={14} /></button>
+        <button className={styles.iconButton} type="button" onClick={refresh} disabled={!authenticated || busy} aria-label={pick(language, "Actualiser", "Refresh")}><FocusGlyph name="RotateCw" size={14} /></button>
       </header>
       <div className={styles.sectionBody}>
         {!authenticated ? <p className={styles.notice}>{pick(language, "Connectez-vous pour accéder au portefeuille PAPER persistant et isolé par compte.", "Sign in to access the persistent, account-isolated PAPER portfolio.")}</p> : (
@@ -138,7 +138,7 @@ export function FocusPaperTrading({
             {order.order_type === "limit" || order.order_type === "stop_limit" ? <label className={styles.field}>Limit<input className={styles.input} type="number" min="0.01" step="0.01" value={order.limit_price ?? ""} onChange={(event) => { setPreview(null); setOrder({ ...order, limit_price: Number(event.target.value) }); }} /></label> : null}
             {order.order_type === "stop" || order.order_type === "stop_limit" ? <label className={styles.field}>Stop<input className={styles.input} type="number" min="0.01" step="0.01" value={order.stop_price ?? ""} onChange={(event) => { setPreview(null); setOrder({ ...order, stop_price: Number(event.target.value) }); }} /></label> : null}
             {preview ? <div className={preview.sufficient_cash ? styles.successNotice : styles.errorNotice}>{preview.message}<br />{preview.quantity} × {preview.estimated_price.toFixed(2)} = {preview.estimated_notional.toFixed(2)} CAD</div> : null}
-            <button className={styles.primaryButton} type="button" onClick={execute} disabled={busy || order.quantity <= 0 || Boolean(preview && !preview.sufficient_cash)}><Send size={14} />{preview ? order.side === "buy" ? pick(language, "Acheter — PAPER", "Buy — PAPER") : pick(language, "Vendre — PAPER", "Sell — PAPER") : pick(language, "Prévisualiser", "Preview")}</button>
+            <button className={styles.primaryButton} type="button" onClick={execute} disabled={busy || order.quantity <= 0 || Boolean(preview && !preview.sufficient_cash)}><FocusGlyph name="Send" size={14} />{preview ? order.side === "buy" ? pick(language, "Acheter — PAPER", "Buy — PAPER") : pick(language, "Vendre — PAPER", "Sell — PAPER") : pick(language, "Prévisualiser", "Preview")}</button>
             {(account?.orders ?? []).some((item) => item.status === "pending") ? <ul className={styles.list}>{account?.orders.filter((item) => item.status === "pending").slice(0, 4).map((item) => <li className={styles.listItem} key={item.id}><span><strong>{item.side.toUpperCase()} {item.quantity} {item.ticker}</strong><small>{item.order_type}</small></span><button className={styles.dangerButton} type="button" disabled={busy} onClick={() => cancel(item.id)}>{pick(language, "Annuler", "Cancel")}</button></li>)}</ul> : null}
             <div className={styles.inlineActions}><label className={styles.field}>{pick(language, "Capital de reset", "Reset capital")}<input className={styles.input} type="number" min="1000" value={resetCapital} onChange={(event) => setResetCapital(Number(event.target.value))} /></label><label className={styles.field}>{pick(language, "Commission/ordre", "Commission/order")}<input className={styles.input} type="number" min="0" step="0.01" value={resetCommission} onChange={(event) => setResetCommission(Number(event.target.value))} /></label></div>
             <button className={styles.dangerButton} type="button" disabled={busy || resetCapital < 1_000 || resetCommission < 0} onClick={reset}>{pick(language, "Réinitialiser PAPER", "Reset PAPER")}</button>

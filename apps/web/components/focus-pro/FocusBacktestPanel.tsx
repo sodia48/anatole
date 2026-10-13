@@ -1,6 +1,6 @@
 "use client";
 
-import { Play } from "lucide-react";
+import { FocusGlyph } from "./FocusGlyph";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { BacktestRequest, BacktestResult } from "@/lib/types";
@@ -55,7 +55,7 @@ export function FocusBacktestPanel({
     <section className={styles.panel} aria-label="Backtest">
       <header className={styles.sectionHeader}>
         <div><span className={styles.eyebrow}>BACKTEST</span><h2>{pick(language, "Simulation sans lookahead", "No-lookahead simulation")}</h2></div>
-        <button className={styles.primaryButton} type="button" onClick={onRun} disabled={loading}><Play size={14} />{loading ? "…" : pick(language, "Exécuter", "Run")}</button>
+        <button className={styles.primaryButton} type="button" onClick={onRun} disabled={loading}><FocusGlyph name="Play" size={14} />{loading ? "…" : pick(language, "Exécuter", "Run")}</button>
       </header>
       <div className={styles.sectionBody}>
         <div className={styles.inlineActions}>

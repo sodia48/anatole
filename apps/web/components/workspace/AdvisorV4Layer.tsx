@@ -21,7 +21,7 @@ import {
   Trash2,
   Users,
   WalletCards,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useMemo, useState } from "react";
 
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";

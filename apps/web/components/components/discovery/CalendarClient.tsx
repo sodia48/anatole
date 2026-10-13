@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, ExternalLink, Search } from "lucide-react";
+import { CalendarDays, ExternalLink, Search } from "@/components/layout/AppIcons";
 import { getCalendarSnapshot } from "@/lib/api";
 import type { CalendarSnapshot } from "@/lib/types";
 

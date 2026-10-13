@@ -19,7 +19,7 @@ import {
   Newspaper,
   ShieldCheck,
   Star,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import { ANATOLE_VERSION_LABEL } from "@/lib/version";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";

@@ -7,7 +7,7 @@ import {
   Grid3X3,
   ShieldAlert,
   Waves,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type {

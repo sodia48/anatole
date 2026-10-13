@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, RefreshCw, Search } from "lucide-react";
+import { Activity, RefreshCw, Search } from "@/components/layout/AppIcons";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";

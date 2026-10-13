@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, TrendingUp } from "lucide-react";
+import { Search, TrendingUp } from "@/components/layout/AppIcons";
 import { useEffect, useMemo, useState } from "react";
 
 import { getEarningsCalendarSnapshot } from "@/lib/api";

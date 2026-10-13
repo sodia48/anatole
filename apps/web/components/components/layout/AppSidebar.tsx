@@ -37,7 +37,7 @@ import {
   TableProperties,
   UserRound,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import guardStyles from "./AppSidebarGuard.module.css";
 import { AccountStatus } from "@/components/account/AccountStatus";

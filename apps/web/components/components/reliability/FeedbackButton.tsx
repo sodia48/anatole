@@ -6,7 +6,7 @@ import {
   Send,
   ShieldCheck,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useEffect,
   useMemo,

@@ -21,7 +21,7 @@ import {
   UserRound,
   TableProperties,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { searchSymbols } from "@/lib/api";
 import type { SymbolSearchItem } from "@/lib/types";
 

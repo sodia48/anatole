@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/layout/AppIcons";
 import type { Quote } from "@/lib/types";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick } from "@/lib/i18n";

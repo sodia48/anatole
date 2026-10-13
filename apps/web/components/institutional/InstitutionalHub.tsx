@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   type ChangeEvent,
   type MouseEvent,

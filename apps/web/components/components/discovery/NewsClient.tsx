@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Newspaper, Search } from "lucide-react";
+import { ExternalLink, Newspaper, Search } from "@/components/layout/AppIcons";
 import { getNewsSnapshot } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import type { NewsSnapshot } from "@/lib/types";

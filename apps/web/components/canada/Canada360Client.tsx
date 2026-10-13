@@ -9,7 +9,7 @@ import {
   RefreshCw,
   TrendingUp,
   X,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useCallback,
   useEffect,

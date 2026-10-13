@@ -11,7 +11,7 @@ import {
   RefreshCw,
   ShieldCheck,
   WalletCards,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useEffect,
   useMemo,

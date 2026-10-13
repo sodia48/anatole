@@ -4,7 +4,7 @@ import {
   BarChart3,
   LoaderCircle,
   TrendingUp,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useEffect,
   useMemo,

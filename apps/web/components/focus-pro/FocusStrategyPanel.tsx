@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, Save, ShieldCheck, X } from "lucide-react";
+import { FocusGlyph } from "./FocusGlyph";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type {
@@ -70,7 +70,7 @@ export function FocusStrategyPanel({
     <section className={styles.panel} aria-label="Strategy Lab">
       <header className={styles.sectionHeader}>
         <div><span className={styles.eyebrow}>STRATEGY LAB</span><h2>{pick(language, "Stratégies et Anatole Script", "Strategies and Anatole Script")}</h2></div>
-        <button className={styles.iconButton} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><X size={14} /></button>
+        <button className={styles.iconButton} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
       </header>
       <div className={styles.sectionBody}>
         <label className={styles.field}>{pick(language, "Stratégie", "Strategy")}
@@ -87,8 +87,8 @@ export function FocusStrategyPanel({
           <>
             <textarea className={styles.textarea} spellCheck={false} value={script} onChange={(event) => onScript(event.target.value)} aria-label="Anatole Script editor" />
             <div className={styles.inlineActions}>
-              <button className={styles.button} type="button" onClick={onValidate} disabled={validating}><ShieldCheck size={14} />{validating ? "…" : pick(language, "Valider", "Validate")}</button>
-              <button className={styles.button} type="button" onClick={onSaveScript}><Save size={14} />{pick(language, "Sauver", "Save")}</button>
+              <button className={styles.button} type="button" onClick={onValidate} disabled={validating}><FocusGlyph name="ShieldCheck" size={14} />{validating ? "…" : pick(language, "Valider", "Validate")}</button>
+              <button className={styles.button} type="button" onClick={onSaveScript}><FocusGlyph name="Save" size={14} />{pick(language, "Sauver", "Save")}</button>
             </div>
             {validation ? (
               <div className={validation.valid ? styles.successNotice : styles.errorNotice} role="status">
@@ -108,7 +108,7 @@ export function FocusStrategyPanel({
             <p className={styles.notice}>{pick(language, "Interpréteur AST borné : aucun eval, import, accès réseau, fichier ou code utilisateur natif.", "Bounded AST interpreter: no eval, imports, network, file access, or native user code.")}</p>
           </>
         )}
-        <button className={styles.primaryButton} type="button" onClick={onRun}><Play size={14} />{pick(language, "Lancer le backtest", "Run backtest")}</button>
+        <button className={styles.primaryButton} type="button" onClick={onRun}><FocusGlyph name="Play" size={14} />{pick(language, "Lancer le backtest", "Run backtest")}</button>
       </div>
     </section>
   );

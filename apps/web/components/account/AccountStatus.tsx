@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Cloud, CloudOff, LoaderCircle, UserRound } from "lucide-react";
+import { Cloud, CloudOff, LoaderCircle, UserRound } from "@/components/layout/AppIcons";
 
 import { useAccount } from "@/components/providers/AccountProvider";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
