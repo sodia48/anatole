@@ -1,0 +1,63 @@
+.root { min-width: 0; display: grid; gap: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel-2); color: var(--text); }
+.header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.header h2 { margin: 5px 0; font-size: clamp(21px, 2vw, 28px); }
+.header p { margin: 0; color: var(--text-secondary); font-size: 12px; }
+.switch { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.switch button { min-height: 42px; padding: 8px 14px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--interactive); color: var(--on-primary); }
+.switch button:focus-visible, .help:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 185px), 1fr)); gap: 10px; }
+.summaryCard { min-width: 0; display: grid; align-content: start; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 13px; background: var(--panel); }
+.summaryCard[data-tone="positive"] { border-top: 2px solid var(--positive-text); }
+.summaryCard[data-tone="negative"] { border-top: 2px solid var(--negative-text); }
+.summaryCard:nth-child(3) .change { display: none; }
+.summaryTop { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 11px; }
+.summaryTitle { flex: 1; min-width: 0; font-weight: 750; }
+.summaryValue { overflow-wrap: anywhere; font-size: clamp(19px, 2vw, 26px); font-variant-numeric: tabular-nums; }
+.icon { display: grid; place-items: center; flex: 0 0 29px; width: 29px; height: 29px; border-radius: 8px; color: var(--interactive); background: var(--surface-raised); font-size: 16px; }
+.help { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-secondary); cursor: help; font-size: 15px; }
+.change { width: fit-content; padding: 3px 7px; border-radius: 6px; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.change[data-tone="positive"], [data-tone="positive"].change { color: var(--positive-text); background: color-mix(in srgb, var(--positive-text) 11%, transparent); }
+.change[data-tone="negative"], [data-tone="negative"].change { color: var(--negative-text); background: color-mix(in srgb, var(--negative-text) 11%, transparent); }
+.change[data-tone="neutral"], [data-tone="neutral"].change { color: var(--text-secondary); background: var(--surface-raised); }
+.partial { margin: 0; padding: 10px 12px; border-left: 3px solid var(--warning); border-radius: 6px; background: var(--panel); color: var(--text-secondary); font-size: 12px; }
+.tableWrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.table { width: 100%; min-width: 1140px; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: 13px 11px; text-align: right; vertical-align: middle; }
+.table th:first-child, .table td:nth-child(2) { text-align: left; }
+.table thead { background: var(--surface-raised); color: var(--text-secondary); }
+.table tbody tr { border-top: 1px solid var(--border); }
+.table tbody tr:hover { background: var(--surface-raised); }
+.table tbody th { font-weight: 800; }
+.table td { white-space: nowrap; }
+.table td:last-child { padding-right: 18px; }
+.range { display: grid; gap: 5px; min-width: 135px; font-variant-numeric: tabular-nums; }
+.rangeTrack { position: relative; height: 5px; margin: 0 5px; border-radius: 99px; background: var(--interactive); opacity: .9; }
+.rangePoint { position: absolute; top: 50%; width: 9px; height: 9px; border: 2px solid var(--panel); border-radius: 50%; background: var(--text); transform: translate(-50%, -50%); }
+.tableWrap[data-mode="cards"] { border: 0; overflow: visible; background: transparent; }
+.tableWrap[data-mode="cards"] .table { display: block; min-width: 0; }
+.tableWrap[data-mode="cards"] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.tableWrap[data-mode="cards"] tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.tableWrap[data-mode="cards"] tbody tr { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; padding: 16px; border: 1px solid var(--border); border-radius: 13px; background: var(--panel); }
+.tableWrap[data-mode="cards"] tbody th { display: block; padding: 0; color: var(--interactive); font-size: 21px; }
+.tableWrap[data-mode="cards"] tbody td { min-width: 0; display: grid; gap: 5px; padding: 10px 0 0; border-top: 1px solid var(--border); white-space: normal; overflow-wrap: anywhere; font-size: 14px; font-weight: 700; }
+.tableWrap[data-mode="cards"] tbody td::before { content: attr(data-label); color: var(--text-secondary); font-size: 11px; font-weight: 400; }
+.tableWrap[data-mode="cards"] tbody td:nth-child(2) { padding: 0; border: 0; text-align: right; color: var(--text-secondary); font-size: 11px; }
+.tableWrap[data-mode="cards"] tbody td:nth-child(2)::before { content: none; }
+.tableWrap[data-mode="cards"] tbody td:nth-child(4),
+.tableWrap[data-mode="cards"] tbody td:nth-child(9) { grid-column: 1 / -1; }
+.reading { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.reading h3 { margin: 0 0 10px; font-size: 17px; }
+.reading ul { display: grid; gap: 7px; margin: 0 0 10px; padding-left: 19px; font-size: 12px; line-height: 1.5; }
+.reading p, .reading small, .provenance { color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.reading p { margin: 0 0 10px; }
+.provenance { border-top: 1px solid var(--border); padding-top: 12px; overflow-wrap: anywhere; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 700px) {
+  .root { padding: 14px; }
+  .switch { width: 100%; }
+  .switch button { flex: 1; }
+  .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tableWrap[data-mode="cards"] tbody { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 400px) { .summary { grid-template-columns: minmax(0, 1fr); } }

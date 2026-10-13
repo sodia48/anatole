@@ -1,6 +1,5 @@
 "use client";
 
-import { FlaskConical, WalletCards } from "lucide-react";
 import Link from "next/link";
 import {
   useCallback,
@@ -15,6 +14,7 @@ import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem"
 import { FocusRangeChart } from "@/components/chart/FocusRangeChart";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { FocusFundamentals, type FundamentalView } from "@/components/stock/FocusFundamentals";
+import { FocusGlyph } from "./FocusGlyph";
 import { FocusStockNews } from "@/components/stock/FocusStockNews";
 import { KeyLevels } from "@/components/stock/KeyLevels";
 import { QuoteHeader } from "@/components/stock/QuoteHeader";
@@ -444,7 +444,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
             </aside> : null}
           </div>
           <div className={styles.sidePanel} style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}><TechnicalSummary technicals={snapshot.technicals} /><KeyLevels technicals={snapshot.technicals} /><FocusFundamentalOverlay enabled={layout.fundamentals_visible} loading={fundamentalsLoading} markers={markers} selected={selectedMarker} language={language} onToggle={() => setLayout({ ...layout, fundamentals_visible: !layout.fundamentals_visible })} onSelect={setSelectedMarker} /></div>
-          <div className={styles.inlineActions}><button className={styles.button} type="button" onClick={() => togglePanel("strategy")}><FlaskConical size={14} />Strategy Lab</button><button className={styles.button} type="button" onClick={() => togglePanel("paper")}><WalletCards size={14} />PAPER</button></div>
+          <div className={styles.inlineActions}><button className={styles.button} type="button" onClick={() => togglePanel("strategy")}><FocusGlyph name="FlaskConical" />Strategy Lab</button><button className={styles.button} type="button" onClick={() => togglePanel("paper")}><FocusGlyph name="WalletCards" />PAPER</button></div>
           <FocusBacktestPanel language={language} request={backtestRequest} result={backtest} loading={backtestLoading} error={backtestError} onChange={setBacktestRequest} onRun={runBacktest} />
           <FocusBottomPanel language={language} account={paperAccount} backtest={backtest} />
         </div>
