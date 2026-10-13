@@ -1,0 +1,20 @@
+.root, .charts { display: grid; gap: 14px; min-width: 0; }
+.panel { min-width: 0; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
+.panel h2 { margin: 4px 0 14px; font-size: 18px; }
+.header { display: flex; align-items: end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.tableWrap { max-width: 100%; overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tableWrap th, .tableWrap td { padding: 12px; border-bottom: 1px solid var(--border); text-align: right; }
+.tableWrap th:first-child { text-align: left; }
+.tableWrap[data-mode="cards"] { overflow: visible; }
+.tableWrap[data-mode="cards"] table { display: block; }
+.tableWrap[data-mode="cards"] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+.tableWrap[data-mode="cards"] tbody { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.tableWrap[data-mode="cards"] tr { display: grid; gap: 5px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.tableWrap[data-mode="cards"] th, .tableWrap[data-mode="cards"] td { padding: 5px 0; border: 0; text-align: left; }
+.tableWrap[data-mode="cards"] td::before { content: attr(data-label) ': '; color: var(--text-secondary); }
+.timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.timeline li { display: flex; gap: 12px; align-items: center; padding: 10px; border-left: 3px solid var(--interactive); background: var(--panel); }
+.timeline time { font-variant-numeric: tabular-nums; font-weight: 750; }
+.panel p { color: var(--text-secondary); }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); }

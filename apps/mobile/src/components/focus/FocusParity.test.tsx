@@ -9,7 +9,7 @@ import { MobileFocusFundamentalTabs } from "./MobileFocusFundamentalTabs";
 import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
-import type { FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
+import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -82,6 +82,22 @@ describe("mobile Focus parity", () => {
     expect(financials.getByText("Aucune période disponible.")).toBeTruthy();
     const analysts = await render(<MobileFocusAnalysts error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
     expect(analysts.getByText("BUY")).toBeTruthy(); expect(analysts.getByText("12")).toBeTruthy();
+  });
+  it("switches native statement modes while preserving negative, zero and source data", async () => {
+    const periods = [
+      { period_end: "2025-12-31", currency: "CAD", total_revenue: 120, net_income: -4,
+        free_cash_flow: 0, source: { source_name: "Issuer 2025" } },
+      { period_end: "2024-12-31", currency: "CAD", total_revenue: 100, net_income: 5,
+        free_cash_flow: null, source: { source_name: "Issuer 2024" } },
+    ] as unknown as FinancialPeriod[];
+    const view = await render(<MobileFocusFinancials error={null} loading={false} onRetry={jest.fn()}
+      snapshot={{ ...snapshot, annual_financials: periods }} />);
+    expect(view.getByText("Issuer 2025 · date N/D")).toBeTruthy();
+    await fireEvent.press(view.getByText("Graphiques"));
+    expect(view.getByText("Évolution des résultats publiés")).toBeTruthy();
+    await fireEvent.press(view.getByText("Tableau"));
+    expect(view.getByText("États financiers publiés")).toBeTruthy();
+    expect(view.getByText("2025-12-31")).toBeTruthy();
   });
   it("mounts Focus Pro only through its specialized embed WebView", async () => {
     const view = await render(<MobileFocusPro ticker="RY" />); expect(view.getByTestId("focus-pro-webview")).toBeTruthy();

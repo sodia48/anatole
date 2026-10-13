@@ -1,7 +1,9 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { pick } from "@/lib/i18n";
+import { FocusSeriesChart } from "./FocusSeriesChart";
+import { FocusViewMode, useFocusMode } from "./FocusViewMode";
 import styles from "./FocusEstimates.module.css";
 
 export type EarningsEstimate = {
@@ -22,29 +24,7 @@ export type EarningsEstimate = {
 };
 
 type Language = "fr" | "en";
-type Mode = "table" | "cards";
 const preferenceKey = "anatole.focus.estimates.view.v1";
-const changeEvent = "anatole-estimates-view";
-let volatileMode: Mode | null = null;
-
-function readMode(): Mode {
-  if (volatileMode) return volatileMode;
-  try {
-    const saved = window.localStorage.getItem(preferenceKey);
-    if (saved === "table" || saved === "cards") return saved;
-  } catch { /* Browser storage is optional. */ }
-  return window.matchMedia("(max-width: 700px)").matches ? "cards" : "table";
-}
-
-function subscribeMode(notify: () => void) {
-  const media = window.matchMedia("(max-width: 700px)");
-  window.addEventListener(changeEvent, notify);
-  media.addEventListener("change", notify);
-  return () => {
-    window.removeEventListener(changeEvent, notify);
-    media.removeEventListener("change", notify);
-  };
-}
 
 function available(value: number | null | undefined): value is number {
   return value !== null && value !== undefined && Number.isFinite(value);
@@ -112,15 +92,11 @@ function estimateCells(row: EarningsEstimate, currency: string, language: Langua
     [labels[10], format(row.revenue_analyst_count, language)],
   ];
 }
-export function FocusEstimates({ rows, currency, language, partial }: {
-  rows: EarningsEstimate[]; currency: string; language: Language; partial: boolean;
+export function FocusEstimates({ rows, currency, language, partial, source }: {
+  rows: EarningsEstimate[]; currency: string; language: Language; partial: boolean; source?: string;
 }) {
-  const mode = useSyncExternalStore(subscribeMode, readMode, () => "table");
-  function choose(next: Mode) {
-    volatileMode = next;
-    try { window.localStorage.setItem(preferenceKey, next); } catch { /* Storage can be unavailable. */ }
-    window.dispatchEvent(new Event(changeEvent));
-  }
+  const [mode, choose] = useFocusMode(preferenceKey, ["table", "cards", "charts"]);
+  const [chartMetric, setChartMetric] = useState<"eps" | "revenue" | "eps_growth" | "revenue_growth">("eps");
   const quarter = rows.find(row => row.period === "+1q");
   const year = rows.find(row => row.period === "0y");
   const spread = dispersion(quarter);
@@ -151,10 +127,8 @@ export function FocusEstimates({ rows, currency, language, partial }: {
   return <section className={styles.root} aria-label={pick(language, "Estimations du marché", "Market estimates")}>
     <header className={styles.header}><div>
       <h2>{pick(language, "Estimations du marché", "Market estimates")}</h2></div>
-      <div className={styles.switch} role="group" aria-label={pick(language, "Mode d’affichage des estimations", "Estimates display mode")}>
-        <button type="button" aria-pressed={mode === "table"} onClick={() => choose("table")}>{pick(language, "Vue tableau", "Table view")}</button>
-        <button type="button" aria-pressed={mode === "cards"} onClick={() => choose("cards")}>{pick(language, "Vue cartes", "Card view")}</button>
-      </div>
+      <FocusViewMode mode={mode} choose={choose} modes={["table", "cards", "charts"]} language={language}
+        label={pick(language, "Mode d’affichage des estimations", "Estimates display mode")} />
     </header>
     <div className={styles.summary}>{summaries.map(([icon, title, value, change, tooltip]) =>
       <article className={styles.summaryCard} data-tone={signed(change)} key={title}>
@@ -166,7 +140,32 @@ export function FocusEstimates({ rows, currency, language, partial }: {
         {change !== null ? <Change value={change} language={language} /> : null}
       </article>)}</div>
     {partial ? <p className={styles.partial} role="status">{pick(language, "Données partielles ou anciennes : N/D si absent.", "Partial or stale data: N/D when absent.")}</p> : null}
-    <div className={styles.tableWrap} data-mode={mode} data-testid={mode === "table" ? "estimates-table-view" : "estimates-card-view"}>
+    {mode === "charts" ? <div className={styles.charts} data-testid="estimates-chart-view">
+      <div className={styles.metrics} role="group" aria-label={pick(language, "Indicateur prévu", "Forecast metric")}>
+        {(["eps", "revenue", "eps_growth", "revenue_growth"] as const).map((key, index) =>
+          <button type="button" key={key} aria-pressed={chartMetric === key} onClick={() => setChartMetric(key)}>
+            {pick(language, ["BPA moyen", "Revenus moyens", "Croissance BPA", "Croissance revenus"][index],
+              ["Average EPS", "Average revenue", "EPS growth", "Revenue growth"][index])}
+          </button>)}
+      </div>
+      {(["q", "y"] as const).map(kind => {
+        const group = rows.filter(row => row.period.endsWith(kind)).sort((a, b) =>
+          (a.end_date ?? "").localeCompare(b.end_date ?? ""));
+        const key = chartMetric === "eps" ? "eps_average" : chartMetric === "revenue" ? "revenue_average" : chartMetric;
+        return <FocusSeriesChart key={kind} title={pick(language,
+          kind === "q" ? "Prévisions trimestrielles" : "Prévisions annuelles",
+          kind === "q" ? "Quarterly forecasts" : "Annual forecasts")}
+          periods={group.map(row => `${row.period} · ${row.end_date ?? "N/D"}`)}
+          periodSources={group.map(() => source ?? null)}
+          series={[{ id: chartMetric, label: pick(language,
+            chartMetric.startsWith("eps") ? "BPA prévu" : "Revenus prévus",
+            chartMetric.startsWith("eps") ? "Forecast EPS" : "Forecast revenue"),
+            values: group.map(row => row[key]),
+            lows: chartMetric === "eps" ? group.map(row => row.eps_low) : chartMetric === "revenue" ? group.map(row => row.revenue_low) : undefined,
+            highs: chartMetric === "eps" ? group.map(row => row.eps_high) : chartMetric === "revenue" ? group.map(row => row.revenue_high) : undefined }]}
+          unit={chartMetric.includes("growth") ? "percent" : "money"} currency={currency} language={language} source={source} forecast />;
+      })}
+    </div> : <div className={styles.tableWrap} data-mode={mode} data-testid={mode === "table" ? "estimates-table-view" : "estimates-card-view"}>
       <table className={styles.table}><caption className={styles.srOnly}>{pick(language, "Estimations financières par période", "Financial estimates by period")}</caption>
         <thead><tr>{labels.map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
         <tbody>{rows.length ? rows.map(row => <tr key={`${row.period}-${row.end_date}`} data-period={row.period}>
@@ -176,7 +175,7 @@ export function FocusEstimates({ rows, currency, language, partial }: {
               {tone ? <span className={styles.change} data-tone={tone}>{value}</span> : value}
             </td>)}
         </tr>) : <tr><td colSpan={11}>{pick(language, "Aucun consensus détaillé publié pour ce titre.", "No detailed consensus is published for this security.")}</td></tr>}</tbody>
-      </table></div>
+      </table></div>}
     <aside className={styles.reading}><h3>{pick(language, "Lecture rapide", "Quick read")}</h3>
       {reading.length ? <ul>{reading.map(line => <li key={line}>{line}</li>)}</ul>
         : <p>{pick(language, "Consensus insuffisant pour une lecture.", "Insufficient consensus data.")}</p>}
