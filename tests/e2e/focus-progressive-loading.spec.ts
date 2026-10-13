@@ -30,6 +30,8 @@ test("Focus keeps analyst snapshot while refreshing and uses compact empty state
   consensus = true;
   const refresh = page.getByRole("button", { name: "Actualiser", exact: true });
   await refresh.click();
+  await page.getByRole("group", { name: "Mode du consensus analystes" })
+    .getByRole("button", { name: "Vue cartes" }).click();
   await expect(page.getByText("Répartition des recommandations", { exact: true })).toBeVisible();
   blocked = true;
   await refresh.click();

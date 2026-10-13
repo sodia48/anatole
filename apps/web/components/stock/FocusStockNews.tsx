@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Newspaper, X } from "lucide-react";
+import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
 import Image from "next/image";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -98,7 +98,7 @@ function ArticleReader({
             ref={closeRef}
             type="button"
           >
-            <X aria-hidden="true" size={18} />
+            <FocusGlyph name="X" size={18} />
           </button>
         </header>
         <div className={styles.readerScroll}>
@@ -156,7 +156,7 @@ function ArticleReader({
               target="_blank"
             >
               {pick(language, "Voir la source originale", "View original source")}
-              <ArrowUpRight aria-hidden="true" size={15} />
+              <FocusGlyph name="ArrowUpRight" size={15} />
             </a>
           </article>
         </div>
@@ -247,7 +247,7 @@ export function FocusStockNews({
       <header className={styles.header}>
         <div>
           <span className={styles.eyebrow}>
-            <Newspaper size={14} aria-hidden="true" />
+            <FocusGlyph name="Newspaper" size={14} />
             {pick(language, "ACTUALITÉS DU TITRE", "STOCK NEWS")}
           </span>
           <h2>

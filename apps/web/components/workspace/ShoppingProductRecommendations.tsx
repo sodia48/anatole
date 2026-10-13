@@ -8,7 +8,7 @@ import {
   Scale,
   ShieldCheck,
   Sparkles,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useState } from "react";
 
 import { pick } from "@/lib/i18n";

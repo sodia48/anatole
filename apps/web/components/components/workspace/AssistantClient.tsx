@@ -17,7 +17,7 @@ import {
   Sparkles,
   Target,
   WalletCards,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   type ChangeEvent,
   type FormEvent,

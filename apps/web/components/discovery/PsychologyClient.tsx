@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Gauge } from "lucide-react";
+import { Activity, Gauge } from "@/components/layout/AppIcons";
 import Link from "next/link";
 import { getPsychologySnapshot } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";

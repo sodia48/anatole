@@ -22,7 +22,7 @@ import {
   Target,
   Trash2,
   WalletCards,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useEffect, useState } from "react";
 
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";

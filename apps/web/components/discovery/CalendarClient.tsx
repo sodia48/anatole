@@ -10,7 +10,7 @@ import {
   ExternalLink,
   Search,
   TrendingUp,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import {
   usePreferences,

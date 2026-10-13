@@ -3,7 +3,7 @@
 import {
   Check,
   RotateCcw,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import {
   usePreferences,

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bot, Send, X } from "lucide-react";
+import { Bot, Send, X } from "@/components/layout/AppIcons";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { askUnifiedAssistant } from "@/lib/api";
 import { readAssistantPortfolio, type AssistantContext, type UnifiedAssistantResponse } from "@/lib/assistant-context";

@@ -18,7 +18,7 @@ import {
   Trash2,
   UserCog,
   UserRound,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 
 import { useAccount } from "@/components/providers/AccountProvider";
 import {

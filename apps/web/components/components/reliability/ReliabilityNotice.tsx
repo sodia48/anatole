@@ -1,6 +1,6 @@
 "use client";
 
-import { WifiOff, X } from "lucide-react";
+import { WifiOff, X } from "@/components/layout/AppIcons";
 import { useEffect, useState } from "react";
 
 import type { ApiTrace } from "@/lib/reliability";

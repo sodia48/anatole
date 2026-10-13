@@ -8,6 +8,9 @@ import {
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import styles from "./FocusFundamentals.module.css";
 import { FocusEstimates, type EarningsEstimate } from "./FocusEstimates";
+import { FocusEarnings } from "./FocusEarnings";
+import { FocusSeriesChart, type FocusChartSeries } from "./FocusSeriesChart";
+import { FocusViewMode, useFocusMode, type FocusMode } from "./FocusViewMode";
 import { localeFor, pick } from "@/lib/i18n";
 import { getFocusFundamentalOverlay } from "@/lib/api";
 
@@ -288,22 +291,6 @@ function pct(value: number | null): string {
   return `${value >= 0 ? "+" : ""}${n(value)} %`;
 }
 
-function date(value: string | null): string {
-  if (!value) {
-    return "N/D";
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "N/D";
-  }
-  return parsed.toLocaleDateString("fr-CA", {
-    timeZone: "America/Toronto",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function signedCompact(
   value: number | null,
   currency?: string | null,
@@ -357,14 +344,6 @@ const panelStyle = {
   background: "var(--panel-2)",
   padding: 18,
 } as const;
-
-function signedColor(value: number | null): string {
-  return value === null
-    ? "var(--text-secondary)"
-    : value >= 0
-      ? "var(--positive-text)"
-      : "var(--negative-text)";
-}
 
 function signedTone(
   value: number | null,
@@ -480,9 +459,22 @@ function Fundamentals({
     snapshot.financial_currency ??
     snapshot.currency ??
     "CAD";
+  const [mode, chooseMode] = useFocusMode("anatole.focus.summary.view.v2", ["table", "cards", "charts"]);
+  const annual = [...snapshot.annual_financials].sort((a, b) => a.period_end.localeCompare(b.period_end));
 
   return (
-    <div className={styles.fundamentalsGrid}>
+    <div className={styles.modeStack}>
+      <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
+        language={language} label={pick(language, "Mode de la synthèse", "Summary display mode")} />
+      {mode === "charts" ? <FocusSeriesChart title={pick(language, "Croissance et rentabilité publiées", "Published growth and profitability")}
+        periods={annual.map(row => row.period_end.slice(0, 10))}
+        periodSources={annual.map(row => row.source?.source_name ?? snapshot.source)}
+        series={[
+          { id: "revenue", label: pick(language, "Revenus", "Revenue"), values: annual.map(row => row.total_revenue) },
+          { id: "ebitda", label: pick(language, "BAIIA", "EBITDA"), values: annual.map(row => row.ebitda) },
+          { id: "income", label: pick(language, "Bénéfice net", "Net income"), values: annual.map(row => row.net_income) },
+        ]} unit="money" currency={currency} language={language} source={snapshot.source} /> : null}
+    <div className={styles.fundamentalsGrid} data-mode={mode}>
 
       <Group title={pick(language, "Croissance et rentabilité", "Growth and profitability")} items={[
         { label: pick(language, "Chiffre d’affaires", "Revenue"), value: compact(m.total_revenue, currency) },
@@ -517,62 +509,7 @@ function Fundamentals({
         { label: pick(language, "Volume moyen 3 mois", "3-month average volume"), value: compact(m.average_volume_3m) },
       ]} />
     </div>
-  );
-}
-
-function MiniTrend({
-  title,
-  rows,
-  field,
-  currency,
-}: {
-  title: string;
-  rows: FinancialPeriod[];
-  field:
-    | "total_revenue"
-    | "operating_income"
-    | "net_income"
-    | "free_cash_flow";
-  currency: string;
-}) {
-  const values = rows
-    .map((row) => row[field])
-    .filter((value): value is number => value !== null);
-  const maximum = Math.max(
-    ...values.map((value) => Math.abs(value)),
-    1,
-  );
-
-  return (
-    <section className={styles.group}>
-      <h3 className={styles.trendTitle}>{title}</h3>
-      <div className={styles.trendRows}>
-        {[...rows].reverse().map((row) => {
-          const value = row[field];
-          const width =
-            value === null
-              ? 0
-              : Math.max(
-                  Math.abs(value) / maximum * 100,
-                  2,
-                );
-
-          return (
-            <div key={`${field}-${row.period_end}`} className={styles.trendRow}>
-              <span className={styles.trendYear}>
-                {new Date(row.period_end).getUTCFullYear()}
-              </span>
-              <div className={styles.trendTrack}>
-                <div className={styles.trendFill} data-tone={value !== null && value < 0 ? "negative" : "positive"} style={{ width: `${width}%` }} />
-              </div>
-              <strong className={styles.trendValue} data-tone={value !== null && value < 0 ? "negative" : undefined}>
-                {compact(value, currency)}
-              </strong>
-            </div>
-          );
-        })}
-      </div>
-    </section>
+    </div>
   );
 }
 
@@ -607,10 +544,12 @@ function FinancialTable({
   rows,
   view,
   currency,
+  mode = "table",
 }: {
   rows: FinancialPeriod[];
   view: StatementView;
   currency: string;
+  mode?: FocusMode;
 }) {
   const { preferences } = usePreferences();
   const language = preferences.language;
@@ -662,8 +601,8 @@ function FinancialTable({
             ] : ["Period", "Gross margin", "Operating margin", "Net margin", "FCF margin", "EPS growth", "Diluted shares"]);
 
   return (
-    <div data-mobile-table-wrap="true" className={styles.financialTableWrap}>
-      <table data-mobile-cards="fundamentals" data-view={view} className={styles.financialTable}>
+    <div data-mode={mode} className={styles.financialTableWrap}>
+      <table data-view={view} className={styles.financialTable}>
         <thead>
           <tr>
             {headers.map((header) => (
@@ -679,10 +618,12 @@ function FinancialTable({
               <tr key={`${view}-${row.period_end}`}>
                 <th scope="row">
                   <div>{periodLabel(row.period_end)}</div>
+                  {row.source ? <small className={styles.periodSource}>{row.source.source_name}
+                    {row.source.filed_at ? ` · ${periodLabel(row.source.filed_at)}` : ""}</small> : null}
                 </th>
 
                 {financialCells(row, view, currency).map(([value, delta], index) =>
-                  <td key={index} data-tone={delta === undefined ? undefined : tone(delta)}>{value}</td>)}
+                  <td key={index} data-label={headers[index + 1]} data-tone={delta === undefined ? undefined : tone(delta)}>{value}</td>)}
               </tr>
             ))
           ) : (
@@ -698,6 +639,48 @@ function FinancialTable({
   );
 }
 
+function StatementCharts({ rows, view, currency, language, source }: {
+  rows: FinancialPeriod[]; view: StatementView; currency: string;
+  language: "fr" | "en"; source: string;
+}) {
+  type SeriesField = { key: keyof FinancialPeriod; fr: string; en: string };
+  const moneyGroups: SeriesField[][] = view === "income" ? [[
+    { key: "total_revenue", fr: "Revenus", en: "Revenue" },
+    { key: "operating_income", fr: "Résultat opérationnel", en: "Operating income" },
+    { key: "ebitda", fr: "BAIIA", en: "EBITDA" },
+    { key: "net_income", fr: "Bénéfice net", en: "Net income" },
+  ], [{ key: "diluted_eps", fr: "BPA dilué", en: "Diluted EPS" }]]
+    : view === "cashflow" ? [[
+      { key: "operating_cash_flow", fr: "Flux opérationnel", en: "Operating cash flow" },
+      { key: "capital_expenditure", fr: "Immobilisations (signées)", en: "Capital expenditure (signed)" },
+      { key: "free_cash_flow", fr: "Flux disponible", en: "Free cash flow" },
+    ]] : view === "balance" ? [[
+      { key: "total_assets", fr: "Actifs", en: "Assets" },
+      { key: "total_liabilities", fr: "Passifs", en: "Liabilities" },
+      { key: "stockholder_equity", fr: "Capitaux propres", en: "Equity" },
+      { key: "total_debt", fr: "Dette", en: "Debt" },
+    ]] : [[
+      { key: "gross_margin", fr: "Marge brute", en: "Gross margin" },
+      { key: "operating_margin", fr: "Marge opérationnelle", en: "Operating margin" },
+      { key: "net_margin", fr: "Marge nette", en: "Net margin" },
+      { key: "free_cash_flow_margin", fr: "Marge FTD", en: "FCF margin" },
+      { key: "eps_growth_yoy", fr: "Croissance BPA", en: "EPS growth" },
+    ]];
+  const chronological = [...rows].sort((a, b) => a.period_end.localeCompare(b.period_end));
+  return <div className={styles.chartGrid} data-testid="financials-chart-view">
+    {moneyGroups.map((group, index) => {
+      const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: pick(language, field.fr, field.en),
+        values: chronological.map(row => row[field.key] as number | null) }));
+      return <FocusSeriesChart key={`${view}-${index}`} title={pick(language,
+        view === "income" && index === 1 ? "BPA dilué publié" : "Évolution des données publiées",
+        view === "income" && index === 1 ? "Published diluted EPS" : "Published data over time")}
+        periods={chronological.map(row => row.period_end.slice(0, 10))}
+        periodSources={chronological.map(row => row.source?.source_name ?? source)} series={series}
+        unit={view === "margins" ? "percent" : "money"} currency={currency} language={language} source={source} />;
+    })}
+  </div>;
+}
+
 function Financials({
   snapshot,
 }: {
@@ -709,6 +692,8 @@ function Financials({
     useState<ResultsSubview>("overview");
   const [statementView, setStatementView] =
     useState<StatementView>("income");
+  const [mode, chooseMode] = useFocusMode("anatole.focus.financials.view.v2", ["table", "cards", "charts"]);
+  const [overviewMode, chooseOverviewMode] = useFocusMode("anatole.focus.overview.view.v2", ["table", "cards", "charts"]);
 
   const currency =
     snapshot.financial_currency ??
@@ -718,6 +703,7 @@ function Financials({
   const h = snapshot.highlights;
   const annual = snapshot.annual_financials;
   const quarterly = snapshot.quarterly_financials;
+  const annualChronological = [...annual].sort((a, b) => a.period_end.localeCompare(b.period_end));
 
   const resultTabs: Array<{
     key: ResultsSubview;
@@ -763,7 +749,9 @@ function Financials({
       </nav>
 
       {subview === "overview" ? (
-        <>
+        <div className={styles.modeStack} data-mode={overviewMode}>
+          <FocusViewMode mode={overviewMode} choose={chooseOverviewMode} modes={["table", "cards", "charts"]}
+            language={language} label={pick(language, "Mode de la vue d’ensemble", "Overview display mode")} />
           <section style={panelStyle}>
             <span className="eyebrow">{pick(language, "DOUZE DERNIERS MOIS", "TRAILING TWELVE MONTHS")}</span>
             <h2 style={{ margin: "4px 0 14px" }}>
@@ -806,34 +794,17 @@ function Financials({
             ]} />
           </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fit, minmax(420px, 1fr))",
-              gap: 14,
-            }}
-          >
-            <MiniTrend
-              title={pick(language, "Évolution annuelle des revenus", "Annual revenue trend")}
-              rows={annual}
-              field="total_revenue"
-              currency={currency}
-            />
-            <MiniTrend
-              title={pick(language, "Évolution annuelle du bénéfice net", "Annual net-income trend")}
-              rows={annual}
-              field="net_income"
-              currency={currency}
-            />
-            <MiniTrend
-              title={pick(language, "Évolution annuelle du flux disponible", "Annual free-cash-flow trend")}
-              rows={annual}
-              field="free_cash_flow"
-              currency={currency}
-            />
-          </div>
-        </>
+          {overviewMode === "charts" ? <FocusSeriesChart
+            title={pick(language, "Historique annuel publié", "Published annual history")}
+            periods={annualChronological.map(row => row.period_end.slice(0, 10))}
+            periodSources={annualChronological.map(row => row.source?.source_name ?? snapshot.source)}
+            series={[
+              { id: "revenue", label: pick(language, "Revenus", "Revenue"), values: annualChronological.map(row => row.total_revenue) },
+              { id: "income", label: pick(language, "Bénéfice net", "Net income"), values: annualChronological.map(row => row.net_income) },
+              { id: "fcf", label: pick(language, "Flux disponible", "Free cash flow"), values: annualChronological.map(row => row.free_cash_flow) },
+            ]} unit="money" currency={currency} language={language} source={snapshot.source} />
+            : <FinancialTable rows={annual} view="income" currency={currency} mode={overviewMode} />}
+        </div>
       ) : subview === "quarterly" || subview === "annual" ? (
         <section style={panelStyle}>
           <div
@@ -877,89 +848,18 @@ function Financials({
             </div>
           </div>
 
-          <FinancialTable
-            rows={
-              subview === "quarterly"
-                ? quarterly
-                : annual
-            }
-            view={statementView}
-            currency={currency}
-          />
+          <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]} language={language}
+            label={pick(language, "Mode d’affichage des états financiers", "Financial statements display mode")} />
+          {mode === "charts" ? <StatementCharts rows={subview === "quarterly" ? quarterly : annual}
+            view={statementView} currency={currency} language={language} source={snapshot.source} />
+            : <FinancialTable rows={subview === "quarterly" ? quarterly : annual}
+              view={statementView} currency={currency} mode={mode} />}
         </section>
       ) : subview === "estimates" ? (
-        <FocusEstimates rows={snapshot.earnings_estimates} currency={currency} language={language} partial={snapshot.status !== "available" || Boolean(snapshot.stale)} />
+        <FocusEstimates rows={snapshot.earnings_estimates} currency={currency} language={language} source={snapshot.source} partial={snapshot.status !== "available" || Boolean(snapshot.stale)} />
       ) : (
-        <>
-          <section style={panelStyle}>
-            <span className="eyebrow">{pick(language, "BÉNÉFICES PAR ACTION", "EARNINGS PER SHARE")}</span>
-            <h2 style={{ margin: "4px 0 14px" }}>
-              {pick(language, "Réel, consensus et surprise", "Actual, consensus, and surprise")}
-            </h2>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(175px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {snapshot.earnings_history.length ? (
-                snapshot.earnings_history.map((quarter) => (
-                  <div
-                    key={quarter.period}
-                    style={{
-                      padding: 14,
-                      border: "1px solid var(--border)",
-                      borderRadius: 11,
-                      background: "var(--panel)",
-                    }}
-                  >
-                    <strong>{quarter.period}</strong>
-                    <div style={{ marginTop: 9, color: "var(--text)" }}>
-                      {pick(language, "Réel", "Actual")}: {money(quarter.actual, currency)}
-                    </div>
-                    <div style={{ color: "var(--text-secondary)" }}>
-                      Consensus : {money(quarter.estimate, currency)}
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 7,
-                        color: signedColor(quarter.surprise_percent),
-                        fontWeight: 750,
-                      }}
-                    >
-                      Surprise : {pct(quarter.surprise_percent)}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <span style={{ color: "var(--text-secondary)" }}>N/D</span>
-              )}
-            </div>
-          </section>
-
-          <Group title={pick(language, "Prochaines dates", "Upcoming dates")}>
-            <Metric
-              label={pick(language, "Publication des résultats", "Earnings release")}
-              value={
-                snapshot.events.earnings_dates.length
-                  ? snapshot.events.earnings_dates
-                      .map(date)
-                      .join(" — ")
-                  : "N/D"
-              }
-            />
-            <Metric
-              label={pick(language, "Date ex-dividende", "Ex-dividend date")}
-              value={date(snapshot.events.ex_dividend_date)}
-            />
-            <Metric
-              label={pick(language, "Versement du dividende", "Dividend payment")}
-              value={date(snapshot.events.dividend_date)}
-            />
-          </Group>
-        </>
+        <FocusEarnings history={snapshot.earnings_history} events={snapshot.events}
+          currency={currency} language={language} source={snapshot.source} />
       )}
     </div>
   );
@@ -985,6 +885,17 @@ function AnalystsView({
     (sum, [, value]) => sum + (value ?? 0),
     0,
   );
+  const [mode, chooseMode] = useFocusMode("anatole.focus.analysts.view.v2", ["table", "cards", "charts"]);
+  const targets = [
+    [pick(language, "Cours observé", "Current price"), a.current_price],
+    [pick(language, "Objectif bas", "Low target"), a.target_low],
+    [pick(language, "Objectif médian", "Median target"), a.target_median],
+    [pick(language, "Objectif moyen", "Average target"), a.target_mean],
+    [pick(language, "Objectif élevé", "High target"), a.target_high],
+  ] as const;
+  const targetValues = targets.map(([, value]) => value).filter((value): value is number => value !== null && Number.isFinite(value));
+  const targetMin = Math.min(...targetValues);
+  const targetSpan = Math.max(...targetValues) - targetMin || 1;
 
   if (!Object.entries(a).some(([key, value]) => key !== "current_price" && value !== null)) {
     return <section style={panelStyle} role="status">{pick(language,
@@ -994,6 +905,8 @@ function AnalystsView({
 
   return (
     <div className={styles.analystsStack}>
+      <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
+        language={language} label={pick(language, "Mode du consensus analystes", "Analyst consensus display mode")} />
       <section className={styles.analystsHero}>
         <div>
           <span className="eyebrow">{pick(language, "CONSENSUS ANALYSTES", "ANALYST CONSENSUS")}</span>
@@ -1018,15 +931,32 @@ function AnalystsView({
         </div>
       </section>
 
-      <Group title={pick(language, "Objectifs de cours", "Price targets")} items={[
+      {mode === "charts" ? <section className={styles.group}>
+        <h2>{pick(language, "Répartition des recommandations", "Recommendation distribution")}</h2>
+        {total > 0 ? <div className={styles.stackedDistribution} role="img" aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}>
+          {distribution.map(([label, value, direction]) => <span key={label} data-tone={direction}
+            style={{ width: `${((value ?? 0) / total) * 100}%` }} title={`${label}: ${value ?? "N/D"}`} />)}
+        </div> : <p>{pick(language, "Répartition indisponible.", "Distribution unavailable.")}</p>}
+        <div className={styles.distributionLegend}>{distribution.map(([label, value]) => <span key={label}>{label}: {value ?? "N/D"}</span>)}</div>
+        <h2>{pick(language, "Fourchette des objectifs", "Price target range")}</h2>
+        {targetValues.length > 1 ? <div className={styles.targetRange} role="img" aria-label={targets.map(([label, value]) => `${label}: ${money(value, currency)}`).join(", ")}>
+          {targets.map(([label, value]) => value === null ? null : <span key={label} className={styles.targetMarker}
+            style={{ left: `${((value - targetMin) / targetSpan) * 100}%` }} title={`${label}: ${money(value, currency)}`} />)}
+        </div> : <p>{pick(language, "Fourchette insuffisante.", "Insufficient target range.")}</p>}
+      </section> : null}
+      {mode === "table" ? <section className={styles.group}><h2>{pick(language, "Données exactes du consensus", "Exact consensus data")}</h2>
+        <div className={styles.analystsTableWrap}><table className={styles.analystsTable}><thead><tr><th scope="col">{pick(language, "Indicateur", "Metric")}</th><th scope="col">{pick(language, "Valeur", "Value")}</th></tr></thead><tbody>
+          {targets.map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{money(value, currency)}</td></tr>)}
+          {distribution.map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{value ?? "N/D"}</td></tr>)}
+        </tbody></table></div></section> : <Group title={pick(language, "Objectifs de cours", "Price targets")} items={[
         { label: pick(language, "Cours observé", "Current price"), value: money(a.current_price, currency) },
         { label: pick(language, "Objectif bas", "Low target"), value: money(a.target_low, currency) },
         { label: pick(language, "Objectif moyen", "Average target"), value: money(a.target_mean, currency) },
         { label: pick(language, "Objectif médian", "Median target"), value: money(a.target_median, currency) },
         { label: pick(language, "Objectif élevé", "High target"), value: money(a.target_high, currency) },
-      ]} />
+      ]} />}
 
-      <section className={styles.group}>
+      {mode === "cards" ? <section className={styles.group}>
         <h2>
           {pick(language, "Répartition des recommandations", "Recommendation distribution")}
         </h2>
@@ -1047,7 +977,7 @@ function AnalystsView({
             );
           })}
         </div>
-      </section>
+      </section> : null}
     </div>
   );
 }

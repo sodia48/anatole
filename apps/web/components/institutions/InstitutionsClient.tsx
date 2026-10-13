@@ -10,7 +10,7 @@ import {
   Info,
   RefreshCw,
   Search,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   type FormEvent,
   useCallback,

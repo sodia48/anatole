@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check } from "@/components/layout/AppIcons";
 
 import { pick } from "@/lib/i18n";
 import type { AnatoleLanguage, AnatoleTheme } from "@/lib/preferences";

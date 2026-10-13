@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/layout/AppIcons";
 import type { Quote } from "@/lib/types";
 
 const price = new Intl.NumberFormat("fr-CA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

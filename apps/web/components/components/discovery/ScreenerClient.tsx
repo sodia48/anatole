@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Filter, Search, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Filter, Search, Sparkles } from "@/components/layout/AppIcons";
 import { getScreenerSnapshot } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import type { ScreenerRow, ScreenerSnapshot } from "@/lib/types";

@@ -10,7 +10,7 @@ import {
   Search,
   Trash2,
   Upload,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import {
   useEffect,
   useLayoutEffect,

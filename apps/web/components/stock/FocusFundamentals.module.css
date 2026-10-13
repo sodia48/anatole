@@ -58,10 +58,43 @@
 .financialTable thead th { padding: 10px 11px; }
 .financialTable th:first-child { text-align: left; }
 .financialTable tbody th { font-weight: 750; }
+.periodSource { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 10px; font-weight: 400; }
 .financialTable tbody tr { border-top: 1px solid var(--border); }
 .financialTable td[data-tone="positive"] { color: var(--positive-text); }
 .financialTable td[data-tone="negative"] { color: var(--negative-text); }
 .financialTable .tableEmpty { padding: 28px; color: var(--text-secondary); text-align: left; }
+.chartGrid { min-width: 0; display: grid; gap: 12px; margin-top: 14px; }
+.modeStack { display: grid; min-width: 0; gap: 14px; }
+.fundamentalsGrid[data-mode="table"] { grid-template-columns: minmax(0, 1fr); }
+.fundamentalsGrid[data-mode="table"] .groupGrid,
+.modeStack[data-mode="table"] .groupGrid,
+.modeStack[data-mode="table"] .dashboardMetrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.fundamentalsGrid[data-mode="table"] .metric,
+.modeStack[data-mode="table"] .metric { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 3px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.fundamentalsGrid[data-mode="table"] .metric strong,
+.modeStack[data-mode="table"] .metric strong { text-align: right; font-size: 13px; }
+.stackedDistribution { display: flex; overflow: hidden; height: 24px; border-radius: 7px; background: var(--surface-raised); }
+.stackedDistribution span { min-width: 0; background: var(--text-secondary); }
+.stackedDistribution span[data-tone="positive"] { background: var(--positive-text); }
+.stackedDistribution span[data-tone="negative"] { background: var(--negative-text); }
+.stackedDistribution span:nth-child(2), .stackedDistribution span:nth-child(5) { opacity: .65; }
+.distributionLegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 22px; color: var(--text-secondary); font-size: 11px; }
+.targetRange { position: relative; height: 16px; margin: 26px 9px 18px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-raised), var(--interactive), var(--surface-raised)); }
+.targetMarker { position: absolute; top: -6px; width: 3px; height: 28px; background: var(--text); transform: translateX(-50%); }
+.analystsTableWrap { max-width: 100%; overflow-x: auto; }
+.analystsTable { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.analystsTable th, .analystsTable td { padding: 9px; border-bottom: 1px solid var(--border); }
+.analystsTable td { text-align: right; }
+.financialTableWrap[data-mode="cards"] { overflow: visible; margin-top: 14px; }
+.financialTableWrap[data-mode="cards"] .financialTable { display: block; min-width: 0; }
+.financialTableWrap[data-mode="cards"] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.financialTableWrap[data-mode="cards"] tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.financialTableWrap[data-mode="cards"] tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.financialTableWrap[data-mode="cards"] tbody th { grid-column: 1 / -1; padding: 0 0 9px; border-bottom: 1px solid var(--border); font-size: 17px; }
+.financialTableWrap[data-mode="cards"] tbody td { min-width: 0; display: grid; gap: 4px; padding: 8px 0; white-space: normal; overflow-wrap: anywhere; font-size: 12px; font-weight: 750; }
+.financialTableWrap[data-mode="cards"] tbody td::before { content: attr(data-label); color: var(--text-secondary); font-size: 10px; font-weight: 400; }
+@media (max-width: 700px) { .financialTableWrap[data-mode="cards"] tbody { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .fundamentalsGrid[data-mode="table"] .groupGrid, .modeStack[data-mode="table"] .groupGrid, .modeStack[data-mode="table"] .dashboardMetrics { grid-template-columns: minmax(0, 1fr); } }
 .metric { min-height: 78px; display: grid; align-content: center; gap: 7px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--panel); }
 .metric span { color: var(--text-secondary); font-size: 11px; }
 .metric strong { color: var(--text); font-size: 18px; }

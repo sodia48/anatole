@@ -9,7 +9,7 @@ import {
   Server,
   TriangleAlert,
   Zap,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";

@@ -1,6 +1,6 @@
 "use client";
 
-import { GitBranch, ListTree, Network, RefreshCw, ShieldCheck } from "lucide-react";
+import { GitBranch, ListTree, Network, RefreshCw, ShieldCheck } from "@/components/layout/AppIcons";
 import { useEffect, useRef, useState } from "react";
 
 import { getCompanyNetwork } from "@/lib/api";

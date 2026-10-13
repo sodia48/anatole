@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Star } from "lucide-react";
+import { Plus, Star } from "@/components/layout/AppIcons";
 import { getWatchlistSnapshot } from "@/lib/api";
 import type { WatchlistSnapshot } from "@/lib/types";
 import { normalizeWatchlistSymbol, readWatchlist, writeWatchlist, WATCHLIST_EVENT } from "@/lib/watchlist";

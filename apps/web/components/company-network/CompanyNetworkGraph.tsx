@@ -1,6 +1,6 @@
 "use client";
 
-import { Focus, Maximize2, Minus, Plus, RotateCcw } from "lucide-react";
+import { Focus, Maximize2, Minus, Plus, RotateCcw } from "@/components/layout/AppIcons";
 import Link from "next/link";
 import { useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 

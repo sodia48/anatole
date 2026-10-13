@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, CircleDollarSign, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, CircleDollarSign, Search } from "@/components/layout/AppIcons";
 import { getEtfDirectory } from "@/lib/api";
 import { REFRESH_INTERVALS } from "@/lib/refresh";
 import type { EtfDirectorySnapshot } from "@/lib/types";

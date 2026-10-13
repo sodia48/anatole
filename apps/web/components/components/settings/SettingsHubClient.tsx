@@ -9,7 +9,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   UserRound,
-} from "lucide-react";
+} from "@/components/layout/AppIcons";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ChevronRight, UserRound } from "lucide-react";
+import { Building2, ChevronRight, UserRound } from "@/components/layout/AppIcons";
 import { useRouter } from "next/navigation";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";

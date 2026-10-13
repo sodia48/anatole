@@ -1,0 +1,5 @@
+.switch { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.switch button { min-height: 42px; padding: 8px 14px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--interactive); color: var(--on-primary); }
+.switch button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+@media (max-width: 700px) { .switch { width: 100%; } .switch button { flex: 1; } }

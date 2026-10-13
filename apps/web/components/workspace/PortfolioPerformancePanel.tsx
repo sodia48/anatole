@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { RefreshCw } from "@/components/layout/AppIcons";
 import { useRef, useState } from "react";
 
 import { getPortfolioPerformance } from "@/lib/api";

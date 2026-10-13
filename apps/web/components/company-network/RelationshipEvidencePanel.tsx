@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, ShieldCheck } from "lucide-react";
+import { ExternalLink, ShieldCheck } from "@/components/layout/AppIcons";
 
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { CompanyNetworkSnapshot, CompanyRelationship } from "@/lib/types";

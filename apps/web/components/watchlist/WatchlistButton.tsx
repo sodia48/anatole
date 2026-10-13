@@ -1,6 +1,6 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { Star } from "@/components/layout/AppIcons";
 import { useEffect, useState } from "react";
 import { normalizeWatchlistSymbol, readWatchlist, toggleWatchlistTicker, WATCHLIST_EVENT } from "@/lib/watchlist";
 

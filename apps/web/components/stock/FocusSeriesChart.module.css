@@ -1,0 +1,25 @@
+.chart { min-width: 0; display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 13px; background: var(--panel); }
+.header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.header h3 { margin: 0 0 3px; font-size: 15px; }
+.header small, .source { color: var(--text-secondary); font-size: 11px; }
+.header button, .legend button { min-height: 36px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); cursor: pointer; font: inherit; font-size: 11px; }
+.header button:focus-visible, .legend button:focus-visible, .data summary:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; }
+.legend button { border-left: 4px solid var(--series-color); }
+.legend button[aria-pressed="false"] { opacity: .55; }
+.plotWrap { max-width: 100%; overflow-x: auto; }
+.plot { display: block; width: 100%; min-width: 460px; height: auto; overflow: visible; }
+.gridLine { stroke: var(--border); stroke-width: 1; }
+.zeroLine { stroke: var(--text-secondary); stroke-width: 1.5; }
+.axisText { fill: var(--text-secondary); font-size: 9px; }
+.line, .range { fill: none; stroke: currentColor; stroke-width: 2.5; }
+.range { stroke-width: 5; opacity: .5; }
+.point { fill: var(--panel); stroke: currentColor; stroke-width: 3; cursor: help; }
+.point:focus-visible { outline: 3px solid var(--interactive); }
+.empty { margin: 0; color: var(--text-secondary); font-size: 12px; }
+.data summary { cursor: pointer; color: var(--interactive); font-size: 11px; }
+.dataScroll { max-width: 100%; overflow-x: auto; }
+.data table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.data th, .data td { padding: 8px; border-bottom: 1px solid var(--border); text-align: right; }
+.data th:first-child { text-align: left; }
+@media (max-width: 700px) { .chart { padding: 12px; } .plot { min-width: 0; } }
