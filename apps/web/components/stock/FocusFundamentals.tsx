@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import styles from "./FocusFundamentals.module.css";
@@ -398,6 +399,7 @@ function Valuation({
   const { preferences } = usePreferences();
   const language = preferences.language;
   const m = snapshot.metrics;
+  const [mode, chooseMode] = useFocusMode("anatole.focus.valuation.view.v3", ["table", "cards", "charts"]);
   const currency =
     snapshot.financial_currency ??
     snapshot.currency ??
@@ -434,7 +436,21 @@ function Valuation({
     );
   }
 
-  return <Group title={pick(language, "Valorisation", "Valuation")} items={[
+  return <div className={styles.modeStack}>
+    <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
+      language={language} label={pick(language, "Mode de la valorisation", "Valuation display mode")} />
+    {mode === "charts" ? <FocusSeriesChart storageKey="valuation.ratios" title={pick(language,
+      "Multiples disponibles à la date du cliché", "Available multiples at snapshot date")}
+      periods={[snapshot.generated_at.slice(0, 10)]} source={snapshot.source} language={language} unit="number" kind="bar"
+      series={[
+        { id: "trailing_pe", label: pick(language, "C/B historique", "Trailing P/E"), values: [m.trailing_pe] },
+        { id: "forward_pe", label: pick(language, "C/B anticipé", "Forward P/E"), values: [m.forward_pe] },
+        { id: "price_to_book", label: pick(language, "Cours / valeur comptable", "Price / book"), values: [m.price_to_book] },
+        { id: "price_to_sales", label: pick(language, "Cours / ventes", "Price / sales"), values: [m.price_to_sales] },
+        { id: "enterprise_to_revenue", label: pick(language, "VE / Revenus", "EV / revenue"), values: [m.enterprise_to_revenue] },
+        { id: "enterprise_to_ebitda", label: pick(language, "VE / BAIIA", "EV / EBITDA"), values: [m.enterprise_to_ebitda] },
+      ]} /> : null}
+    <Group title={pick(language, "Valorisation", "Valuation")} items={[
     { label: pick(language, "Capitalisation", "Market capitalization"), value: compact(m.market_cap, currency) },
     { label: pick(language, "Valeur d’entreprise", "Enterprise value"), value: compact(m.enterprise_value, currency) },
     { label: pick(language, "C/B historique", "Trailing P/E"), value: n(m.trailing_pe) },
@@ -444,7 +460,8 @@ function Valuation({
     { label: pick(language, "VE / Revenus", "EV / Revenue"), value: n(m.enterprise_to_revenue) },
     { label: pick(language, "VE / BAIIA", "EV / EBITDA"), value: n(m.enterprise_to_ebitda) },
     { label: pick(language, "BPA historique", "Trailing EPS"), value: money(m.trailing_eps, currency) },
-  ]} />;
+  ]} />
+  </div>;
 }
 
 function Fundamentals({
@@ -466,13 +483,16 @@ function Fundamentals({
     <div className={styles.modeStack}>
       <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
         language={language} label={pick(language, "Mode de la synthèse", "Summary display mode")} />
-      {mode === "charts" ? <FocusSeriesChart title={pick(language, "Croissance et rentabilité publiées", "Published growth and profitability")}
+      {mode === "charts" ? <FocusSeriesChart storageKey="summary" title={pick(language, "Croissance et rentabilité publiées", "Published growth and profitability")}
         periods={annual.map(row => row.period_end.slice(0, 10))}
-        periodSources={annual.map(row => row.source?.source_name ?? snapshot.source)}
+        periodCurrencies={annual.map(row => row.currency ?? currency)}
+        periodSources={annual.map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)}
         series={[
           { id: "revenue", label: pick(language, "Revenus", "Revenue"), values: annual.map(row => row.total_revenue) },
           { id: "ebitda", label: pick(language, "BAIIA", "EBITDA"), values: annual.map(row => row.ebitda) },
+          { id: "operating", label: pick(language, "Résultat opérationnel", "Operating income"), values: annual.map(row => row.operating_income) },
           { id: "income", label: pick(language, "Bénéfice net", "Net income"), values: annual.map(row => row.net_income) },
+          { id: "fcf", label: pick(language, "Flux disponible", "Free cash flow"), values: annual.map(row => row.free_cash_flow) },
         ]} unit="money" currency={currency} language={language} source={snapshot.source} /> : null}
     <div className={styles.fundamentalsGrid} data-mode={mode}>
 
@@ -639,9 +659,9 @@ function FinancialTable({
   );
 }
 
-function StatementCharts({ rows, view, currency, language, source }: {
+function StatementCharts({ rows, view, frequency, currency, language, source }: {
   rows: FinancialPeriod[]; view: StatementView; currency: string;
-  language: "fr" | "en"; source: string;
+  language: "fr" | "en"; source: string; frequency: "annual" | "quarterly";
 }) {
   type SeriesField = { key: keyof FinancialPeriod; fr: string; en: string };
   const moneyGroups: SeriesField[][] = view === "income" ? [[
@@ -671,12 +691,13 @@ function StatementCharts({ rows, view, currency, language, source }: {
     {moneyGroups.map((group, index) => {
       const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: pick(language, field.fr, field.en),
         values: chronological.map(row => row[field.key] as number | null) }));
-      return <FocusSeriesChart key={`${view}-${index}`} title={pick(language,
+      return <FocusSeriesChart key={`${view}-${index}`} storageKey={`statements.${frequency}.${view}.${index}`} title={pick(language,
         view === "income" && index === 1 ? "BPA dilué publié" : "Évolution des données publiées",
         view === "income" && index === 1 ? "Published diluted EPS" : "Published data over time")}
         periods={chronological.map(row => row.period_end.slice(0, 10))}
-        periodSources={chronological.map(row => row.source?.source_name ?? source)} series={series}
-        unit={view === "margins" ? "percent" : "money"} currency={currency} language={language} source={source} />;
+        periodCurrencies={chronological.map(row => row.currency ?? currency)}
+        periodSources={chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`)} series={series}
+        unit={view === "margins" ? "percent" : view === "income" && index === 1 ? "per_share" : "money"} currency={currency} language={language} source={source} />;
     })}
   </div>;
 }
@@ -794,12 +815,15 @@ function Financials({
             ]} />
           </div>
 
-          {overviewMode === "charts" ? <FocusSeriesChart
+          {overviewMode === "charts" ? <FocusSeriesChart storageKey="overview"
             title={pick(language, "Historique annuel publié", "Published annual history")}
             periods={annualChronological.map(row => row.period_end.slice(0, 10))}
-            periodSources={annualChronological.map(row => row.source?.source_name ?? snapshot.source)}
+            periodCurrencies={annualChronological.map(row => row.currency ?? currency)}
+            periodSources={annualChronological.map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)}
             series={[
               { id: "revenue", label: pick(language, "Revenus", "Revenue"), values: annualChronological.map(row => row.total_revenue) },
+              { id: "ebitda", label: pick(language, "BAIIA", "EBITDA"), values: annualChronological.map(row => row.ebitda) },
+              { id: "operating", label: pick(language, "Résultat opérationnel", "Operating income"), values: annualChronological.map(row => row.operating_income) },
               { id: "income", label: pick(language, "Bénéfice net", "Net income"), values: annualChronological.map(row => row.net_income) },
               { id: "fcf", label: pick(language, "Flux disponible", "Free cash flow"), values: annualChronological.map(row => row.free_cash_flow) },
             ]} unit="money" currency={currency} language={language} source={snapshot.source} />
@@ -851,7 +875,8 @@ function Financials({
           <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]} language={language}
             label={pick(language, "Mode d’affichage des états financiers", "Financial statements display mode")} />
           {mode === "charts" ? <StatementCharts rows={subview === "quarterly" ? quarterly : annual}
-            view={statementView} currency={currency} language={language} source={snapshot.source} />
+            view={statementView} frequency={subview === "quarterly" ? "quarterly" : "annual"}
+            currency={currency} language={language} source={snapshot.source} />
             : <FinancialTable rows={subview === "quarterly" ? quarterly : annual}
               view={statementView} currency={currency} mode={mode} />}
         </section>
@@ -863,6 +888,41 @@ function Financials({
       )}
     </div>
   );
+}
+
+type DistributionType = "bar" | "pie" | "donut";
+const distributionKey = "anatole.focus.analysts.distribution.v3";
+const distributionEvent = "anatole-focus-analyst-distribution";
+let currentDistributionType: DistributionType | null = null;
+function readDistributionType(): DistributionType {
+  if (currentDistributionType) return currentDistributionType;
+  try {
+    const saved = window.localStorage.getItem(distributionKey);
+    if (saved === "bar" || saved === "pie" || saved === "donut") return saved;
+  } catch { /* Preferences remain usable when storage is blocked. */ }
+  return "bar";
+}
+function subscribeDistribution(notify: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== distributionKey) return;
+    currentDistributionType = event.newValue === "pie" || event.newValue === "donut" ? event.newValue : "bar";
+    notify();
+  };
+  window.addEventListener(distributionEvent, notify);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(distributionEvent, notify);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+function useDistributionType() {
+  const type = useSyncExternalStore(subscribeDistribution, readDistributionType, () => "bar");
+  const choose = (value: DistributionType) => {
+    currentDistributionType = value;
+    try { window.localStorage.setItem(distributionKey, value); } catch { /* Optional persistence. */ }
+    window.dispatchEvent(new Event(distributionEvent));
+  };
+  return [type, choose] as const;
 }
 
 function AnalystsView({
@@ -886,6 +946,16 @@ function AnalystsView({
     0,
   );
   const [mode, chooseMode] = useFocusMode("anatole.focus.analysts.view.v2", ["table", "cards", "charts"]);
+  const [distributionType, setDistributionType] = useDistributionType();
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const validComposition = total > 0 && distribution.every(([, value]) => value !== null && Number.isFinite(value) && value >= 0);
+  const distributionColors = ["#16847a", "#3a9fff", "#a38d49", "#d3844b", "#c7596d"];
+  let cumulative = 0;
+  const slices = distribution.map(([, value], index) => {
+    const start = cumulative;
+    cumulative += validComposition ? (value as number) / total * 100 : 0;
+    return `${distributionColors[index]} ${start}% ${cumulative}%`;
+  }).join(", ");
   const targets = [
     [pick(language, "Cours observé", "Current price"), a.current_price],
     [pick(language, "Objectif bas", "Low target"), a.target_low],
@@ -933,11 +1003,28 @@ function AnalystsView({
 
       {mode === "charts" ? <section className={styles.group}>
         <h2>{pick(language, "Répartition des recommandations", "Recommendation distribution")}</h2>
-        {total > 0 ? <div className={styles.stackedDistribution} role="img" aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}>
+        <div className={styles.chartType} role="group" aria-label={pick(language, "Type de graphique", "Chart type")}>
+          {(["bar", "pie", "donut"] as const).map(type => <button type="button" key={type}
+            aria-pressed={distributionType === type} disabled={type !== "bar" && !validComposition}
+            onClick={() => setDistributionType(type)}>{type === "bar" ? pick(language, "Barres", "Bars")
+              : type === "pie" ? pick(language, "Secteurs", "Pie") : pick(language, "Anneau", "Donut")}</button>)}
+        </div>
+        {!validComposition ? <p>{pick(language,
+          "Secteurs et anneau indisponibles : catégories incomplètes, négatives ou total nul.",
+          "Pie and donut unavailable: incomplete or negative categories, or zero total.")}</p> : null}
+        {distributionType === "bar" || !validComposition ? total > 0 ? <div className={styles.stackedDistribution} role="img"
+          aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}>
           {distribution.map(([label, value, direction]) => <span key={label} data-tone={direction}
             style={{ width: `${((value ?? 0) / total) * 100}%` }} title={`${label}: ${value ?? "N/D"}`} />)}
-        </div> : <p>{pick(language, "Répartition indisponible.", "Distribution unavailable.")}</p>}
-        <div className={styles.distributionLegend}>{distribution.map(([label, value]) => <span key={label}>{label}: {value ?? "N/D"}</span>)}</div>
+        </div> : <p>{pick(language, "Répartition indisponible.", "Distribution unavailable.")}</p>
+          : <div className={styles.composition} data-kind={distributionType} role="img"
+            aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}
+            style={{ background: `conic-gradient(${slices})` }} />}
+        <div className={styles.distributionLegend}>{distribution.map(([label, value], index) => <button type="button" key={label}
+          aria-pressed={highlighted === label} onClick={() => setHighlighted(highlighted === label ? null : label)}
+          style={{ borderLeft: `4px solid ${distributionColors[index]}` }}>{label}: {value ?? "N/D"}</button>)}</div>
+        {highlighted ? <p role="status">{highlighted}: {distribution.find(([label]) => label === highlighted)?.[1] ?? "N/D"}
+          {validComposition ? ` · ${(((distribution.find(([label]) => label === highlighted)?.[1] ?? 0) / total) * 100).toFixed(1)} %` : ""}</p> : null}
         <h2>{pick(language, "Fourchette des objectifs", "Price target range")}</h2>
         {targetValues.length > 1 ? <div className={styles.targetRange} role="img" aria-label={targets.map(([label, value]) => `${label}: ${money(value, currency)}`).join(", ")}>
           {targets.map(([label, value]) => value === null ? null : <span key={label} className={styles.targetMarker}

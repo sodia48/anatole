@@ -31,11 +31,11 @@ export function FocusEarnings({ history, events, currency, language, source }: {
         label={pick(language, "Mode d’affichage du BPA", "EPS display mode")} />
     </header>
       {mode === "charts" ? <div className={styles.charts} data-testid="earnings-chart-view">
-        <FocusSeriesChart title={pick(language, "BPA réel et consensus publié", "Published actual EPS and consensus")}
-          periods={ordered.map(row => row.period)} source={source} language={language} currency={currency} unit="money" kind="bar"
-          series={[{ id: "actual", label: pick(language, "Réel", "Actual"), values: ordered.map(row => row.actual) },
-            { id: "estimate", label: pick(language, "Consensus", "Consensus"), values: ordered.map(row => row.estimate) }]} />
-        <FocusSeriesChart title={pick(language, "Surprise de BPA publiée", "Published EPS surprise")}
+        <FocusSeriesChart storageKey="earnings.eps" title={pick(language, "BPA réel et consensus publié", "Published actual EPS and consensus")}
+          periods={ordered.map(row => row.period)} source={source} language={language} currency={currency} unit="per_share" kind="bar"
+          series={[{ id: "actual", label: pick(language, "Réel", "Actual"), values: ordered.map(row => row.actual), nature: "published" },
+            { id: "estimate", label: pick(language, "Consensus", "Consensus"), values: ordered.map(row => row.estimate), nature: "estimate" }]} />
+        <FocusSeriesChart storageKey="earnings.surprise" title={pick(language, "Surprise de BPA publiée", "Published EPS surprise")}
           periods={ordered.map(row => row.period)} source={source} language={language} unit="percent" kind="bar"
           series={[{ id: "surprise", label: pick(language, "Surprise", "Surprise"), values: ordered.map(row => row.surprise_percent) }]} />
       </div> : <div className={styles.tableWrap} data-mode={mode} data-testid={mode === "table" ? "earnings-table-view" : "earnings-card-view"}>

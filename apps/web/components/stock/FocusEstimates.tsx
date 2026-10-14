@@ -96,7 +96,7 @@ export function FocusEstimates({ rows, currency, language, partial, source }: {
   rows: EarningsEstimate[]; currency: string; language: Language; partial: boolean; source?: string;
 }) {
   const [mode, choose] = useFocusMode(preferenceKey, ["table", "cards", "charts"]);
-  const [chartMetric, setChartMetric] = useState<"eps" | "revenue" | "eps_growth" | "revenue_growth">("eps");
+  const [chartMetric, setChartMetric] = useState<"both" | "eps" | "revenue" | "eps_growth" | "revenue_growth">("both");
   const quarter = rows.find(row => row.period === "+1q");
   const year = rows.find(row => row.period === "0y");
   const spread = dispersion(quarter);
@@ -142,28 +142,32 @@ export function FocusEstimates({ rows, currency, language, partial, source }: {
     {partial ? <p className={styles.partial} role="status">{pick(language, "Données partielles ou anciennes : N/D si absent.", "Partial or stale data: N/D when absent.")}</p> : null}
     {mode === "charts" ? <div className={styles.charts} data-testid="estimates-chart-view">
       <div className={styles.metrics} role="group" aria-label={pick(language, "Indicateur prévu", "Forecast metric")}>
-        {(["eps", "revenue", "eps_growth", "revenue_growth"] as const).map((key, index) =>
+        {(["both", "eps", "revenue", "eps_growth", "revenue_growth"] as const).map((key, index) =>
           <button type="button" key={key} aria-pressed={chartMetric === key} onClick={() => setChartMetric(key)}>
-            {pick(language, ["BPA moyen", "Revenus moyens", "Croissance BPA", "Croissance revenus"][index],
-              ["Average EPS", "Average revenue", "EPS growth", "Revenue growth"][index])}
+            {pick(language, ["BPA et revenus", "BPA moyen", "Revenus moyens", "Croissance BPA", "Croissance revenus"][index],
+              ["EPS and revenue", "Average EPS", "Average revenue", "EPS growth", "Revenue growth"][index])}
           </button>)}
       </div>
-      {(["q", "y"] as const).map(kind => {
+      {(["q", "y"] as const).flatMap(kind => {
         const group = rows.filter(row => row.period.endsWith(kind)).sort((a, b) =>
           (a.end_date ?? "").localeCompare(b.end_date ?? ""));
-        const key = chartMetric === "eps" ? "eps_average" : chartMetric === "revenue" ? "revenue_average" : chartMetric;
-        return <FocusSeriesChart key={kind} title={pick(language,
-          kind === "q" ? "Prévisions trimestrielles" : "Prévisions annuelles",
-          kind === "q" ? "Quarterly forecasts" : "Annual forecasts")}
-          periods={group.map(row => `${row.period} · ${row.end_date ?? "N/D"}`)}
-          periodSources={group.map(() => source ?? null)}
-          series={[{ id: chartMetric, label: pick(language,
-            chartMetric.startsWith("eps") ? "BPA prévu" : "Revenus prévus",
-            chartMetric.startsWith("eps") ? "Forecast EPS" : "Forecast revenue"),
-            values: group.map(row => row[key]),
-            lows: chartMetric === "eps" ? group.map(row => row.eps_low) : chartMetric === "revenue" ? group.map(row => row.revenue_low) : undefined,
-            highs: chartMetric === "eps" ? group.map(row => row.eps_high) : chartMetric === "revenue" ? group.map(row => row.revenue_high) : undefined }]}
-          unit={chartMetric.includes("growth") ? "percent" : "money"} currency={currency} language={language} source={source} forecast />;
+        const metrics = chartMetric === "both" ? ["eps", "revenue"] as const : [chartMetric];
+        return metrics.map(metric => {
+          const key = metric === "eps" ? "eps_average" : metric === "revenue" ? "revenue_average" : metric;
+          return <FocusSeriesChart key={`${kind}-${metric}`} storageKey={`estimates.${kind}.${metric}`} title={pick(language,
+            `${kind === "q" ? "Prévisions trimestrielles" : "Prévisions annuelles"} · ${metric.startsWith("eps") ? "BPA" : "Revenus"}`,
+            `${kind === "q" ? "Quarterly forecasts" : "Annual forecasts"} · ${metric.startsWith("eps") ? "EPS" : "Revenue"}`)}
+            periods={group.map(row => `${row.period} · ${row.end_date ?? "N/D"}`)}
+            periodSources={group.map(() => source ?? null)}
+            series={[{ id: metric, label: pick(language,
+              metric.startsWith("eps") ? "BPA prévu" : "Revenus prévus",
+              metric.startsWith("eps") ? "Forecast EPS" : "Forecast revenue"),
+              values: group.map(row => row[key]),
+              lows: metric === "eps" ? group.map(row => row.eps_low) : metric === "revenue" ? group.map(row => row.revenue_low) : undefined,
+              highs: metric === "eps" ? group.map(row => row.eps_high) : metric === "revenue" ? group.map(row => row.revenue_high) : undefined }]}
+            unit={metric.includes("growth") ? "percent" : metric === "eps" ? "per_share" : "money"}
+            currency={currency} language={language} source={source} forecast />;
+        });
       })}
     </div> : <div className={styles.tableWrap} data-mode={mode} data-testid={mode === "table" ? "estimates-table-view" : "estimates-card-view"}>
       <table className={styles.table}><caption className={styles.srOnly}>{pick(language, "Estimations financières par période", "Financial estimates by period")}</caption>

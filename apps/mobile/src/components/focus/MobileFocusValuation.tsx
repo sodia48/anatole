@@ -6,6 +6,10 @@ import { spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { moneyOrNd, valueOrNd } from "./format";
+import { MobileFocusSeries } from "./MobileFocusSeries";
+import { MobileFocusViewMode, useMobileFocusMode } from "./MobileFocusViewMode";
+
+const modes = ["table", "cards", "charts"] as const;
 
 type Metric = {
   key:
@@ -58,6 +62,7 @@ export function MobileFocusValuation({
 }) {
   useMobileTheme();
   const { language, pick } = useLocale();
+  const [mode, chooseMode] = useMobileFocusMode("anatole.focus.mobile.valuation.view.v3", modes);
   const currency = snapshot?.financial_currency ?? snapshot?.currency ?? "CAD";
   const hasAny = Boolean(
     snapshot &&
@@ -69,6 +74,13 @@ export function MobileFocusValuation({
 
   return (
     <View style={styles.stack} testID="focus-valuation-section">
+      {snapshot && hasAny ? <MobileFocusViewMode mode={mode} choose={chooseMode} modes={modes} /> : null}
+      {snapshot && hasAny && mode === "charts" ? <MobileFocusSeries storageKey="mobile.valuation.ratios"
+        defaultShape="bar"
+        title={pick("Multiples disponibles à la date du cliché", "Available multiples at snapshot date")}
+        periods={[snapshot.generated_at.slice(0, 10)]} currency={currency} source={snapshot.source} unit="number"
+        series={metrics.filter(item => !item.format).map(item => ({ id: item.key, fr: item.fr, en: item.en,
+          values: [snapshot.metrics[item.key]] }))} /> : null}
       <Card title={pick("Valorisation", "Valuation")}>
         <QueryState
           error={!snapshot ? error : null}
