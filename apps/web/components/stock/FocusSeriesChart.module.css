@@ -2,24 +2,40 @@
 .header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .header h3 { margin: 0 0 3px; font-size: 15px; }
 .header small, .source { color: var(--text-secondary); font-size: 11px; }
-.header button, .legend button { min-height: 36px; padding: 5px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); cursor: pointer; font: inherit; font-size: 11px; }
-.header button:focus-visible, .legend button:focus-visible, .data summary:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.controls { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
+.controls label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 11px; }
+.controls select { min-height: 38px; max-width: 220px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); font: inherit; }
+.scale, .presets { display: flex; flex-wrap: wrap; gap: 5px; }
+.scale button, .presets button, .legend button { min-height: 38px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); cursor: pointer; font: inherit; font-size: 11px; }
+.scale button[aria-pressed="true"] { border-color: var(--interactive); color: var(--interactive); }
+.scale button:disabled { opacity: .5; cursor: not-allowed; }
+.explanation { color: var(--text-secondary); font-size: 11px; }
+.scale button:focus-visible, .presets button:focus-visible, .controls select:focus-visible, .legend button:focus-visible, .data summary:focus-visible, .tooltip button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .legend button { border-left: 4px solid var(--series-color); }
 .legend button[aria-pressed="false"] { opacity: .55; }
-.plotWrap { max-width: 100%; overflow-x: auto; }
+.plotWrap { position: relative; max-width: 100%; overflow-x: auto; }
 .plot { display: block; width: 100%; min-width: 460px; height: auto; overflow: visible; }
 .gridLine { stroke: var(--border); stroke-width: 1; }
 .zeroLine { stroke: var(--text-secondary); stroke-width: 1.5; }
 .axisText { fill: var(--text-secondary); font-size: 9px; }
 .line, .range { fill: none; stroke: currentColor; stroke-width: 2.5; }
+.area { fill: currentColor; fill-opacity: .14; stroke: none; transition: fill-opacity .18s ease; }
+.guide { stroke: var(--interactive); stroke-width: 1.5; stroke-dasharray: 4 3; }
 .range { stroke-width: 5; opacity: .5; }
-.point { fill: var(--panel); stroke: currentColor; stroke-width: 3; cursor: help; }
-.point:focus-visible { outline: 3px solid var(--interactive); }
+.point { fill: var(--panel); stroke: currentColor; stroke-width: 3; transition: r .18s ease; }
+.hit { fill: transparent; cursor: pointer; }
+.hit:focus-visible { stroke: var(--interactive); stroke-width: 2; outline: none; }
+.tooltip { position: absolute; z-index: 2; bottom: 30px; width: min(280px, 80%); transform: translateX(-50%); display: grid; gap: 6px; padding: 12px; border: 1px solid var(--interactive); border-radius: 10px; background: var(--panel); box-shadow: 0 10px 28px #0003; color: var(--text); font-size: 11px; pointer-events: none; }
+.tooltipHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tooltipHead button { border: 0; background: none; color: var(--text); font-size: 20px; cursor: pointer; pointer-events: auto; }
+.tooltipSeries { display: grid; gap: 2px; padding-top: 5px; border-top: 1px solid var(--border); }
+.tooltip small { color: var(--text-secondary); }
 .empty { margin: 0; color: var(--text-secondary); font-size: 12px; }
 .data summary { cursor: pointer; color: var(--interactive); font-size: 11px; }
 .dataScroll { max-width: 100%; overflow-x: auto; }
 .data table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .data th, .data td { padding: 8px; border-bottom: 1px solid var(--border); text-align: right; }
 .data th:first-child { text-align: left; }
-@media (max-width: 700px) { .chart { padding: 12px; } .plot { min-width: 0; } }
+@media (max-width: 700px) { .chart { padding: 12px; } .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .controls select { width: 100%; } .scale { grid-column: 1 / -1; } .tooltip { position: sticky; left: 0 !important; bottom: auto; width: auto; transform: none; margin: 0 5px 8px; } }
+@media (prefers-reduced-motion: reduce) { .area, .point { transition: none; } }

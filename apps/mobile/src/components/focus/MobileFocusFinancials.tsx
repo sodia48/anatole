@@ -40,16 +40,21 @@ export function MobileFocusFinancials({ snapshot, loading, error, onRetry }: { s
         <View style={styles.tableRow}><Text style={styles.tableLabel}>{pick("Date de dépôt", "Filed date")}</Text>{periods.map(row => <Text key={row.period_end} style={styles.tableCell}>{row.source?.filed_at ?? "N/D"}</Text>)}</View>
       </View></ScrollView><Text style={styles.source}>{snapshot.source}</Text>
     </Card> : null}
-    {mode === "charts" ? <><MobileFocusSeries title={pick("Évolution des résultats publiés", "Published financial history")}
+    {mode === "charts" ? <><MobileFocusSeries storageKey={`mobile.financials.${kind}.money`} title={pick("Évolution des résultats publiés", "Published financial history")}
       periods={[...periods].reverse().map(row => row.period_end)}
       series={fields.filter(field => !field.percent && field.key !== "diluted_eps").map(field => ({ id: field.key, fr: field.fr, en: field.en, values: [...periods].reverse().map(row => row[field.key] as number | null) }))}
-      currency={snapshot.financial_currency ?? snapshot.currency ?? "CAD"} source={snapshot.source}
+      currency={snapshot.financial_currency ?? snapshot.currency ?? "CAD"} currencies={[...periods].reverse().map(row => row.currency ?? snapshot.financial_currency ?? snapshot.currency ?? "CAD")} source={snapshot.source}
       sources={[...periods].reverse().map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)} />
-      <MobileFocusSeries title={pick("Marges et croissance publiées", "Published margins and growth")}
+      <MobileFocusSeries storageKey={`mobile.financials.${kind}.percent`} title={pick("Marges et croissance publiées", "Published margins and growth")}
         periods={[...periods].reverse().map(row => row.period_end)}
         series={fields.filter(field => field.percent).map(field => ({ id: field.key, fr: field.fr, en: field.en, values: [...periods].reverse().map(row => row[field.key] as number | null) }))}
-        currency={snapshot.financial_currency ?? snapshot.currency ?? "CAD"} source={snapshot.source}
+        currency={snapshot.financial_currency ?? snapshot.currency ?? "CAD"} currencies={[...periods].reverse().map(row => row.currency ?? snapshot.financial_currency ?? snapshot.currency ?? "CAD")} source={snapshot.source}
         sources={[...periods].reverse().map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)} unit="percent" />
+      <MobileFocusSeries storageKey={`mobile.financials.${kind}.eps`} title={pick("BPA dilué publié", "Published diluted EPS")}
+        periods={[...periods].reverse().map(row => row.period_end)}
+        series={[{ id: "diluted_eps", fr: "BPA dilué", en: "Diluted EPS", values: [...periods].reverse().map(row => row.diluted_eps) }]}
+        currency={snapshot.financial_currency ?? snapshot.currency ?? "CAD"} currencies={[...periods].reverse().map(row => row.currency ?? snapshot.financial_currency ?? snapshot.currency ?? "CAD")} source={snapshot.source}
+        sources={[...periods].reverse().map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)} unit="per_share" />
     </> : null}
   </> : null}</View>;
 }

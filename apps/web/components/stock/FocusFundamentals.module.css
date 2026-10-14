@@ -79,6 +79,13 @@
 .stackedDistribution span[data-tone="negative"] { background: var(--negative-text); }
 .stackedDistribution span:nth-child(2), .stackedDistribution span:nth-child(5) { opacity: .65; }
 .distributionLegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 22px; color: var(--text-secondary); font-size: 11px; }
+.distributionLegend button, .chartType button { min-height: 36px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); padding: 5px 10px; cursor: pointer; font: inherit; }
+.distributionLegend button[aria-pressed="true"], .chartType button[aria-pressed="true"] { outline: 2px solid var(--interactive); }
+.distributionLegend button:focus-visible, .chartType button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.chartType { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.chartType button:disabled { opacity: .5; cursor: not-allowed; }
+.composition { width: 160px; aspect-ratio: 1; border-radius: 50%; margin: 14px auto; border: 1px solid var(--border); }
+.composition[data-kind="donut"] { mask: radial-gradient(circle, transparent 0 42%, #000 43%); }
 .targetRange { position: relative; height: 16px; margin: 26px 9px 18px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-raised), var(--interactive), var(--surface-raised)); }
 .targetMarker { position: absolute; top: -6px; width: 3px; height: 28px; background: var(--text); transform: translateX(-50%); }
 .analystsTableWrap { max-width: 100%; overflow-x: auto; }

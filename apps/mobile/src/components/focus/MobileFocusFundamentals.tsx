@@ -39,13 +39,14 @@ export function MobileFocusFundamentals({ snapshot, loading, error, onRetry }: {
   const annual = [...(snapshot?.annual_financials ?? [])].sort((a, b) => a.period_end.localeCompare(b.period_end));
   return <View style={styles.stack} testID="focus-fundamentals-section"><QueryState error={!snapshot ? error : null} loading={loading} onRetry={onRetry} />{snapshot ? <>
     <MobileFocusViewMode mode={mode} choose={chooseMode} modes={modes} />
-    {mode === "charts" ? <MobileFocusSeries title={pick("Historique annuel publié", "Published annual history")}
+    {mode === "charts" ? <MobileFocusSeries storageKey="mobile.summary" title={pick("Historique annuel publié", "Published annual history")}
       periods={annual.map(row => row.period_end)} series={[
         { id: "revenue", fr: "Revenus", en: "Revenue", values: annual.map(row => row.total_revenue) },
         { id: "ebitda", fr: "BAIIA", en: "EBITDA", values: annual.map(row => row.ebitda) },
+        { id: "operating", fr: "Résultat opérationnel", en: "Operating income", values: annual.map(row => row.operating_income) },
         { id: "income", fr: "Bénéfice net", en: "Net income", values: annual.map(row => row.net_income) },
         { id: "fcf", fr: "Flux disponible", en: "Free cash flow", values: annual.map(row => row.free_cash_flow) },
-      ]} currency={currency} source={snapshot.source}
+      ]} currency={currency} currencies={annual.map(row => row.currency ?? currency)} source={snapshot.source}
       sources={annual.map(row => row.source?.source_name ?? snapshot.source)} /> : null}
     {groups.map((group) => <Card key={group.en} title={pick(group.fr, group.en)}>{group.items.map((item) => <View key={item.key} style={[uiStyles.row, mode === "table" && styles.tableRow]}><Text style={uiStyles.label}>{pick(item.fr, item.en)}</Text><Text style={styles.value}>{display(snapshot.metrics[item.key], item.format, currency, language)}</Text></View>)}</Card>)}
     <Card title="TTM"><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Revenus", "Revenue")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.total_revenue, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>BAIIA / EBITDA</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.ebitda, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>{pick("Bénéfice net", "Net income")}</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.net_income, snapshot.ttm.currency ?? currency, true, language)}</Text></View><View style={uiStyles.row}><Text style={uiStyles.label}>FCF</Text><Text style={styles.value}>{moneyOrNd(snapshot.ttm.free_cash_flow, snapshot.ttm.currency ?? currency, true, language)}</Text></View></Card>
