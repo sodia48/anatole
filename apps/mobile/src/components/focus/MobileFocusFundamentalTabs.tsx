@@ -4,12 +4,13 @@ import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 
-export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "financials" | "analysts";
+export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "scenarios" | "financials" | "analysts";
 
 const tabs: { id: MobileFundamentalView; fr: string; en: string }[] = [
   { id: "fundamentals", fr: "Synthèse", en: "Overview" },
   { id: "diagnostic", fr: "Diagnostic 360°", en: "Diagnostic 360°" },
   { id: "peers", fr: "Pairs", en: "Peers" },
+  { id: "scenarios", fr: "Scénarios", en: "Scenarios" },
   { id: "financials", fr: "Résultats", en: "Financials" },
   { id: "analysts", fr: "Analystes", en: "Analysts" },
 ];
