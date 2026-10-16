@@ -4,6 +4,7 @@ import { MobileFocusAnalysts } from "./MobileFocusAnalysts";
 import { MobileFocusFinancials } from "./MobileFocusFinancials";
 import { MobileFocusDiagnostic } from "./MobileFocusDiagnostic";
 import { MobileFocusPeers } from "./MobileFocusPeers";
+import { MobileFocusScenarios } from "./MobileFocusScenarios";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
@@ -13,6 +14,7 @@ import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
 import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
 import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
+import { defaultScenarioRequest, type ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -122,6 +124,34 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Indicateur")).toBeTruthy();
     await fireEvent.press(view.getByText("Graphiques"));
     expect(view.getByText("RY · 10 %")).toBeTruthy();
+  });
+  it("keeps scenario assumptions editable and values distinct from market prices", async () => {
+    const metric = (value: number | null) => ({ value, unit: "money" as const,
+      status: value === null ? "unavailable" as const : "calculated" as const,
+      formula: "Revenue shock", missing_inputs: value === null ? ["annual report"] : [] });
+    const simulation = { ticker: "RY.TO", sector_family: "bank", baseline_period_end: "2025-12-31T00:00:00Z",
+      currency: "CAD", baseline_source: "Issuer report", baseline_source_url: "https://issuer.example/report.pdf",
+      baseline_filed_at: "2026-02-10T00:00:00Z", baseline_stale: false, status: "partial", limitations_fr: ["Pas des prévisions."],
+      limitations_en: ["Not forecasts."], outcomes: defaultScenarioRequest.scenarios.map((assumptions, index) => ({
+        key: assumptions.key, assumptions,
+        revenue: metric([85, 100, 115][index] ?? null), operating_income: metric(null), net_income: metric(null),
+        operating_cash_flow: metric(null), free_cash_flow: metric(null), operating_margin: metric(null),
+        free_cash_flow_margin: metric(null), dcf: { status: "unavailable", reason: "Bank-specific model required",
+          settings: null, projected_fcf: [], enterprise_value: null, net_debt: null, equity_value: null,
+          shares_outstanding: null, per_share: null, sensitivity: [], formula: "Discounted FCF" },
+      })) } as ScenarioSimulation;
+    const onCalculate = jest.fn();
+    const view = await render(<MobileFocusScenarios simulation={simulation} error={null} loading={false}
+      onRetry={jest.fn()} onCalculate={onCalculate} />);
+    expect(view.getByText(/Pas des prévisions\./)).toBeTruthy();
+    await fireEvent.press(view.getByText("Calculer les scénarios"));
+    expect(onCalculate).toHaveBeenCalledWith(expect.objectContaining({ scenarios: expect.arrayContaining([
+      expect.objectContaining({ key: "prudent", revenue_change_percent: -15 }),
+    ]) }));
+    await fireEvent.press(view.getByText("Tableau"));
+    expect(view.getByText("Indicateur")).toBeTruthy();
+    await fireEvent.press(view.getByText("Graphiques"));
+    expect(view.getAllByText(/Revenus ·/).length).toBeGreaterThan(0);
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
