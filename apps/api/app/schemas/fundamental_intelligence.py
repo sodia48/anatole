@@ -66,6 +66,20 @@ class FundamentalFinding(BaseModel):
     measure_keys: list[str]
 
 
+class SectorInsight(BaseModel):
+    key: str
+    label_fr: str
+    label_en: str
+    value: float | None = None
+    unit: str
+    status: Literal["available", "unavailable"]
+    period_end: datetime | None = None
+    source_name: str | None = None
+    source_url: str | None = None
+    source_confidence: Literal["official", "secondary", "unclassified"] = "unclassified"
+    filed_at: datetime | None = None
+
+
 class FundamentalDiagnostic(BaseModel):
     ticker: str
     name: str
@@ -80,7 +94,53 @@ class FundamentalDiagnostic(BaseModel):
     measures: list[FundamentalMeasure]
     dimensions: list[FundamentalDimension]
     findings: list[FundamentalFinding]
+    sector_metrics: list[SectorInsight] = Field(default_factory=list)
     methodology_fr: str
     methodology_en: str
     missing_data: list[str] = Field(default_factory=list)
     global_score: None = None
+
+
+class PeerCandidate(BaseModel):
+    ticker: str
+    name: str
+    sector: str
+    selection_basis: str
+
+
+class PeerMeasureValue(BaseModel):
+    ticker: str
+    value: float
+    period_end: datetime
+    source_name: str
+    source_url: str | None = None
+    source_confidence: Literal["official", "secondary", "unclassified"]
+
+
+class PeerMeasureComparison(BaseModel):
+    key: str
+    label_fr: str
+    label_en: str
+    basis: Literal["annual", "current_snapshot"]
+    unit: Literal["percent", "ratio"]
+    values: list[PeerMeasureValue]
+    median: float | None = None
+    rank: int | None = None
+    sample_size: int
+    minimum_sample_size: int = 6
+    explanation_fr: str
+    explanation_en: str
+
+
+class PeerComparison(BaseModel):
+    target: str
+    sector: str | None = None
+    sector_family: str
+    universe_source: str
+    universe_as_of: str | None = None
+    candidates: list[PeerCandidate]
+    selected: list[str]
+    excluded: dict[str, str] = Field(default_factory=dict)
+    measures: list[PeerMeasureComparison]
+    method_fr: str
+    method_en: str

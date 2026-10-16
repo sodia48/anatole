@@ -1,0 +1,26 @@
+.panel { display: grid; gap: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); color: var(--text); }
+.panel h2, .panel h4 { margin: 0 0 8px; }
+.muted { color: var(--text-secondary); font-size: 13px; }
+.panel details { padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.panel summary { cursor: pointer; font-weight: 700; }
+.panel label { display: flex; gap: 6px; align-items: center; }
+.panel input[type="text"], .panel input:not([type]) { min-height: 40px; margin: 8px; }
+.candidates, .metrics { display: flex; flex-wrap: wrap; gap: 8px; }
+.candidates { max-height: 180px; overflow-y: auto; }
+.candidates button { padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); }
+.candidates button[aria-pressed="true"] { border-color: var(--accent, #318cff); }
+.metrics { padding: 12px; border: 1px solid var(--border); border-radius: 8px; }
+.metrics label { padding-right: 10px; font-size: 13px; }
+.excluded { padding: 8px 12px; border-left: 3px solid #c17a34; background: var(--panel-2, var(--panel)); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.card { padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
+.card p { margin: 7px 0; }
+.tableWrap { overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.tableWrap caption { text-align: left; font-weight: 700; padding-bottom: 8px; }
+.tableWrap th, .tableWrap td { border-bottom: 1px solid var(--border); padding: 8px; min-width: 90px; vertical-align: top; }
+.tableWrap small { display: block; font-size: 11px; }
+.barRow { display: grid; gap: 4px; margin: 12px 0; }
+.track { height: 9px; border-radius: 4px; background: var(--border); }
+.bar { height: 100%; border-radius: 4px; background: var(--accent, #318cff); }
+@media (max-width: 700px) { .panel { padding: 12px; } }

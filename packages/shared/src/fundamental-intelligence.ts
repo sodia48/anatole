@@ -57,6 +57,20 @@ export type FundamentalFinding = {
   measure_keys: string[];
 };
 
+export type SectorInsight = {
+  key: string;
+  label_fr: string;
+  label_en: string;
+  value: number | null;
+  unit: string;
+  status: "available" | "unavailable";
+  period_end: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  source_confidence: "official" | "secondary" | "unclassified";
+  filed_at: string | null;
+};
+
 export type FundamentalDiagnostic = {
   ticker: string;
   name: string;
@@ -71,8 +85,68 @@ export type FundamentalDiagnostic = {
   measures: FundamentalMeasure[];
   dimensions: FundamentalDimension[];
   findings: FundamentalFinding[];
+  sector_metrics: SectorInsight[];
   methodology_fr: string;
   methodology_en: string;
   missing_data: string[];
   global_score: null;
 };
+
+export type PeerCandidate = {
+  ticker: string;
+  name: string;
+  sector: string;
+  selection_basis: string;
+};
+
+export type PeerMeasureValue = {
+  ticker: string;
+  value: number;
+  period_end: string;
+  source_name: string;
+  source_url: string | null;
+  source_confidence: "official" | "secondary" | "unclassified";
+};
+
+export type PeerMeasureComparison = {
+  key: string;
+  label_fr: string;
+  label_en: string;
+  basis: "annual" | "current_snapshot";
+  unit: "percent" | "ratio";
+  values: PeerMeasureValue[];
+  median: number | null;
+  rank: number | null;
+  sample_size: number;
+  minimum_sample_size: number;
+  explanation_fr: string;
+  explanation_en: string;
+};
+
+export type PeerComparison = {
+  target: string;
+  sector: string | null;
+  sector_family: string;
+  universe_source: string;
+  universe_as_of: string | null;
+  candidates: PeerCandidate[];
+  selected: string[];
+  excluded: Record<string, string>;
+  measures: PeerMeasureComparison[];
+  method_fr: string;
+  method_en: string;
+};
+
+const exclusionFr: Record<string, string> = {
+  "financial snapshot unavailable": "instantané financier indisponible",
+  "different business family": "modèle économique différent",
+  "different industry": "activité différente",
+  "market capitalization unavailable": "capitalisation indisponible",
+  "market capitalization currencies differ or are unknown": "devises de capitalisation différentes ou inconnues",
+  "market capitalization outside 0.2–5× target range": "capitalisation hors de la fourchette 0,2 à 5 fois la cible",
+  "outside selected Canadian sector universe": "hors de l’univers canadien du secteur sélectionné",
+};
+
+export function peerExclusionReason(reason: string, language: "fr" | "en"): string {
+  return language === "fr" ? exclusionFr[reason] ?? reason : reason;
+}
