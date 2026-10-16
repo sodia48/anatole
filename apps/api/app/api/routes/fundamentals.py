@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.fundamentals import (
     CompositeCoverageSnapshot,
@@ -6,9 +6,10 @@ from app.schemas.fundamentals import (
     IssuerDocumentDiagnostics,
     YahooStatementsDiagnostics,
 )
-from app.schemas.fundamental_intelligence import FundamentalDiagnostic
+from app.schemas.fundamental_intelligence import FundamentalDiagnostic, PeerComparison
 from app.services.fundamentals import fundamentals_service
 from app.services.fundamental_intelligence import build_fundamental_diagnostic
+from app.services.fundamental_peers import peer_comparison
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
@@ -119,3 +120,16 @@ async def fundamentals(
 async def fundamental_diagnostic(ticker: str) -> FundamentalDiagnostic:
     snapshot = await fundamentals_service.get_snapshot(ticker)
     return build_fundamental_diagnostic(snapshot)
+
+
+@router.get(
+    "/{ticker}/fundamental-intelligence/peers",
+    response_model=PeerComparison,
+    summary="Comparable Canadian peers with sourced fundamental measures",
+)
+async def fundamental_peers(ticker: str, peers: str | None = Query(default=None, max_length=160)) -> PeerComparison:
+    requested = None if peers is None else [item.strip() for item in peers.split(",") if item.strip()]
+    try:
+        return await peer_comparison(ticker, requested)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error

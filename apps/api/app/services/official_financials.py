@@ -18,6 +18,7 @@ from app.services.issuer_documents import (
     IssuerFinancialsResult,
     issuer_financial_documents_service,
 )
+from app.services.fundamental_intelligence import sector_family
 from app.services.sec_edgar import (
     SECEdgarResult,
     sec_edgar_financials_provider,
@@ -503,7 +504,7 @@ class OfficialFinancialsService:
             try:
                 issuer_result = await asyncio.wait_for(
                     issuer_financial_documents_service.get_financials(
-                        ticker, snapshot.website
+                        ticker, snapshot.website, sector_family(snapshot)
                     ), self.source_budget_seconds
                 )
             except Exception:  # noqa: BLE001

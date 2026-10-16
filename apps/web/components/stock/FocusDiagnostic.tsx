@@ -104,6 +104,18 @@ export function FocusDiagnostic({ ticker }: { ticker: string }) {
           {language === "fr" ? measures.get(key)?.label_fr : measures.get(key)?.label_en}</a>)}
       </p>)}
     </div> : null}
+    {(current.sector_metrics ?? []).length ? <section className={styles.dimension}>
+      <h3>{pick(language, "Indicateurs propres au secteur", "Sector-specific metrics")}</h3>
+      <p className={styles.muted}>{pick(language, "Uniquement les valeurs explicitement présentes dans une publication officielle sont affichées.",
+        "Only values explicitly present in an official publication are shown.")}</p>
+      <div className={styles.cards}>{current.sector_metrics.map(item => <div className={styles.measure} key={item.key}>
+        <strong>{language === "fr" ? item.label_fr : item.label_en}</strong>
+        <span>{item.value === null ? pick(language, "N/D", "N/A") : `${new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(item.value)} ${item.unit}`}</span>
+        {item.source_url?.startsWith("https://") ? <a href={item.source_url} target="_blank" rel="noopener noreferrer">
+          {item.source_name} · {item.filed_at?.slice(0, 10) ?? pick(language, "date N/D", "date N/A")}</a>
+          : <span className={styles.muted}>{pick(language, "Publication officielle non disponible", "Official publication unavailable")}</span>}
+      </div>)}</div>
+    </section> : null}
     {current.dimensions.map(dimension => <section className={styles.dimension} key={dimension.key}>
       <h3>{language === "fr" ? dimension.label_fr : dimension.label_en}</h3>
       <details><summary>{dimension.score === null ? pick(language, "Indice non calculable", "Index unavailable")

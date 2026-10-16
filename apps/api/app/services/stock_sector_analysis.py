@@ -19,6 +19,49 @@ BANK_KEYS = {
     "dividend_payout": ("Taux de distribution publié", "%"),
 }
 
+# A sector fact is extracted only from an explicit label and unit on one short
+# document line. The publication date is retained as filed_at, not misstated as
+# the financial period end. The registry can grow without changing clients.
+SECTOR_KEYS: dict[str, dict[str, tuple[str, str, str]]] = {
+    "mining": {
+        "gold_production": ("Production d'or", "Gold production", "oz"),
+        "gold_aisc": ("Coût de maintien tout compris", "Gold AISC", "USD/oz"),
+        "gold_reserves": ("Réserves d'or prouvées et probables", "Proven and probable gold reserves", "million oz"),
+    },
+    "real_estate": {
+        "ffo_per_unit": ("FFO par part", "FFO per unit", "report currency/unit"),
+        "affo_per_unit": ("AFFO par part", "AFFO per unit", "report currency/unit"),
+        "occupancy": ("Taux d'occupation", "Occupancy", "%"),
+    },
+    "insurance": {
+        "solvency_ratio": ("Ratio de solvabilité", "Solvency ratio", "%"),
+        "combined_ratio": ("Ratio combiné", "Combined ratio", "%"),
+        "loss_ratio": ("Ratio de sinistralité", "Loss ratio", "%"),
+    },
+    "technology": {
+        "annual_recurring_revenue": ("Revenus annuels récurrents", "Annual recurring revenue", "million, report currency"),
+        "net_revenue_retention": ("Rétention nette des revenus", "Net revenue retention", "%"),
+    },
+    "industrial": {
+        "order_backlog": ("Carnet de commandes", "Order backlog", "million, report currency"),
+    },
+}
+
+_SECTOR_PATTERNS = {
+    "gold_production": r"(?:Gold production)\s*[:|–-]?\s*([\d,]+)\s*(?:ounces|oz)\b",
+    "gold_aisc": r"(?:All.in sustaining costs?|AISC)\s*[:|–-]?\s*(?:US\$|USD\s*)\s*([\d,]+(?:\.\d+)?)\s*(?:per|/)\s*(?:ounce|oz)\b",
+    "gold_reserves": r"(?:Proven and probable gold reserves)\s*[:|–-]?\s*([\d,]+(?:\.\d+)?)\s*million\s*(?:ounces|oz)\b",
+    "ffo_per_unit": r"^\s*(?:Funds from operations|FFO)\s+per\s+(?:unit|share)\s*[:|–-]?\s*\$([\d,]+(?:\.\d+)?)\b",
+    "affo_per_unit": r"^\s*(?:Adjusted funds from operations|AFFO)\s+per\s+(?:unit|share)\s*[:|–-]?\s*\$([\d,]+(?:\.\d+)?)\b",
+    "occupancy": r"(?:Occupancy|Occupancy rate)\s*[:|–-]?\s*(\d{1,3}(?:\.\d+)?)\s*%",
+    "solvency_ratio": r"(?:Solvency ratio|LICAT ratio)\s*[:|–-]?\s*(\d{1,3}(?:\.\d+)?)\s*%",
+    "combined_ratio": r"(?:Combined ratio)\s*[:|–-]?\s*(\d{1,3}(?:\.\d+)?)\s*%",
+    "loss_ratio": r"(?:Loss ratio)\s*[:|–-]?\s*(\d{1,3}(?:\.\d+)?)\s*%",
+    "annual_recurring_revenue": r"(?:Annual recurring revenue|ARR)\s*[:|–-]?\s*\$([\d,]+(?:\.\d+)?)\s*million\b",
+    "net_revenue_retention": r"(?:Net revenue retention|NRR)\s*[:|–-]?\s*(\d{1,3}(?:\.\d+)?)\s*%",
+    "order_backlog": r"(?:Order backlog|Backlog of orders)\s*[:|–-]?\s*\$([\d,]+(?:\.\d+)?)\s*million\b",
+}
+
 # Match only an explicit label and a value on the same short line. A document's
 # own date and URL accompany each extracted value. Ambiguous tables are omitted.
 _BANK_PATTERNS = {
@@ -62,5 +105,26 @@ def extract_official_bank_metrics(text: str, *, source_url: str, source_name: st
             continue
         label, unit = BANK_KEYS[key]
         found.append(SectorMetric(key=key, label=label, value=matches[0], unit=unit,
-                                  source=source, period_end=filed_at))
+                                  source=source, period_end=None))
+    return found
+
+
+def extract_official_sector_metrics(text: str, *, family: str, source_url: str,
+                                    source_name: str, filed_at: datetime | None) -> list[SectorMetric]:
+    if family == "bank":
+        return extract_official_bank_metrics(text, source_url=source_url, source_name=source_name, filed_at=filed_at)
+    if family not in SECTOR_KEYS or not source_url.startswith("https://"):
+        return []
+    source = FinancialSource(source_type="issuer_official_document", source_name=source_name,
+                             source_url=source_url, filed_at=filed_at, confidence="official")
+    found: list[SectorMetric] = []
+    for key, (label_fr, _label_en, unit) in SECTOR_KEYS[family].items():
+        pattern = _SECTOR_PATTERNS[key]
+        matches = [float(match.group(1).replace(",", "")) for line in text.splitlines()[:10000]
+                   if len(line) <= 220 for match in [re.search(pattern, line, re.I)] if match]
+        upper = 100 if key in {"ffo_per_unit", "affo_per_unit"} else 1000 if unit == "%" else 100_000_000
+        if len(matches) != 1 or not 0 < matches[0] < upper:
+            continue
+        found.append(SectorMetric(key=key, label=label_fr, value=matches[0], unit=unit,
+                                  source=source, period_end=None))
     return found

@@ -1,4 +1,4 @@
-import type { FundamentalDiagnostic } from "@anatole/shared/fundamental-intelligence";
+import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import type {
   CalendarSnapshot,
   EarningsCalendarSnapshot,
@@ -643,6 +643,14 @@ export function getFocusFundamentalOverlay(
 export function getFundamentalDiagnostic(ticker: string, signal?: AbortSignal): Promise<FundamentalDiagnostic> {
   return apiRequest<FundamentalDiagnostic>(
     `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/diagnostic`,
+    {}, signal, 45_000,
+  );
+}
+
+export function getFundamentalPeers(ticker: string, peers?: string[], signal?: AbortSignal): Promise<PeerComparison> {
+  const selection = peers === undefined ? "" : `?peers=${encodeURIComponent(peers.join(","))}`;
+  return apiRequest<PeerComparison>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/peers${selection}`,
     {}, signal, 45_000,
   );
 }

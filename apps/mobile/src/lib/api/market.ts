@@ -1,5 +1,5 @@
 import { apiRequest } from "./base";
-import type { FundamentalDiagnostic } from "@anatole/shared/fundamental-intelligence";
+import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import type {
   CalendarSnapshot,
   CockpitSnapshot,
@@ -68,6 +68,7 @@ export const marketApi = {
   focus: (ticker: string, range = "1y", interval = "1d", signal?: AbortSignal) => apiRequest<FocusSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/focus?range=${encodeURIComponent(range)}&interval=${encodeURIComponent(interval)}`, { timeoutMs: 12_000, signal }),
   fundamentals: (ticker: string, signal?: AbortSignal) => apiRequest<FundamentalSnapshot>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamentals`, { timeoutMs: 18_000, signal }),
   fundamentalDiagnostic: (ticker: string, signal?: AbortSignal) => apiRequest<FundamentalDiagnostic>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/diagnostic`, { timeoutMs: 18_000, signal }),
+  fundamentalPeers: (ticker: string, peers?: string[], signal?: AbortSignal) => apiRequest<PeerComparison>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/peers${peers === undefined ? "" : `?peers=${encodeURIComponent(peers.join(","))}`}`, { timeoutMs: 45_000, signal }),
   companyNetwork: (ticker: string, depth: 1 | 2 = 1, signal?: AbortSignal) => apiRequest<CompanyNetworkSnapshot>(`/api/v1/discovery/company-network/${encodeURIComponent(ticker)}?depth=${depth}`, { timeoutMs: 25_000, signal }),
   companyNetworkEvidence: (ticker: string, signal?: AbortSignal) => apiRequest<CompanyNetworkEvidenceResponse>(`/api/v1/discovery/company-network/${encodeURIComponent(ticker)}/evidence`, { timeoutMs: 20_000, signal }),
   companyNetworkPath: (from: string, to: string, signal?: AbortSignal) => apiRequest<CompanyRelationshipPath>(`/api/v1/discovery/company-network/path?from_ticker=${encodeURIComponent(from)}&to_ticker=${encodeURIComponent(to)}&max_depth=3`, { timeoutMs: 25_000, signal }),

@@ -30,7 +30,7 @@ from app.services.issuer_document_parser import (
     financial_document_parser,
 )
 from app.schemas.fundamentals import SectorMetric
-from app.services.stock_sector_analysis import extract_official_bank_metrics
+from app.services.stock_sector_analysis import extract_official_sector_metrics
 
 
 DATA_DIRECTORY = (
@@ -866,6 +866,7 @@ class IssuerFinancialDocumentsService:
         self,
         ticker: str,
         website: str | None,
+        family: str | None = None,
     ) -> IssuerFinancialsResult:
         resolved_website, documents, error = (
             await self.discover(
@@ -889,6 +890,7 @@ class IssuerFinancialDocumentsService:
         all_periods: list[FinancialPeriod] = []
         parsed_documents = 0
         sector_metrics: list[SectorMetric] = []
+        sector_scanned = 0
 
         async with await asyncio.to_thread(httpx.AsyncClient,
             headers=self.headers,
@@ -920,13 +922,16 @@ class IssuerFinancialDocumentsService:
                     parsed_documents += 1
                     all_periods.extend(periods)
 
-                if ticker.upper().removesuffix(".TO") in {"RY", "TD", "BMO", "BNS", "CM", "NA"}:
+                known_bank = ticker.upper().removesuffix(".TO") in {"RY", "TD", "BMO", "BNS", "CM", "NA"}
+                effective_family = "bank" if known_bank and family in {None, "general"} else family
+                if effective_family and (effective_family == "bank" or sector_scanned < 2):
+                    sector_scanned += 1
                     try:
                         document_text = await asyncio.to_thread(
                             financial_document_parser.extract_text, content, document, max_pdf_pages=8)
-                        sector_metrics.extend(extract_official_bank_metrics(
-                            document_text, source_url=document.url, source_name=document.title,
-                            filed_at=document.published_at))
+                        sector_metrics.extend(extract_official_sector_metrics(
+                            document_text, family=effective_family, source_url=document.url,
+                            source_name=document.title, filed_at=document.published_at))
                     except Exception:  # noqa: BLE001
                         pass
 
@@ -986,10 +991,12 @@ class IssuerFinancialDocumentsService:
         self,
         ticker: str,
         website: str | None,
+        family: str | None = None,
         *,
         force_refresh: bool = False,
     ) -> IssuerFinancialsResult:
-        key = ticker.strip().upper()
+        symbol = ticker.strip().upper()
+        key = f"{symbol}:{family or 'unknown'}"
         cached = self._cache.get(key)
         now = monotonic()
 
@@ -1016,12 +1023,13 @@ class IssuerFinancialDocumentsService:
             try:
                 async with asyncio.timeout(28):
                     result = await self._load(
-                        key,
+                        symbol,
                         website,
+                        family,
                     )
             except TimeoutError:
                 result = IssuerFinancialsResult(
-                    ticker=key,
+                    ticker=symbol,
                     website=website,
                     annual=[],
                     quarterly=[],
