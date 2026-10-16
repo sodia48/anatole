@@ -6,7 +6,9 @@ from app.schemas.fundamentals import (
     IssuerDocumentDiagnostics,
     YahooStatementsDiagnostics,
 )
+from app.schemas.fundamental_intelligence import FundamentalDiagnostic
 from app.services.fundamentals import fundamentals_service
+from app.services.fundamental_intelligence import build_fundamental_diagnostic
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
@@ -107,3 +109,13 @@ async def fundamentals(
     ticker: str,
 ) -> FundamentalSnapshot:
     return await fundamentals_service.get_snapshot(ticker)
+
+
+@router.get(
+    "/{ticker}/fundamental-intelligence/diagnostic",
+    response_model=FundamentalDiagnostic,
+    summary="Source-aware, non-advisory financial diagnostic",
+)
+async def fundamental_diagnostic(ticker: str) -> FundamentalDiagnostic:
+    snapshot = await fundamentals_service.get_snapshot(ticker)
+    return build_fundamental_diagnostic(snapshot)

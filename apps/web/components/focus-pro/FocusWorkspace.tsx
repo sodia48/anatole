@@ -14,6 +14,7 @@ import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem"
 import { FocusRangeChart } from "@/components/chart/FocusRangeChart";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { FocusFundamentals, type FundamentalView } from "@/components/stock/FocusFundamentals";
+import { FocusDiagnostic } from "@/components/stock/FocusDiagnostic";
 import { FocusGlyph } from "./FocusGlyph";
 import { FocusStockNews } from "@/components/stock/FocusStockNews";
 import { KeyLevels } from "@/components/stock/KeyLevels";
@@ -92,7 +93,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : "overview");
-  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation">>("fundamentals");
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic">("fundamentals");
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -400,6 +401,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
             <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className={styles.fundamentalSubtabs}>
               {([
                 { id: "fundamentals", fr: "Synthèse", en: "Overview" },
+                { id: "diagnostic", fr: "Diagnostic 360°", en: "Diagnostic 360°" },
                 { id: "financials", fr: "Résultats", en: "Financials" },
                 { id: "analysts", fr: "Analystes", en: "Analysts" },
               ] as const).map((item) => (
@@ -415,11 +417,11 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
               ))}
             </nav>
           ) : null}
-          <FocusFundamentals
+          {section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} /> : <FocusFundamentals
             key={ticker}
             ticker={ticker}
-            view={section === "overview" ? "valuation" : fundamentalView}
-          />
+            view={section === "overview" ? "valuation" : fundamentalView as FundamentalView}
+          />}
           {section === "overview" ? (
             <FocusStockNews
               ticker={ticker}
