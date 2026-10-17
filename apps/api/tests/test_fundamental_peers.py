@@ -1,8 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.fundamental_intelligence import PeerCandidate
-from app.services.fundamental_peers import build_peer_comparison
+from app.services.fundamental_peers import build_peer_comparison, peer_comparison
 from app.services.tsx_composite_universe import CompositeConstituent
 from test_fundamental_intelligence import sample_snapshot
 
@@ -73,3 +74,25 @@ def test_http_peer_selection_and_empty_comparison(monkeypatch) -> None:
     assert empty.json()["selected"] == []
     invalid = client.get("/api/v1/stocks/TEST/fundamental-intelligence/peers?peers=P1,P1")
     assert invalid.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_assistant_peer_comparison_reuses_target_snapshot(monkeypatch) -> None:
+    target = peer("TEST")
+    target.stale = True
+    requested = []
+
+    async def get_universe():
+        return [CompositeConstituent(ticker=code, name=code, sector="Industrials", weight=1, currency="CAD")
+                for code in ["TEST", "P1"]]
+
+    async def get_snapshot(code: str):
+        requested.append(code)
+        assert code == "P1"
+        return peer(code)
+
+    monkeypatch.setattr("app.services.fundamental_peers.tsx_composite_universe_service.get_constituents", get_universe)
+    monkeypatch.setattr("app.services.fundamental_peers.fundamentals_service.get_snapshot", get_snapshot)
+    result = await peer_comparison("TEST", target_snapshot=target)
+    assert result.target == "TEST.TO"
+    assert requested == ["P1"]

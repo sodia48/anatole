@@ -150,8 +150,9 @@ def build_peer_comparison(target: FundamentalSnapshot, peers: list[FundamentalSn
     )
 
 
-async def peer_comparison(ticker: str, requested: list[str] | None = None) -> PeerComparison:
-    target = await fundamentals_service.get_snapshot(ticker)
+async def peer_comparison(ticker: str, requested: list[str] | None = None, *,
+                          target_snapshot: FundamentalSnapshot | None = None) -> PeerComparison:
+    target = target_snapshot if target_snapshot is not None else await fundamentals_service.get_snapshot(ticker)
     try:
         universe = await tsx_composite_universe_service.get_constituents()
         universe_source, as_of = XIC_UNIVERSE_SOURCE, tsx_composite_universe_service.as_of
