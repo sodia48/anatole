@@ -120,6 +120,7 @@ export default async function InstitutionalResearchPage({
           <Link href={`/focus/${encodeURIComponent(symbol)}?view=peers`}>Pairs et comparables →</Link>
           <Link href={`/focus/${encodeURIComponent(symbol)}?view=scenarios`}>Scénarios documentés →</Link>
           <Link href={`/focus/${encodeURIComponent(symbol)}?view=documents`}>Rapports officiels →</Link>
+          <Link href="/alertes">Alertes fondamentales →</Link>
         </> : null}
       </section>
 
