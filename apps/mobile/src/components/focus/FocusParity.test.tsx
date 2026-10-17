@@ -5,6 +5,7 @@ import { MobileFocusFinancials } from "./MobileFocusFinancials";
 import { MobileFocusDiagnostic } from "./MobileFocusDiagnostic";
 import { MobileFocusPeers } from "./MobileFocusPeers";
 import { MobileFocusScenarios } from "./MobileFocusScenarios";
+import { MobileFocusDocuments } from "./MobileFocusDocuments";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
@@ -15,6 +16,7 @@ import { liveQuoteStatus } from "./liveStatus";
 import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
 import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import { defaultScenarioRequest, type ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
+import type { FundamentalDocumentResearch } from "@anatole/shared/fundamental-documents";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -152,6 +154,24 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Indicateur")).toBeTruthy();
     await fireEvent.press(view.getByText("Graphiques"));
     expect(view.getAllByText(/Revenus ·/).length).toBeGreaterThan(0);
+  });
+  it("shows literal report excerpts with verified pages and an editable search", async () => {
+    const passage = { document_url: "https://issuer.example/annual.pdf", document_title: "Annual report",
+      document_type: "annual", published_at: "2026-02-10T00:00:00Z", page_number: 3,
+      topic: "results" as const, excerpt: "Revenue increased to 100 CAD in the annual period." };
+    const research: FundamentalDocumentResearch = { ticker: "RY.TO", status: "available", query: null, source_stale: false,
+      documents_scanned: 1, documents: [{ url: passage.document_url, title: passage.document_title,
+        document_type: "annual", published_at: passage.published_at, pages_scanned: 20 }],
+      passages: [passage], reported_observations: [], comparisons: [],
+      limitations_fr: ["Page vérifiée."], limitations_en: ["Page verified."] };
+    const onSearch = jest.fn();
+    const view = await render(<MobileFocusDocuments research={research} error={null} loading={false}
+      onRetry={jest.fn()} onSearch={onSearch} />);
+    expect(view.getByText(passage.excerpt)).toBeTruthy();
+    expect(view.getByText(/Annual report · page 3/)).toBeTruthy();
+    await fireEvent.changeText(view.getByLabelText("Rechercher un terme ou une expression"), "Revenue");
+    await fireEvent.press(view.getByText("Rechercher"));
+    expect(onSearch).toHaveBeenCalledWith("Revenue");
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
