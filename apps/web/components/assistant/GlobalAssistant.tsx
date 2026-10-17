@@ -13,7 +13,7 @@ const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|diversifi
 const EXPLICIT_SWITCH = /\b(?:ETF|FNB)\b|gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\bcompare\b/i;
 const EXPLICIT_INSTRUMENT = /\b(?:analyse|cours|prix)\s+(?:de|du|pour)\s+[A-Z][A-Z0-9.^-]{0,9}\b/;
 const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", etf_performance: "Performance ETF", etf_ranking: "Classement ETF", etf_comparison: "Comparaison ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
-const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/;
+const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}(?:\?view=(?:diagnostic|peers|scenarios|documents))?|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/;
 
 function AssistantText({ text, collapseSources = false, onReady }: { text: string; collapseSources?: boolean; onReady: () => void }) {
   const host = useRef<HTMLDivElement>(null);

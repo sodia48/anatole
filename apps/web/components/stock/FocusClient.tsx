@@ -9,8 +9,10 @@ import type { FocusSnapshot } from "@/lib/types";
  */
 export function FocusClient({
   initialSnapshot,
+  initialFundamentalView,
 }: {
   initialSnapshot: FocusSnapshot;
+  initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents";
 }) {
-  return <FocusWorkspace initialSnapshot={initialSnapshot} />;
+  return <FocusWorkspace initialSnapshot={initialSnapshot} initialFundamentalView={initialFundamentalView} />;
 }

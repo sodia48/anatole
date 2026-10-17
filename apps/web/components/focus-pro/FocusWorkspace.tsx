@@ -91,13 +91,19 @@ const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
   { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
 
-export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialSnapshot: FocusSnapshot; embedded?: boolean }) {
+export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" }) {
   const { preferences, updatePreferences } = usePreferences();
   const { user, refreshAccount } = useAccount();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
-  const [section, setSection] = useState<Section>(embedded ? "chart" : "overview");
-  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">("fundamentals");
+  const [section, setSection] = useState<Section>(embedded ? "chart" : initialFundamentalView ? "fundamentals" : "overview");
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView ?? "fundamentals");
+  useEffect(() => {
+    if (initialFundamentalView && !embedded) {
+      setSection("fundamentals");
+      setFundamentalView(initialFundamentalView);
+    }
+  }, [initialFundamentalView, embedded]);
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
