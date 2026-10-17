@@ -225,12 +225,15 @@ class NavigationAction(BaseModel):
     def internal_href(cls, value: str) -> str:
         path, _, query = value.partition("?")
         if (not ROUTE_RE.fullmatch(path) or len(query) > 100
-                or (query and (path != "/comparateur" or not re.fullmatch(r"symbols=[A-Z0-9.^-]{1,15}(?:,[A-Z0-9.^-]{1,15}){0,4}", query)))):
+                or (query and not (
+                    path == "/comparateur" and re.fullmatch(r"symbols=[A-Z0-9.^-]{1,15}(?:,[A-Z0-9.^-]{1,15}){0,4}", query)
+                    or path.startswith("/focus/") and re.fullmatch(r"view=(?:diagnostic|peers|scenarios|documents)", query)
+                ))):
             raise ValueError("Navigation action must be an allowlisted internal route")
         if any(path.startswith(prefix) and not SYMBOL_RE.fullmatch(path.removeprefix(prefix))
                for prefix in ("/focus/", "/etf/")):
             raise ValueError("Navigation action has an invalid symbol")
-        if query and any(not SYMBOL_RE.fullmatch(symbol) for symbol in query.removeprefix("symbols=").split(",")):
+        if path == "/comparateur" and query and any(not SYMBOL_RE.fullmatch(symbol) for symbol in query.removeprefix("symbols=").split(",")):
             raise ValueError("Navigation action has an invalid comparison symbol")
         return value
 

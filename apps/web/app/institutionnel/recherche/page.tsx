@@ -99,7 +99,7 @@ export default async function InstitutionalResearchPage({
         </Link>
         <Link href="/actualites">Actualités →</Link>
         <Link href="/calendrier">Calendrier →</Link>
-        <Link href="/assistant">Copilote recherche →</Link>
+        <Link href={symbol ? `/focus/${encodeURIComponent(symbol)}?view=diagnostic` : "/focus/RY?view=diagnostic"}>Diagnostic 360° →</Link>
         <Link
           href={
             symbol
@@ -112,6 +112,15 @@ export default async function InstitutionalResearchPage({
         <Link href="/institutionnel/comite">
           Comité d&apos;investissement →
         </Link>
+      </section>
+
+      <section className={styles.commandStrip} aria-label="Recherche fondamentale publique">
+        <span>Assistant Anatole : ouvre le bouton flottant et interroge les données publiques du titre.</span>
+        {symbol ? <>
+          <Link href={`/focus/${encodeURIComponent(symbol)}?view=peers`}>Pairs et comparables →</Link>
+          <Link href={`/focus/${encodeURIComponent(symbol)}?view=scenarios`}>Scénarios documentés →</Link>
+          <Link href={`/focus/${encodeURIComponent(symbol)}?view=documents`}>Rapports officiels →</Link>
+        </> : null}
       </section>
 
       <div className={styles.layout}>
