@@ -162,7 +162,7 @@ def _scenario_answer(snapshot: FundamentalSnapshot, question: str) -> Fundamenta
 async def _peers_answer(snapshot: FundamentalSnapshot) -> FundamentalAnswer:
     result = FundamentalAnswer(text="## Comparaison sectorielle", view="peers")
     try:
-        comparison = await peer_comparison(snapshot.symbol)
+        comparison = await peer_comparison(snapshot.symbol, target_snapshot=snapshot)
     except Exception:  # A secondary source must not break the stock answer.
         result.text += "\nLes comparables sectoriels sont temporairement indisponibles."
         result.missing.append("Comparables sectoriels indisponibles")

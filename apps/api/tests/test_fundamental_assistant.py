@@ -78,7 +78,8 @@ async def test_requested_revenue_shock_uses_shared_scenario_and_exposes_missing_
 
 @pytest.mark.asyncio
 async def test_peer_comparison_uses_sample_threshold_not_invented_ranking(research_tools, monkeypatch):
-    async def peers(_symbol):
+    async def peers(_symbol, *, target_snapshot):
+        assert target_snapshot is research_tools
         return PeerComparison(target="TEST.TO", sector="Industrials", sector_family="industrial",
             universe_source="TSX", candidates=[], selected=["ONE"], measures=[PeerMeasureComparison(
                 key="operating_margin", label_fr="Marge opérationnelle", label_en="Operating margin",
