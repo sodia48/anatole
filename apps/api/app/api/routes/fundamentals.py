@@ -9,11 +9,13 @@ from app.schemas.fundamentals import (
 from app.schemas.fundamental_intelligence import FundamentalDiagnostic, PeerComparison
 from app.schemas.fundamental_scenarios import ScenarioRequest, ScenarioSimulation
 from app.schemas.fundamental_documents import FundamentalDocumentResearch
+from app.schemas.fundamental_capital import FundamentalCapitalResearch
 from app.services.fundamentals import fundamentals_service
 from app.services.fundamental_intelligence import build_fundamental_diagnostic
 from app.services.fundamental_peers import peer_comparison
 from app.services.fundamental_scenarios import simulate_financial_scenarios
 from app.services.fundamental_documents import research_official_documents
+from app.services.fundamental_capital import build_capital_research
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
@@ -163,3 +165,13 @@ async def fundamental_documents(
 ) -> FundamentalDocumentResearch:
     snapshot = await fundamentals_service.get_snapshot(ticker)
     return await research_official_documents(snapshot, query)
+
+
+@router.get(
+    "/{ticker}/fundamental-intelligence/capital",
+    response_model=FundamentalCapitalResearch,
+    summary="Sourced capital allocation and non-historical analyst snapshot",
+)
+async def fundamental_capital(ticker: str) -> FundamentalCapitalResearch:
+    snapshot = await fundamentals_service.get_snapshot(ticker)
+    return build_capital_research(snapshot)

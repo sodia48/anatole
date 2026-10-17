@@ -1,6 +1,7 @@
 import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import type { ScenarioRequest, ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
 import type { FundamentalDocumentResearch } from "@anatole/shared/fundamental-documents";
+import type { FundamentalCapitalResearch } from "@anatole/shared/fundamental-capital";
 import type {
   CalendarSnapshot,
   EarningsCalendarSnapshot,
@@ -669,6 +670,13 @@ export function getFundamentalDocuments(ticker: string, query?: string, signal?:
   return apiRequest<FundamentalDocumentResearch>(
     `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/documents${search}`,
     {}, signal, 60_000,
+  );
+}
+
+export function getFundamentalCapital(ticker: string, signal?: AbortSignal): Promise<FundamentalCapitalResearch> {
+  return apiRequest<FundamentalCapitalResearch>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/capital`,
+    {}, signal, 30_000,
   );
 }
 
