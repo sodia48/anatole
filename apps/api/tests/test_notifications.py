@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+import asyncio
+
+from sqlalchemy import update
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +15,7 @@ from app.api.routes import notifications as notification_routes
 from app.main import app
 from app.services.accounts import AccountService
 from app.services.notifications import NotificationService
+from app.schemas.workspace import AlertEvaluation, AlertRule
 
 
 @pytest.fixture()
@@ -41,6 +47,35 @@ def register(client: TestClient) -> dict:
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_fundamental_feed_deduplicates_filing_and_honors_cooldown(notification_client, monkeypatch):
+    client, service = notification_client
+    user_id = register(client)["user"]["id"]
+    rule = AlertRule(id="filing-rule", symbol="RY", kind="event", event_type="fundamental_results", cooldown_minutes=60)
+    workspace = SimpleNamespace(data=SimpleNamespace(alerts=[rule]))
+    fingerprint = "RY:results:annual:2025:report-1"
+
+    async def evaluate(_request):
+        return SimpleNamespace(items=[AlertEvaluation(
+            id=rule.id, symbol="RY", name="Royal Bank", event_type="fundamental_results",
+            metric_label="Publication de résultats", unit="", triggered=True, status="triggered",
+            message="Rapport officiel daté.", event_fingerprint=fingerprint,
+            evaluated_at=datetime.now(UTC),
+        )])
+
+    monkeypatch.setattr("app.services.notifications.alert_service.evaluate", evaluate)
+    asyncio.run(service._generate_alert_events(user_id, workspace, "2026-01-01"))
+    assert len(asyncio.run(service.list_feed(user_id)).items) == 1
+    fingerprint = "RY:results:quarterly:2026:report-2"
+    asyncio.run(service._generate_alert_events(user_id, workspace, "2026-01-02"))
+    assert len(asyncio.run(service.list_feed(user_id)).items) == 1
+    with service.account_service.engine.begin() as connection:
+        connection.execute(update(service.events).values(created_at=(datetime.now(UTC) - timedelta(hours=2)).isoformat()))
+    asyncio.run(service._generate_alert_events(user_id, workspace, "2026-01-03"))
+    assert len(asyncio.run(service.list_feed(user_id)).items) == 2
+    asyncio.run(service._generate_alert_events(user_id, workspace, "2026-01-04"))
+    assert len(asyncio.run(service.list_feed(user_id)).items) == 2
 
 
 def test_notification_preferences_and_feed(notification_client):

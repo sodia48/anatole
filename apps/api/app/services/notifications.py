@@ -452,9 +452,18 @@ class NotificationService:
         snapshot = await alert_service.evaluate(
             AlertEvaluateRequest(rules=workspace.data.alerts)
         )
+        rules = {rule.id: rule for rule in workspace.data.alerts}
         for item in snapshot.items:
             if not item.triggered:
                 continue
+            rule = rules.get(item.id)
+            fundamental = bool(rule and rule.event_type and rule.event_type.startswith("fundamental_"))
+            route = f"/focus/{item.symbol}"
+            if fundamental:
+                rule_digest = hashlib.sha256(item.id.encode("utf-8")).hexdigest()[:16]
+                route = f"{route}?alert={rule_digest}"
+                if await self._alert_in_cooldown(user_id, route, rule.cooldown_minutes):
+                    continue
             await self.create_event(
                 user_id=user_id,
                 kind="alert",
@@ -462,9 +471,25 @@ class NotificationService:
                 message=item.message,
                 severity="important",
                 symbol=item.symbol,
-                route=f"/focus/{item.symbol}",
-                dedupe_key=f"alert:{item.id}:{date_key}",
+                route=route,
+                dedupe_key=f"alert:{item.id}:{item.event_fingerprint or date_key}",
             )
+
+    async def _alert_in_cooldown(self, user_id: str, route: str, minutes: int) -> bool:
+        await self.start()
+        return await asyncio.to_thread(self._alert_in_cooldown_sync, user_id, route, minutes)
+
+    def _alert_in_cooldown_sync(self, user_id: str, route: str, minutes: int) -> bool:
+        with self.account_service.engine.connect() as connection:
+            row = connection.execute(
+                select(self.events.c.created_at).where(
+                    self.events.c.user_id == user_id,
+                    self.events.c.kind == "alert",
+                    self.events.c.route == route,
+                ).order_by(self.events.c.created_at.desc()).limit(1)
+            ).first()
+        created = _from_iso(row.created_at) if row else None
+        return bool(created and _utc_now() - created < timedelta(minutes=minutes))
 
     async def _generate_watchlist_events(
         self,

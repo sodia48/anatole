@@ -86,7 +86,7 @@ export type AlertRule = {
   enabled: boolean;
   label?: string | null;
   kind?: "threshold" | "event";
-  event_type?: "terminal_anomaly" | "terminal_regime" | "earnings_upcoming" | "insider_unusual" | "company_news" | null;
+  event_type?: "terminal_anomaly" | "terminal_regime" | "earnings_upcoming" | "insider_unusual" | "company_news" | "fundamental_margin_drop" | "fundamental_debt_rise" | "fundamental_fcf_drop" | "fundamental_results" | null;
   cooldown_minutes?: number;
 };
 

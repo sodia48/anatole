@@ -863,10 +863,13 @@ export type AlertType =
 export type AlertRule = {
   id: string;
   symbol: string;
-  metric: AlertMetric;
-  operator: "above" | "below";
-  threshold: number;
+  metric?: AlertMetric | null;
+  operator?: "above" | "below" | null;
+  threshold?: number | null;
   enabled: boolean;
+  kind?: "threshold" | "event";
+  event_type?: "fundamental_margin_drop" | "fundamental_debt_rise" | "fundamental_fcf_drop" | "fundamental_results" | null;
+  cooldown_minutes?: number;
   label?: string | null;
   alert_type?: AlertType;
   indicator_id?: string | null;
@@ -885,11 +888,12 @@ export type AlertEvaluation = {
   id: string;
   symbol: string;
   name: string;
-  metric: AlertMetric;
+  metric: AlertMetric | null;
+  event_type: AlertRule["event_type"];
   alert_type: AlertType;
   metric_label: string;
-  operator: "above" | "below";
-  threshold: number;
+  operator: "above" | "below" | null;
+  threshold: number | null;
   current_value: number | null;
   unit: string;
   triggered: boolean;

@@ -89,11 +89,14 @@ export function evaluateAlertTransitions(
     }
     if (!fingerprint) continue;
     const newEvent = fingerprint !== current.last_event_fingerprint;
-    const fires = newEvent || (!current.condition_active && cooldownExpired(current, rule, now));
+    const fundamental = rule.event_type?.startsWith("fundamental_") ?? false;
+    const fires = fundamental
+      ? newEvent && cooldownExpired(current, rule, now)
+      : newEvent || (!current.condition_active && cooldownExpired(current, rule, now));
     states[rule.id] = {
       ...current,
       condition_active: fires || current.condition_active,
-      last_event_fingerprint: fingerprint,
+      last_event_fingerprint: fundamental && !fires ? current.last_event_fingerprint : fingerprint,
       last_event_value: evaluation.event_value ?? current.last_event_value,
       last_triggered_at: fires ? triggeredAt : current.last_triggered_at,
     };
