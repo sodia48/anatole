@@ -1,0 +1,9 @@
+# Fundamental Intelligence 360 — allocation du capital et analystes
+
+Le pont d'allocation reprend au plus cinq exercices annuels du **même instantané fondamental** que le diagnostic. Les investissements, dividendes et rachats sont présentés en valeurs absolues afin de décrire des utilisations de trésorerie, quelle que soit la convention de signe du fournisseur. Le résultat « solde après allocations » = flux opérationnel − investissements − dividendes − rachats, uniquement si les quatre postes sont disponibles. Il s'agit d'une réconciliation illustrative, distincte du flux disponible publié; elle ne mesure pas directement la croissance réinvestie.
+
+La part d'investissement divise les dépenses d'investissement par la somme des utilisations connues lorsque tous les postes sont fournis et que la somme est positive. La conversion bénéfice-trésorerie divise le flux opérationnel par un bénéfice net strictement positif. La variation de dette soustrait deux soldes annuels consécutifs; même devise et même définition de source sont exigées. Cette variation ne prouve pas à elle seule une émission ou un remboursement.
+
+Chaque exercice indique sa devise, sa période, sa source, son degré de confiance et sa date de dépôt lorsqu'ils existent. Un calcul incomplet retourne `null` avec ses entrées manquantes. L'interface conserve les vues Tableau, Cartes et Graphiques ainsi que la sélection d'indicateurs.
+
+Le consensus, la distribution des recommandations, les objectifs et les prévisions courantes sont affichés comme **instantané secondaire**. La devise des objectifs n'est pas déduite de la devise comptable. Les écarts BPA réel/estimé ne sont montrés que lorsque les deux valeurs existent dans le même enregistrement, sans prétendre vérifier une date de publication absente. La liste des prévisions par exercice ne constitue pas un historique de révisions : sans événements datés de révision, cet historique reste explicitement indisponible.

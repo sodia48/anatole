@@ -4,7 +4,7 @@ import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 
-export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "financials" | "analysts";
+export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts";
 
 const tabs: { id: MobileFundamentalView; fr: string; en: string }[] = [
   { id: "fundamentals", fr: "Synthèse", en: "Overview" },
@@ -12,6 +12,7 @@ const tabs: { id: MobileFundamentalView; fr: string; en: string }[] = [
   { id: "peers", fr: "Pairs", en: "Peers" },
   { id: "scenarios", fr: "Scénarios", en: "Scenarios" },
   { id: "documents", fr: "Rapports", en: "Reports" },
+  { id: "capital", fr: "Capital", en: "Capital" },
   { id: "financials", fr: "Résultats", en: "Financials" },
   { id: "analysts", fr: "Analystes", en: "Analysts" },
 ];

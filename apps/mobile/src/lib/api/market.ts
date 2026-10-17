@@ -2,6 +2,7 @@ import { apiRequest } from "./base";
 import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import type { ScenarioRequest, ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
 import type { FundamentalDocumentResearch } from "@anatole/shared/fundamental-documents";
+import type { FundamentalCapitalResearch } from "@anatole/shared/fundamental-capital";
 import type {
   CalendarSnapshot,
   CockpitSnapshot,
@@ -73,6 +74,7 @@ export const marketApi = {
   fundamentalPeers: (ticker: string, peers?: string[], signal?: AbortSignal) => apiRequest<PeerComparison>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/peers${peers === undefined ? "" : `?peers=${encodeURIComponent(peers.join(","))}`}`, { timeoutMs: 45_000, signal }),
   fundamentalScenarios: (ticker: string, request: ScenarioRequest, signal?: AbortSignal) => apiRequest<ScenarioSimulation>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/scenarios`, { method: "POST", body: JSON.stringify(request), timeoutMs: 45_000, signal }),
   fundamentalDocuments: (ticker: string, query?: string, signal?: AbortSignal) => apiRequest<FundamentalDocumentResearch>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/documents${query?.trim() ? `?query=${encodeURIComponent(query.trim())}` : ""}`, { timeoutMs: 60_000, signal }),
+  fundamentalCapital: (ticker: string, signal?: AbortSignal) => apiRequest<FundamentalCapitalResearch>(`/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/capital`, { timeoutMs: 30_000, signal }),
   companyNetwork: (ticker: string, depth: 1 | 2 = 1, signal?: AbortSignal) => apiRequest<CompanyNetworkSnapshot>(`/api/v1/discovery/company-network/${encodeURIComponent(ticker)}?depth=${depth}`, { timeoutMs: 25_000, signal }),
   companyNetworkEvidence: (ticker: string, signal?: AbortSignal) => apiRequest<CompanyNetworkEvidenceResponse>(`/api/v1/discovery/company-network/${encodeURIComponent(ticker)}/evidence`, { timeoutMs: 20_000, signal }),
   companyNetworkPath: (from: string, to: string, signal?: AbortSignal) => apiRequest<CompanyRelationshipPath>(`/api/v1/discovery/company-network/path?from_ticker=${encodeURIComponent(from)}&to_ticker=${encodeURIComponent(to)}&max_depth=3`, { timeoutMs: 25_000, signal }),

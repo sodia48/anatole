@@ -6,6 +6,7 @@ import { MobileFocusDiagnostic } from "./MobileFocusDiagnostic";
 import { MobileFocusPeers } from "./MobileFocusPeers";
 import { MobileFocusScenarios } from "./MobileFocusScenarios";
 import { MobileFocusDocuments } from "./MobileFocusDocuments";
+import { MobileFocusCapital } from "./MobileFocusCapital";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
@@ -17,6 +18,7 @@ import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@
 import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import { defaultScenarioRequest, type ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
 import type { FundamentalDocumentResearch } from "@anatole/shared/fundamental-documents";
+import type { FundamentalCapitalResearch } from "@anatole/shared/fundamental-capital";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -172,6 +174,27 @@ describe("mobile Focus parity", () => {
     await fireEvent.changeText(view.getByLabelText("Rechercher un terme ou une expression"), "Revenue");
     await fireEvent.press(view.getByText("Rechercher"));
     expect(onSearch).toHaveBeenCalledWith("Revenue");
+  });
+  it("separates sourced capital uses from unavailable analyst revisions", async () => {
+    const value = (amount: number | null) => ({ value: amount, status: amount === null ? "unavailable" as const : "calculated" as const,
+      formula: "Explicit calculation", missing_inputs: amount === null ? ["reported input"] : [] });
+    const period = { period_end: "2025-12-31T00:00:00Z", currency: "CAD", source_name: "Issuer report",
+      source_url: "https://issuer.example/report.pdf", source_confidence: "official" as const,
+      filed_at: "2026-02-10T00:00:00Z", operating_cash_flow: value(70), capital_expenditure: value(20),
+      dividends: value(10), repurchases: value(5), free_cash_flow: value(40), cash_after_allocations: value(35),
+      capex_share_of_known_uses: value(57), earnings_cash_conversion: value(70), debt_change: value(-10) };
+    const research: FundamentalCapitalResearch = { ticker: "RY.TO", status: "partial", financial_currency: "CAD", stale: false,
+      periods: [period], analysts: { status: "partial", as_of: "2026-02-10T00:00:00Z", source_name: "Secondary analyst snapshot",
+        source_confidence: "secondary_snapshot", recommendation_key: "buy", distribution: { strong_buy: 1, buy: 5, hold: 2, sell: 0, strong_sell: 0 },
+        target_low: null, target_mean: 150, target_median: null, target_high: null, target_currency: null, estimates: [],
+        actual_vs_consensus: [], revision_history_status: "unavailable", revision_history_reason_fr: "Aucun historique daté des révisions.",
+        revision_history_reason_en: "No dated revision history." }, limitations_fr: ["Calcul illustratif."], limitations_en: ["Illustrative calculation."] };
+    const view = await render(<MobileFocusCapital research={research} error={null} loading={false} onRetry={jest.fn()} />);
+    expect(view.getByText("Aucun historique daté des révisions.")).toBeTruthy();
+    await fireEvent.press(view.getByText("Tableau"));
+    expect(view.getByText("Indicateur")).toBeTruthy();
+    await fireEvent.press(view.getByText("Graphiques"));
+    expect(view.getByText(/Flux opérationnel · 70 CAD/)).toBeTruthy();
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
