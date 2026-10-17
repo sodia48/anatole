@@ -700,6 +700,30 @@ class FinancialDocumentParser:
     max_xlsx_rows_per_sheet = 650
     max_xlsx_columns = 36
 
+    def extract_pages(
+        self,
+        content: bytes,
+        document: IssuerDocumentCandidate,
+        *,
+        max_pdf_pages: int = 24,
+    ) -> list[tuple[int | None, str]]:
+        """Keep physical PDF page numbers attached to extracted source text."""
+        if document.document_format == "pdf":
+            reader = PdfReader(io.BytesIO(content))
+            output: list[tuple[int | None, str]] = []
+            for page_number, page in enumerate(reader.pages[:max(1, min(max_pdf_pages, self.max_pdf_pages))], start=1):
+                try:
+                    page_text = page.extract_text(extraction_mode="layout")
+                except TypeError:
+                    page_text = page.extract_text()
+                except Exception:  # noqa: BLE001
+                    page_text = ""
+                if page_text:
+                    output.append((page_number, page_text))
+            return output
+        text = self.extract_text(content, document, max_pdf_pages=max_pdf_pages)
+        return [(None, text)] if text else []
+
     def parse_text(
         self,
         text: str,
