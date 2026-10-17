@@ -289,6 +289,7 @@
 }
 
 .suggestions {
+  display: none;
   position: absolute;
   z-index: 40;
   top: calc(100% + 8px);
@@ -301,6 +302,10 @@
   border-radius: 13px;
   background: var(--panel);
   box-shadow: 0 24px 60px var(--light-shadow, rgba(0, 0, 0, 0.5));
+}
+
+.searchField:focus-within .suggestions {
+  display: block;
 }
 
 .suggestion {

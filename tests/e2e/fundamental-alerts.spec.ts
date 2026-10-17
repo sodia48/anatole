@@ -17,8 +17,11 @@ test("fundamental alerts keep a sourced filing, threshold and reminder", async (
   await page.goto("/alertes");
   await expect(page.getByRole("button", { name: "Signaler un problème" })).toHaveAttribute("data-client-ready", "true");
   await page.getByLabel("Symbole").fill("RY");
+  const symbolSuggestions = page.locator('[class*="searchField"] [class*="suggestions"]');
+  await expect(symbolSuggestions).toBeVisible();
   await page.getByLabel("Type de règle").selectOption("event");
   await page.getByLabel("Changement minimal").fill("4");
+  await expect(symbolSuggestions).toBeHidden();
   await page.getByLabel("Rappel minimal").selectOption("10080");
   await page.getByRole("button", { name: "Créer" }).click();
   await expect(page.getByText("Baisse de marge opérationnelle (points) · 10080 min")).toBeVisible();
