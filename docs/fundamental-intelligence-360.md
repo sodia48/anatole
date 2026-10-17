@@ -43,3 +43,11 @@ Chaque PR est testable séparément et ne modifie pas les règles de protection 
 - Aucun historique de consensus ou de révisions ne peut être reconstruit à partir de l'instantané courant.
 - Une valeur d'entreprise DCF ne peut être assimilée à un cours certain; absence de flux, d'actions, de devise ou de taux cohérent implique « non calculable ».
 - Les droits de redistribution des données secondaires doivent être vérifiés avant un export institutionnel commercial.
+
+## Assistant et profils (PR 7)
+
+- Les questions ciblées sur divergence bénéfice/trésorerie, pairs, sensibilité des revenus et changements entre rapports passent par les modules de diagnostic, comparables, scénarios et documents. La réponse déterministe distingue faits publiés, calculs, scénarios et interprétation; l'absence de données est affichée au lieu d'être comblée.
+- Une divergence n'est affirmée que si deux exercices consécutifs de même devise montrent réellement un bénéfice en hausse et un flux opérationnel en baisse. Une différence textuelle entre rapports ne devient pas une conclusion comptable.
+- Le scénario de revenus requiert un pourcentage et un sens explicites. Il utilise le même choc dans les trois emplacements du simulateur existant, sans DCF ni hypothèse de taux inventée, et signale les sorties incalculables.
+- Les actions de l'Assistant ouvrent la vue Focus correspondante par un paramètre `view` strictement autorisé. Les parcours Particulier et Institutionnel partagent les faits publics; le contexte Institutionnel ne transmet que le symbole et la route, jamais le brouillon de thèse.
+- Les annotations privées, la collaboration, les approbations d'équipe et les exports redistribuant des données secondaires restent inactifs tant que les permissions d'organisation et les licences ne sont pas établies.

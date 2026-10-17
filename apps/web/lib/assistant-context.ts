@@ -80,15 +80,16 @@ export function deriveAssistantContext(pathname: string, search: URLSearchParams
   const route = pathname.replace(/\/$/, "") || "/";
   const focus = /^\/focus\/([A-Za-z0-9.^-]{1,15})$/.exec(route);
   const etf = /^\/etf\/([A-Za-z0-9.^-]{1,15})$/.exec(route);
-  const symbol = (focus?.[1] ?? etf?.[1])?.toUpperCase().replace(/\.TO$/, "");
+  const institutionalSymbol = route === "/institutionnel/recherche" ? search.get("symbol") : null;
+  const symbol = (focus?.[1] ?? etf?.[1] ?? institutionalSymbol)?.toUpperCase().replace(/\.TO$/, "");
   const symbols = route === "/comparateur"
     ? (search.get("symbols") ?? "").split(",").map((value) => value.toUpperCase().replace(/\.TO$/, "")).filter((value) => SYMBOL.test(value)).slice(0, 5)
     : symbol && SYMBOL.test(symbol) ? [symbol] : [];
-  const surface: AssistantSurface = focus ? "stock" : etf ? "etf" : route === "/portefeuille" ? "portfolio"
+  const surface: AssistantSurface = focus || (institutionalSymbol && symbols.length) ? "stock" : etf ? "etf" : route === "/portefeuille" ? "portfolio"
     : route === "/comparateur" ? "compare" : route === "/actualites" ? "news" : route === "/canada" ? "canada360" : route === "/taux-obligations" ? "fixed_income"
     : route === "/terminal" || route === "/screener" ? "market" : "other";
   return { surface, route, symbol: symbols[0], symbols,
-    instrument_type: focus ? "stock" : etf ? "etf" : "unknown",
+    instrument_type: focus || (institutionalSymbol && symbols.length) ? "stock" : etf ? "etf" : "unknown",
     portfolio_scope: { authorized: false, position_count: 0 }, language, metadata: {} };
 }
 

@@ -27,6 +27,7 @@ from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.etf_holdings import etf_holdings_service
 from app.services.assistant_etf_history import EtfHistoryQuery, ETF_HISTORY_SKILLS, historical_answer, history_query
 from app.services.fundamentals import fundamentals_service
+from app.services.fundamental_assistant import answer_fundamental_question, fundamental_question_kind, FOCUS_VIEW
 from app.services.market_data import market_data_service
 from app.services.stock_research import build_stock_research_bundle, format_stock_research
 from app.services.portfolio import portfolio_service
@@ -286,6 +287,17 @@ class AnatoleAssistantOrchestrator:
             focus = None
         bundle = build_stock_research_bundle(symbol, focus, fundamental_snapshot, news_snapshot)
         answer = format_stock_research(bundle, question=question)
+        if fundamental_snapshot is not None and fundamental_question_kind(question):
+            try:
+                focused = await answer_fundamental_question(fundamental_snapshot, question)
+                if focused is not None:
+                    answer = focused.text + "\n\n## Analyse complète\n" + answer
+                    bundle.facts = focused.facts + bundle.facts
+                    bundle.sources = focused.sources + bundle.sources
+                    bundle.missing_data.extend(focused.missing)
+            except Exception:
+                logger.info("assistant_fundamental_tool_failed skill=stock_analysis")
+                bundle.missing_data.append("Analyse fondamentale approfondie temporairement indisponible")
         sector = f"{focus.profile.sector or ''} {focus.profile.industry or ''}".casefold() if focus is not None else ""
         if any(word in question.casefold() for word in ("taux", "rate", "obligat", "bond")) and any(
             word in sector for word in ("bank", "banque", "reit", "immobili", "utilit", "insurance", "assurance")
@@ -721,6 +733,10 @@ class AnatoleAssistantOrchestrator:
                                    f"/comparateur?symbols={symbols[0]},{symbols[1]}"))
         elif skill == "stock_analysis" and symbols:
             actions.append(_action(f"Ouvrir l’analyse complète de {symbols[0]} dans Focus", f"/focus/{symbols[0]}"))
+            topic = fundamental_question_kind(request.message)
+            if topic:
+                view = FOCUS_VIEW[topic]
+                actions.append(_action(f"Voir {view} dans Focus", f"/focus/{symbols[0]}?view={view}"))
         elif skill == "etf_analysis" and symbols:
             actions.append(_action(f"Voir {symbols[0]} dans ETF", f"/etf/{symbols[0]}"))
         elif skill == "portfolio_analysis":
@@ -738,7 +754,7 @@ class AnatoleAssistantOrchestrator:
         bundle.navigation_actions.extend(actions)
         base.intent = skill
         synthesis = None
-        if skill not in {"canada360", "guardrail"}:
+        if skill not in {"canada360", "guardrail"} and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
             macro_suffix = ("\n\n## Contexte macro Canada 360" +
                             base.answer.split("\n\n## Contexte macro Canada 360", 1)[1]
                             if mixed_macro and skill == "portfolio_analysis"
