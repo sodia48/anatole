@@ -29,6 +29,13 @@ Les scores sont **dimensionnels**. Ils nécessitent une couverture minimale docu
 
 Chaque PR est testable séparément et ne modifie pas les règles de protection de `main`. Les PR dépendantes ciblent la branche précédente jusqu'à autorisation de fusion, puis sont réalignées sur `main` dans l'ordre.
 
+## Surveillance fondamentale (PR 6)
+
+- L'utilisateur ajoute explicitement une règle par titre : baisse de marge opérationnelle (points), hausse dette/capitaux propres (points de ratio), baisse du flux disponible (%) ou publication d'un rapport annuel/trimestriel officiel. Les trois seuils et le rappel minimal (1, 7 ou 30 jours) sont personnalisables sur web et mobile.
+- Un changement requiert les deux derniers exercices annuels consécutifs (300 à 430 jours), même devise et type de source, liens et dates de dépôt officiels, et une publication récente (90 jours). Les ratios et flux proviennent du diagnostic partagé. Un instantané périmé, une source secondaire, une absence de base positive ou une métrique inadaptée au secteur empêchent le déclenchement.
+- L'identifiant d'événement combine titre, période, mesure et document. Le centre de notifications conserve un historique en base, évite de répéter une même publication et respecte le rappel minimal par règle. Les navigateurs et l'application mobile conservent aussi leur état local de déduplication.
+- Les révisions de prévisions et de recommandations ne sont pas émises : le fournisseur expose un instantané courant sans historique daté vérifiable. Une « nouvelle information officielle importante » n'est pas déduite automatiquement d'un document sans classification fiable de son contenu.
+
 ## Dépendances et limites à ne pas masquer
 
 - Une comparaison sectorielle ne peut déclarer une médiane représentative si trop peu de sociétés comparables ont une même définition et une même période.

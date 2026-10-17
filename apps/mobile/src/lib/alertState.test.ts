@@ -55,4 +55,16 @@ describe("persistent alert transitions", () => {
     expect(await loadAlertStates()).toEqual(states);
     expect(await AsyncStorage.getItem(ALERT_STATE_KEY)).not.toContain("token");
   });
+
+  it("honors the chosen frequency and never repeats a fundamental filing", () => {
+    const rule = { ...eventRule("fundamental", "fundamental_results"), cooldown_minutes: 60 };
+    const first = evaluateAlertTransitions([rule], [event("fundamental", "fundamental_results", "filing-1", "2025")], {}, new Date("2026-09-04T12:00:00Z"));
+    expect(first.triggered).toHaveLength(1);
+    const second = evaluateAlertTransitions([rule], [event("fundamental", "fundamental_results", "filing-2", "2026")], first.states, new Date("2026-09-04T12:10:00Z"));
+    expect(second.triggered).toHaveLength(0);
+    const third = evaluateAlertTransitions([rule], [event("fundamental", "fundamental_results", "filing-2", "2026")], second.states, new Date("2026-09-04T13:00:00Z"));
+    expect(third.triggered).toHaveLength(1);
+    const repeated = evaluateAlertTransitions([rule], [event("fundamental", "fundamental_results", "filing-2", "2026")], third.states, new Date("2026-09-05T13:00:00Z"));
+    expect(repeated.triggered).toHaveLength(0);
+  });
 });
