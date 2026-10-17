@@ -12,6 +12,7 @@
     "./etf-ranking": "./src/etf-ranking.ts",
     "./focus-chart": "./src/focus-chart.ts",
     "./fundamental-intelligence": "./src/fundamental-intelligence.ts",
-    "./fundamental-scenarios": "./src/fundamental-scenarios.ts"
+    "./fundamental-scenarios": "./src/fundamental-scenarios.ts",
+    "./fundamental-documents": "./src/fundamental-documents.ts"
   }
 }

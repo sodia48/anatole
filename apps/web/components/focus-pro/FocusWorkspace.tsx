@@ -17,6 +17,7 @@ import { FocusFundamentals, type FundamentalView } from "@/components/stock/Focu
 import { FocusDiagnostic } from "@/components/stock/FocusDiagnostic";
 import { FocusPeers } from "@/components/stock/FocusPeers";
 import { FocusScenarios } from "@/components/stock/FocusScenarios";
+import { FocusDocuments } from "@/components/stock/FocusDocuments";
 import { FocusGlyph } from "./FocusGlyph";
 import { FocusStockNews } from "@/components/stock/FocusStockNews";
 import { KeyLevels } from "@/components/stock/KeyLevels";
@@ -95,7 +96,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : "overview");
-  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios">("fundamentals");
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents">("fundamentals");
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -406,6 +407,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
                 { id: "diagnostic", fr: "Diagnostic 360°", en: "Diagnostic 360°" },
                 { id: "peers", fr: "Pairs", en: "Peers" },
                 { id: "scenarios", fr: "Scénarios", en: "Scenarios" },
+                { id: "documents", fr: "Rapports", en: "Reports" },
                 { id: "financials", fr: "Résultats", en: "Financials" },
                 { id: "analysts", fr: "Analystes", en: "Analysts" },
               ] as const).map((item) => (
@@ -423,7 +425,8 @@ export function FocusWorkspace({ initialSnapshot, embedded = false }: { initialS
           ) : null}
           {section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} />
             : section === "fundamentals" && fundamentalView === "peers" ? <FocusPeers key={ticker} ticker={ticker} />
-              : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} /> : <FocusFundamentals
+              : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} />
+                : section === "fundamentals" && fundamentalView === "documents" ? <FocusDocuments key={ticker} ticker={ticker} /> : <FocusFundamentals
             key={ticker}
             ticker={ticker}
             view={section === "overview" ? "valuation" : fundamentalView as FundamentalView}

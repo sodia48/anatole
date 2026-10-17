@@ -8,10 +8,12 @@ from app.schemas.fundamentals import (
 )
 from app.schemas.fundamental_intelligence import FundamentalDiagnostic, PeerComparison
 from app.schemas.fundamental_scenarios import ScenarioRequest, ScenarioSimulation
+from app.schemas.fundamental_documents import FundamentalDocumentResearch
 from app.services.fundamentals import fundamentals_service
 from app.services.fundamental_intelligence import build_fundamental_diagnostic
 from app.services.fundamental_peers import peer_comparison
 from app.services.fundamental_scenarios import simulate_financial_scenarios
+from app.services.fundamental_documents import research_official_documents
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
@@ -148,3 +150,16 @@ async def fundamental_scenarios(ticker: str, request: ScenarioRequest) -> Scenar
         return simulate_financial_scenarios(snapshot, request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get(
+    "/{ticker}/fundamental-intelligence/documents",
+    response_model=FundamentalDocumentResearch,
+    summary="Search bounded official issuer documents with verifiable excerpts",
+)
+async def fundamental_documents(
+    ticker: str,
+    query: str | None = Query(default=None, min_length=2, max_length=120),
+) -> FundamentalDocumentResearch:
+    snapshot = await fundamentals_service.get_snapshot(ticker)
+    return await research_official_documents(snapshot, query)
