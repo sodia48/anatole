@@ -7,9 +7,11 @@ from app.schemas.fundamentals import (
     YahooStatementsDiagnostics,
 )
 from app.schemas.fundamental_intelligence import FundamentalDiagnostic, PeerComparison
+from app.schemas.fundamental_scenarios import ScenarioRequest, ScenarioSimulation
 from app.services.fundamentals import fundamentals_service
 from app.services.fundamental_intelligence import build_fundamental_diagnostic
 from app.services.fundamental_peers import peer_comparison
+from app.services.fundamental_scenarios import simulate_financial_scenarios
 from app.services.issuer_documents import (
     issuer_financial_documents_service,
 )
@@ -131,5 +133,18 @@ async def fundamental_peers(ticker: str, peers: str | None = Query(default=None,
     requested = None if peers is None else [item.strip() for item in peers.split(",") if item.strip()]
     try:
         return await peer_comparison(ticker, requested)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post(
+    "/{ticker}/fundamental-intelligence/scenarios",
+    response_model=ScenarioSimulation,
+    summary="Explicit financial sensitivities and conditional DCF valuation",
+)
+async def fundamental_scenarios(ticker: str, request: ScenarioRequest) -> ScenarioSimulation:
+    snapshot = await fundamentals_service.get_snapshot(ticker)
+    try:
+        return simulate_financial_scenarios(snapshot, request)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

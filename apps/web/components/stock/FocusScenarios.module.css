@@ -1,0 +1,25 @@
+.panel { display: grid; gap: 16px; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); color: var(--text); }
+.panel h2, .panel h3 { margin: 0 0 8px; }
+.muted { color: var(--text-secondary); font-size: 13px; }
+.form, .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.form fieldset, .metrics, .card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.form legend, .metrics legend { font-weight: 700; }
+.form label { display: grid; gap: 4px; margin: 7px 0; font-size: 13px; }
+.form input[type="number"] { min-height: 40px; width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+.form button { align-self: end; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: var(--accent, #318cff); color: white; font-weight: 700; }
+.rates { display: grid; gap: 6px; }
+.metrics { display: flex; flex-wrap: wrap; gap: 12px; }
+.metrics label { display: flex; gap: 6px; align-items: center; }
+.tableWrap { overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; text-align: left; }
+.tableWrap caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
+.tableWrap th, .tableWrap td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.tableWrap small, .card small { display: block; color: var(--text-secondary); font-size: 11px; }
+.panel details { font-size: 12px; color: var(--text-secondary); }
+.panel summary { cursor: pointer; }
+.card p { margin: 8px 0; }
+.barRow { display: grid; gap: 5px; margin: 12px 0; }
+.track { height: 9px; border-radius: 5px; background: var(--border); }
+.bar { height: 9px; border-radius: 5px; background: var(--accent, #318cff); }
+.limits { border-top: 1px solid var(--border); padding-top: 12px; }
+@media (max-width: 700px) { .panel { padding: 12px; } }
