@@ -15,6 +15,9 @@ const diagnostic = {
   methodology_fr: "Calculs déterministes. Aucun score global ni conseil d'investissement.",
   methodology_en: "Deterministic calculations. No global score or investment advice.",
   missing_data: [],
+  sector_metrics: [{ key: "cet1", label_fr: "CET1", label_en: "CET1 capital ratio", value: 13.2, unit: "%",
+    status: "available", period_end: null, source_name: "Issuer capital report", source_url: "https://issuer.example/capital.pdf",
+    source_confidence: "official", filed_at: "2026-02-10T00:00:00Z" }],
   findings: [{ kind: "observation", text_fr: "La marge nette s'améliore.", text_en: "Net margin improved.", measure_keys: ["net_margin"] }],
   measures: [{ key: "net_margin", label_fr: "Marge nette", label_en: "Net margin", dimension: "profitability", unit: "percent",
     observations: [observation(15, 2025), observation(12, 2024)], status: "available",
@@ -38,6 +41,8 @@ test("Focus diagnostic retains sources, stale status, bilingual modes and avoids
   await expect(panel.getByText("La marge nette s'améliore.")).toBeVisible();
   await expect(panel.getByText(/Dernier instantané disponible/)).toBeVisible();
   await expect(panel.getByText("15 %").first()).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Indicateurs propres au secteur" })).toBeVisible();
+  await expect(panel.getByRole("link", { name: /Issuer capital report/ })).toHaveAttribute("href", "https://issuer.example/capital.pdf");
   await expect(panel.getByRole("link", { name: /Issuer 2025/ })).toHaveAttribute("href", "https://issuer.example/reports/2025.pdf");
   const beforeModeChange = requests;
   await panel.getByRole("group", { name: "Mode du diagnostic" }).getByRole("button", { name: "Vue tableau" }).click();

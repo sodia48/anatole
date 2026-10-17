@@ -57,6 +57,16 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
       {diagnostic.findings.length ? <Card title={pick("Constats fondés sur les données", "Data-backed findings")}>
         {diagnostic.findings.map((finding, index) => <Text key={`${finding.kind}-${index}`} style={styles.finding}>{pick(finding.text_fr, finding.text_en)}</Text>)}
       </Card> : null}
+      {(diagnostic.sector_metrics ?? []).length ? <Card title={pick("Indicateurs propres au secteur", "Sector-specific metrics")}>
+        <Text style={styles.note}>{pick("Seules les valeurs explicitement publiées sont affichées.", "Only explicitly published values are shown.")}</Text>
+        {diagnostic.sector_metrics.map(item => <View key={item.key} style={styles.measure}>
+          <Text style={styles.label}>{pick(item.label_fr, item.label_en)}</Text>
+          <Text style={styles.value}>{item.value === null ? pick("N/D", "N/A") : `${new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(item.value)} ${item.unit}`}</Text>
+          {item.source_url?.startsWith("https://") ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(item.source_url!)}>
+            <Text style={styles.link}>{item.source_name} · {item.filed_at?.slice(0, 10) ?? pick("date N/D", "date N/A")}</Text></Pressable>
+            : <Text style={styles.note}>{pick("Publication officielle non disponible", "Official publication unavailable")}</Text>}
+        </View>)}
+      </Card> : null}
       {diagnostic.dimensions.map(dimension => {
         const members = dimension.measure_keys.map(key => byKey.get(key)).filter((item): item is FundamentalMeasure => Boolean(item));
         return <Card key={dimension.key} title={pick(dimension.label_fr, dimension.label_en)}>

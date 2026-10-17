@@ -12,6 +12,7 @@ import { MobileFocusFundamentalTabs, type MobileFundamentalView } from "@/src/co
 import { MobileFocusHeader } from "@/src/components/focus/MobileFocusHeader";
 import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights";
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
+import { MobileFocusPeers } from "@/src/components/focus/MobileFocusPeers";
 import { focusPeriods, MobileFocusOverview, type FocusPeriod } from "@/src/components/focus/MobileFocusOverview";
 import { MobileFocusPro } from "@/src/components/focus/MobileFocusPro";
 import { IntelligenceActions } from "@/src/components/search/IntelligenceActions";
@@ -33,6 +34,7 @@ export default function StockDetailScreen() {
   const { workspace, saveWorkspace } = useMobileAccount();
   const [section, setSection] = useState<MobileFocusSection>("overview");
   const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>("fundamentals");
+  const [peerSelection, setPeerSelection] = useState<string[] | undefined>(undefined);
   const [preloadedProTicker, setPreloadedProTicker] = useState<string | null>(null);
   const [period, setPeriod] = useState<FocusPeriod>(focusPeriods[0]);
   const [appActive, setAppActive] = useState(AppState.currentState === "active");
@@ -51,10 +53,11 @@ export default function StockDetailScreen() {
   const needsFundamentals = section === "overview" || section === "fundamentals";
   const fundamentals = useQuery({ queryKey: ["fundamentals", ticker], queryFn: ({ signal }) => marketApi.fundamentals(ticker, signal), enabled: Boolean(focus.data) && needsFundamentals, staleTime: 10 * 60_000 });
   const diagnostic = useQuery({ queryKey: ["fundamental-diagnostic", ticker], queryFn: ({ signal }) => marketApi.fundamentalDiagnostic(ticker, signal), enabled: Boolean(focus.data) && section === "fundamentals" && fundamentalView === "diagnostic", staleTime: 10 * 60_000 });
+  const peers = useQuery({ queryKey: ["fundamental-peers", ticker, peerSelection], queryFn: ({ signal }) => marketApi.fundamentalPeers(ticker, peerSelection, signal), enabled: Boolean(focus.data) && section === "fundamentals" && fundamentalView === "peers", staleTime: 10 * 60_000 });
   const live = useLiveQuote(ticker, focus.data?.quote);
   const followed = workspace.data.watchlist.includes(ticker);
   async function toggleWatchlist() { await saveWorkspace({ ...workspace.data, watchlist: followed ? workspace.data.watchlist.filter((item) => item !== ticker) : [...workspace.data.watchlist, ticker] }); }
-  const refresh = () => { if (section === "overview") void Promise.all([focus.refetch(), news.refetch(), fundamentals.refetch()]); else if (fundamentalView === "diagnostic" && section === "fundamentals") void diagnostic.refetch(); else if (needsFundamentals) void fundamentals.refetch(); };
+  const refresh = () => { if (section === "overview") void Promise.all([focus.refetch(), news.refetch(), fundamentals.refetch()]); else if (fundamentalView === "diagnostic" && section === "fundamentals") void diagnostic.refetch(); else if (fundamentalView === "peers" && section === "fundamentals") void peers.refetch(); else if (needsFundamentals) void fundamentals.refetch(); };
   const changeSection = (next: MobileFocusSection) => { if (next === "pro") setPreloadedProTicker(ticker); setSection(next); };
   return <Screen onRefresh={refresh} refreshing={focus.isRefetching || fundamentals.isRefetching || news.isRefetching} testID="stock-detail-screen">
     <QueryState error={!focus.data ? focus.error : null} loading={focus.isLoading} onRetry={() => void focus.refetch()} />
@@ -80,6 +83,7 @@ export default function StockDetailScreen() {
       {section === "fundamentals" ? <>
         <MobileFocusFundamentalTabs view={fundamentalView} onChange={setFundamentalView} />
         {fundamentalView === "diagnostic" ? <MobileFocusDiagnostic diagnostic={diagnostic.data} error={!diagnostic.data ? diagnostic.error : null} loading={diagnostic.isLoading} onRetry={() => void diagnostic.refetch()} /> : null}
+        {fundamentalView === "peers" ? <MobileFocusPeers comparison={peers.data} error={!peers.data ? peers.error : null} loading={peers.isLoading} onRetry={() => void peers.refetch()} selection={peerSelection} onSelect={setPeerSelection} /> : null}
         {fundamentalView === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
         {fundamentalView === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
         {fundamentalView === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}

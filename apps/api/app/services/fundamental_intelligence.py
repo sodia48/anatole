@@ -18,8 +18,10 @@ from app.schemas.fundamental_intelligence import (
     FundamentalMeasure,
     FundamentalObservation,
     FundamentalScoreContribution,
+    SectorInsight,
 )
 from app.schemas.fundamentals import FinancialPeriod, FundamentalSnapshot
+from app.services.stock_sector_analysis import BANK_KEYS, SECTOR_KEYS
 
 
 Operation = Literal["field", "ratio", "growth", "net_debt_to_ebitda"]
@@ -102,7 +104,7 @@ def sector_family(snapshot: FundamentalSnapshot) -> str:
         return "insurance"
     if any(value in context for value in ("reit", "real estate", "immobilier")):
         return "real_estate"
-    if any(value in context for value in ("mining", "miner", "métaux", "metals")):
+    if any(value in context for value in ("mining", "miner", "métaux", "metals", "gold", "silver", "copper", "uranium")):
         return "mining"
     if any(value in context for value in ("technology", "software", "technologie")):
         return "technology"
@@ -288,6 +290,39 @@ def _findings(measures: list[FundamentalMeasure]) -> list[FundamentalFinding]:
     return found
 
 
+_BANK_EN = {
+    "cet1": "CET1 capital ratio", "pcl": "Credit loss provisions", "roe": "Reported ROE",
+    "efficiency_ratio": "Efficiency ratio", "impaired_loans": "Gross impaired loans",
+    "nim": "Net interest margin", "loans_to_deposits": "Loans / deposits",
+    "dividend_payout": "Reported dividend payout",
+}
+
+
+def _sector_insights(snapshot: FundamentalSnapshot, family: str) -> list[SectorInsight]:
+    if family == "bank":
+        registry = {key: (label, _BANK_EN[key], unit) for key, (label, unit) in BANK_KEYS.items()}
+    else:
+        registry = SECTOR_KEYS.get(family, {})
+    reported = {item.key: item for item in snapshot.sector_metrics
+                if item.source.confidence == "official" and item.source.source_url
+                and item.source.source_url.startswith("https://")}
+    output: list[SectorInsight] = []
+    for key, (label_fr, label_en, unit) in registry.items():
+        item = reported.get(key)
+        if item is not None and item.unit != unit:
+            item = None  # Never present an incompatible unit under the same label.
+        output.append(SectorInsight(
+            key=key, label_fr=label_fr, label_en=label_en, unit=unit,
+            value=item.value if item else None, status="available" if item else "unavailable",
+            period_end=item.period_end if item else None,
+            source_name=item.source.source_name if item else None,
+            source_url=item.source.source_url if item else None,
+            source_confidence="official" if item else "unclassified",
+            filed_at=item.source.filed_at if item else None,
+        ))
+    return output
+
+
 def build_fundamental_diagnostic(snapshot: FundamentalSnapshot) -> FundamentalDiagnostic:
     """Build a non-advisory diagnostic from observations already in the snapshot."""
     family = sector_family(snapshot)
@@ -301,6 +336,7 @@ def build_fundamental_diagnostic(snapshot: FundamentalSnapshot) -> FundamentalDi
         financial_currency=snapshot.financial_currency, status=snapshot.status,
         measures=measures, dimensions=_dimensions(measures, rows, family),
         findings=_findings(measures),
+        sector_metrics=_sector_insights(snapshot, family),
         methodology_fr="Calculs déterministes sur les exercices annuels du même instantané. Sources, périodes et formules par observation. Aucun score global ni conseil d'investissement.",
         methodology_en="Deterministic calculations over annual periods from one snapshot. Sources, periods and formulas per observation. No global score or investment advice.",
         missing_data=[item.key for item in measures if item.status == "insufficient"],

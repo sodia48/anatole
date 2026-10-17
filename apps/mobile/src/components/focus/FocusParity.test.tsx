@@ -3,6 +3,7 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 import { MobileFocusAnalysts } from "./MobileFocusAnalysts";
 import { MobileFocusFinancials } from "./MobileFocusFinancials";
 import { MobileFocusDiagnostic } from "./MobileFocusDiagnostic";
+import { MobileFocusPeers } from "./MobileFocusPeers";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
@@ -11,7 +12,7 @@ import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
 import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
-import type { FundamentalDiagnostic } from "@anatole/shared/fundamental-intelligence";
+import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -76,7 +77,7 @@ describe("mobile Focus parity", () => {
     const diagnostic = { ticker: "RY.TO", name: "Royal Bank", sector: "Financials", industry: "Bank",
       sector_family: "bank", generated_at: "2026-02-11T00:00:00Z", source_generated_at: "2026-02-10T00:00:00Z",
       stale: true, financial_currency: "CAD", status: "partial", methodology_fr: "Calculs déterministes.",
-      methodology_en: "Deterministic calculations.", missing_data: [], global_score: null,
+      methodology_en: "Deterministic calculations.", missing_data: [], global_score: null, sector_metrics: [],
       findings: [{ kind: "observation", text_fr: "Marge publiée.", text_en: "Published margin.", measure_keys: ["net_margin"] }],
       measures: [{ key: "net_margin", label_fr: "Marge nette", label_en: "Net margin", dimension: "profitability",
         unit: "percent", observations: [point], status: "available", reason_fr: null, reason_en: null,
@@ -94,6 +95,33 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Dernière valeur")).toBeTruthy();
     await fireEvent.press(view.getByText("Graphiques"));
     expect(view.getByText("Historique · pourcentages")).toBeTruthy();
+  });
+  it("keeps peer medians unavailable for a small sample and supports replacing peers", async () => {
+    const comparison = { target: "RY.TO", sector: "Financials", sector_family: "bank", universe_source: "XIC",
+      universe_as_of: "2026-10-15", method_fr: "Même secteur, taille comparable.", method_en: "Same sector, comparable size.",
+      selected: ["TD.TO"], excluded: {}, candidates: [
+        { ticker: "TD", name: "Toronto-Dominion", sector: "Financials", selection_basis: "same sector" },
+        { ticker: "BMO", name: "Bank of Montreal", sector: "Financials", selection_basis: "same sector" },
+      ], measures: [{ key: "revenue_growth", label_fr: "Croissance des revenus", label_en: "Revenue growth", basis: "annual",
+        unit: "percent", median: null, rank: null, sample_size: 2, minimum_sample_size: 6,
+        explanation_fr: "Échantillon insuffisant.", explanation_en: "Insufficient sample.", values: [
+          { ticker: "RY.TO", value: 10, period_end: "2025-12-31T00:00:00Z", source_name: "Issuer report",
+            source_url: "https://issuer.example/report.pdf", source_confidence: "official" },
+          { ticker: "TD.TO", value: 8, period_end: "2025-12-31T00:00:00Z", source_name: "Issuer report",
+            source_url: "https://issuer.example/report.pdf", source_confidence: "official" },
+        ] }],
+    } as PeerComparison;
+    const onSelect = jest.fn();
+    const view = await render(<MobileFocusPeers comparison={comparison} error={null} loading={false} onRetry={jest.fn()} onSelect={onSelect} />);
+    expect(view.getByText(/Échantillon insuffisant/)).toBeTruthy();
+    expect(view.getByText(/Issuer report/)).toBeTruthy();
+    await fireEvent.press(view.getByText(/Choisir ou remplacer les sociétés/));
+    await fireEvent.press(view.getByText(/BMO · Bank of Montreal/));
+    expect(onSelect).toHaveBeenCalledWith(["TD", "BMO"]);
+    await fireEvent.press(view.getByText("Tableau"));
+    expect(view.getByText("Indicateur")).toBeTruthy();
+    await fireEvent.press(view.getByText("Graphiques"));
+    expect(view.getByText("RY · 10 %")).toBeTruthy();
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
