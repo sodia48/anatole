@@ -2,6 +2,7 @@ import { act, fireEvent, render } from "@testing-library/react-native";
 
 import { MobileFocusAnalysts } from "./MobileFocusAnalysts";
 import { MobileFocusFinancials } from "./MobileFocusFinancials";
+import { MobileFocusDiagnostic } from "./MobileFocusDiagnostic";
 import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
@@ -10,6 +11,7 @@ import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
 import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
+import type { FundamentalDiagnostic } from "@anatole/shared/fundamental-intelligence";
 
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
 
@@ -60,10 +62,38 @@ describe("mobile Focus parity", () => {
     const view = await render(<MobileFocusFundamentalTabs view="fundamentals" onChange={onChange} />);
     expect(view.getByText("Résultats")).toBeTruthy();
     expect(view.getByText("Analystes")).toBeTruthy();
+    expect(view.getByText("Diagnostic 360°")).toBeTruthy();
     await fireEvent.press(view.getByText("Résultats"));
     await fireEvent.press(view.getByText("Analystes"));
     expect(onChange).toHaveBeenCalledWith("financials");
     expect(onChange).toHaveBeenCalledWith("analysts");
+  });
+  it("renders sourced diagnostic values and switches all three native modes", async () => {
+    const point = { value: 15, period_end: "2025-12-31T00:00:00Z", period_type: "annual" as const,
+      unit: "percent" as const, currency: null, nature: "calculated" as const, formula: "income / revenue",
+      inputs: ["net_income", "total_revenue"], source_name: "Issuer report", source_url: "https://issuer.example/report.pdf",
+      source_type: "issuer_official_document", source_confidence: "official" as const, filed_at: "2026-02-10T00:00:00Z" };
+    const diagnostic = { ticker: "RY.TO", name: "Royal Bank", sector: "Financials", industry: "Bank",
+      sector_family: "bank", generated_at: "2026-02-11T00:00:00Z", source_generated_at: "2026-02-10T00:00:00Z",
+      stale: true, financial_currency: "CAD", status: "partial", methodology_fr: "Calculs déterministes.",
+      methodology_en: "Deterministic calculations.", missing_data: [], global_score: null,
+      findings: [{ kind: "observation", text_fr: "Marge publiée.", text_en: "Published margin.", measure_keys: ["net_margin"] }],
+      measures: [{ key: "net_margin", label_fr: "Marge nette", label_en: "Net margin", dimension: "profitability",
+        unit: "percent", observations: [point], status: "available", reason_fr: null, reason_en: null,
+        method_fr: "Bénéfice / revenus", method_en: "Income / revenue" }],
+      dimensions: [{ key: "profitability", label_fr: "Rentabilité", label_en: "Profitability", measure_keys: ["net_margin"],
+        available_count: 1, score: null, score_status: "insufficient", contributions: [],
+        explanation_fr: "Données insuffisantes", explanation_en: "Insufficient data" }],
+    } as FundamentalDiagnostic;
+    const view = await render(<MobileFocusDiagnostic diagnostic={diagnostic} error={null} loading={false} onRetry={jest.fn()} />);
+    expect(view.getByText("Marge publiée.")).toBeTruthy();
+    expect(view.getByText(/Instantané périmé/)).toBeTruthy();
+    expect(view.getByText("15 %")).toBeTruthy();
+    expect(view.getByText(/Issuer report/)).toBeTruthy();
+    await fireEvent.press(view.getByText("Tableau"));
+    expect(view.getByText("Dernière valeur")).toBeTruthy();
+    await fireEvent.press(view.getByText("Graphiques"));
+    expect(view.getByText("Historique · pourcentages")).toBeTruthy();
   });
   it("renders null backend values as N/D in fundamentals", async () => {
     const view = await render(<MobileFocusFundamentals error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);

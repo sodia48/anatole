@@ -1,3 +1,4 @@
+import type { FundamentalDiagnostic } from "@anatole/shared/fundamental-intelligence";
 import type {
   CalendarSnapshot,
   EarningsCalendarSnapshot,
@@ -636,6 +637,13 @@ export function getFocusFundamentalOverlay(
     {},
     signal,
     45_000,
+  );
+}
+
+export function getFundamentalDiagnostic(ticker: string, signal?: AbortSignal): Promise<FundamentalDiagnostic> {
+  return apiRequest<FundamentalDiagnostic>(
+    `/api/v1/stocks/${encodeURIComponent(ticker)}/fundamental-intelligence/diagnostic`,
+    {}, signal, 45_000,
   );
 }
 

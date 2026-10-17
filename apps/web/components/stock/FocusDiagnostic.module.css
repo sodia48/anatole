@@ -1,0 +1,22 @@
+.panel { display: grid; gap: 18px; padding: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); color: var(--text); }
+.panel h2, .panel h3 { margin: 0 0 8px; }
+.panel p { margin: 6px 0; }
+.muted { color: var(--text-secondary); font-size: 13px; }
+.findings { display: grid; gap: 7px; }
+.findings p { padding: 10px 12px; border-left: 3px solid var(--border); background: var(--panel-2, var(--panel)); }
+.findings p[data-kind="strength"] { border-left-color: #16847a; }
+.findings p[data-kind="vulnerability"] { border-left-color: #c7596d; }
+.findings a { margin-left: 8px; }
+.dimension { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.dimension details { color: var(--text-secondary); font-size: 13px; }
+.dimension summary { cursor: pointer; color: var(--text); font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.details { display: grid; gap: 7px; }
+.measure { display: grid; gap: 6px; padding: 11px; border: 1px solid var(--border); border-radius: 9px; scroll-margin-top: 90px; }
+.value { font-size: 18px; font-weight: 750; }
+.charts { display: grid; gap: 14px; }
+.tableWrap { overflow-x: auto; }
+.tableWrap table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.tableWrap caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
+.tableWrap th, .tableWrap td { padding: 8px; border-bottom: 1px solid var(--border); }
+@media (max-width: 700px) { .panel { padding: 12px; } .dimension { padding: 10px; } }
