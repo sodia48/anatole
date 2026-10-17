@@ -22,6 +22,8 @@ from app.services.analysis import analysis_service
 from app.services.earnings_calendar import earnings_calendar_service
 from app.services.insiders import insider_service
 from app.services.stock_news import stock_news_service
+from app.services.fundamentals import fundamentals_service
+from app.services.fundamental_alerts import evaluate_fundamental_event
 
 
 _METRIC_LABELS = {
@@ -143,6 +145,9 @@ class AlertService:
                 if recent:
                     event_value = recent[0].id or recent[0].url
                     event_fingerprint = f"{symbol}:news:{event_value}"
+            elif rule.event_type and rule.event_type.startswith("fundamental_"):
+                snapshot = await fundamentals_service.get_snapshot(symbol)
+                return evaluate_fundamental_event(rule, snapshot, evaluated_at)
             else:
                 raise ValueError("Type d'événement inconnu")
         except Exception:  # noqa: BLE001
@@ -157,15 +162,18 @@ class AlertService:
                 if rule.enabled and rule.kind == "threshold"
             )
         )
-        quotes, histories = await asyncio.gather(
-            market_data_service.get_quotes(enabled_symbols),
-            market_data_service.get_history_many(
-                enabled_symbols,
-                range_="3mo",
-                interval="1d",
-                concurrency=6,
-            ),
-        )
+        if enabled_symbols:
+            quotes, histories = await asyncio.gather(
+                market_data_service.get_quotes(enabled_symbols),
+                market_data_service.get_history_many(
+                    enabled_symbols,
+                    range_="3mo",
+                    interval="1d",
+                    concurrency=6,
+                ),
+            )
+        else:
+            quotes, histories = [], {}
         quote_by_symbol = {_key(item.symbol): item for item in quotes}
         quote_by_symbol.update({_key(item.ticker): item for item in quotes})
         evaluated_at = datetime.now(UTC)

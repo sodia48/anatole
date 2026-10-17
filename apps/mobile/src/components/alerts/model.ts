@@ -1,7 +1,7 @@
 import type { AlertRule, AlertSnapshot } from "@/src/lib/api/types";
 
 export const thresholdMetrics: NonNullable<AlertRule["metric"]>[] = ["price", "change_percent", "rsi_14", "momentum_20d", "relative_volume", "score"];
-export const eventTypes: NonNullable<AlertRule["event_type"]>[] = ["terminal_anomaly", "terminal_regime", "earnings_upcoming", "insider_unusual", "company_news"];
+export const eventTypes: NonNullable<AlertRule["event_type"]>[] = ["terminal_anomaly", "terminal_regime", "earnings_upcoming", "insider_unusual", "company_news", "fundamental_margin_drop", "fundamental_debt_rise", "fundamental_fcf_drop", "fundamental_results"];
 
 export function migrateAlertRule(rule: AlertRule): AlertRule {
   return { ...rule, kind: rule.kind ?? "threshold", cooldown_minutes: rule.cooldown_minutes ?? 1_440 };
@@ -9,7 +9,7 @@ export function migrateAlertRule(rule: AlertRule): AlertRule {
 
 export function alertLabel(rule: AlertRule, language: "fr" | "en"): string {
   if ((rule.kind ?? "threshold") === "event") {
-    const labels: Record<string, [string, string]> = { terminal_anomaly: ["Anomalie Terminal", "Terminal anomaly"], terminal_regime: ["Régime Terminal", "Terminal regime"], earnings_upcoming: ["Résultats à venir", "Upcoming earnings"], insider_unusual: ["Transaction d’initié inhabituelle", "Unusual insider trade"], company_news: ["Nouvelle de l’entreprise", "Company news"] };
+    const labels: Record<string, [string, string]> = { terminal_anomaly: ["Anomalie Terminal", "Terminal anomaly"], terminal_regime: ["Régime Terminal", "Terminal regime"], earnings_upcoming: ["Résultats à venir", "Upcoming earnings"], insider_unusual: ["Transaction d’initié inhabituelle", "Unusual insider trade"], company_news: ["Nouvelle de l’entreprise", "Company news"], fundamental_margin_drop: ["Baisse de marge opérationnelle (points)", "Operating margin drop (points)"], fundamental_debt_rise: ["Hausse dette / capitaux propres (x)", "Debt / equity rise (x)"], fundamental_fcf_drop: ["Baisse du flux disponible (%)", "Free cash flow drop (%)"], fundamental_results: ["Nouveau rapport officiel", "New official report"] };
     return labels[rule.event_type ?? ""]?.[language === "fr" ? 0 : 1] ?? "N/D";
   }
   const metric = rule.metric ?? "N/D";

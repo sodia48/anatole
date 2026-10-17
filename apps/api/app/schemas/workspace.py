@@ -356,6 +356,10 @@ AlertEventType = Literal[
     "earnings_upcoming",
     "insider_unusual",
     "company_news",
+    "fundamental_margin_drop",
+    "fundamental_debt_rise",
+    "fundamental_fcf_drop",
+    "fundamental_results",
 ]
 AlertType = Literal[
     "price_level",
@@ -430,6 +434,14 @@ class AlertRule(BaseModel):
         if self.kind == "event":
             if self.event_type is None:
                 raise ValueError("Une alerte événementielle exige event_type.")
+            limits = {
+                "fundamental_margin_drop": 100.0,
+                "fundamental_debt_rise": 100.0,
+                "fundamental_fcf_drop": 100.0,
+            }
+            if self.event_type in limits and self.threshold is not None:
+                if not 0 < self.threshold <= limits[self.event_type]:
+                    raise ValueError("Le seuil fondamental doit être positif et au plus 100.")
             return self
         if self.metric is None or self.operator is None or self.threshold is None:
             raise ValueError("Une alerte de seuil exige metric, operator et threshold.")
