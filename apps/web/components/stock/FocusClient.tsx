@@ -14,5 +14,5 @@ export function FocusClient({
   initialSnapshot: FocusSnapshot;
   initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents";
 }) {
-  return <FocusWorkspace initialSnapshot={initialSnapshot} initialFundamentalView={initialFundamentalView} />;
+  return <FocusWorkspace key={initialFundamentalView ?? "overview"} initialSnapshot={initialSnapshot} initialFundamentalView={initialFundamentalView} />;
 }

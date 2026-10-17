@@ -98,12 +98,6 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : initialFundamentalView ? "fundamentals" : "overview");
   const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView ?? "fundamentals");
-  useEffect(() => {
-    if (initialFundamentalView && !embedded) {
-      setSection("fundamentals");
-      setFundamentalView(initialFundamentalView);
-    }
-  }, [initialFundamentalView, embedded]);
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
