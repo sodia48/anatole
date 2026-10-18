@@ -51,3 +51,14 @@ Chaque PR est testable séparément et ne modifie pas les règles de protection 
 - Le scénario de revenus requiert un pourcentage et un sens explicites. Il utilise le même choc dans les trois emplacements du simulateur existant, sans DCF ni hypothèse de taux inventée, et signale les sorties incalculables.
 - Les actions de l'Assistant ouvrent la vue Focus correspondante par un paramètre `view` strictement autorisé. Les parcours Particulier et Institutionnel partagent les faits publics; le contexte Institutionnel ne transmet que le symbole et la route, jamais le brouillon de thèse.
 - Les annotations privées, la collaboration, les approbations d'équipe et les exports redistribuant des données secondaires restent inactifs tant que les permissions d'organisation et les licences ne sont pas établies.
+
+## Intégration finale (PR 8)
+
+| Parcours | Preuve vérifiée | Limite conservée |
+| --- | --- | --- |
+| Institutionnel → Assistant | Le contexte transporte le symbole public RY; le brouillon de thèse et les positions ne sont pas envoyés. | Pas de partage de thèse privée sans modèle d'organisation. |
+| Assistant → Focus Scénarios | Le lien `view=scenarios` ouvre la bonne vue et sa source de référence. | Les chiffres sont des sensibilités, pas des prévisions; la DCF exige ses entrées. |
+| Focus Pairs et Rapports | Les comparables gardent leur source et la médiane reste indisponible si l'échantillon est trop petit. Les extraits renvoient à la page du PDF. | Une différence d'extrait ne prouve pas son importance financière. |
+| Focus → Alertes | La règle conserve seuil et rappel explicites, puis pointe vers le document source de l'événement. | Aucun événement ne doit être affirmé sans observation officielle comparable et récente. |
+
+Le test navigateur `fundamental-intelligence-flow.spec.ts` traverse ce parcours sur Chromium, Android et iPhone avec une source de rapport commune. Les tests des modules 1 à 7 couvrent séparément devises incompatibles, données manquantes, fraîcheur, permissions, déduplication et cas sectoriels. Les contrôles `api-tests`, `web-build`, `mobile-quality` et `e2e` restent obligatoires pour chaque PR de la série. Aucun seuil de performance ou contrôle de sécurité n'est assoupli.
