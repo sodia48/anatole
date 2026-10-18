@@ -106,6 +106,9 @@ class PeerCandidate(BaseModel):
     name: str
     sector: str
     selection_basis: str
+    comparability: Literal["direct", "related", "sector"] = "sector"
+    industry: str | None = None
+    reason: str | None = None
 
 
 class PeerMeasureValue(BaseModel):

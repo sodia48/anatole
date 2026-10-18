@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import type { FundamentalDocumentResearch, DocumentPassage } from "@anatole/shared/fundamental-documents";
+import { formatFinancialNumber } from "@anatole/shared/financial-display";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { getFundamentalDocuments } from "@/lib/api";
 import { pick } from "@/lib/i18n";
@@ -70,7 +71,7 @@ export function FocusDocuments({ ticker }: { ticker: string }) {
           <th>{pick(language, "Valeur", "Value")}</th><th>{pick(language, "Source", "Source")}</th></tr></thead><tbody>
           {data.reported_observations.map((item, index) => <tr key={`${item.metric}-${item.period_end}-${index}`}>
             <th>{pick(language, ...(metricLabels[item.metric] ?? [item.metric, item.metric]))}</th><td>{item.period_end.slice(0, 10)}</td>
-            <td>{new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(item.value)} {item.currency}</td>
+            <td>{formatFinancialNumber(item.value, { language, unit: "money", currency: item.currency })}</td>
             <td><a href={item.source_url} target="_blank" rel="noopener noreferrer">{item.source_name}</a></td></tr>)}</tbody></table></div></section> : null}
       {data.status === "unavailable" || !data.passages.length ? <p>{pick(language, "Aucun passage vérifiable disponible pour cette recherche.", "No verifiable passage available for this search.")}</p> : null}
       <div className={styles.cards}>{data.passages.map((passage, index) => <article key={`${passage.document_url}-${passage.page_number}-${passage.topic}-${index}`} className={styles.card}>

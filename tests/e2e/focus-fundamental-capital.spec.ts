@@ -25,7 +25,10 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("capital");
   const panel = page.getByRole("region", { name: "Allocation du capital" });
   await expect(panel.getByText("Aucun historique daté des révisions n'est fourni.")).toBeVisible();
+  await panel.getByText("Voir les sources, formules et valeurs exactes").click();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/annual-2025.pdf");
+  await expect(panel.getByText("Achat", { exact: true })).toBeVisible();
+  await expect(panel.getByText("devise non vérifiée")).toBeVisible();
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue tableau" }).click();
   await expect(panel.getByRole("table")).toContainText("35 CAD");
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue graphiques" }).click();

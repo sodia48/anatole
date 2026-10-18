@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { peerExclusionReason, type PeerComparison, type PeerMeasureComparison, type PeerMeasureValue } from "@anatole/shared/fundamental-intelligence";
+import { useEffect, useRef, useState } from "react";
+import { peerExclusionReason, type PeerComparison, type PeerMeasureValue } from "@anatole/shared/fundamental-intelligence";
+import { comparableDelta, exactFinancialNumber, formatFinancialNumber, signedBar } from "@anatole/shared/financial-display";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { getFundamentalPeers } from "@/lib/api";
 import { pick } from "@/lib/i18n";
@@ -12,8 +13,7 @@ const modes = ["table", "cards", "charts"] as const;
 const code = (ticker: string) => ticker.replace(/\.TO$/i, "").toUpperCase();
 
 function number(value: number | null, unit: "percent" | "ratio", language: "fr" | "en") {
-  if (value === null) return language === "fr" ? "N/D" : "N/A";
-  return `${new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(value)}${unit === "percent" ? " %" : "×"}`;
+  return formatFinancialNumber(value, { language, unit });
 }
 
 function Evidence({ value, language }: { value: PeerMeasureValue; language: "fr" | "en" }) {
@@ -23,18 +23,6 @@ function Evidence({ value, language }: { value: PeerMeasureValue; language: "fr"
   return value.source_url?.startsWith("https://")
     ? <a href={value.source_url} target="_blank" rel="noopener noreferrer">{content}</a>
     : <span>{content}</span>;
-}
-
-function MeasureCard({ measure, target, language }: { measure: PeerMeasureComparison; target: string; language: "fr" | "en" }) {
-  const current = measure.values.find(item => item.ticker === target);
-  return <article className={styles.card}>
-    <h4>{language === "fr" ? measure.label_fr : measure.label_en}</h4>
-    <p>{pick(language, "Cible", "Target")} : <strong>{number(current?.value ?? null, measure.unit, language)}</strong></p>
-    <p>{pick(language, "Médiane", "Median")} : {number(measure.median, measure.unit, language)} · {pick(language, "Rang", "Rank")} : {measure.rank ?? "N/D"}</p>
-    <p>{measure.sample_size} / {measure.minimum_sample_size} {pick(language, "sociétés requises", "companies required")}</p>
-    <p className={styles.muted}>{language === "fr" ? measure.explanation_fr : measure.explanation_en}</p>
-    {current ? <Evidence value={current} language={language} /> : null}
-  </article>;
 }
 
 export function FocusPeers({ ticker }: { ticker: string }) {
@@ -48,19 +36,22 @@ export function FocusPeers({ ticker }: { ticker: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const requestId = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    const id = ++requestId.current;
     void getFundamentalPeers(ticker, selection, controller.signal).then(value => {
-      if (!controller.signal.aborted) { setData(value); setLoading(false); setError(false); }
-    }).catch(() => { if (!controller.signal.aborted) { setLoading(false); setError(true); } });
+      if (!controller.signal.aborted && id === requestId.current) { setData(value); setLoading(false); setError(false); }
+    }).catch(() => { if (!controller.signal.aborted && id === requestId.current) { setLoading(false); setError(true); } });
     return () => controller.abort();
   }, [ticker, selection, retry]);
 
   const current = data?.target.replace(/\.TO$/i, "").toUpperCase() === code(ticker) ? data : null;
-  const selected = selection ?? current?.selected.map(code) ?? [];
+  const selected = current?.selected.map(code) ?? [];
+  const pending = loading && selection ? selection.filter(item => !selected.includes(item)) : [];
   const shown = current?.measures.filter(item => keys.includes(item.key)) ?? [];
-  const candidates = current?.candidates.filter(item => `${item.ticker} ${item.name}`.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const candidates = current?.candidates.filter(item => `${item.ticker} ${item.name} ${item.industry ?? ""}`.toLowerCase().includes(search.toLowerCase())).slice(0, 20) ?? [];
   const toggle = (item: string) => {
     const next = selected.includes(item) ? selected.filter(value => value !== item) : [...selected, item];
     if (next.length > 8) return;
@@ -74,16 +65,22 @@ export function FocusPeers({ ticker }: { ticker: string }) {
     </header>
     {current ? <>
       <details><summary>{pick(language, "Choisir ou remplacer les sociétés", "Choose or replace peers")} ({selected.length}/8)</summary>
+        <p>{pick(language, "Pairs admissibles", "Eligible peers")} : {selected.join(", ") || pick(language, "aucun", "none")}{pending.length ? ` · ${pick(language, "Validation en cours", "Validating")}: ${pending.join(", ")}` : ""}</p>
         <label>{pick(language, "Rechercher un pair", "Search peers")}<input value={search} onChange={event => setSearch(event.target.value)} /></label>
-        <div className={styles.candidates}>{candidates.map(item => <button type="button" key={item.ticker}
-          aria-pressed={selected.includes(item.ticker)} disabled={!selected.includes(item.ticker) && selected.length >= 8}
-          onClick={() => toggle(item.ticker)}>{item.ticker} · {item.name}</button>)}</div>
+        <div className={styles.candidates}>{candidates.map((item, index) => <div key={item.ticker} className={styles.candidate}>
+          {index === 0 || candidates[index - 1]?.comparability !== item.comparability ? <h3>{pick(language,
+            item.comparability === "direct" ? "Comparables directs" : item.comparability === "related" ? "Activités connexes" : "Autres entreprises du secteur",
+            item.comparability === "direct" ? "Direct peers" : item.comparability === "related" ? "Related businesses" : "Other sector companies")}</h3> : null}
+          <button type="button" aria-pressed={selected.includes(code(item.ticker))} disabled={loading || (item.comparability !== "direct" && !selected.includes(code(item.ticker))) || (!selected.includes(code(item.ticker)) && selected.length >= 8)}
+            onClick={() => toggle(code(item.ticker))}>{item.ticker} · {item.name}</button>
+          <small>{item.industry ?? pick(language, "activité non vérifiée", "industry unverified")}{item.reason ? ` · ${peerExclusionReason(item.reason, language)}` : ""}</small>
+        </div>)}</div>
         <p className={styles.muted}>{pick(language, "Sélection vérifiée après chargement : activité, capitalisation, devise et période.",
           "Selection is verified after loading: business, market cap, currency and period.")}</p>
       </details>
-      {Object.entries(current.excluded).length ? <div role="status" className={styles.excluded}>
+      {Object.entries(current.excluded).length ? <details className={styles.excluded}><summary>{pick(language, "Demandes exclues", "Excluded requests")} ({Object.keys(current.excluded).length})</summary>
         {Object.entries(current.excluded).map(([item, reason]) => <p key={item}>{item} : {peerExclusionReason(reason, language)}</p>)}
-      </div> : null}
+      </details> : null}
       <FocusViewMode mode={mode} choose={choose} modes={modes} language={language}
         label={pick(language, "Mode des comparaisons", "Peer comparison mode")} />
       <fieldset className={styles.metrics}><legend>{pick(language, "Indicateurs", "Metrics")}</legend>
@@ -91,23 +88,32 @@ export function FocusPeers({ ticker }: { ticker: string }) {
           onChange={() => setKeys(previous => previous.includes(item.key) ? previous.filter(key => key !== item.key) : [...previous, item.key])} />
           {language === "fr" ? item.label_fr : item.label_en}</label>)}
       </fieldset>
-      {mode === "cards" ? <div className={styles.cards}>{shown.map(item => <MeasureCard key={item.key} measure={item} target={current.target} language={language} />)}</div> : null}
-      {mode === "table" ? <div className={styles.tableWrap}><table><caption>{pick(language, "Comparaison des indicateurs sélectionnés", "Selected metric comparison")}</caption>
-        <thead><tr><th>{pick(language, "Indicateur", "Metric")}</th><th>{code(current.target)}</th>{current.selected.map(item => <th key={item}>{code(item)}</th>)}<th>{pick(language, "Médiane", "Median")}</th><th>{pick(language, "Rang", "Rank")}</th></tr></thead>
-        <tbody>{shown.map(item => <tr key={item.key}><th>{language === "fr" ? item.label_fr : item.label_en}</th>
+      {mode !== "charts" ? <div className={`${styles.tableWrap} ${mode === "cards" ? styles.cardTable : ""}`}><table><caption>{pick(language, "Comparaison des indicateurs sélectionnés", "Selected metric comparison")}</caption>
+        <thead><tr><th>{pick(language, "Indicateur", "Metric")}</th><th>{code(current.target)}</th>{current.selected.map(item => <th key={item}>{code(item)}</th>)}{current.selected.length === 1 ? <th>{pick(language, "Écart cible – pair", "Target – peer difference")}</th> : null}<th>{pick(language, "Médiane", "Median")}</th><th>{pick(language, "Rang", "Rank")}</th></tr></thead>
+        <tbody>{shown.map(item => <tr key={item.key}><th>{language === "fr" ? item.label_fr : item.label_en}<small>{item.sample_size} {pick(language, "sociétés avec cette donnée", "companies with this value")}</small><small>{language === "fr" ? item.explanation_fr : item.explanation_en}</small></th>
           {[current.target, ...current.selected].map(tickerValue => { const value = item.values.find(point => point.ticker === tickerValue);
-            return <td key={tickerValue}>{number(value?.value ?? null, item.unit, language)}{value ? <small><Evidence value={value} language={language} /></small> : null}</td>; })}
-          <td>{number(item.median, item.unit, language)}</td><td>{item.rank ?? "N/D"}</td></tr>)}</tbody></table></div> : null}
+            return <td key={tickerValue} title={value ? exactFinancialNumber(value.value, language) : undefined}><b className={styles.cardTicker}>{code(tickerValue)}</b>{number(value?.value ?? null, item.unit, language)}{value ? <small>{value.period_end.slice(0, 10)}</small> : null}</td>; })}
+          {current.selected.length === 1 ? <td><b className={styles.cardTicker}>{pick(language, "Écart cible – pair", "Target – peer difference")}</b>{comparableDelta(item.values.find(value => value.ticker === current.target)?.value,
+            item.values.find(value => value.ticker === current.selected[0])?.value, language, item.unit) ?? "N/D"}</td> : null}
+          <td><b className={styles.cardTicker}>{pick(language, "Médiane", "Median")}</b>{number(item.median, item.unit, language)}</td><td><b className={styles.cardTicker}>{pick(language, "Rang", "Rank")}</b>{item.rank ?? "N/D"}</td></tr>)}</tbody></table></div> : null}
       {mode === "charts" ? <div className={styles.cards}>{shown.map(item => {
         const bound = Math.max(...item.values.map(point => Math.abs(point.value)), 1);
+        const a = item.values.find(value => value.ticker === current.target)?.value;
+        const b = item.values.length === 2 ? item.values.find(value => value.ticker !== current.target)?.value : null;
         return <article key={item.key} className={styles.card}><h4>{language === "fr" ? item.label_fr : item.label_en}</h4>
           {item.values.map(value => <div key={value.ticker} className={styles.barRow}>
-            <span>{code(value.ticker)} · {number(value.value, item.unit, language)}</span>
-            <div className={styles.track}><div className={styles.bar} style={{ width: `${Math.abs(value.value) / bound * 100}%` }} /></div>
-            <Evidence value={value} language={language} />
-          </div>)}<p className={styles.muted}>{language === "fr" ? item.explanation_fr : item.explanation_en}</p>
+            <span>{code(value.ticker)} · <strong title={exactFinancialNumber(value.value, language)}>{number(value.value, item.unit, language)}</strong> · {value.period_end.slice(0, 10)}</span>
+            {mode === "charts" ? <div className={styles.track} role="img" aria-label={`${code(value.ticker)} ${number(value.value, item.unit, language)}`}><div className={styles.zero} /><div className={`${styles.bar} ${value.value < 0 ? styles.negative : ""}`} style={signedBar(value.value, bound)} /></div> : null}
+          </div>)}
+          {a != null && b != null ? <p>{pick(language, "Écart cible – pair", "Target – peer difference")} : {comparableDelta(a, b, language, item.unit)}</p> : null}
+          {item.median !== null ? <p>{pick(language, "Médiane", "Median")} : {number(item.median, item.unit, language)} · {pick(language, "Rang", "Rank")} : {item.rank}</p> : null}
+          <p className={styles.muted}>{item.sample_size} {pick(language, "sociétés avec cette donnée", "companies with this value")} · {language === "fr" ? item.explanation_fr : item.explanation_en}</p>
         </article>;
       })}</div> : null}
+      <details><summary>{pick(language, "Voir les sources et valeurs exactes", "View sources and exact values")}</summary>
+        {shown.flatMap(item => item.values.map(value => <p key={`${item.key}-${value.ticker}`}>
+          {language === "fr" ? item.label_fr : item.label_en} · {code(value.ticker)} · {exactFinancialNumber(value.value, language)} {item.unit === "percent" ? "%" : "×"} · <Evidence value={value} language={language} />
+        </p>))}</details>
     </> : null}
     {loading ? <p role="status">{pick(language, "Chargement des pairs…", "Loading peers…")}</p> : null}
     {error ? <p role="alert">{pick(language, "Comparaison indisponible.", "Comparison unavailable.")} <button type="button" onClick={() => { setLoading(true); setError(false); setRetry(value => value + 1); }}>{pick(language, "Réessayer", "Retry")}</button></p> : null}

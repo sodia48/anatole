@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { defaultScenarioRequest, scenarioDcfReason, scenarioKeys, type ScenarioAssumptions, type ScenarioKey,
   type ScenarioRequest, type ScenarioSimulation, type ScenarioValue } from "@anatole/shared/fundamental-scenarios";
+import { formatFinancialNumber, signedBar } from "@anatole/shared/financial-display";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { runFundamentalScenarios } from "@/lib/api";
 import { pick } from "@/lib/i18n";
@@ -31,9 +32,7 @@ const labels: Record<ScenarioKey, { fr: string; en: string }> = {
 };
 
 function formatted(value: ScenarioValue | undefined, currency: string | null, language: Language): string {
-  if (!value || value.value === null) return pick(language, "N/D", "N/A");
-  const amount = new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(value.value);
-  return `${amount}${value.unit === "percent" ? " %" : value.unit === "ratio" ? "×" : currency ? ` ${currency}` : ""}`;
+  return formatFinancialNumber(value?.value, { language, unit: value?.unit ?? "plain", currency });
 }
 
 function Measure({ value, currency, language }: { value: ScenarioValue; currency: string | null; language: Language }) {
@@ -134,7 +133,7 @@ export function FocusScenarios({ ticker }: { ticker: string }) {
         const bound = Math.max(1, ...values.map(value => Math.abs(value ?? 0)));
         return <article className={styles.card} key={metric.key}><h3>{pick(language, metric.fr, metric.en)}</h3>
           {current.outcomes.map(item => <div key={item.key} className={styles.barRow}><span>{pick(language, labels[item.key].fr, labels[item.key].en)} · {formatted(item[metric.key], current.currency, language)}</span>
-            <div className={styles.track}><div className={styles.bar} style={{ width: `${Math.abs(item[metric.key].value ?? 0) / bound * 100}%` }} /></div></div>)}</article>;
+            <div className={styles.track}><div className={styles.zero} /><div className={`${styles.bar} ${(item[metric.key].value ?? 0) < 0 ? styles.negative : ""}`} style={signedBar(item[metric.key].value, bound)} /></div></div>)}</article>;
       })}</div> : null}
       {current.outcomes.some(item => item.dcf.status === "calculated") ? <details><summary>{pick(language, "Sensibilité DCF et formules", "DCF sensitivity and formulas")}</summary>
         {current.outcomes.map(item => item.dcf.status === "calculated" ? <div key={item.key}>

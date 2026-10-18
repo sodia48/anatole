@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
 import type { FundamentalDiagnostic, FundamentalMeasure, FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
+import { formatFinancialNumber } from "@anatole/shared/financial-display";
 import { getFundamentalDiagnostic } from "@/lib/api";
 import { pick } from "@/lib/i18n";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
@@ -15,10 +16,7 @@ const modes = ["table", "cards", "charts"] as const;
 
 function valueText(observation: FundamentalObservation | undefined, language: Language): string {
   if (!observation) return language === "fr" ? "N/D" : "N/A";
-  const value = new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(observation.value);
-  if (observation.unit === "percent") return `${value} %`;
-  if (observation.unit === "ratio") return `${value}×`;
-  return `${value} ${observation.currency ?? ""}`.trim();
+  return formatFinancialNumber(observation.value, { language, unit: observation.unit, currency: observation.currency });
 }
 
 function sourceLink(observation: FundamentalObservation, language: Language) {
@@ -151,7 +149,7 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
         "Only values explicitly present in an official publication are shown.")}</p>
       {availableSector.length ? <div className="fd-cards">{availableSector.map(item => <div className="fd-measure" key={item.key}>
         <strong>{language === "fr" ? item.label_fr : item.label_en}</strong>
-        <span className="fd-value">{`${new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(item.value!)} ${item.unit}`}</span>
+        <span className="fd-value">{formatFinancialNumber(item.value, { language, unit: item.unit === "percent" || item.unit === "ratio" ? item.unit : "plain" })} {item.unit === "percent" || item.unit === "ratio" ? "" : item.unit}</span>
         {item.source_url?.startsWith("https://") ? <a href={item.source_url} target="_blank" rel="noopener noreferrer">
           {item.source_name} · {item.filed_at?.slice(0, 10) ?? pick(language, "date N/D", "date N/A")}</a>
           : <span className="fd-muted">{pick(language, "Publication officielle non disponible", "Official publication unavailable")}</span>}
