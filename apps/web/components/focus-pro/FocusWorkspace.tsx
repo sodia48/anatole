@@ -78,7 +78,7 @@ import type {
   SnapMode,
 } from "./types";
 import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 
 type Panel = "indicators" | "compare" | "alerts" | "layouts" | "strategy" | "paper" | null;
@@ -398,16 +398,16 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
   return (
     <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
       {!embedded ? <QuoteHeader quote={quote} liveState={liveState} /> : null}
-      {!embedded ? <nav className={styles.bottomTabs} aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className={styles.tabButton} aria-pressed={section === item.id} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<Link className={styles.button} href="/terminal">← Terminal Pro</Link></nav> : null}
+      {!embedded ? <nav className="fp-bottomTabs" aria-label="Focus sections">{SECTIONS.map((item) => <button key={item.id} className="fp-tabButton" aria-pressed={section === item.id} type="button" onClick={() => setSection(item.id)}>{pick(language, item.fr, item.en)}</button>)}<Link className="fp-button" href="/terminal">← Terminal Pro</Link></nav> : null}
       {section === "overview" || section === "fundamentals" ? (
         <>
           {section === "overview" ? (
             <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} />
           ) : null}
-          {section === "fundamentals" ? <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className={styles.fundamentalSubtabs}>
-            <button type="button" className={styles.tabButton} aria-pressed={fundamentalView === "portal"} onClick={() => setFundamentalView("portal")}>{pick(language, "Intelligence 360°", "Intelligence 360°")}</button>
-            <button type="button" className={styles.tabButton} aria-pressed={fundamentalView === "fundamentals"} onClick={() => setFundamentalView("fundamentals")}>{pick(language, "Synthèse", "Overview")}</button>
-            <label className={styles.modulePicker}>{pick(language, "Accès direct", "Quick access")}
+          {section === "fundamentals" ? <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className="fp-fundamentalSubtabs">
+            <button type="button" className="fp-tabButton" aria-pressed={fundamentalView === "portal"} onClick={() => setFundamentalView("portal")}>{pick(language, "Intelligence 360°", "Intelligence 360°")}</button>
+            <button type="button" className="fp-tabButton" aria-pressed={fundamentalView === "fundamentals"} onClick={() => setFundamentalView("fundamentals")}>{pick(language, "Synthèse", "Overview")}</button>
+            <label className="fp-modulePicker">{pick(language, "Accès direct", "Quick access")}
               <select aria-label={pick(language, "Ouvrir un module", "Open a module")} value={fundamentalView === "portal" || fundamentalView === "fundamentals" ? "" : fundamentalView}
                 onChange={event => { setDiagnosticSection(undefined); setFundamentalView(event.target.value as typeof fundamentalView); }}>
                 <option value="">{pick(language, "Choisir un module", "Choose a module")}</option>
@@ -440,12 +440,12 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
           ) : null}
         </>
       ) : section === "ecosystem" ? <CompanyEcosystem key={ticker} ticker={ticker} language={language} /> : (
-        <div className={styles.workspace}>
+        <div className="fp-workspace">
           <FocusToolbar ticker={ticker} timeframe={layout.timeframe} chartType={layout.chart_type} language={language} onTimeframe={(value) => setLayout({ ...layout, timeframe: value })} onChartType={(value) => setLayout({ ...layout, chart_type: value })} onToggleIndicators={() => togglePanel("indicators")} onToggleCompare={() => togglePanel("compare")} onCreateAlert={() => togglePanel("alerts")} onToggleLayouts={() => togglePanel("layouts")} onToggleStrategy={() => togglePanel("strategy")} onTogglePaper={() => togglePanel("paper")} onSaveLayout={() => saveLayout()} />
-          <div className={`${styles.mainGrid} ${panel ? "" : styles.mainGridNoSide}`}>
+          <div className={`fp-mainGrid ${panel ? "" : "fp-mainGridNoSide"}`}>
             <FocusDrawingToolbar activeTool={activeTool} snapMode={snapMode} drawingsCount={timeframeDrawings.length} selected={selectedDrawing?.timeframe && selectedDrawing.timeframe !== layout.timeframe ? null : selectedDrawing} canUndo={drawingState.past.length > 0} canRedo={drawingState.future.length > 0} language={language} onTool={setActiveTool} onSnap={setSnapMode} onUndo={() => dispatchDrawing({ type: "undo" })} onRedo={() => dispatchDrawing({ type: "redo" })} onDuplicate={() => selectedDrawing && dispatchDrawing({ type: "duplicate", id: selectedDrawing.id })} onToggleLock={() => selectedDrawing && dispatchDrawing({ type: "update", id: selectedDrawing.id, update: { locked: !selectedDrawing.locked } })} onToggleHidden={() => selectedDrawing && dispatchDrawing({ type: "update", id: selectedDrawing.id, update: { hidden: !selectedDrawing.hidden } })} onDelete={() => selectedDrawing && dispatchDrawing({ type: "delete", id: selectedDrawing.id })} onFibLevels={(fib_levels) => selectedDrawing && dispatchDrawing({ type: "update", id: selectedDrawing.id, update: { fib_levels } })} onText={(text) => selectedDrawing && dispatchDrawing({ type: "update", id: selectedDrawing.id, update: { text } })} />
             <FocusChart candles={candles} quote={quote} technicals={snapshot.technicals} chartType={layout.chart_type} timeframe={layout.timeframe} indicators={layout.indicators} drawings={timeframeDrawings} comparisons={comparisons} fundamentalMarkers={[...markers, ...paperMarkers]} activeDrawingTool={activeTool} snapMode={snapMode} language={language} loading={loading} refreshing={refreshing} error={error} onAddDrawing={(drawing) => dispatchDrawing({ type: "add", drawing: { ...drawing, timeframe: layout.timeframe } })} onUpdateDrawing={(id, update) => dispatchDrawing({ type: "update", id, update })} onSelectDrawing={(id) => dispatchDrawing({ type: "select", id })} selectedDrawingId={drawingState.selectedId} onSelectMarker={setSelectedMarker} />
-            {panel ? <aside className={styles.sidePanel}>
+            {panel ? <aside className="fp-sidePanel">
               {panel === "indicators" ? <FocusIndicatorPanel indicators={layout.indicators} language={language} onChange={(items) => setLayout({ ...layout, indicators: items })} onClose={() => setPanel(null)} /> : null}
               {panel === "compare" ? <FocusComparePanel ticker={ticker} comparisons={layout.comparisons} language={language} onChange={(items) => setLayout({ ...layout, comparisons: items })} onClose={() => setPanel(null)} /> : null}
               {panel === "alerts" ? <FocusAlertPanel ticker={ticker} price={quote.price} drawings={timeframeDrawings} language={language} onSave={saveAlert} onClose={() => setPanel(null)} /> : null}
@@ -454,8 +454,8 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
               {panel === "paper" ? <FocusPaperTrading ticker={ticker} language={language} authenticated={Boolean(user)} account={paperAccount} onAccount={onPaperAccount} /> : null}
             </aside> : null}
           </div>
-          <div className={styles.sidePanel} style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}><TechnicalSummary technicals={snapshot.technicals} /><KeyLevels technicals={snapshot.technicals} /><FocusFundamentalOverlay enabled={layout.fundamentals_visible} loading={fundamentalsLoading} markers={markers} selected={selectedMarker} language={language} onToggle={() => setLayout({ ...layout, fundamentals_visible: !layout.fundamentals_visible })} onSelect={setSelectedMarker} /></div>
-          <div className={styles.inlineActions}><button className={styles.button} type="button" onClick={() => togglePanel("strategy")}><FocusGlyph name="FlaskConical" />Strategy Lab</button><button className={styles.button} type="button" onClick={() => togglePanel("paper")}><FocusGlyph name="WalletCards" />PAPER</button></div>
+          <div className="fp-sidePanel" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}><TechnicalSummary technicals={snapshot.technicals} /><KeyLevels technicals={snapshot.technicals} /><FocusFundamentalOverlay enabled={layout.fundamentals_visible} loading={fundamentalsLoading} markers={markers} selected={selectedMarker} language={language} onToggle={() => setLayout({ ...layout, fundamentals_visible: !layout.fundamentals_visible })} onSelect={setSelectedMarker} /></div>
+          <div className="fp-inlineActions"><button className="fp-button" type="button" onClick={() => togglePanel("strategy")}><FocusGlyph name="FlaskConical" />Strategy Lab</button><button className="fp-button" type="button" onClick={() => togglePanel("paper")}><FocusGlyph name="WalletCards" />PAPER</button></div>
           <FocusBacktestPanel language={language} request={backtestRequest} result={backtest} loading={backtestLoading} error={backtestError} onChange={setBacktestRequest} onRun={runBacktest} />
           <FocusBottomPanel language={language} account={paperAccount} backtest={backtest} />
         </div>

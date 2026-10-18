@@ -1,28 +1,28 @@
-.root {
+.frc-root {
   display: grid;
   gap: 10px;
 }
 
-.heading {
+.frc-heading {
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
 
-.heading span {
+.frc-heading span {
   color: var(--light-accent, #55b9ff);
   font-size: 9px;
   font-weight: 850;
   letter-spacing: 0.12em;
 }
 
-.heading h1 {
+.frc-heading h1 {
   margin: 0;
   color: var(--light-text, #eaf6fc);
   font-size: 16px;
 }
 
-.toolbar {
+.frc-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -30,7 +30,7 @@
   flex-wrap: wrap;
 }
 
-.periods {
+.frc-periods {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -40,7 +40,7 @@
   background: var(--light-panel, rgba(4, 18, 29, 0.82));
 }
 
-.periodButton {
+.frc-periodButton {
   min-width: 43px;
   height: 32px;
   display: inline-flex;
@@ -62,21 +62,21 @@
     transform 140ms ease;
 }
 
-.periodButton:hover {
+.frc-periodButton:hover {
   color: var(--light-text, #e7f5ff);
   background: var(--light-raised, rgba(26, 65, 91, 0.56));
 }
 
-.periodButton:focus-visible {
+.frc-periodButton:focus-visible {
   outline: 2px solid var(--light-accent, rgba(57, 161, 255, 0.9));
   outline-offset: 2px;
 }
 
-.periodButton:active {
+.frc-periodButton:active {
   transform: translateY(1px);
 }
 
-.activePeriod {
+.frc-activePeriod {
   border-color: var(--light-border, rgba(52, 154, 232, 0.62));
   background: var(--light-raised, rgba(29, 104, 157, 0.72));
   color: var(--light-text, white);
@@ -85,11 +85,11 @@
     0 5px 14px var(--light-shadow, rgba(0, 0, 0, 0.16));
 }
 
-.livePeriod {
+.frc-livePeriod {
   min-width: 58px;
 }
 
-.liveDot {
+.frc-liveDot {
   width: 7px;
   height: 7px;
   display: inline-block;
@@ -97,10 +97,10 @@
   border-radius: 999px;
   background: #00d7ad;
   box-shadow: 0 0 9px rgba(0, 215, 173, 0.86);
-  animation: pulse 1.7s ease-in-out infinite;
+  animation: frc-pulse 1.7s ease-in-out infinite;
 }
 
-.legend {
+.frc-legend {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -108,33 +108,33 @@
   font-size: 10px;
 }
 
-.legend span {
+.frc-legend span {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
 }
 
-.legend i {
+.frc-legend i {
   width: 17px;
   height: 2px;
   display: inline-block;
   border-radius: 999px;
 }
 
-.sma20 {
+.frc-sma20 {
   background: #2f9bff;
 }
 
-.sma50 {
+.frc-sma50 {
   background: #00d1c7;
 }
 
-.sma200 {
+.frc-sma200 {
   background: #8c6cff;
 }
 
-.summary {
+.frc-summary {
   min-height: 34px;
   display: flex;
   align-items: center;
@@ -148,57 +148,57 @@
   font-size: 10px;
 }
 
-.periodName {
+.frc-periodName {
   color: var(--light-text, #dcecf6);
   font-weight: 750;
 }
 
-.summary strong {
+.frc-summary strong {
   font-size: 12px;
 }
 
-.positive {
+.frc-positive {
   color: var(--light-positive, #00d7ad);
 }
 
-.negative {
+.frc-negative {
   color: var(--light-negative, #ff4d70);
 }
 
-.neutral {
+.frc-neutral {
   color: var(--light-text, #dcecf6);
 }
 
-.liveStatus,
-.refreshing,
-.delayed {
+.frc-liveStatus,
+.frc-refreshing,
+.frc-delayed {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   margin-left: auto;
 }
 
-.liveStatus {
+.frc-liveStatus {
   color: var(--light-positive, #00d7ad);
 }
 
-.refreshing {
+.frc-refreshing {
   color: var(--light-accent, #65b8f5);
 }
 
-.delayed {
+.frc-delayed {
   margin-left: 0;
   color: var(--light-warning, #d2a45e);
 }
 
-.chartLayout {
+.frc-chartLayout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 188px;
   gap: 10px;
   min-width: 0;
 }
 
-.chartShell {
+.frc-chartShell {
   position: relative;
   min-width: 0;
   height: clamp(420px, 53vh, 620px);
@@ -208,12 +208,12 @@
   background: #061622;
 }
 
-.chart {
+.frc-chart {
   width: 100%;
   height: 100%;
 }
 
-.volumePanel {
+.frc-volumePanel {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -225,14 +225,14 @@
     linear-gradient(180deg, var(--light-panel, rgba(8, 32, 48, 0.96)), var(--light-panel, rgba(5, 20, 31, 0.96)));
 }
 
-.volumeHeading {
+.frc-volumeHeading {
   display: grid;
   gap: 4px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--light-border, rgba(55, 96, 122, 0.54));
 }
 
-.volumeHeading span {
+.frc-volumeHeading span {
   color: var(--light-muted, #7f9db1);
   font-size: 9px;
   font-weight: 850;
@@ -240,13 +240,13 @@
   text-transform: uppercase;
 }
 
-.volumeHeading strong {
+.frc-volumeHeading strong {
   color: var(--light-text, #f1f8fc);
   font-size: 22px;
   letter-spacing: -0.03em;
 }
 
-.volumeBar {
+.frc-volumeBar {
   width: 100%;
   height: 8px;
   display: flex;
@@ -255,18 +255,18 @@
   background: var(--light-raised, rgba(80, 108, 126, 0.28));
 }
 
-.buyerBar { background: #00cba1; }
-.sellerBar { background: #ff365f; }
-.neutralBar { background: #7892a4; }
+.frc-buyerBar { background: #00cba1; }
+.frc-sellerBar { background: #ff365f; }
+.frc-neutralBar { background: #7892a4; }
 
-.volumeMetric {
+.frc-volumeMetric {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 4px 8px;
 }
 
-.volumeMetric span {
+.frc-volumeMetric span {
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -276,42 +276,42 @@
   font-weight: 700;
 }
 
-.volumeMetric i {
+.frc-volumeMetric i {
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
   border-radius: 999px;
 }
 
-.volumeMetric strong {
+.frc-volumeMetric strong {
   color: var(--light-text, #e8f5fc);
   font-size: 14px;
 }
 
-.volumeMetric small {
+.frc-volumeMetric small {
   grid-column: 2;
   color: var(--light-muted, #6f8da1);
   font-size: 9px;
   text-align: right;
 }
 
-.buyerDot { background: #00cba1; }
-.sellerDot { background: #ff365f; }
-.neutralDot { background: #7892a4; }
+.frc-buyerDot { background: #00cba1; }
+.frc-sellerDot { background: #ff365f; }
+.frc-neutralDot { background: #7892a4; }
 
-.neutralMetric {
+.frc-neutralMetric {
   padding-top: 10px;
   border-top: 1px solid var(--light-border, rgba(55, 96, 122, 0.36));
 }
 
-.volumeMethod {
+.frc-volumeMethod {
   margin: auto 0 0;
   color: var(--light-muted, #607f93);
   font-size: 9px;
   line-height: 1.5;
 }
 
-.overlay {
+.frc-overlay {
   position: absolute;
   inset: 0;
   display: grid;
@@ -322,7 +322,7 @@
   backdrop-filter: blur(2px);
 }
 
-.errorBanner {
+.frc-errorBanner {
   position: absolute;
   left: 12px;
   right: 12px;
@@ -336,14 +336,14 @@
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
 }
 
-.note {
+.frc-note {
   margin: 0;
   color: var(--light-muted, #69879b);
   font-size: 9px;
   line-height: 1.45;
 }
 
-@keyframes pulse {
+@keyframes frc-pulse {
   0%,
   100% {
     opacity: 0.52;
@@ -357,86 +357,86 @@
 }
 
 @media (max-width: 760px) {
-  .toolbar {
+  .frc-toolbar {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .periods {
+  .frc-periods {
     width: 100%;
     overflow-x: auto;
     scrollbar-width: thin;
   }
 
-  .periodButton {
+  .frc-periodButton {
     flex: 0 0 auto;
   }
 
-  .legend {
+  .frc-legend {
     justify-content: flex-start;
     overflow-x: auto;
   }
 
-  .summary {
+  .frc-summary {
     align-items: flex-start;
   }
 
-  .liveStatus {
+  .frc-liveStatus {
     margin-left: 0;
   }
 
-  .chartLayout {
+  .frc-chartLayout {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .chartShell {
+  .frc-chartShell {
     height: 430px;
   }
 
-  .volumePanel {
+  .frc-volumePanel {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 10px 14px;
   }
 
-  .volumeHeading,
-  .volumeBar,
-  .volumeMethod {
+  .frc-volumeHeading,
+  .frc-volumeBar,
+  .frc-volumeMethod {
     grid-column: 1 / -1;
   }
 
-  .volumeMethod {
+  .frc-volumeMethod {
     margin-top: 0;
   }
 }
 
 @media (max-width: 480px) {
-  .chartShell {
+  .frc-chartShell {
     height: 390px;
   }
 
-  .summary span:nth-of-type(3),
-  .summary span:nth-of-type(4) {
+  .frc-summary span:nth-of-type(3),
+  .frc-summary span:nth-of-type(4) {
     display: none;
   }
 
-  .volumePanel {
+  .frc-volumePanel {
     grid-template-columns: 1fr;
   }
 
-  .volumeHeading,
-  .volumeBar,
-  .volumeMethod {
+  .frc-volumeHeading,
+  .frc-volumeBar,
+  .frc-volumeMethod {
     grid-column: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .liveDot {
+  .frc-liveDot {
     animation: none;
   }
 
-  .periodButton {
+  .frc-periodButton {
     transition: none;
   }
 }

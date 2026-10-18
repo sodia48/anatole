@@ -7,7 +7,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
-import styles from "./FocusFundamentals.module.css";
+import "./FocusFundamentals.css";
 import { FocusEstimates, type EarningsEstimate } from "./FocusEstimates";
 import { FocusEarnings } from "./FocusEarnings";
 import { FocusSeriesChart, type FocusChartSeries } from "./FocusSeriesChart";
@@ -366,7 +366,7 @@ function Metric({
   tone?: "positive" | "negative";
 }) {
   return (
-    <div className={styles.metric}>
+    <div className="ff-metric">
       <span>{label}</span>
       <strong data-tone={tone}>{value}</strong>
     </div>
@@ -383,9 +383,9 @@ function Group({
   items?: Array<{ label: string; value: string; tone?: "positive" | "negative" }>;
 }) {
   return (
-    <section className={styles.group}>
+    <section className="ff-group">
       <h2>{title}</h2>
-      <div className={styles.groupGrid}>{items?.map(item => <Metric key={item.label} {...item} />) ?? children}</div>
+      <div className="ff-groupGrid">{items?.map(item => <Metric key={item.label} {...item} />) ?? children}</div>
     </section>
   );
 }
@@ -436,7 +436,7 @@ function Valuation({
     );
   }
 
-  return <div className={styles.modeStack}>
+  return <div className="ff-modeStack">
     <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
       language={language} label={pick(language, "Mode de la valorisation", "Valuation display mode")} />
     {mode === "charts" ? <FocusSeriesChart storageKey="valuation.ratios" title={pick(language,
@@ -480,7 +480,7 @@ function Fundamentals({
   const annual = [...snapshot.annual_financials].sort((a, b) => a.period_end.localeCompare(b.period_end));
 
   return (
-    <div className={styles.modeStack}>
+    <div className="ff-modeStack">
       <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
         language={language} label={pick(language, "Mode de la synthèse", "Summary display mode")} />
       {mode === "charts" ? <FocusSeriesChart storageKey="summary" title={pick(language, "Croissance et rentabilité publiées", "Published growth and profitability")}
@@ -494,7 +494,7 @@ function Fundamentals({
           { id: "income", label: pick(language, "Bénéfice net", "Net income"), values: annual.map(row => row.net_income) },
           { id: "fcf", label: pick(language, "Flux disponible", "Free cash flow"), values: annual.map(row => row.free_cash_flow) },
         ]} unit="money" currency={currency} language={language} source={snapshot.source} /> : null}
-    <div className={styles.fundamentalsGrid} data-mode={mode}>
+    <div className="ff-fundamentalsGrid" data-mode={mode}>
 
       <Group title={pick(language, "Croissance et rentabilité", "Growth and profitability")} items={[
         { label: pick(language, "Chiffre d’affaires", "Revenue"), value: compact(m.total_revenue, currency) },
@@ -621,8 +621,8 @@ function FinancialTable({
             ] : ["Period", "Gross margin", "Operating margin", "Net margin", "FCF margin", "EPS growth", "Diluted shares"]);
 
   return (
-    <div data-mode={mode} className={styles.financialTableWrap}>
-      <table data-view={view} className={styles.financialTable}>
+    <div data-mode={mode} className="ff-financialTableWrap">
+      <table data-view={view} className="ff-financialTable">
         <thead>
           <tr>
             {headers.map((header) => (
@@ -638,7 +638,7 @@ function FinancialTable({
               <tr key={`${view}-${row.period_end}`}>
                 <th scope="row">
                   <div>{periodLabel(row.period_end)}</div>
-                  {row.source ? <small className={styles.periodSource}>{row.source.source_name}
+                  {row.source ? <small className="ff-periodSource">{row.source.source_name}
                     {row.source.filed_at ? ` · ${periodLabel(row.source.filed_at)}` : ""}</small> : null}
                 </th>
 
@@ -648,7 +648,7 @@ function FinancialTable({
             ))
           ) : (
             <tr>
-              <td colSpan={headers.length} className={styles.tableEmpty}>
+              <td colSpan={headers.length} className="ff-tableEmpty">
                 {pick(language, "Cette série n’est pas publiée par la source.", "This series is not published by the source.")}
               </td>
             </tr>
@@ -687,7 +687,7 @@ function StatementCharts({ rows, view, frequency, currency, language, source }: 
       { key: "eps_growth_yoy", fr: "Croissance BPA", en: "EPS growth" },
     ]];
   const chronological = [...rows].sort((a, b) => a.period_end.localeCompare(b.period_end));
-  return <div className={styles.chartGrid} data-testid="financials-chart-view">
+  return <div className="ff-chartGrid" data-testid="financials-chart-view">
     {moneyGroups.map((group, index) => {
       const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: pick(language, field.fr, field.en),
         values: chronological.map(row => row[field.key] as number | null) }));
@@ -751,7 +751,7 @@ function Financials({
     <div style={{ display: "grid", gap: 14 }}>
       <nav
         aria-label={pick(language, "Vues des résultats financiers", "Financial results views")}
-        className={styles.resultsNav}
+        className="ff-resultsNav"
       >
         {resultTabs.map((tab) => {
           const active = subview === tab.key;
@@ -761,7 +761,7 @@ function Financials({
               key={tab.key}
               onClick={() => setSubview(tab.key)}
               aria-pressed={active}
-              className={styles.resultsTab}
+              className="ff-resultsTab"
             >
               {pick(language, tab.label[0], tab.label[1])}
             </button>
@@ -770,7 +770,7 @@ function Financials({
       </nav>
 
       {subview === "overview" ? (
-        <div className={styles.modeStack} data-mode={overviewMode}>
+        <div className="ff-modeStack" data-mode={overviewMode}>
           <FocusViewMode mode={overviewMode} choose={chooseOverviewMode} modes={["table", "cards", "charts"]}
             language={language} label={pick(language, "Mode de la vue d’ensemble", "Overview display mode")} />
           <section style={panelStyle}>
@@ -779,7 +779,7 @@ function Financials({
               {pick(language, "Tableau de bord financier", "Financial dashboard")}
             </h2>
 
-            <div className={styles.dashboardMetrics}>{([
+            <div className="ff-dashboardMetrics">{([
               [pick(language, "Revenus TTM", "TTM revenue"), compact(t.total_revenue, currency)],
               [pick(language, "Résultat opérationnel TTM", "TTM operating income"), compact(t.operating_income, currency)],
               [pick(language, "BAIIA TTM", "TTM EBITDA"), compact(t.ebitda, currency)],
@@ -791,7 +791,7 @@ function Financials({
             ] as const).map(([label, value]) => <Metric key={label} label={label} value={value} />)}</div>
           </section>
 
-          <div className={styles.fundamentalsGrid}>
+          <div className="ff-fundamentalsGrid">
             <Group title={pick(language, "Croissance du dernier trimestre", "Latest-quarter growth")} items={[
               { label: pick(language, "Revenus sur un an", "Revenue year over year"), value: pct(h.revenue_growth_yoy), tone: tone(h.revenue_growth_yoy) },
               { label: pick(language, "Résultat opérationnel sur un an", "Operating income year over year"), value: pct(h.operating_income_growth_yoy), tone: tone(h.operating_income_growth_yoy) },
@@ -853,7 +853,7 @@ function Financials({
             </div>
 
             <div
-              className={styles.statementNav}
+              className="ff-statementNav"
             >
               {statementTabs.map((tab) => {
                 const active = statementView === tab.key;
@@ -863,7 +863,7 @@ function Financials({
                     key={tab.key}
                     onClick={() => setStatementView(tab.key)}
                     aria-pressed={active}
-                    className={styles.statementTab}
+                    className="ff-statementTab"
                   >
                     {pick(language, tab.label[0], tab.label[1])}
                   </button>
@@ -974,24 +974,24 @@ function AnalystsView({
   }
 
   return (
-    <div className={styles.analystsStack}>
+    <div className="ff-analystsStack">
       <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
         language={language} label={pick(language, "Mode du consensus analystes", "Analyst consensus display mode")} />
-      <section className={styles.analystsHero}>
+      <section className="ff-analystsHero">
         <div>
           <span className="eyebrow">{pick(language, "CONSENSUS ANALYSTES", "ANALYST CONSENSUS")}</span>
-          <h2 className={styles.analystsRating}>
+          <h2 className="ff-analystsRating">
             {a.recommendation_key
               ? a.recommendation_key.replaceAll("_", " ").toUpperCase()
               : "N/D"}
           </h2>
-          <p className={styles.analystsMeta}>
+          <p className="ff-analystsMeta">
             {pick(language, "Note moyenne", "Average rating")}: {n(a.recommendation_mean)} ·{" "}
             {a.analyst_count ?? "N/D"} {pick(language, "analystes", "analysts")}
           </p>
         </div>
 
-        <div className={styles.analystsUpside}>
+        <div className="ff-analystsUpside">
           <span>
             {pick(language, "Potentiel vers la cible moyenne", "Upside to average target")}
           </span>
@@ -1001,9 +1001,9 @@ function AnalystsView({
         </div>
       </section>
 
-      {mode === "charts" ? <section className={styles.group}>
+      {mode === "charts" ? <section className="ff-group">
         <h2>{pick(language, "Répartition des recommandations", "Recommendation distribution")}</h2>
-        <div className={styles.chartType} role="group" aria-label={pick(language, "Type de graphique", "Chart type")}>
+        <div className="ff-chartType" role="group" aria-label={pick(language, "Type de graphique", "Chart type")}>
           {(["bar", "pie", "donut"] as const).map(type => <button type="button" key={type}
             aria-pressed={distributionType === type} disabled={type !== "bar" && !validComposition}
             onClick={() => setDistributionType(type)}>{type === "bar" ? pick(language, "Barres", "Bars")
@@ -1012,27 +1012,27 @@ function AnalystsView({
         {!validComposition ? <p>{pick(language,
           "Secteurs et anneau indisponibles : catégories incomplètes, négatives ou total nul.",
           "Pie and donut unavailable: incomplete or negative categories, or zero total.")}</p> : null}
-        {distributionType === "bar" || !validComposition ? total > 0 ? <div className={styles.stackedDistribution} role="img"
+        {distributionType === "bar" || !validComposition ? total > 0 ? <div className="ff-stackedDistribution" role="img"
           aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}>
           {distribution.map(([label, value, direction]) => <span key={label} data-tone={direction}
             style={{ width: `${((value ?? 0) / total) * 100}%` }} title={`${label}: ${value ?? "N/D"}`} />)}
         </div> : <p>{pick(language, "Répartition indisponible.", "Distribution unavailable.")}</p>
-          : <div className={styles.composition} data-kind={distributionType} role="img"
+          : <div className="ff-composition" data-kind={distributionType} role="img"
             aria-label={distribution.map(([label, value]) => `${label}: ${value ?? "N/D"}`).join(", ")}
             style={{ background: `conic-gradient(${slices})` }} />}
-        <div className={styles.distributionLegend}>{distribution.map(([label, value], index) => <button type="button" key={label}
+        <div className="ff-distributionLegend">{distribution.map(([label, value], index) => <button type="button" key={label}
           aria-pressed={highlighted === label} onClick={() => setHighlighted(highlighted === label ? null : label)}
           style={{ borderLeft: `4px solid ${distributionColors[index]}` }}>{label}: {value ?? "N/D"}</button>)}</div>
         {highlighted ? <p role="status">{highlighted}: {distribution.find(([label]) => label === highlighted)?.[1] ?? "N/D"}
           {validComposition ? ` · ${(((distribution.find(([label]) => label === highlighted)?.[1] ?? 0) / total) * 100).toFixed(1)} %` : ""}</p> : null}
         <h2>{pick(language, "Fourchette des objectifs", "Price target range")}</h2>
-        {targetValues.length > 1 ? <div className={styles.targetRange} role="img" aria-label={targets.map(([label, value]) => `${label}: ${money(value, currency)}`).join(", ")}>
-          {targets.map(([label, value]) => value === null ? null : <span key={label} className={styles.targetMarker}
+        {targetValues.length > 1 ? <div className="ff-targetRange" role="img" aria-label={targets.map(([label, value]) => `${label}: ${money(value, currency)}`).join(", ")}>
+          {targets.map(([label, value]) => value === null ? null : <span key={label} className="ff-targetMarker"
             style={{ left: `${((value - targetMin) / targetSpan) * 100}%` }} title={`${label}: ${money(value, currency)}`} />)}
         </div> : <p>{pick(language, "Fourchette insuffisante.", "Insufficient target range.")}</p>}
       </section> : null}
-      {mode === "table" ? <section className={styles.group}><h2>{pick(language, "Données exactes du consensus", "Exact consensus data")}</h2>
-        <div className={styles.analystsTableWrap}><table className={styles.analystsTable}><thead><tr><th scope="col">{pick(language, "Indicateur", "Metric")}</th><th scope="col">{pick(language, "Valeur", "Value")}</th></tr></thead><tbody>
+      {mode === "table" ? <section className="ff-group"><h2>{pick(language, "Données exactes du consensus", "Exact consensus data")}</h2>
+        <div className="ff-analystsTableWrap"><table className="ff-analystsTable"><thead><tr><th scope="col">{pick(language, "Indicateur", "Metric")}</th><th scope="col">{pick(language, "Valeur", "Value")}</th></tr></thead><tbody>
           {targets.map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{money(value, currency)}</td></tr>)}
           {distribution.map(([label, value]) => <tr key={label}><th scope="row">{label}</th><td>{value ?? "N/D"}</td></tr>)}
         </tbody></table></div></section> : <Group title={pick(language, "Objectifs de cours", "Price targets")} items={[
@@ -1043,22 +1043,22 @@ function AnalystsView({
         { label: pick(language, "Objectif élevé", "High target"), value: money(a.target_high, currency) },
       ]} />}
 
-      {mode === "cards" ? <section className={styles.group}>
+      {mode === "cards" ? <section className="ff-group">
         <h2>
           {pick(language, "Répartition des recommandations", "Recommendation distribution")}
         </h2>
-        <div className={styles.distribution}>
+        <div className="ff-distribution">
           {distribution.map(([label, value, direction]) => {
             const width =
               total > 0 ? ((value ?? 0) / total) * 100 : 0;
             return (
               <div key={label}>
-                <div className={styles.distributionLabel}>
+                <div className="ff-distributionLabel">
                   <span>{label}</span>
                   <strong>{value ?? "N/D"}</strong>
                 </div>
-                <div className={styles.distributionTrack}>
-                  <div className={styles.distributionFill} data-tone={direction} style={{ width: `${width}%` }} />
+                <div className="ff-distributionTrack">
+                  <div className="ff-distributionFill" data-tone={direction} style={{ width: `${width}%` }} />
                 </div>
               </div>
             );
@@ -1141,7 +1141,7 @@ export function FocusFundamentals({
 
   if (!currentSnapshot && !error) {
     return (
-      <section className={styles.loadingPanel} data-view={view}>
+      <section className="ff-loadingPanel" data-view={view}>
         {view === "valuation"
           ? pick(language, "Synchronisation de la valorisation…", "Synchronizing valuation…")
           : pick(language, "Chargement des données fondamentales…", "Loading fundamental data…")}
@@ -1151,7 +1151,7 @@ export function FocusFundamentals({
 
   if (error && !currentSnapshot) {
     return (
-      <section className={styles.errorPanel}>
+      <section className="ff-errorPanel">
         {pick(language, "Données fondamentales indisponibles", "Fundamental data unavailable")}: {language === "fr" ? error : "The data provider did not return a usable response."}
       </section>
     );
@@ -1171,9 +1171,9 @@ export function FocusFundamentals({
 
   if (view === "valuation") {
     return (
-      <div className={styles.valuationStack} data-focus-valuation="true">
+      <div className="ff-valuationStack" data-focus-valuation="true">
         {(loading || snapshot.refresh_in_progress || error || snapshot.stale) ? (
-          <div role="status" className={styles.valuationStatus}>
+          <div role="status" className="ff-valuationStatus">
             {error || snapshot.stale
               ? pick(language, "Dernières données disponibles", "Latest available data")
               : pick(language, "Actualisation en cours…", "Refreshing…")}
@@ -1188,7 +1188,7 @@ export function FocusFundamentals({
   }
 
   return (
-    <div className={styles.focusStack}>
+    <div className="ff-focusStack">
       <div role="status">
         {loading || snapshot.refresh_in_progress ? pick(language, "Synchronisation en cours…", "Synchronization in progress…") : null}
         {error || snapshot.stale ? pick(language, "Dernières données disponibles", "Latest available data") : null}
@@ -1196,19 +1196,19 @@ export function FocusFundamentals({
           {pick(language, "Actualiser", "Refresh")}
         </button>
       </div>
-      <header className={styles.focusHeader}>
+      <header className="ff-focusHeader">
         <div>
           <span className="eyebrow">{pick(language, "FOCUS FONDAMENTAL", "FUNDAMENTAL FOCUS")}</span>
-          <h2 className={styles.focusName}>
+          <h2 className="ff-focusName">
             {snapshot.name}
           </h2>
-          <p className={styles.focusClassification}>
+          <p className="ff-focusClassification">
             {[snapshot.sector, snapshot.industry]
               .filter(Boolean)
               .join(" · ") || pick(language, "Classification non disponible", "Classification unavailable")}
           </p>
         </div>
-        <div className={styles.focusAvailability}>
+        <div className="ff-focusAvailability">
           <strong data-status={snapshot.status}>
             {snapshot.status === "available"
               ? pick(language, "Données disponibles", "Data available")
@@ -1217,7 +1217,7 @@ export function FocusFundamentals({
                 : pick(language, "Données indisponibles", "Data unavailable")}
           </strong>
           {snapshot.message ? (
-            <div className={styles.focusMessage}>
+            <div className="ff-focusMessage">
               {language === "fr" ? snapshot.message : "Some fields may be unavailable from the current source."}
             </div>
           ) : null}

@@ -6,7 +6,7 @@ import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { FocusFundamentalOverlaySnapshot } from "@/lib/types";
 
 import type { FundamentalMarker } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 function seconds(value: string): number | null {
   const parsed = Date.parse(value);
@@ -103,18 +103,18 @@ export function FocusFundamentalOverlay({
   onSelect: (marker: FundamentalMarker) => void;
 }) {
   return (
-    <section className={styles.panel}>
-      <header className={styles.sectionHeader}>
-        <div><span className={styles.eyebrow}>FUNDAMENTALS</span><h2>{pick(language, "Événements fondamentaux", "Fundamental events")}</h2></div>
-        <button className={`${styles.iconButton} ${enabled ? styles.buttonActive : ""}`} type="button" onClick={onToggle} aria-pressed={enabled} aria-label={pick(language, "Afficher les événements fondamentaux", "Show fundamental events")}>{enabled ? <FocusGlyph name="Eye" size={14} /> : <FocusGlyph name="EyeOff" size={14} />}</button>
+    <section className="fp-panel">
+      <header className="fp-sectionHeader">
+        <div><span className="fp-eyebrow">FUNDAMENTALS</span><h2>{pick(language, "Événements fondamentaux", "Fundamental events")}</h2></div>
+        <button className={`fp-iconButton ${enabled ? "fp-buttonActive" : ""}`} type="button" onClick={onToggle} aria-pressed={enabled} aria-label={pick(language, "Afficher les événements fondamentaux", "Show fundamental events")}>{enabled ? <FocusGlyph name="Eye" size={14} /> : <FocusGlyph name="EyeOff" size={14} />}</button>
       </header>
-      <div className={styles.sectionBody}>
-        <span className={styles.muted}>{loading ? pick(language, "Chargement…", "Loading…") : `${markers.length} ${pick(language, "marqueurs officiels ou sourcés", "official or sourced markers")}`}</span>
+      <div className="fp-sectionBody">
+        <span className="fp-muted">{loading ? pick(language, "Chargement…", "Loading…") : `${markers.length} ${pick(language, "marqueurs officiels ou sourcés", "official or sourced markers")}`}</span>
         {enabled ? (
-          <ul className={styles.list}>
+          <ul className="fp-list">
             {markers.slice(-8).reverse().map((marker) => (
-              <li className={styles.listItem} key={marker.id}>
-                <button className={styles.button} type="button" onClick={() => onSelect(marker)}>
+              <li className="fp-listItem" key={marker.id}>
+                <button className="fp-button" type="button" onClick={() => onSelect(marker)}>
                   <strong>{marker.title}</strong> {new Date(marker.time * 1_000).toLocaleDateString()}
                 </button>
               </li>
@@ -122,7 +122,7 @@ export function FocusFundamentalOverlay({
           </ul>
         ) : null}
         {selected ? (
-          <div className={styles.notice} role="status">
+          <div className="fp-notice" role="status">
             <strong>{selected.title} · {new Date(selected.time * 1_000).toLocaleDateString()}</strong><br />
             {selected.detail}<br />
             Source : {selected.source}

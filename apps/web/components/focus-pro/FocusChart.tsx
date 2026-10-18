@@ -48,7 +48,7 @@ import type {
   FundamentalMarker,
   SnapMode,
 } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 type PriceSeries =
   | ISeriesApi<"Candlestick">
@@ -488,20 +488,20 @@ export function FocusChart({
   }, [candles, chartType, quote.price]);
 
   return (
-    <section className={styles.chartPanel} aria-label="Focus Pro chart">
-      <header className={styles.chartHeader}>
+    <section className="fp-chartPanel" aria-label="Focus Pro chart">
+      <header className="fp-chartHeader">
         <div>
-          <span className={styles.eyebrow}>FOCUS PRO · {pick(language, "POSTE PROFESSIONNEL", "PROFESSIONAL CHART")} · {chartLabel(chartType, language)}</span>
+          <span className="fp-eyebrow">FOCUS PRO · {pick(language, "POSTE PROFESSIONNEL", "PROFESSIONAL CHART")} · {chartLabel(chartType, language)}</span>
           <h2>{quote.symbol} · {timeframe}</h2>
         </div>
-        <div className={styles.chartStatus}>
+        <div className="fp-chartStatus">
           <span>{displayCandles.length.toLocaleString(localeFor(language))} {pick(language, "observations", "observations")}</span>
           {chartType === "heikin_ashi" ? <strong>{pick(language, "OHLC transformé — source réelle conservée", "Transformed OHLC — real source retained")}</strong> : null}
           {refreshing ? <i>{pick(language, "Actualisation…", "Refreshing…")}</i> : null}
         </div>
       </header>
-      <div className={styles.chartStage}>
-        <div ref={containerRef} className={styles.chartCanvas} />
+      <div className="fp-chartStage">
+        <div ref={containerRef} className="fp-chartCanvas" />
         <DrawingInteractionLayer
           key={activeDrawingTool}
           chart={interaction.chart}
@@ -516,10 +516,10 @@ export function FocusChart({
           onUpdate={onUpdateDrawing}
           onSelect={onSelectDrawing}
         />
-        {loading && !candles.length ? <div className={styles.chartOverlay}>{pick(language, "Chargement du graphique…", "Loading chart…")}</div> : null}
-        {error ? <div className={styles.chartError}>{error}</div> : null}
+        {loading && !candles.length ? <div className="fp-chartOverlay">{pick(language, "Chargement du graphique…", "Loading chart…")}</div> : null}
+        {error ? <div className="fp-chartError">{error}</div> : null}
       </div>
-      <footer className={styles.chartFooter}>
+      <footer className="fp-chartFooter">
         <span>{pick(language, "Source", "Source")} {quote.source}{quote.delayed ? ` · ${pick(language, "différée", "delayed")}` : ""}</span>
         <span>{pick(language, "Heure de marché", "Market time")} · America/Toronto</span>
       </footer>

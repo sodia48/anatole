@@ -8,7 +8,7 @@ import { pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { FocusChartType, FocusTimeframe } from "./types";
 import { TIMEFRAMES } from "./types";
 import { FocusGlyph } from "./FocusGlyph";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 const CHART_TYPES: Array<{
   id: FocusChartType;
@@ -67,11 +67,11 @@ export function FocusToolbar({
   };
 
   return (
-    <nav className={styles.toolbar} aria-label="Focus Pro toolbar">
-      <div className={styles.toolbarGroup}>
+    <nav className="fp-toolbar" aria-label="Focus Pro toolbar">
+      <div className="fp-toolbarGroup">
         <FocusGlyph name="ChartNoAxesCombined" size={17} color="#65b8f5" />
         <input
-          className={styles.tickerInput}
+          className="fp-tickerInput"
           aria-label={pick(language, "Symbole", "Ticker")}
           value={symbol}
           onChange={(event) => setSymbol(event.target.value)}
@@ -81,9 +81,9 @@ export function FocusToolbar({
           onBlur={navigate}
         />
       </div>
-      <div className={styles.toolbarGroup}>
+      <div className="fp-toolbarGroup">
         <select
-          className={styles.select}
+          className="fp-select"
           aria-label={pick(language, "Unité de temps", "Timeframe")}
           value={timeframe}
           onChange={(event) => onTimeframe(event.target.value as FocusTimeframe)}
@@ -91,7 +91,7 @@ export function FocusToolbar({
           {TIMEFRAMES.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
         </select>
         <select
-          className={styles.select}
+          className="fp-select"
           aria-label={pick(language, "Type de graphique", "Chart type")}
           value={chartType}
           onChange={(event) => onChartType(event.target.value as FocusChartType)}
@@ -101,29 +101,29 @@ export function FocusToolbar({
           ))}
         </select>
       </div>
-      <div className={styles.toolbarActions}>
-        <button className={styles.button} type="button" onClick={onToggleIndicators}>
+      <div className="fp-toolbarActions">
+        <button className="fp-button" type="button" onClick={onToggleIndicators}>
           <FocusGlyph name="Layers3" /> {pick(language, "Indicateurs", "Indicators")}
         </button>
-        <button className={styles.button} type="button" onClick={onToggleCompare}>
+        <button className="fp-button" type="button" onClick={onToggleCompare}>
           <FocusGlyph name="Columns3" /> {pick(language, "Comparer", "Compare")}
         </button>
-        <button className={styles.button} type="button" onClick={onCreateAlert}>
+        <button className="fp-button" type="button" onClick={onCreateAlert}>
           <FocusGlyph name="BellPlus" /> {pick(language, "Alerte", "Alert")}
         </button>
-        <button className={styles.button} type="button" onClick={onToggleLayouts}>
+        <button className="fp-button" type="button" onClick={onToggleLayouts}>
           <FocusGlyph name="Save" /> Layout
         </button>
-        <button className={styles.button} type="button" onClick={onToggleStrategy}>
+        <button className="fp-button" type="button" onClick={onToggleStrategy}>
           <FocusGlyph name="FlaskConical" /> Strategy
         </button>
-        <button className={styles.button} type="button" onClick={onTogglePaper}>
+        <button className="fp-button" type="button" onClick={onTogglePaper}>
           <FocusGlyph name="WalletCards" /> PAPER
         </button>
-        <button className={styles.iconButton} type="button" onClick={onSaveLayout} aria-label={pick(language, "Sauvegarder le layout", "Save layout")}>
+        <button className="fp-iconButton" type="button" onClick={onSaveLayout} aria-label={pick(language, "Sauvegarder le layout", "Save layout")}>
           <FocusGlyph name="Save" />
         </button>
-        <button className={styles.iconButton} type="button" onClick={fullscreen} aria-label={pick(language, "Plein écran", "Fullscreen")}>
+        <button className="fp-iconButton" type="button" onClick={fullscreen} aria-label={pick(language, "Plein écran", "Fullscreen")}>
           <FocusGlyph name="Expand" />
         </button>
       </div>

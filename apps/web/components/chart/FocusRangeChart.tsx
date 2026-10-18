@@ -26,7 +26,7 @@ import { buildCandleSessionFlow } from "@anatole/shared";
 
 import { pick } from "@/lib/i18n";
 
-import styles from "./FocusRangeChart.module.css";
+import "./FocusRangeChart.css";
 
 type Candle = {
   time: string | number;
@@ -671,8 +671,8 @@ export function FocusRangeChart({
     performance !== null && performance >= 0;
 
   return (
-    <section className={styles.root} aria-label="Performance du titre">
-      <header className={styles.heading}>
+    <section className="frc-root" aria-label="Performance du titre">
+      <header className="frc-heading">
         <span>
           {pick(
             language,
@@ -683,9 +683,9 @@ export function FocusRangeChart({
         <h1>{ticker} · {period.label}</h1>
       </header>
 
-      <div className={styles.toolbar}>
+      <div className="frc-toolbar">
         <div
-          className={styles.periods}
+          className="frc-periods"
           role="group"
           aria-label="Période du graphique"
         >
@@ -694,43 +694,43 @@ export function FocusRangeChart({
               type="button"
               key={candidate.key}
               className={[
-                styles.periodButton,
+                "frc-periodButton",
                 candidate.key === periodKey
-                  ? styles.activePeriod
+                  ? "frc-activePeriod"
                   : "",
                 candidate.key === "live"
-                  ? styles.livePeriod
+                  ? "frc-livePeriod"
                   : "",
               ].join(" ")}
               aria-pressed={candidate.key === periodKey}
               onClick={() => setPeriodKey(candidate.key)}
             >
               {candidate.key === "live" ? (
-                <span className={styles.liveDot} />
+                <span className="frc-liveDot" />
               ) : null}
               {candidate.label}
             </button>
           ))}
         </div>
 
-        <div className={styles.legend} aria-label="Moyennes mobiles">
+        <div className="frc-legend" aria-label="Moyennes mobiles">
           <span>
-            <i className={styles.sma20} />
+            <i className="frc-sma20" />
             SMA 20
           </span>
           <span>
-            <i className={styles.sma50} />
+            <i className="frc-sma50" />
             SMA 50
           </span>
           <span>
-            <i className={styles.sma200} />
+            <i className="frc-sma200" />
             SMA 200
           </span>
         </div>
       </div>
 
-      <div className={styles.summary}>
-        <span className={styles.periodName}>
+      <div className="frc-summary">
+        <span className="frc-periodName">
           {periodKey === "live"
             ? "Séance en cours"
             : `Évolution ${period.label}`}
@@ -739,10 +739,10 @@ export function FocusRangeChart({
         <strong
           className={
             performance === null
-              ? styles.neutral
+              ? "frc-neutral"
               : positive
-                ? styles.positive
-                : styles.negative
+                ? "frc-positive"
+                : "frc-negative"
           }
         >
           {formatPercent(performance)}
@@ -757,92 +757,92 @@ export function FocusRangeChart({
         </span>
 
         {periodKey === "live" ? (
-          <span className={styles.liveStatus}>
-            <span className={styles.liveDot} />
+          <span className="frc-liveStatus">
+            <span className="frc-liveDot" />
             actualisation 15 s
           </span>
         ) : null}
 
         {refreshing ? (
-          <span className={styles.refreshing}>Actualisation…</span>
+          <span className="frc-refreshing">Actualisation…</span>
         ) : null}
 
         {delayed ? (
-          <span className={styles.delayed}>
+          <span className="frc-delayed">
             Source potentiellement différée
           </span>
         ) : null}
       </div>
 
-      <div className={styles.chartLayout}>
-        <div className={styles.chartShell}>
-          <div ref={chartContainerRef} className={styles.chart} />
+      <div className="frc-chartLayout">
+        <div className="frc-chartShell">
+          <div ref={chartContainerRef} className="frc-chart" />
 
           {loading && candles.length === 0 ? (
-            <div className={styles.overlay}>
+            <div className="frc-overlay">
               Chargement de la période…
             </div>
           ) : null}
 
           {error ? (
-            <div className={styles.errorBanner}>
+            <div className="frc-errorBanner">
               {error}
             </div>
           ) : null}
         </div>
 
         <aside
-          className={styles.volumePanel}
+          className="frc-volumePanel"
           aria-label={`Volumes acheteur et vendeur estimés — ${period.label}`}
         >
-          <div className={styles.volumeHeading}>
+          <div className="frc-volumeHeading">
             <span>Volume · {period.label}</span>
             <strong>{formatVolume(volume.total_volume)}</strong>
           </div>
 
-          <div className={styles.volumeBar} aria-hidden="true">
+          <div className="frc-volumeBar" aria-hidden="true">
             <span
-              className={styles.buyerBar}
+              className="frc-buyerBar"
               style={{ width: `${volumeShare(volume.buy_volume, volume.total_volume)}%` }}
             />
             <span
-              className={styles.sellerBar}
+              className="frc-sellerBar"
               style={{ width: `${volumeShare(volume.sell_volume, volume.total_volume)}%` }}
             />
             <span
-              className={styles.neutralBar}
+              className="frc-neutralBar"
               style={{ width: `${volumeShare(volume.neutral_volume, volume.total_volume)}%` }}
             />
           </div>
 
-          <div className={styles.volumeMetric}>
-            <span><i className={styles.buyerDot} />Acheteur estimé</span>
+          <div className="frc-volumeMetric">
+            <span><i className="frc-buyerDot" />Acheteur estimé</span>
             <strong>{formatVolume(volume.buy_volume)}</strong>
             <small>{volume.buy_ratio === null ? "N/D" : `${(volume.buy_ratio * 100).toFixed(1)} %`}</small>
           </div>
 
-          <div className={styles.volumeMetric}>
-            <span><i className={styles.sellerDot} />Vendeur estimé</span>
+          <div className="frc-volumeMetric">
+            <span><i className="frc-sellerDot" />Vendeur estimé</span>
             <strong>{formatVolume(volume.sell_volume)}</strong>
             <small>{volume.sell_ratio === null ? "N/D" : `${(volume.sell_ratio * 100).toFixed(1)} %`}</small>
           </div>
 
           {volume.neutral_volume !== null && volume.neutral_volume > 0 ? (
-            <div className={`${styles.volumeMetric} ${styles.neutralMetric}`}>
-              <span><i className={styles.neutralDot} />Indéterminé</span>
+            <div className={`frc-volumeMetric frc-neutralMetric`}>
+              <span><i className="frc-neutralDot" />Indéterminé</span>
               <strong>{formatVolume(volume.neutral_volume)}</strong>
               <small>{volumeShare(volume.neutral_volume, volume.total_volume).toFixed(1)} %</small>
             </div>
           ) : null}
 
-          <p className={styles.volumeMethod}>
+          <p className="frc-volumeMethod">
             Estimation OHLCV : volume des bougies haussières ou baissières,
             et non transactions bid/ask exactes.
           </p>
         </aside>
       </div>
 
-      <p className={styles.note}>
+      <p className="frc-note">
         Pour 5A et 10A, les bougies et les SMA utilisent une
         fréquence hebdomadaire. Le mode LIVE dépend du délai de la
         source de marché.

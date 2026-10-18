@@ -1,0 +1,47 @@
+.fd-panel { display: grid; gap: 24px; max-width: 1200px; margin: 20px auto; padding: clamp(18px, 3vw, 34px); border: 1px solid var(--border); border-radius: 18px; background: var(--panel); color: var(--text); }
+.fd-panel h2, .fd-panel h3 { margin: 0 0 8px; }
+.fd-panel p { margin: 6px 0; }
+.fd-overviewGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.fd-overviewCard { display: grid; align-content: start; gap: 12px; min-height: 190px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2, var(--panel)); color: var(--text); text-decoration: none; scroll-margin-top: 100px; }
+.fd-overviewCard:hover { border-color: var(--blue); }
+.fd-overviewCard:focus-within { border-color: var(--blue); }
+.fd-cardTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fd-cardIcon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--blue); background: var(--primary-surface); }
+.fd-coverage { color: var(--text-secondary); font-size: 12px; }
+.fd-scoreRow { display: flex; align-items: center; gap: 12px; color: var(--text-secondary); font-size: 12px; }
+.fd-scoreRing { display: grid; place-items: center; width: 54px; height: 54px; flex: 0 0 auto; border-radius: 50%; background: conic-gradient(var(--blue) var(--score), var(--border) 0); }
+.fd-scoreRing b { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--panel); color: var(--text); font-size: 15px; }
+.fd-unavailable { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 13px; }
+.fd-subdimension { display: grid; gap: 7px; }
+.fd-subdimensionName { font-size: 12px; font-weight: 750; }
+.fd-cardExplanation { color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.fd-cardAction { align-self: end; margin-top: 3px; color: var(--accent-text); font-size: 12px; font-weight: 750; text-decoration: none; }
+.fd-cardAction:hover, .fd-cardAction:focus-visible { text-decoration: underline; }
+.fd-muted { color: var(--text-secondary); font-size: 13px; }
+.fd-findings { display: grid; gap: 10px; }
+.fd-findingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.fd-findingCard { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2, var(--panel)); }
+.fd-findingHead { display: flex; align-items: center; gap: 8px; color: var(--blue); }
+.fd-findingCard[data-kind="strength"] .fd-findingHead { color: #16847a; }
+.fd-findingCard[data-kind="vulnerability"] .fd-findingHead { color: #c7596d; }
+.fd-findingCard p { margin: 10px 0; font-size: 14px; line-height: 1.55; }
+.fd-findingCard details { font-size: 12px; }
+.fd-findingCard a { display: block; margin-top: 5px; }
+.fd-dimension { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.fd-dimension[id] { scroll-margin-top: 90px; }
+.fd-dimension h3 { display: flex; align-items: center; gap: 8px; }
+.fd-dimension h3 svg { color: var(--blue); }
+.fd-dimension details { color: var(--text-secondary); font-size: 13px; }
+.fd-dimension summary { cursor: pointer; color: var(--text); font-weight: 700; }
+.fd-missingSector { padding: 12px 14px; border-radius: 8px; background: var(--panel-2, var(--panel)); }
+.fd-missingSector ul { display: flex; flex-wrap: wrap; gap: 7px 22px; padding-left: 20px; }
+.fd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.fd-details { display: grid; gap: 7px; }
+.fd-measure { display: grid; gap: 6px; padding: 11px; border: 1px solid var(--border); border-radius: 9px; scroll-margin-top: 90px; }
+.fd-value { font-size: 18px; font-weight: 750; }
+.fd-charts { display: grid; gap: 14px; }
+.fd-tableWrap { overflow-x: auto; }
+.fd-tableWrap table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.fd-tableWrap caption { text-align: left; font-weight: 700; margin-bottom: 6px; }
+.fd-tableWrap th, .fd-tableWrap td { padding: 8px; border-bottom: 1px solid var(--border); }
+@media (max-width: 700px) { .fd-panel { padding: 14px; } .fd-dimension { padding: 12px; } .fd-overviewGrid { grid-template-columns: 1fr; } .fd-overviewCard { min-height: 150px; } }

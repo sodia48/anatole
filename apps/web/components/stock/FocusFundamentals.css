@@ -1,0 +1,152 @@
+/* Styling for results and statement tabs lives in CSS rather than client JavaScript. */
+.ff-resultsNav,
+.ff-statementNav {
+  display: flex;
+  gap: 5px;
+  max-width: 100%;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.ff-resultsNav {
+  align-items: center;
+  width: fit-content;
+  border-radius: 11px;
+}
+.ff-statementNav { border-radius: 9px; }
+.ff-resultsTab,
+.ff-statementTab {
+  flex: 0 0 auto;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ff-resultsTab {
+  min-width: 105px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.ff-statementTab {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 750;
+}
+.ff-resultsTab[aria-pressed="true"] {
+  border-color: var(--interactive);
+}
+.ff-resultsTab[aria-pressed="true"],
+.ff-statementTab[aria-pressed="true"] {
+  background: var(--interactive);
+  color: var(--on-primary);
+}
+
+.ff-financialTableWrap { max-width: 100%; overflow-x: auto; }
+.ff-financialTable { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 11px; text-align: right; color: var(--text); }
+.ff-financialTable[data-view="income"] { min-width: 1320px; }
+.ff-financialTable[data-view="balance"] { min-width: 1180px; }
+.ff-financialTable thead { color: var(--text-secondary); }
+.ff-financialTable th, .ff-financialTable td { padding: 11px; white-space: nowrap; }
+.ff-financialTable thead th { padding: 10px 11px; }
+.ff-financialTable th:first-child { text-align: left; }
+.ff-financialTable tbody th { font-weight: 750; }
+.ff-periodSource { display: block; margin-top: 4px; color: var(--text-secondary); font-size: 10px; font-weight: 400; }
+.ff-financialTable tbody tr { border-top: 1px solid var(--border); }
+.ff-financialTable td[data-tone="positive"] { color: var(--positive-text); }
+.ff-financialTable td[data-tone="negative"] { color: var(--negative-text); }
+.ff-financialTable .ff-tableEmpty { padding: 28px; color: var(--text-secondary); text-align: left; }
+.ff-chartGrid { min-width: 0; display: grid; gap: 12px; margin-top: 14px; }
+.ff-modeStack { display: grid; min-width: 0; gap: 14px; }
+.ff-fundamentalsGrid[data-mode="table"] { grid-template-columns: minmax(0, 1fr); }
+.ff-fundamentalsGrid[data-mode="table"] .ff-groupGrid,
+.ff-modeStack[data-mode="table"] .ff-groupGrid,
+.ff-modeStack[data-mode="table"] .ff-dashboardMetrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.ff-fundamentalsGrid[data-mode="table"] .ff-metric,
+.ff-modeStack[data-mode="table"] .ff-metric { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 3px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.ff-fundamentalsGrid[data-mode="table"] .ff-metric strong,
+.ff-modeStack[data-mode="table"] .ff-metric strong { text-align: right; font-size: 13px; }
+.ff-stackedDistribution { display: flex; overflow: hidden; height: 24px; border-radius: 7px; background: var(--surface-raised); }
+.ff-stackedDistribution span { min-width: 0; background: var(--text-secondary); }
+.ff-stackedDistribution span[data-tone="positive"] { background: var(--positive-text); }
+.ff-stackedDistribution span[data-tone="negative"] { background: var(--negative-text); }
+.ff-stackedDistribution span:nth-child(2), .ff-stackedDistribution span:nth-child(5) { opacity: .65; }
+.ff-distributionLegend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 22px; color: var(--text-secondary); font-size: 11px; }
+.ff-distributionLegend button, .ff-chartType button { min-height: 36px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); padding: 5px 10px; cursor: pointer; font: inherit; }
+.ff-distributionLegend button[aria-pressed="true"], .ff-chartType button[aria-pressed="true"] { outline: 2px solid var(--interactive); }
+.ff-distributionLegend button:focus-visible, .ff-chartType button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.ff-chartType { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.ff-chartType button:disabled { opacity: .5; cursor: not-allowed; }
+.ff-composition { width: 160px; aspect-ratio: 1; border-radius: 50%; margin: 14px auto; border: 1px solid var(--border); }
+.ff-composition[data-kind="donut"] { mask: radial-gradient(circle, transparent 0 42%, #000 43%); }
+.ff-targetRange { position: relative; height: 16px; margin: 26px 9px 18px; border-radius: 8px; background: linear-gradient(90deg, var(--surface-raised), var(--interactive), var(--surface-raised)); }
+.ff-targetMarker { position: absolute; top: -6px; width: 3px; height: 28px; background: var(--text); transform: translateX(-50%); }
+.ff-analystsTableWrap { max-width: 100%; overflow-x: auto; }
+.ff-analystsTable { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.ff-analystsTable th, .ff-analystsTable td { padding: 9px; border-bottom: 1px solid var(--border); }
+.ff-analystsTable td { text-align: right; }
+.ff-financialTableWrap[data-mode="cards"] { overflow: visible; margin-top: 14px; }
+.ff-financialTableWrap[data-mode="cards"] .ff-financialTable { display: block; min-width: 0; }
+.ff-financialTableWrap[data-mode="cards"] thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.ff-financialTableWrap[data-mode="cards"] tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ff-financialTableWrap[data-mode="cards"] tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 16px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.ff-financialTableWrap[data-mode="cards"] tbody th { grid-column: 1 / -1; padding: 0 0 9px; border-bottom: 1px solid var(--border); font-size: 17px; }
+.ff-financialTableWrap[data-mode="cards"] tbody td { min-width: 0; display: grid; gap: 4px; padding: 8px 0; white-space: normal; overflow-wrap: anywhere; font-size: 12px; font-weight: 750; }
+.ff-financialTableWrap[data-mode="cards"] tbody td::before { content: attr(data-label); color: var(--text-secondary); font-size: 10px; font-weight: 400; }
+@media (max-width: 700px) { .ff-financialTableWrap[data-mode="cards"] tbody { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) { .ff-fundamentalsGrid[data-mode="table"] .ff-groupGrid, .ff-modeStack[data-mode="table"] .ff-groupGrid, .ff-modeStack[data-mode="table"] .ff-dashboardMetrics { grid-template-columns: minmax(0, 1fr); } }
+.ff-metric { min-height: 78px; display: grid; align-content: center; gap: 7px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--panel); }
+.ff-metric span { color: var(--text-secondary); font-size: 11px; }
+.ff-metric strong { color: var(--text); font-size: 18px; }
+.ff-metric strong[data-tone="positive"] { color: var(--positive-text); }
+.ff-metric strong[data-tone="negative"] { color: var(--negative-text); }
+.ff-group { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
+.ff-group h2 { margin: 0 0 14px; font-size: 18px; }
+.ff-groupGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
+.ff-fundamentalsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 14px; }
+.ff-trendTitle { margin: 0 0 14px; font-size: 15px; }
+.ff-trendRows { display: grid; gap: 10px; }
+.ff-trendRow { display: grid; grid-template-columns: 78px 1fr 120px; align-items: center; gap: 10px; }
+.ff-trendYear { color: var(--text-secondary); font-size: 10px; }
+.ff-trendTrack { height: 10px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
+.ff-trendFill { height: 100%; border-radius: 999px; background: var(--positive-text); }
+.ff-trendFill[data-tone="negative"] { background: var(--negative-text); }
+.ff-trendValue { color: var(--text); text-align: right; font-size: 11px; }
+.ff-trendValue[data-tone="negative"] { color: var(--negative-text); }
+.ff-dashboardMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.ff-analystsStack { display: grid; gap: 14px; }
+.ff-analystsHero { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
+.ff-analystsRating { margin: 5px 0 8px; font-size: 28px; }
+.ff-analystsMeta { margin: 0; color: var(--text-secondary); }
+.ff-analystsUpside { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel); }
+.ff-analystsUpside span { color: var(--text-secondary); font-size: 11px; }
+.ff-analystsUpside strong { display: block; margin-top: 8px; font-size: 30px; color: var(--text-secondary); }
+.ff-analystsUpside strong[data-tone="positive"] { color: var(--positive-text); }
+.ff-analystsUpside strong[data-tone="negative"] { color: var(--negative-text); }
+.ff-distribution { display: grid; gap: 12px; }
+.ff-distributionLabel { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 5px; color: var(--text-secondary); font-size: 12px; }
+.ff-distributionTrack { height: 9px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
+.ff-distributionFill { height: 100%; border-radius: 999px; background: var(--text-secondary); }
+.ff-distributionFill[data-tone="positive"] { background: var(--positive-text); }
+.ff-distributionFill[data-tone="negative"] { background: var(--negative-text); }
+.ff-loadingPanel { min-height: 360px; display: grid; place-items: center; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
+.ff-loadingPanel[data-view="valuation"] { min-height: 140px; }
+.ff-errorPanel { padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); color: var(--negative-text); }
+.ff-valuationStack { display: grid; gap: 8px; }
+.ff-valuationStatus { color: var(--text-secondary); font-size: 11px; }
+.ff-focusStack { display: grid; gap: 12px; }
+.ff-focusHeader { display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
+.ff-focusName { margin: 4px 0 0; }
+.ff-focusClassification { margin: 6px 0 0; color: var(--text-secondary); }
+.ff-focusAvailability { text-align: right; }
+.ff-focusAvailability strong[data-status="available"] { color: var(--positive-text); }
+.ff-focusAvailability strong[data-status="partial"] { color: var(--warning); }
+.ff-focusAvailability strong[data-status="unavailable"] { color: var(--negative-text); }
+.ff-focusMessage { max-width: 460px; margin-top: 4px; color: var(--text-secondary); font-size: 10px; }
