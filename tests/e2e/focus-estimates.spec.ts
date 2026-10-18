@@ -23,7 +23,7 @@ async function openEstimates(page: import("@playwright/test").Page, language: "f
   await page.getByRole("navigation", { name: "Focus sections" })
     .getByRole("button", { name: language === "fr" ? "Fondamentaux" : "Fundamentals", exact: true }).click();
   await page.getByRole("navigation", { name: language === "fr" ? "Vues fondamentales" : "Fundamental views" })
-    .getByRole("button", { name: language === "fr" ? "Résultats" : "Financials", exact: true }).click();
+    .getByRole("combobox", { name: language === "fr" ? "Ouvrir un module" : "Open a module" }).selectOption("financials");
   await page.getByRole("navigation", { name: language === "fr" ? "Vues des résultats financiers" : "Financial results views" })
     .getByRole("button", { name: language === "fr" ? "Estimations" : "Estimates", exact: true }).click();
 }

@@ -11,7 +11,7 @@ import type {
   IndicatorId,
   IndicatorInputValue,
 } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 export function FocusIndicatorPanel({
   indicators,
@@ -51,51 +51,51 @@ export function FocusIndicatorPanel({
   ) => update(item.id, { inputs: { ...item.inputs, [key]: value } });
 
   return (
-    <section className={styles.panel} aria-label={pick(language, "Panneau des indicateurs", "Indicator panel")}>
-      <header className={styles.sectionHeader}>
-        <div><span className={styles.eyebrow}>INDICATOR ENGINE</span><h2>{pick(language, "Indicateurs", "Indicators")}</h2></div>
-        <button type="button" className={styles.iconButton} onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
+    <section className="fp-panel" aria-label={pick(language, "Panneau des indicateurs", "Indicator panel")}>
+      <header className="fp-sectionHeader">
+        <div><span className="fp-eyebrow">INDICATOR ENGINE</span><h2>{pick(language, "Indicateurs", "Indicators")}</h2></div>
+        <button type="button" className="fp-iconButton" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
       </header>
-      <div className={styles.sectionBody}>
-        <div className={styles.inlineActions}>
-          <select className={styles.select} style={{ flex: 1 }} value={selected} onChange={(event) => setSelected(event.target.value as IndicatorId)}>
+      <div className="fp-sectionBody">
+        <div className="fp-inlineActions">
+          <select className="fp-select" style={{ flex: 1 }} value={selected} onChange={(event) => setSelected(event.target.value as IndicatorId)}>
             {INDICATOR_DEFINITIONS.map((definition) => (
               <option key={definition.id} value={definition.id}>{definition.name} · {definition.category}</option>
             ))}
           </select>
-          <button className={styles.primaryButton} type="button" onClick={add} disabled={indicators.length >= 20}><FocusGlyph name="Plus" size={14} /> {pick(language, "Ajouter", "Add")}</button>
+          <button className="fp-primaryButton" type="button" onClick={add} disabled={indicators.length >= 20}><FocusGlyph name="Plus" size={14} /> {pick(language, "Ajouter", "Add")}</button>
         </div>
-        <span className={styles.muted}>{indicators.length}/20 · {pick(language, "calcul mémorisé par série, sans recalcul au tick", "memoized per series, no tick recalculation")}</span>
-        <ul className={styles.list}>
+        <span className="fp-muted">{indicators.length}/20 · {pick(language, "calcul mémorisé par série, sans recalcul au tick", "memoized per series, no tick recalculation")}</span>
+        <ul className="fp-list">
           {indicators.map((item) => {
             const definition = INDICATOR_DEFINITIONS.find((candidate) => candidate.id === item.definition_id);
             if (!definition) return null;
             return (
-              <li className={styles.listItem} key={item.id} style={{ display: "grid" }}>
-                <div className={styles.between}>
+              <li className="fp-listItem" key={item.id} style={{ display: "grid" }}>
+                <div className="fp-between">
                   <span><strong>{definition.name}</strong><small>{definition.pane === "main" ? pick(language, "Graphique principal", "Main chart") : pick(language, "Panneau séparé", "Separate pane")}</small></span>
-                  <div className={styles.inlineActions}>
-                    <button className={styles.iconButton} type="button" onClick={() => update(item.id, { visible: !item.visible })} aria-label={pick(language, "Visibilité", "Visibility")}>{item.visible ? <FocusGlyph name="Eye" size={13} /> : <FocusGlyph name="EyeOff" size={13} />}</button>
-                    <button className={styles.iconButton} type="button" onClick={() => onChange(indicators.filter((candidate) => candidate.id !== item.id))} aria-label={pick(language, "Supprimer", "Delete")}><FocusGlyph name="Trash2" size={13} /></button>
+                  <div className="fp-inlineActions">
+                    <button className="fp-iconButton" type="button" onClick={() => update(item.id, { visible: !item.visible })} aria-label={pick(language, "Visibilité", "Visibility")}>{item.visible ? <FocusGlyph name="Eye" size={13} /> : <FocusGlyph name="EyeOff" size={13} />}</button>
+                    <button className="fp-iconButton" type="button" onClick={() => onChange(indicators.filter((candidate) => candidate.id !== item.id))} aria-label={pick(language, "Supprimer", "Delete")}><FocusGlyph name="Trash2" size={13} /></button>
                   </div>
                 </div>
-                <div className={styles.inlineActions} style={{ flexWrap: "wrap" }}>
+                <div className="fp-inlineActions" style={{ flexWrap: "wrap" }}>
                   {Object.entries(item.inputs).map(([key, value]) => (
-                    <label className={styles.field} key={key} style={{ minWidth: 72, flex: 1 }}>
+                    <label className="fp-field" key={key} style={{ minWidth: 72, flex: 1 }}>
                       {key}
                       {key === "source" ? (
-                        <select className={styles.select} value={String(value)} onChange={(event) => updateInput(item, key, event.target.value)}>
+                        <select className="fp-select" value={String(value)} onChange={(event) => updateInput(item, key, event.target.value)}>
                           {['open', 'high', 'low', 'close', 'hl2', 'hlc3', 'ohlc4'].map((source) => <option key={source}>{source}</option>)}
                         </select>
                       ) : (
-                        <input className={styles.input} type="number" step="any" value={String(value)} onChange={(event) => updateInput(item, key, Number(event.target.value))} />
+                        <input className="fp-input" type="number" step="any" value={String(value)} onChange={(event) => updateInput(item, key, Number(event.target.value))} />
                       )}
                     </label>
                   ))}
                 </div>
-                <div className={styles.inlineActions}>
-                  <label className={styles.field}>{pick(language, "Couleur", "Color")}<input type="color" value={item.colors[0] ?? definition.colors[0]} onChange={(event) => update(item.id, { colors: [event.target.value, ...item.colors.slice(1)] })} /></label>
-                  <label className={styles.field}>{pick(language, "Épaisseur", "Width")}<input className={styles.input} type="number" min={1} max={4} value={item.line_width} onChange={(event) => update(item.id, { line_width: Number(event.target.value) })} /></label>
+                <div className="fp-inlineActions">
+                  <label className="fp-field">{pick(language, "Couleur", "Color")}<input type="color" value={item.colors[0] ?? definition.colors[0]} onChange={(event) => update(item.id, { colors: [event.target.value, ...item.colors.slice(1)] })} /></label>
+                  <label className="fp-field">{pick(language, "Épaisseur", "Width")}<input className="fp-input" type="number" min={1} max={4} value={item.line_width} onChange={(event) => update(item.id, { line_width: Number(event.target.value) })} /></label>
                 </div>
               </li>
             );

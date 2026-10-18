@@ -105,12 +105,12 @@ test("public research flows from institutional Assistant through Focus evidence 
   await expect(scenarios).toContainText("pas des prévisions");
 
   const views = page.getByRole("navigation", { name: "Vues fondamentales" });
-  await views.getByRole("button", { name: "Pairs" }).click();
+  await views.getByRole("combobox", { name: "Ouvrir un module" }).selectOption("peers");
   const peers = page.getByRole("region", { name: "Comparateur sectoriel" });
   await peers.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue cartes" }).click();
   await expect(peers).toContainText("Médiane indisponible");
   await expect(peers.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", source);
-  await views.getByRole("button", { name: "Rapports" }).click();
+  await views.getByRole("combobox", { name: "Ouvrir un module" }).selectOption("documents");
   const documents = page.getByRole("region", { name: "Recherche dans les rapports officiels" });
   await expect(documents.getByRole("link", { name: /Annual report 2025 · page 3/ }).first()).toHaveAttribute("href", `${source}#page=3`);
 

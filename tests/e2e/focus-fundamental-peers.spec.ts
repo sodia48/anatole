@@ -28,7 +28,7 @@ test("Focus peers explain coverage, preserve provenance and allow replacement", 
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Pairs" }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("peers");
   const panel = page.getByRole("region", { name: "Comparateur sectoriel" });
   await panel.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue cartes" }).click();
   await expect(panel.getByText("Médiane indisponible : échantillon insuffisant.").first()).toBeVisible();

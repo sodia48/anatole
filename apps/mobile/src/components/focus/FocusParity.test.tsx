@@ -11,6 +11,7 @@ import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
 import { MobileFocusFundamentalTabs } from "./MobileFocusFundamentalTabs";
+import { MobileFundamentalPortal } from "./MobileFundamentalPortal";
 import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
@@ -66,14 +67,25 @@ describe("mobile Focus parity", () => {
   });
   it("nests Results and Analysts under Fundamentals", async () => {
     const onChange = jest.fn();
-    const view = await render(<MobileFocusFundamentalTabs view="fundamentals" onChange={onChange} />);
+    const view = await render(<MobileFocusFundamentalTabs view="portal" onChange={onChange} />);
+    expect(view.getByText("Intelligence 360°")).toBeTruthy();
+    await fireEvent.press(view.getByText(/Autres vues/));
     expect(view.getByText("Résultats")).toBeTruthy();
     expect(view.getByText("Analystes")).toBeTruthy();
     expect(view.getByText("Diagnostic 360°")).toBeTruthy();
     await fireEvent.press(view.getByText("Résultats"));
+    await fireEvent.press(view.getByText(/Autres vues/));
     await fireEvent.press(view.getByText("Analystes"));
     expect(onChange).toHaveBeenCalledWith("financials");
     expect(onChange).toHaveBeenCalledWith("analysts");
+  });
+  it("opens the diagnostic from the eight-module native portal", async () => {
+    const onOpen = jest.fn();
+    const view = await render(<MobileFundamentalPortal ticker="RY" onOpen={onOpen} />);
+    expect(view.getByText("Anatole Fundamental Intelligence 360")).toBeTruthy();
+    expect(view.getByTestId("fundamental-portal-assistant")).toBeTruthy();
+    await fireEvent.press(view.getByTestId("fundamental-portal-diagnostic"));
+    expect(onOpen).toHaveBeenCalledWith("diagnostic");
   });
   it("renders sourced diagnostic values and switches all three native modes", async () => {
     const point = { value: 15, period_end: "2025-12-31T00:00:00Z", period_type: "annual" as const,

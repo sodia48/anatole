@@ -8,7 +8,7 @@ import type {
   FocusDrawing,
   SnapMode,
 } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 type DrawingToolDefinition = {
   id: DrawingTool;
@@ -69,13 +69,13 @@ export function FocusDrawingToolbar({
   onText: (text: string) => void;
 }) {
   return (
-    <aside className={styles.drawingToolbar} aria-label={pick(language, "Outils de dessin", "Drawing tools")}>
+    <aside className="fp-drawingToolbar" aria-label={pick(language, "Outils de dessin", "Drawing tools")}>
       {TOOLS.map((tool) => {
         return (
           <button
             key={tool.id}
             type="button"
-            className={`${styles.iconButton} ${activeTool === tool.id ? styles.buttonActive : ""}`}
+            className={`fp-iconButton ${activeTool === tool.id ? "fp-buttonActive" : ""}`}
             aria-label={pick(language, tool.label[0], tool.label[1])}
             aria-pressed={activeTool === tool.id}
             title={pick(language, tool.label[0], tool.label[1])}
@@ -85,9 +85,9 @@ export function FocusDrawingToolbar({
           </button>
         );
       })}
-      <div className={styles.drawingDivider} />
+      <div className="fp-drawingDivider" />
       <select
-        className={styles.select}
+        className="fp-select"
         style={{ minWidth: 34, width: 34, padding: 2 }}
         aria-label="Snap"
         title="Snap"
@@ -98,17 +98,17 @@ export function FocusDrawingToolbar({
         <option value="ohlc">O</option>
         <option value="high_low">H/L</option>
       </select>
-      <button className={styles.iconButton} type="button" onClick={onUndo} disabled={!canUndo} aria-label={pick(language, "Annuler", "Undo")}><FocusGlyph name="Undo2" /></button>
-      <button className={styles.iconButton} type="button" onClick={onRedo} disabled={!canRedo} aria-label={pick(language, "Rétablir", "Redo")}><FocusGlyph name="Redo2" /></button>
-      <button className={styles.iconButton} type="button" onClick={onDuplicate} disabled={!selected} aria-label={pick(language, "Dupliquer", "Duplicate")}><FocusGlyph name="Copy" /></button>
-      <button className={`${styles.iconButton} ${selected?.locked ? styles.buttonActive : ""}`} type="button" onClick={onToggleLock} disabled={!selected} aria-label={pick(language, "Verrouiller", "Lock")}><FocusGlyph name="Lock" /></button>
-      <button className={`${styles.iconButton} ${selected?.hidden ? styles.buttonActive : ""}`} type="button" onClick={onToggleHidden} disabled={!selected} aria-label={pick(language, "Masquer", "Hide")}><FocusGlyph name="EyeOff" /></button>
-      <button className={styles.iconButton} type="button" onClick={onDelete} disabled={!selected} aria-label={pick(language, "Supprimer", "Delete")}><FocusGlyph name="Trash2" /></button>
-      <span className={styles.drawingCount}>{drawingsCount}/50</span>
+      <button className="fp-iconButton" type="button" onClick={onUndo} disabled={!canUndo} aria-label={pick(language, "Annuler", "Undo")}><FocusGlyph name="Undo2" /></button>
+      <button className="fp-iconButton" type="button" onClick={onRedo} disabled={!canRedo} aria-label={pick(language, "Rétablir", "Redo")}><FocusGlyph name="Redo2" /></button>
+      <button className="fp-iconButton" type="button" onClick={onDuplicate} disabled={!selected} aria-label={pick(language, "Dupliquer", "Duplicate")}><FocusGlyph name="Copy" /></button>
+      <button className={`fp-iconButton ${selected?.locked ? "fp-buttonActive" : ""}`} type="button" onClick={onToggleLock} disabled={!selected} aria-label={pick(language, "Verrouiller", "Lock")}><FocusGlyph name="Lock" /></button>
+      <button className={`fp-iconButton ${selected?.hidden ? "fp-buttonActive" : ""}`} type="button" onClick={onToggleHidden} disabled={!selected} aria-label={pick(language, "Masquer", "Hide")}><FocusGlyph name="EyeOff" /></button>
+      <button className="fp-iconButton" type="button" onClick={onDelete} disabled={!selected} aria-label={pick(language, "Supprimer", "Delete")}><FocusGlyph name="Trash2" /></button>
+      <span className="fp-drawingCount">{drawingsCount}/50</span>
       {selected?.tool.startsWith("fib_") ? (
         <input
           key={selected.id}
-          className={styles.input}
+          className="fp-input"
           style={{ width: 38, padding: 3, fontSize: 8 }}
           defaultValue={selected.fib_levels.join(",")}
           title={pick(language, "Niveaux Fibonacci séparés par des virgules", "Comma-separated Fibonacci levels")}
@@ -125,7 +125,7 @@ export function FocusDrawingToolbar({
       {selected?.tool === "text" ? (
         <input
           key={selected.id}
-          className={styles.input}
+          className="fp-input"
           style={{ width: 38, padding: 3, fontSize: 8 }}
           defaultValue={selected.text ?? ""}
           aria-label={pick(language, "Texte du dessin", "Drawing text")}

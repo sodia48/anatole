@@ -35,7 +35,7 @@ test("Particulier: question fondamentale sourcée puis vue Focus ciblée", async
   expect((request?.context as { symbol: string }).symbol).toBe("RY");
   await dialog.getByRole("link", { name: /Voir diagnostic dans Focus/ }).click();
   await expect(page).toHaveURL(/\/focus\/RY\?view=diagnostic/);
-  await expect(page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Diagnostic 360°" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" })).toHaveValue("diagnostic");
 });
 
 test("Institutionnel: contexte public RY sans transmettre le brouillon privé", async ({ page }) => {

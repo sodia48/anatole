@@ -6,7 +6,7 @@ import { useState } from "react";
 import { pick, type AnatoleLanguage } from "@/lib/i18n";
 
 import type { FocusComparisonConfig } from "./types";
-import styles from "./FocusPro.module.css";
+import "./FocusPro.css";
 
 const COLORS = ["#f6b94a", "#8a63ff", "#13d0c5", "#ff5f76", "#65b8f5"];
 
@@ -38,33 +38,33 @@ export function FocusComparePanel({
   };
 
   return (
-    <section className={styles.panel} aria-label={pick(language, "Comparaisons", "Comparisons")}>
-      <header className={styles.sectionHeader}>
-        <div><span className={styles.eyebrow}>+ COMPARE</span><h2>{pick(language, "Comparer jusqu’à 5 actifs", "Compare up to 5 assets")}</h2></div>
-        <button className={styles.iconButton} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
+    <section className="fp-panel" aria-label={pick(language, "Comparaisons", "Comparisons")}>
+      <header className="fp-sectionHeader">
+        <div><span className="fp-eyebrow">+ COMPARE</span><h2>{pick(language, "Comparer jusqu’à 5 actifs", "Compare up to 5 assets")}</h2></div>
+        <button className="fp-iconButton" type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")}><FocusGlyph name="X" size={14} /></button>
       </header>
-      <div className={styles.sectionBody}>
-        <div className={styles.inlineActions}>
-          <input className={styles.input} style={{ flex: 1 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") add(); }} placeholder="RY, XIU, ^GSPTSE…" />
-          <button className={styles.primaryButton} type="button" onClick={() => add()} disabled={comparisons.length >= 5}><FocusGlyph name="Plus" size={14} /></button>
+      <div className="fp-sectionBody">
+        <div className="fp-inlineActions">
+          <input className="fp-input" style={{ flex: 1 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") add(); }} placeholder="RY, XIU, ^GSPTSE…" />
+          <button className="fp-primaryButton" type="button" onClick={() => add()} disabled={comparisons.length >= 5}><FocusGlyph name="Plus" size={14} /></button>
         </div>
-        <select className={styles.select} value={mode} onChange={(event) => setMode(event.target.value as FocusComparisonConfig["mode"])}>
+        <select className="fp-select" value={mode} onChange={(event) => setMode(event.target.value as FocusComparisonConfig["mode"])}>
           <option value="normalized_percent">{pick(language, "Normalisé · base 0 %", "Normalized · base 0%")}</option>
           <option value="price">{pick(language, "Prix", "Price")}</option>
         </select>
-        <div className={styles.inlineActions}>
-          <button className={styles.button} type="button" onClick={() => add("XIU")}>TSX 60 · XIU</button>
-          <button className={styles.button} type="button" onClick={() => add("^GSPTSE")}>TSX Composite</button>
+        <div className="fp-inlineActions">
+          <button className="fp-button" type="button" onClick={() => add("XIU")}>TSX 60 · XIU</button>
+          <button className="fp-button" type="button" onClick={() => add("^GSPTSE")}>TSX Composite</button>
         </div>
-        <ul className={styles.list}>
+        <ul className="fp-list">
           {comparisons.map((item) => (
-            <li className={styles.listItem} key={item.symbol}>
+            <li className="fp-listItem" key={item.symbol}>
               <span><strong style={{ color: item.color }}>{item.symbol}</strong><small>{item.mode === "normalized_percent" ? "0 %" : pick(language, "Prix", "Price")}</small></span>
-              <button className={styles.iconButton} type="button" onClick={() => onChange(comparisons.filter((candidate) => candidate.symbol !== item.symbol))} aria-label={pick(language, "Retirer", "Remove")}><FocusGlyph name="Trash2" size={13} /></button>
+              <button className="fp-iconButton" type="button" onClick={() => onChange(comparisons.filter((candidate) => candidate.symbol !== item.symbol))} aria-label={pick(language, "Retirer", "Remove")}><FocusGlyph name="Trash2" size={13} /></button>
             </li>
           ))}
         </ul>
-        <p className={styles.notice}>{pick(language, "Les séries utilisent uniquement leurs timestamps communs. Aucun forward-fill n’est appliqué entre des séances incompatibles.", "Series use only shared timestamps. No forward fill is applied across incompatible sessions.")}</p>
+        <p className="fp-notice">{pick(language, "Les séries utilisent uniquement leurs timestamps communs. Aucun forward-fill n’est appliqué entre des séances incompatibles.", "Series use only shared timestamps. No forward fill is applied across incompatible sessions.")}</p>
       </div>
     </section>
   );
