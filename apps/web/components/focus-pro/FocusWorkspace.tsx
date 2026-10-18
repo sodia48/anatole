@@ -7,6 +7,7 @@ import {
   useMemo,
   useReducer,
   useState,
+  type ReactNode,
 } from "react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
@@ -79,6 +80,7 @@ import type {
 import { createDefaultFocusLayout, TIMEFRAMES } from "./types";
 import styles from "./FocusPro.module.css";
 
+
 type Panel = "indicators" | "compare" | "alerts" | "layouts" | "strategy" | "paper" | null;
 type Section = "overview" | "chart" | "ecosystem" | "fundamentals";
 
@@ -91,13 +93,14 @@ const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
   { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
 
-export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" }) {
+export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView, initialDiagnosticSection, portal }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts"; initialDiagnosticSection?: "sector"; portal?: ReactNode }) {
   const { preferences, updatePreferences } = usePreferences();
   const { user, refreshAccount } = useAccount();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : initialFundamentalView ? "fundamentals" : "overview");
-  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView ?? "fundamentals");
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "portal" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView ?? "portal");
+  const [diagnosticSection, setDiagnosticSection] = useState<"sector" | undefined>(initialDiagnosticSection);
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -401,31 +404,25 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
           {section === "overview" ? (
             <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} />
           ) : null}
-          {section === "fundamentals" ? (
-            <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className={styles.fundamentalSubtabs}>
-              {([
-                { id: "fundamentals", fr: "Synthèse", en: "Overview" },
-                { id: "diagnostic", fr: "Diagnostic 360°", en: "Diagnostic 360°" },
-                { id: "peers", fr: "Pairs", en: "Peers" },
-                { id: "scenarios", fr: "Scénarios", en: "Scenarios" },
-                { id: "documents", fr: "Rapports", en: "Reports" },
-                { id: "capital", fr: "Capital", en: "Capital" },
-                { id: "financials", fr: "Résultats", en: "Financials" },
-                { id: "analysts", fr: "Analystes", en: "Analysts" },
-              ] as const).map((item) => (
-                <button
-                  type="button"
-                  key={item.id}
-                  aria-pressed={fundamentalView === item.id}
-                  className={styles.tabButton}
-                  onClick={() => setFundamentalView(item.id)}
-                >
-                  {pick(language, item.fr, item.en)}
-                </button>
-              ))}
-            </nav>
-          ) : null}
-          {section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} />
+          {section === "fundamentals" ? <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className={styles.fundamentalSubtabs}>
+            <button type="button" className={styles.tabButton} aria-pressed={fundamentalView === "portal"} onClick={() => setFundamentalView("portal")}>{pick(language, "Intelligence 360°", "Intelligence 360°")}</button>
+            <button type="button" className={styles.tabButton} aria-pressed={fundamentalView === "fundamentals"} onClick={() => setFundamentalView("fundamentals")}>{pick(language, "Synthèse", "Overview")}</button>
+            <label className={styles.modulePicker}>{pick(language, "Accès direct", "Quick access")}
+              <select aria-label={pick(language, "Ouvrir un module", "Open a module")} value={fundamentalView === "portal" || fundamentalView === "fundamentals" ? "" : fundamentalView}
+                onChange={event => { setDiagnosticSection(undefined); setFundamentalView(event.target.value as typeof fundamentalView); }}>
+                <option value="">{pick(language, "Choisir un module", "Choose a module")}</option>
+                <option value="diagnostic">{pick(language, "Diagnostic 360°", "360° diagnostic")}</option>
+                <option value="peers">{pick(language, "Comparateur sectoriel", "Sector comparison")}</option>
+                <option value="scenarios">{pick(language, "Simulateur", "Simulator")}</option>
+                <option value="documents">{pick(language, "Analyse documentaire", "Document research")}</option>
+                <option value="capital">{pick(language, "Capital", "Capital")}</option>
+                <option value="financials">{pick(language, "Résultats", "Financials")}</option>
+                <option value="analysts">{pick(language, "Analystes", "Analysts")}</option>
+              </select>
+            </label>
+          </nav> : null}
+          {section === "fundamentals" && fundamentalView === "portal" ? portal
+            : section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} focusSection={diagnosticSection} />
             : section === "fundamentals" && fundamentalView === "peers" ? <FocusPeers key={ticker} ticker={ticker} />
               : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} />
                 : section === "fundamentals" && fundamentalView === "documents" ? <FocusDocuments key={ticker} ticker={ticker} />

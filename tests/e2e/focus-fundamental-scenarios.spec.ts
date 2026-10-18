@@ -34,7 +34,7 @@ test("Focus scenarios separate editable assumptions, sourced results and conditi
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Scénarios" }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("scenarios");
   const panel = page.getByRole("region", { name: "Simulateur fondamental" });
   await expect(panel.getByText(/Sensibilités illustratives, pas des prévisions/)).toBeVisible();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ })).toHaveAttribute("href", "https://issuer.example/report.pdf");

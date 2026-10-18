@@ -9,6 +9,7 @@ import { MobileFocusDiagnostic } from "@/src/components/focus/MobileFocusDiagnos
 import { MobileFocusFinancials } from "@/src/components/focus/MobileFocusFinancials";
 import { MobileFocusFundamentals } from "@/src/components/focus/MobileFocusFundamentals";
 import { MobileFocusFundamentalTabs, type MobileFundamentalView } from "@/src/components/focus/MobileFocusFundamentalTabs";
+import { MobileFundamentalPortal } from "@/src/components/focus/MobileFundamentalPortal";
 import { MobileFocusHeader } from "@/src/components/focus/MobileFocusHeader";
 import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights";
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
@@ -37,7 +38,7 @@ export default function StockDetailScreen() {
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
   const [section, setSection] = useState<MobileFocusSection>("overview");
-  const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>("fundamentals");
+  const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>("portal");
   const [peerSelection, setPeerSelection] = useState<string[] | undefined>(undefined);
   const [scenarioRequest, setScenarioRequest] = useState<ScenarioRequest>(defaultScenarioRequest);
   const [documentQuery, setDocumentQuery] = useState("");
@@ -91,6 +92,7 @@ export default function StockDetailScreen() {
       {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
       {section === "fundamentals" ? <>
         <MobileFocusFundamentalTabs view={fundamentalView} onChange={setFundamentalView} />
+        {fundamentalView === "portal" ? <MobileFundamentalPortal ticker={ticker} onOpen={setFundamentalView} /> : null}
         {fundamentalView === "diagnostic" ? <MobileFocusDiagnostic diagnostic={diagnostic.data} error={!diagnostic.data ? diagnostic.error : null} loading={diagnostic.isLoading} onRetry={() => void diagnostic.refetch()} /> : null}
         {fundamentalView === "peers" ? <MobileFocusPeers comparison={peers.data} error={!peers.data ? peers.error : null} loading={peers.isLoading} onRetry={() => void peers.refetch()} selection={peerSelection} onSelect={setPeerSelection} /> : null}
         {fundamentalView === "scenarios" ? <MobileFocusScenarios simulation={scenarios.data} error={!scenarios.data ? scenarios.error : null} loading={scenarios.isLoading} onRetry={() => void scenarios.refetch()} onCalculate={setScenarioRequest} /> : null}

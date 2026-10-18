@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 
-export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts";
+export type MobileFundamentalView = "portal" | "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts";
 
 const tabs: { id: MobileFundamentalView; fr: string; en: string }[] = [
   { id: "fundamentals", fr: "Synthèse", en: "Overview" },
@@ -26,22 +27,34 @@ export function MobileFocusFundamentalTabs({
 }) {
   useMobileTheme();
   const { pick } = useLocale();
+  const [expanded, setExpanded] = useState(false);
   return (
     <View style={styles.row} testID="focus-fundamental-subtabs">
-      {tabs.map((item) => (
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: view === "portal" }}
+        onPress={() => { onChange("portal"); setExpanded(false); }} style={[styles.tab, view === "portal" && styles.active]}>
+        <Text style={[styles.text, view === "portal" && styles.activeText]}>Intelligence 360°</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: view === "fundamentals" }}
+        onPress={() => { onChange("fundamentals"); setExpanded(false); }} style={[styles.tab, view === "fundamentals" && styles.active]}>
+        <Text style={[styles.text, view === "fundamentals" && styles.activeText]}>{pick("Synthèse", "Overview")}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.more}>
+        <Text style={styles.text}>{pick("Autres vues", "More views")} {expanded ? "▴" : "▾"}</Text>
+      </Pressable>
+      {expanded ? tabs.filter(item => item.id !== "fundamentals").map((item) => (
         <Pressable
           key={item.id}
           testID={`focus-fundamental-tab-${item.id}`}
           accessibilityRole="tab"
           accessibilityState={{ selected: view === item.id }}
-          onPress={() => onChange(item.id)}
+          onPress={() => { onChange(item.id); setExpanded(false); }}
           style={[styles.tab, view === item.id && styles.active]}
         >
           <Text style={[styles.text, view === item.id && styles.activeText]}>
             {pick(item.fr, item.en)}
           </Text>
         </Pressable>
-      ))}
+      )) : null}
     </View>
   );
 }
@@ -57,4 +70,5 @@ const styles = createThemedStyles((colors) => ({
   active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
   text: { ...typography.label, color: colors.textMuted },
   activeText: { color: colors.text },
+  more: { width: "100%", minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
 }));

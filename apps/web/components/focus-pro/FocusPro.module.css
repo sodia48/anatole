@@ -566,7 +566,11 @@
 
   .bottomTabs {
     overflow-x: auto;
+    align-items: center;
+    min-height: 50px;
   }
+
+  .bottomTabs > * { flex: 0 0 auto; white-space: nowrap; }
 
   .mobileMenuLabel {
     display: inline;
@@ -586,6 +590,9 @@
   min-height: 44px;
   padding: 0 14px;
 }
+.modulePicker { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--text-secondary); font-size: 12px; }
+.modulePicker select { min-height: 44px; max-width: 230px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; }
+@media (max-width: 640px) { .modulePicker { width: 100%; margin-left: 0; justify-content: space-between; } .modulePicker select { max-width: 60%; } }
 /* Focus tabs: selected state comes from aria-pressed (no JS class condition). */
 .bottomTabs .tabButton[aria-pressed="true"],
 .fundamentalSubtabs .tabButton[aria-pressed="true"] {

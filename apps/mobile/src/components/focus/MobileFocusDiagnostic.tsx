@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import type { FundamentalDiagnostic, FundamentalMeasure, FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
 import { Card, QueryState, uiStyles } from "@/src/components/ui";
@@ -44,7 +44,11 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
   useMobileTheme();
   const { language, pick } = useLocale();
   const [mode, choose] = useMobileFocusMode("anatole.focus.mobile.diagnostic.view.v1", modes);
+  const [showMissingSector, setShowMissingSector] = useState(false);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const byKey = useMemo(() => new Map(diagnostic?.measures.map(measure => [measure.key, measure]) ?? []), [diagnostic]);
+  const availableSector = diagnostic?.sector_metrics.filter(item => item.value !== null && item.status === "available") ?? [];
+  const missingSector = diagnostic?.sector_metrics.filter(item => item.value === null || item.status !== "available") ?? [];
   return <View style={styles.stack} testID="focus-diagnostic-section">
     <QueryState error={!diagnostic ? error : null} loading={loading} onRetry={onRetry} />
     {diagnostic ? <>
@@ -53,20 +57,61 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
         {diagnostic.stale ? <Text style={styles.note}>{pick("Instantané périmé; actualisation en cours ou différée.", "Stale snapshot; refresh in progress or delayed.")}</Text> : null}
         <Text style={styles.note}>{pick(diagnostic.methodology_fr, diagnostic.methodology_en)}</Text>
       </Card>
-      <MobileFocusViewMode mode={mode} choose={choose} modes={modes} />
+      <View style={styles.overviewGrid} testID="focus-diagnostic-overview">{([
+        { key: "profitability", fr: "Rentabilité", en: "Profitability", keys: ["profitability"] },
+        { key: "financial_strength", fr: "Solidité financière", en: "Financial strength", keys: ["liquidity", "leverage"] },
+        { key: "earnings_quality", fr: "Qualité des bénéfices", en: "Earnings quality", keys: ["earnings_quality", "cash_flow"] },
+        { key: "growth", fr: "Croissance", en: "Growth", keys: ["growth"] },
+      ] as const).map(group => {
+        const dimensions = diagnostic.dimensions.filter(item => (group.keys as readonly string[]).includes(item.key));
+        const available = dimensions.reduce((total, item) => total + item.available_count, 0);
+        const possible = dimensions.reduce((total, item) => total + item.measure_keys.length, 0);
+        return <View key={group.key} style={styles.overviewCard}>
+          <Text style={styles.overviewLabel}>{pick(group.fr, group.en)}</Text>
+          <Text style={styles.coverage}>{available}/{possible} {pick("indicateurs", "measures")}</Text>
+          {dimensions.length ? dimensions.map(dimension => {
+            const scored = dimension.score_status === "directional" && dimension.score !== null && Number.isFinite(dimension.score);
+            return <View key={dimension.key} style={styles.overviewSubdimension}>
+              {dimensions.length > 1 ? <Text style={styles.label}>{pick(dimension.label_fr, dimension.label_en)}</Text> : null}
+              {scored ? <Text style={styles.overviewScore}>{Math.round(dimension.score!)} / 100 · {pick("Direction historique", "Historical direction")}</Text>
+                : <Text style={styles.unavailable}>{pick(dimension.score_status === "not_applicable" ? "Non applicable" : "Données insuffisantes", dimension.score_status === "not_applicable" ? "Not applicable" : "Insufficient data")}</Text>}
+              <Text style={styles.note}>{pick(dimension.explanation_fr, dimension.explanation_en)}</Text>
+            </View>;
+          }) : <Text style={styles.unavailable}>{pick("Données insuffisantes dans cet instantané", "Insufficient data in this snapshot")}</Text>}
+          {dimensions.length ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: expandedGroup === group.key }}
+            onPress={() => setExpandedGroup(expandedGroup === group.key ? null : group.key)} style={styles.missingToggle}>
+            <Text style={styles.link}>{pick("Voir les calculs détaillés", "View detailed calculations")} {expandedGroup === group.key ? "▴" : "▾"}</Text>
+          </Pressable> : null}
+          {expandedGroup === group.key ? dimensions.flatMap(dimension => dimension.measure_keys).map(key => byKey.get(key))
+            .filter((item): item is FundamentalMeasure => Boolean(item)).map(measure => <Measure key={measure.key} measure={measure} />) : null}
+        </View>;
+      })}</View>
       {diagnostic.findings.length ? <Card title={pick("Constats fondés sur les données", "Data-backed findings")}>
-        {diagnostic.findings.map((finding, index) => <Text key={`${finding.kind}-${index}`} style={styles.finding}>{pick(finding.text_fr, finding.text_en)}</Text>)}
+        {diagnostic.findings.map((finding, index) => <View key={`${finding.kind}-${index}`} style={styles.findingCard}>
+          <Text style={styles.findingKind}>{pick(finding.kind === "strength" ? "Point fort" : finding.kind === "vulnerability" ? "Point de vigilance" : "Observation", finding.kind === "strength" ? "Strength" : finding.kind === "vulnerability" ? "Watch point" : "Observation")}</Text>
+          <Text style={styles.finding}>{pick(finding.text_fr, finding.text_en)}</Text>
+          <Text style={styles.note}>{finding.measure_keys.map(key => pick(byKey.get(key)?.label_fr ?? key, byKey.get(key)?.label_en ?? key)).join(" · ")}</Text>
+        </View>)}
       </Card> : null}
       {(diagnostic.sector_metrics ?? []).length ? <Card title={pick("Indicateurs propres au secteur", "Sector-specific metrics")}>
         <Text style={styles.note}>{pick("Seules les valeurs explicitement publiées sont affichées.", "Only explicitly published values are shown.")}</Text>
-        {diagnostic.sector_metrics.map(item => <View key={item.key} style={styles.measure}>
+        {availableSector.map(item => <View key={item.key} style={styles.measure}>
           <Text style={styles.label}>{pick(item.label_fr, item.label_en)}</Text>
           <Text style={styles.value}>{item.value === null ? pick("N/D", "N/A") : `${new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", { maximumFractionDigits: 2 }).format(item.value)} ${item.unit}`}</Text>
           {item.source_url?.startsWith("https://") ? <Pressable accessibilityRole="link" onPress={() => void Linking.openURL(item.source_url!)}>
             <Text style={styles.link}>{item.source_name} · {item.filed_at?.slice(0, 10) ?? pick("date N/D", "date N/A")}</Text></Pressable>
             : <Text style={styles.note}>{pick("Publication officielle non disponible", "Official publication unavailable")}</Text>}
         </View>)}
+        {missingSector.length ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: showMissingSector }}
+          onPress={() => setShowMissingSector(!showMissingSector)} style={styles.missingToggle}>
+          <Text style={styles.link}>{missingSector.length} {pick("indicateurs sans publication vérifiable", "metrics without a verifiable publication")} {showMissingSector ? "▴" : "▾"}</Text>
+        </Pressable> : null}
+        {showMissingSector ? <View style={styles.missingList}>
+          <Text style={styles.note}>{pick("Aucune valeur vérifiable avec unité compatible dans l’instantané courant. Aucune valeur n’est estimée.", "No verifiable value with a compatible unit in the current snapshot. No value is estimated.")}</Text>
+          {missingSector.map(item => <Text key={item.key} style={styles.note}>• {pick(item.label_fr, item.label_en)}</Text>)}
+        </View> : null}
       </Card> : null}
+      <MobileFocusViewMode mode={mode} choose={choose} modes={modes} />
       {diagnostic.dimensions.map(dimension => {
         const members = dimension.measure_keys.map(key => byKey.get(key)).filter((item): item is FundamentalMeasure => Boolean(item));
         return <Card key={dimension.key} title={pick(dimension.label_fr, dimension.label_en)}>
@@ -103,6 +148,13 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
 
 const styles = createThemedStyles(colors => ({
   stack: { gap: spacing.md }, measure: { paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, gap: spacing.xs },
+  overviewGrid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  overviewCard: { width: "48%", minHeight: 155, padding: spacing.md, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surfaceRaised, gap: spacing.xs },
+  overviewLabel: { ...typography.section, color: colors.text }, overviewScore: { ...typography.label, color: colors.primary },
+  overviewSubdimension: { gap: spacing.xs },
+  coverage: { ...typography.caption, color: colors.textMuted }, unavailable: { ...typography.label, color: colors.textMuted },
+  findingCard: { padding: spacing.md, marginBottom: spacing.sm, borderRadius: 12, backgroundColor: colors.surfaceRaised, gap: spacing.xs },
+  findingKind: { ...typography.label, color: colors.primary }, missingToggle: { minHeight: 44, justifyContent: "center" }, missingList: { gap: spacing.xs, padding: spacing.sm },
   label: { ...typography.label, color: colors.text }, value: { ...typography.body, color: colors.text, fontWeight: "700" },
   source: { ...typography.caption, color: colors.textMuted }, link: { ...typography.caption, color: colors.primary, textDecorationLine: "underline" },
   note: { ...typography.caption, color: colors.textMuted }, history: { paddingLeft: spacing.sm },

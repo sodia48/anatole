@@ -22,7 +22,7 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Capital" }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("capital");
   const panel = page.getByRole("region", { name: "Allocation du capital" });
   await expect(panel.getByText("Aucun historique daté des révisions n'est fourni.")).toBeVisible();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/annual-2025.pdf");
