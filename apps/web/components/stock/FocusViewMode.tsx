@@ -4,6 +4,8 @@ import { useSyncExternalStore } from "react";
 import { pick } from "@/lib/i18n";
 import styles from "./FocusViewMode.module.css";
 
+const tr = pick;
+
 export type FocusMode = "table" | "cards" | "charts";
 type Language = "fr" | "en";
 const current = new Map<string, FocusMode>();
@@ -53,9 +55,9 @@ export function FocusViewMode({ mode, choose, modes, language, label }: {
   language: Language; label: string;
 }) {
   const titles = {
-    table: pick(language, "Vue tableau", "Table view"),
-    cards: pick(language, "Vue cartes", "Card view"),
-    charts: pick(language, "Vue graphiques", "Chart view"),
+    table: tr(language, "Vue tableau", "Table view"),
+    cards: tr(language, "Vue cartes", "Card view"),
+    charts: tr(language, "Vue graphiques", "Chart view"),
   };
   return <div className={styles.switch} role="group" aria-label={label}>
     {modes.map(value => <button key={value} type="button" aria-pressed={mode === value}

@@ -145,6 +145,7 @@ export function FeedbackButton() {
         className={styles.trigger}
         onClick={() => setOpen(true)}
         aria-label={pick(language, "Signaler un problème", "Report a problem")}
+        title={pick(language, "Signaler un problème", "Report a problem")}
         data-client-ready="false"
       >
         <Bug size={17} aria-hidden="true" />

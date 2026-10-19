@@ -10,6 +10,8 @@ import type { StockNewsSnapshot } from "@/lib/types";
 
 import styles from "./FocusStockNews.module.css";
 
+const tr = pick;
+
 type NewsItem = StockNewsSnapshot["items"][number];
 
 function ArticleReader({
@@ -90,9 +92,9 @@ function ArticleReader({
         role="dialog"
       >
         <header className={styles.readerTopbar}>
-          <span>{item.publisher || pick(language, "Source", "Source")}</span>
+          <span>{item.publisher || tr(language, "Source", "Source")}</span>
           <button
-            aria-label={pick(language, "Fermer", "Close")}
+            aria-label={tr(language, "Fermer", "Close")}
             className={styles.closeButton}
             onClick={onClose}
             ref={closeRef}
@@ -115,10 +117,10 @@ function ArticleReader({
           ) : null}
           <article className={styles.article}>
             <span className={styles.articleLabel}>
-              {pick(language, "ARTICLE", "ARTICLE")}
+              {tr(language, "ARTICLE", "ARTICLE")}
             </span>
             <div className={styles.articleMeta}>
-              <span>{item.publisher || pick(language, "Source", "Source")}</span>
+              <span>{item.publisher || tr(language, "Source", "Source")}</span>
               <time dateTime={item.published_at}>
                 {formatter.format(new Date(item.published_at))}
               </time>
@@ -133,13 +135,13 @@ function ArticleReader({
             ) : null}
             <section aria-labelledby={`${titleId}-summary`} className={styles.readerSummary}>
               <h3 id={`${titleId}-summary`}>
-                {pick(language, "Résumé", "Summary")}
+                {tr(language, "Résumé", "Summary")}
               </h3>
               <p>{item.summary}</p>
             </section>
             <div className={styles.unavailable}>
               <strong>
-                {pick(language, "Contenu complet non disponible", "Full article unavailable")}
+                {tr(language, "Contenu complet non disponible", "Full article unavailable")}
               </strong>
               <span>
                 {pick(
@@ -155,7 +157,7 @@ function ArticleReader({
               rel="noopener noreferrer"
               target="_blank"
             >
-              {pick(language, "Voir la source originale", "View original source")}
+              {tr(language, "Voir la source originale", "View original source")}
               <FocusGlyph name="ArrowUpRight" size={15} />
             </a>
           </article>
@@ -248,22 +250,22 @@ export function FocusStockNews({
         <div>
           <span className={styles.eyebrow}>
             <FocusGlyph name="Newspaper" size={14} />
-            {pick(language, "ACTUALITÉS DU TITRE", "STOCK NEWS")}
+            {tr(language, "ACTUALITÉS DU TITRE", "STOCK NEWS")}
           </span>
           <h2>
-            {pick(language, "Dernières nouvelles", "Latest news")} · {ticker}
+            {tr(language, "Dernières nouvelles", "Latest news")} · {ticker}
           </h2>
         </div>
         {!loading && items.length ? (
           <span className={styles.count}>
-            {items.length} {pick(language, "articles", "articles")}
+            {items.length} {tr(language, "articles", "articles")}
           </span>
         ) : null}
       </header>
 
       {loading ? (
         <div className={styles.state}>
-          {pick(language, "Recherche des nouvelles récentes…", "Loading recent news…")}
+          {tr(language, "Recherche des nouvelles récentes…", "Loading recent news…")}
         </div>
       ) : null}
 
@@ -295,7 +297,7 @@ export function FocusStockNews({
               <h3>{item.title}</h3>
               <p className={styles.summary}>{item.summary}</p>
               <span className={styles.open}>
-                {pick(language, "Lire dans Anatole", "Read in Anatole")}
+                {tr(language, "Lire dans Anatole", "Read in Anatole")}
               </span>
             </button>
           ))}

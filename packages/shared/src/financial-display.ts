@@ -10,14 +10,15 @@ export function formatFinancialNumber(
   if (value === null || value === undefined || !Number.isFinite(value)) return language === "fr" ? "N/D" : "N/A";
   const locale = language === "fr" ? "fr-CA" : "en-CA";
   const magnitude = Math.abs(value);
-  const scales: [number, string, string][] = [[1e9, "G", "B"], [1e6, "M", "M"], [1e3, "k", "K"]];
-  const scale = !exact && unit === "money" ? scales.find(([threshold]) => magnitude >= threshold) : undefined;
-  const amount = scale ? value / scale[0] : value;
+  const divisor = !exact && unit === "money"
+    ? magnitude >= 1e9 ? 1e9 : magnitude >= 1e6 ? 1e6 : magnitude >= 1e3 ? 1e3 : 1 : 1;
+  const amount = value / divisor;
   const decimals = exact ? 12 : 2;
   const rounded = new Intl.NumberFormat(locale, { maximumFractionDigits: decimals }).format(amount);
   const visible = !exact && amount !== 0 && Math.abs(amount) < .005
     ? `${value < 0 ? "−" : ""}<${language === "fr" ? "0,01" : "0.01"}` : rounded;
-  const suffix = scale ? ` ${language === "fr" ? scale[1] : scale[2]}` : "";
+  const suffix = divisor === 1e9 ? ` ${language === "fr" ? "G" : "B"}`
+    : divisor === 1e6 ? " M" : divisor === 1e3 ? ` ${language === "fr" ? "k" : "K"}` : "";
   if (unit === "percent") return `${visible} %`;
   if (unit === "ratio") return `${visible}×`;
   if (unit === "money") return `${visible}${suffix}${currency ? ` ${currency}` : ""}`;

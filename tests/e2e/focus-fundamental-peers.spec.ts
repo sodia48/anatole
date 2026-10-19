@@ -19,7 +19,7 @@ const comparison = {
       explanation_en: "Median unavailable: insufficient sample." }],
 };
 
-test("Focus peers explain coverage, preserve provenance and allow replacement", async ({ page }) => {
+test("Focus peers explain coverage, preserve provenance and allow replacement", async ({ page }, testInfo) => {
   const requested: string[] = [];
   await page.route("**/stocks/RY/fundamental-intelligence/peers*", route => {
     requested.push(route.request().url());
@@ -33,6 +33,7 @@ test("Focus peers explain coverage, preserve provenance and allow replacement", 
   await panel.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue cartes" }).click();
   await expect(panel.getByText("Médiane indisponible : échantillon insuffisant.").first()).toBeVisible();
   await expect(panel.getByText("Écart cible – pair", { exact: true }).last()).toBeVisible();
+  await testInfo.attach("comparateur-cartes", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByText("Voir les sources et valeurs exactes").click();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/RY.pdf");
   await panel.getByText("Choisir ou remplacer les sociétés").click();
@@ -43,9 +44,12 @@ test("Focus peers explain coverage, preserve provenance and allow replacement", 
   const beforeModeChange = requested.length;
   await panel.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue tableau" }).click();
   await expect(panel.getByRole("table")).toBeVisible();
+  await testInfo.attach("comparateur-tableau", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(panel.getByRole("img", { name: "RY 10 %" })).toBeVisible();
   await expect(panel.getByRole("img", { name: "RY -15 %" })).toBeVisible();
   await expect(panel.locator('[role="img"][aria-label="RY -15 %"] > div').last()).toHaveCSS("background-color", "rgb(198, 109, 97)");
+  await expect.poll(() => panel.evaluate(element => element.getBoundingClientRect().left)).toBeGreaterThanOrEqual(0);
+  await testInfo.attach("comparateur-graphiques", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   expect(requested.length).toBe(beforeModeChange);
 });

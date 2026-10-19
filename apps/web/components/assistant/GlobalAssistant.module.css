@@ -1,4 +1,5 @@
 .launcher { position: fixed; z-index: 70; right: 22px; bottom: 76px; display: flex; align-items: center; gap: 8px; padding: 11px 15px; border: 1px solid var(--border); border-radius: 999px; color: var(--text); background: var(--panel); box-shadow: 0 10px 32px #0005; font: inherit; font-weight: 700; cursor: pointer; }
+@media (max-width: 1440px) { .launcher { width: 44px; height: 44px; justify-content: center; padding: 0; } .launcher span { display: none; } }
 .launcher:hover, .action:hover { border-color: var(--accent); }
 .backdrop { position: fixed; z-index: 1600; inset: 0; display: flex; justify-content: flex-end; background: #020912aa; }
 .drawer { width: min(100%, 440px); height: 100dvh; display: flex; flex-direction: column; background: var(--background, #06111d); border-left: 1px solid var(--border); box-shadow: -16px 0 46px #0008; color: var(--text); }

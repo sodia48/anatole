@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Focus capital shows sourced allocations and refuses invented analyst revisions", async ({ page }) => {
+test("Focus capital shows sourced allocations and refuses invented analyst revisions", async ({ page }, testInfo) => {
   const measure = (value: number | null) => ({ value, status: value === null ? "unavailable" : "calculated",
     formula: "Explicit annual bridge", missing_inputs: value === null ? ["reported value"] : [] });
   const period = (year: number, ocf: number) => ({ period_end: `${year}-12-31T00:00:00Z`, currency: "CAD",
@@ -25,14 +25,18 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("capital");
   const panel = page.getByRole("region", { name: "Allocation du capital" });
   await expect(panel.getByText("Aucun historique daté des révisions n'est fourni.")).toBeVisible();
+  await testInfo.attach("capital-cartes", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByText("Voir les sources, formules et valeurs exactes").click();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/annual-2025.pdf");
   await expect(panel.getByText("Achat", { exact: true })).toBeVisible();
   await expect(panel.getByText("devise non vérifiée")).toBeVisible();
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue tableau" }).click();
   await expect(panel.getByRole("table")).toContainText("35 CAD");
+  await testInfo.attach("capital-tableau", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(panel.getByText("2025-12-31 · 70 CAD")).toBeVisible();
   await panel.getByRole("checkbox", { name: "Variation de la dette" }).check();
   await expect(panel.getByText("2025-12-31 · -10 CAD")).toBeVisible();
+  await expect.poll(() => panel.evaluate(element => element.getBoundingClientRect().left)).toBeGreaterThanOrEqual(0);
+  await testInfo.attach("capital-graphiques", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });
