@@ -160,7 +160,7 @@ export function GlobalAssistant() {
   }
 
   return <>
-    <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Ouvrir Anatole Assistant">
+    <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Ouvrir Anatole Assistant" title="Anatole Assistant">
       <Bot size={19} aria-hidden="true" /><span>Anatole Assistant</span>
     </button>
     {open && <div className={styles.backdrop} ref={backdrop} onKeyDown={(event) => {

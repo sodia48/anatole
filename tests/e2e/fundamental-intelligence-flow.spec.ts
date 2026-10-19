@@ -109,6 +109,7 @@ test("public research flows from institutional Assistant through Focus evidence 
   const peers = page.getByRole("region", { name: "Comparateur sectoriel" });
   await peers.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue cartes" }).click();
   await expect(peers).toContainText("Médiane indisponible");
+  await peers.getByText("Voir les sources et valeurs exactes").click();
   await expect(peers.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", source);
   await views.getByRole("combobox", { name: "Ouvrir un module" }).selectOption("documents");
   const documents = page.getByRole("region", { name: "Recherche dans les rapports officiels" });

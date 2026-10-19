@@ -50,10 +50,10 @@ def _eligible(target: FundamentalSnapshot, peer: FundamentalSnapshot) -> str | N
         return "financial snapshot unavailable"
     if sector_family(peer) != sector_family(target):
         return "different business family"
-    if target.industry and peer.industry and target.industry.casefold() != peer.industry.casefold():
-        # Financials and materials contain business models too different to rank together.
-        if sector_family(target) in {"bank", "insurance", "mining", "real_estate"}:
-            return "different industry"
+    if not target.industry or not peer.industry:
+        return "industry unverified"
+    if target.industry.casefold() != peer.industry.casefold():
+        return "different industry"
     a, b = target.metrics.market_cap, peer.metrics.market_cap
     if not a or not b or not math.isfinite(a) or not math.isfinite(b) or a <= 0 or b <= 0:
         return "market capitalization unavailable"
@@ -61,7 +61,30 @@ def _eligible(target: FundamentalSnapshot, peer: FundamentalSnapshot) -> str | N
         return "market capitalization currencies differ or are unknown"
     if not .2 <= b / a <= 5:
         return "market capitalization outside 0.2–5× target range"
+    target_years = {row.period_end.year for row in target.annual_financials if row.currency == target.financial_currency}
+    peer_years = {row.period_end.year for row in peer.annual_financials if row.currency == peer.financial_currency}
+    if not target_years.intersection(peer_years) or target.financial_currency != peer.financial_currency:
+        return "no comparable annual metrics"
     return None
+
+
+def _candidate(target: FundamentalSnapshot, member: CompositeConstituent,
+               snapshot: FundamentalSnapshot | None) -> PeerCandidate:
+    reason = _eligible(target, snapshot) if snapshot else "financial snapshot unavailable"
+    if reason is None:
+        category = "direct"
+    elif (snapshot and target.industry and snapshot.industry
+          and sector_family(target) == sector_family(snapshot)
+          and target.industry.casefold() != snapshot.industry.casefold()):
+        category, reason = "related", "related business only"
+    else:
+        category = "sector"
+        reason = reason or "sector exploration only"
+    return PeerCandidate(
+        ticker=member.ticker, name=member.name, sector=member.sector or "",
+        selection_basis="Verified snapshot" if snapshot else "Canadian index constituent; classification pending",
+        comparability=category, industry=snapshot.industry if snapshot else None, reason=reason,
+    )
 
 
 def _annual_values(target: FundamentalSnapshot, peers: list[FundamentalSnapshot]) -> list[PeerMeasureComparison]:
@@ -126,7 +149,7 @@ def _comparison(key: str, label_fr: str, label_en: str, basis: str, unit: str,
 def build_peer_comparison(target: FundamentalSnapshot, peers: list[FundamentalSnapshot],
                           candidates: list[PeerCandidate], *, universe_source: str,
                           universe_as_of: str | None, selected: list[str]) -> PeerComparison:
-    permitted = {_code(item.ticker) for item in candidates}
+    permitted = {_code(item.ticker): item for item in candidates}
     excluded: dict[str, str] = {}
     accepted: list[FundamentalSnapshot] = []
     by_code = {_code(item.ticker): item for item in peers}
@@ -134,6 +157,8 @@ def build_peer_comparison(target: FundamentalSnapshot, peers: list[FundamentalSn
         item = by_code.get(code)
         if code not in permitted:
             excluded[code] = "outside selected Canadian sector universe"
+        elif permitted[code].reason in {"related business only", "sector exploration only"}:
+            excluded[code] = permitted[code].reason
         elif item is None:
             excluded[code] = "financial snapshot unavailable"
         elif reason := _eligible(target, item):
@@ -145,8 +170,8 @@ def build_peer_comparison(target: FundamentalSnapshot, peers: list[FundamentalSn
         universe_source=universe_source, universe_as_of=universe_as_of,
         candidates=candidates, selected=[item.ticker for item in accepted], excluded=excluded,
         measures=_annual_values(target, accepted) + _valuation_values(target, accepted),
-        method_fr="Pairs canadiens du même secteur, même famille d'activité, taille entre 0,2 et 5 fois la cible (capitalisation dans la même devise). Ratios annuels du moteur partagé : même année civile et dates à 210 jours au plus. Multiples sur instantanés secondaires de même source et à moins de 24 heures. Aucun classement si moins de cinq pairs admissibles.",
-        method_en="Canadian peers in the same sector and business family, market cap within 0.2–5 times the target in the same currency. Annual ratios from the shared engine: same calendar year and dates within 210 days. Secondary valuation snapshots use the same source and are within 24 hours. No ranking with fewer than five eligible peers.",
+        method_fr="Pairs directs : même industrie vérifiée, capitalisation entre 0,2 et 5 fois la cible dans la même devise, et exercices financiers comparables. Les activités connexes et autres sociétés du secteur restent exploratoires. Médiane et rang exigent au moins six sociétés avec une valeur comparable.",
+        method_en="Direct peers require a verified matching industry, market cap within 0.2–5 times the target in the same currency, and comparable fiscal data. Related businesses and other sector companies are exploratory. Median and rank require at least six companies with comparable values.",
     )
 
 
@@ -163,21 +188,32 @@ async def peer_comparison(ticker: str, requested: list[str] | None = None, *,
     target_code = _code(target.ticker)
     target_member = next((item for item in universe if _code(item.ticker) == target_code), None)
     broad_sector = target_member.sector if target_member else target.sector
-    candidates = [PeerCandidate(ticker=item.ticker, name=item.name, sector=item.sector or "",
-                                selection_basis="Canadian index constituent; same broad sector")
-                  for item in universe if item.sector == broad_sector and _code(item.ticker) != target_code]
-    candidates = candidates[:40]
-    selected = [_code(item) for item in requested] if requested is not None else [item.ticker for item in candidates[:MAX_PEERS]]
+    members = [item for item in universe if item.sector == broad_sector and _code(item.ticker) != target_code][:40]
+    selected = [_code(item) for item in requested] if requested is not None else []
     if len(selected) > MAX_PEERS or len(set(selected)) != len(selected) or any(not TICKER.fullmatch(item) for item in selected):
         raise ValueError("Select up to eight distinct valid peer tickers")
 
     async def load(code: str) -> FundamentalSnapshot | None:
         try:
-            return await asyncio.wait_for(fundamentals_service.get_snapshot(code), timeout=18)
+            async with semaphore:
+                return await asyncio.wait_for(fundamentals_service.get_snapshot(code), timeout=8)
         except Exception:  # noqa: BLE001
             return None
 
-    allowed = {_code(item.ticker) for item in candidates}
-    loaded = await asyncio.gather(*(load(item) for item in selected if item in allowed))
-    return build_peer_comparison(target, [item for item in loaded if item is not None], candidates,
+    semaphore = asyncio.Semaphore(10)
+    ordered_codes = list(dict.fromkeys([*selected, *(_code(item.ticker) for item in members)]))
+    allowed = {_code(item.ticker) for item in members}
+    tasks = {code: asyncio.create_task(load(code)) for code in ordered_codes if code in allowed}
+    done, pending = await asyncio.wait(tasks.values(), timeout=10) if tasks else (set(), set())
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+    snapshots = {code: task.result() for code, task in tasks.items() if task in done and not task.cancelled()
+                 and task.exception() is None and task.result() is not None}
+    candidates = [_candidate(target, item, snapshots.get(_code(item.ticker))) for item in members]
+    candidates.sort(key=lambda item: ("direct", "related", "sector").index(item.comparability))
+    if requested is None:
+        selected = [_code(item.ticker) for item in candidates if item.comparability == "direct"][:MAX_PEERS]
+    return build_peer_comparison(target, [snapshots[code] for code in selected if code in snapshots], candidates,
                                  universe_source=universe_source, universe_as_of=as_of, selected=selected)

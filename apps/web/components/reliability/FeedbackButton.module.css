@@ -19,6 +19,7 @@
   font-weight: 760;
   cursor: pointer;
 }
+@media (max-width: 1440px) { .trigger { width: 44px; padding: 0; justify-content: center; } .trigger span { display: none; } }
 
 .trigger:hover,
 .trigger:focus-visible {

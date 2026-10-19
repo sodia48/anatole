@@ -97,6 +97,9 @@ export type PeerCandidate = {
   name: string;
   sector: string;
   selection_basis: string;
+  comparability?: "direct" | "related" | "sector";
+  industry?: string | null;
+  reason?: string | null;
 };
 
 export type PeerMeasureValue = {
@@ -145,6 +148,10 @@ const exclusionFr: Record<string, string> = {
   "market capitalization currencies differ or are unknown": "devises de capitalisation différentes ou inconnues",
   "market capitalization outside 0.2–5× target range": "capitalisation hors de la fourchette 0,2 à 5 fois la cible",
   "outside selected Canadian sector universe": "hors de l’univers canadien du secteur sélectionné",
+  "industry unverified": "activité précise non vérifiée",
+  "no comparable annual metrics": "aucune donnée annuelle comparable",
+  "related business only": "activité connexe, hors comparaison directe",
+  "sector exploration only": "même grand secteur, hors comparaison directe",
 };
 
 export function peerExclusionReason(reason: string, language: "fr" | "en"): string {

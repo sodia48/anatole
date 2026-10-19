@@ -14,6 +14,7 @@ def peer(code: str, *, cap: float = 100, currency: str = "CAD"):
     snapshot.symbol = code
     snapshot.metrics.market_cap = cap
     snapshot.currency = currency
+    snapshot.industry = "Industrial Machinery"
     return snapshot
 
 
@@ -48,6 +49,26 @@ def test_rejects_currency_size_sector_and_missing_market_cap() -> None:
     assert result.selected == []
     assert len(result.excluded) == 4
     assert all(item.median is None and item.rank is None for item in result.measures)
+
+
+def test_specialty_materials_do_not_auto_accept_gold_miners() -> None:
+    target = peer("VNP")
+    target.sector = "Basic Materials"
+    target.industry = "Specialty Chemicals"
+    miner = peer("GOLD")
+    miner.sector = "Basic Materials"
+    miner.industry = "Gold"
+    chemical = peer("CHEM")
+    chemical.sector = "Basic Materials"
+    chemical.industry = "Specialty Chemicals"
+    selected = ["GOLD", "CHEM"]
+    result = build_peer_comparison(target, [miner, chemical], candidates(*selected),
+                                   universe_source="XIC", universe_as_of=None, selected=selected)
+    assert result.selected == ["CHEM.TO"]
+    assert result.excluded["GOLD"] in {"different business family", "different industry"}
+    assert result.measures[0].sample_size == 2
+    assert result.measures[0].median is None
+    assert result.measures[0].rank is None
 
 
 def test_http_peer_selection_and_empty_comparison(monkeypatch) -> None:

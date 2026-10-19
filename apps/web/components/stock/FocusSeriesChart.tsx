@@ -6,6 +6,8 @@ import { focusBase100Reference, focusChartChange, focusChartIndexes, focusChartV
 import { pick } from "@/lib/i18n";
 import styles from "./FocusSeriesChart.module.css";
 
+const tr = pick;
+
 export type FocusChartSeries = { id: string; label: string; values: (number | null)[];
   lows?: (number | null)[]; highs?: (number | null)[]; nature?: "published" | "estimate" };
 type Shape = FocusChartShape | "grouped";
@@ -82,9 +84,9 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
   const format = (number: number, compact = false, actualCurrency = currency) => new Intl.NumberFormat(locale, {
     ...(unit === "money" || unit === "per_share" ? actualCurrency ? { style: "currency", currency: actualCurrency } : {} : {}),
     ...(compact ? { notation: "compact" } : {}), maximumFractionDigits: compact ? 1 : 2,
-  }).format(number) + (unit === "percent" ? " %" : unit === "per_share" ? pick(language, " / action", " / share") : "");
-  const unitLabel = mixedCurrencies ? pick(language, "devises multiples", "multiple currencies") : normalized ? "Base 100" : unit === "percent" ? "%" : unit === "per_share"
-    ? pick(language, `${currency ?? ""} par action`, `${currency ?? ""} per share`) : unit === "money" ? currency ?? "" : pick(language, "nombre", "number");
+  }).format(number) + (unit === "percent" ? " %" : unit === "per_share" ? tr(language, " / action", " / share") : "");
+  const unitLabel = mixedCurrencies ? tr(language, "devises multiples", "multiple currencies") : normalized ? "Base 100" : unit === "percent" ? "%" : unit === "per_share"
+    ? tr(language, `${currency ?? ""} par action`, `${currency ?? ""} per share`) : unit === "money" ? currency ?? "" : tr(language, "nombre", "number");
   const activePosition = point ? indexes.indexOf(point.index) : -1;
   const choosePoint = (index: number) => setPoint(current => current?.index === index && current.locked
     ? null : { index, locked: true });
@@ -93,54 +95,49 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
     if (event.key === "Escape") setPoint(null);
   };
   const toggle = (id: string) => save({ ids: ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id] });
-  const shapeLabels: Record<Shape, string> = { line: pick(language, "Courbe", "Line"),
-    bar: pick(language, "Barres", "Bars"), area: pick(language, "Aire", "Area"),
-    points: pick(language, "Points", "Points"), grouped: pick(language, "Colonnes groupées", "Grouped columns") };
+  const shapeLabels: Record<Shape, string> = { line: tr(language, "Courbe", "Line"),
+    bar: tr(language, "Barres", "Bars"), area: tr(language, "Aire", "Area"),
+    points: tr(language, "Points", "Points"), grouped: tr(language, "Colonnes groupées", "Grouped columns") };
   return <section className={styles.chart} aria-label={title}>
-    <header className={styles.header}><div><h3>{title}</h3><small>{forecast ? pick(language, "Prévisions / consensus", "Forecasts / consensus")
-      : pick(language, "Observations publiées", "Published observations")} · {unitLabel}</small></div></header>
+    <header className={styles.header}><div><h3>{title}</h3><small>{forecast ? tr(language, "Prévisions / consensus", "Forecasts / consensus")
+      : tr(language, "Observations publiées", "Published observations")} · {unitLabel}</small></div></header>
     <div className={styles.controls}>
-      <label>{pick(language, "Type de graphique", "Chart type")}<select value={shape} onChange={event => save({ shape: event.target.value as Shape })}>
+      <label>{tr(language, "Type de graphique", "Chart type")}<select value={shape} onChange={event => save({ shape: event.target.value as Shape })}>
         {shapes.map(option => <option value={option} key={option}
           disabled={option === "grouped" && visible.length < 2 || (option === "line" || option === "area") && periods.length < 2}>{shapeLabels[option]}</option>)}
-        <option disabled>{pick(language, "Secteurs — réservé aux répartitions", "Pie — distributions only")}</option>
-        <option disabled>{pick(language, "Anneau — réservé aux répartitions", "Donut — distributions only")}</option>
       </select></label>
-      <label>{pick(language, "Période", "Period")}<select value={range} onChange={event => { save({ range: event.target.value as FocusChartRange }); setPoint(null); }}>
+      <label>{tr(language, "Période", "Period")}<select value={range} onChange={event => { save({ range: event.target.value as FocusChartRange }); setPoint(null); }}>
         {ranges.map(option => <option value={option} key={option} disabled={option !== "all" && !periods.some(period => focusPeriodDate(period) !== null)}>
-          {option === "all" ? pick(language, "Tout", "All") : pick(language, `${option.slice(0, -1)} an(s)`, `${option.slice(0, -1)} year(s)`)}</option>)}
+          {option === "all" ? tr(language, "Tout", "All") : tr(language, `${option.slice(0, -1)} an(s)`, `${option.slice(0, -1)} year(s)`)}</option>)}
       </select></label>
-      <div className={styles.scale} role="group" aria-label={pick(language, "Échelle", "Scale")}>
-        <button type="button" aria-pressed={!normalized} onClick={() => save({ base100: false })}>{pick(language, "Valeurs réelles", "Actual values")}</button>
+      <div className={styles.scale} role="group" aria-label={tr(language, "Échelle", "Scale")}>
+        <button type="button" aria-pressed={!normalized} onClick={() => save({ base100: false })}>{tr(language, "Valeurs réelles", "Actual values")}</button>
         <button type="button" aria-pressed={normalized} disabled={mixedCurrencies || base === null || indexes.length < 2} onClick={() => save({ base100: true })}>Base 100</button>
       </div>
     </div>
-    <small className={styles.explanation}>{pick(language,
-      "Secteurs et anneau sont réservés aux répartitions additives; une évolution temporelle utilise les autres formats.",
-      "Pie and donut are reserved for additive distributions; time series use the other formats.")}</small>
-    {periods.length < 2 ? <small className={styles.explanation}>{pick(language,
+    {periods.length < 2 ? <small className={styles.explanation}>{tr(language,
       "Un seul instantané est disponible : aucune évolution historique ne peut être tracée.",
       "Only one snapshot is available: no historical trend can be plotted.")}</small> : null}
-    {base === null ? <small className={styles.explanation}>{pick(language,
+    {base === null ? <small className={styles.explanation}>{tr(language,
       "Base 100 indisponible : une observation initiale commune et positive, sans changement de signe, est nécessaire.",
       "Base 100 unavailable: a shared positive starting observation without sign changes is required.")}</small>
-      : normalized ? <small className={styles.explanation}>{pick(language,
+      : normalized ? <small className={styles.explanation}>{tr(language,
         `Base 100 au ${periods[base]}. Valeur observée / valeur à cette date × 100.`,
         `Base 100 at ${periods[base]}. Observed value / value on this date × 100.`)}</small> : null}
-    {mixedCurrencies ? <p className={styles.explanation} role="status">{pick(language,
+    {mixedCurrencies ? <p className={styles.explanation} role="status">{tr(language,
       "Graphique indisponible : les périodes utilisent plusieurs devises. Les valeurs exactes restent dans le tableau.",
       "Chart unavailable: periods use multiple currencies. Exact values remain in the table.")}</p> : null}
-    {series.length > 1 ? <><div className={styles.presets} role="group" aria-label={pick(language, "Groupes d’indicateurs", "Metric groups")}>
-      <button type="button" onClick={() => save({ ids: series.map(item => item.id) })}>{pick(language, "Tous", "All")}</button>
-      <button type="button" onClick={() => save({ ids: series.filter(item => item.values.some(v => v !== null)).slice(0, 3).map(item => item.id) })}>{pick(language, "Principaux", "Core metrics")}</button>
-      <button type="button" onClick={() => save({ ids: series.map(item => item.id), shape: kind, range: "all", base100: false })}>{pick(language, "Réinitialiser", "Reset")}</button>
-    </div><div className={styles.legend} role="group" aria-label={pick(language, "Indicateurs et séries affichées", "Metrics and visible series")}>
+    {series.length > 1 ? <><div className={styles.presets} role="group" aria-label={tr(language, "Groupes d’indicateurs", "Metric groups")}>
+      <button type="button" onClick={() => save({ ids: series.map(item => item.id) })}>{tr(language, "Tous", "All")}</button>
+      <button type="button" onClick={() => save({ ids: series.filter(item => item.values.some(v => v !== null)).slice(0, 3).map(item => item.id) })}>{tr(language, "Principaux", "Core metrics")}</button>
+      <button type="button" onClick={() => save({ ids: series.map(item => item.id), shape: kind, range: "all", base100: false })}>{tr(language, "Réinitialiser", "Reset")}</button>
+    </div><div className={styles.legend} role="group" aria-label={tr(language, "Indicateurs et séries affichées", "Metrics and visible series")}>
       {series.map((item, index) => <button type="button" key={item.id} aria-pressed={ids.includes(item.id)}
         style={{ "--series-color": palette[index % palette.length] } as CSSProperties} onClick={() => toggle(item.id)}>{item.label}</button>)}
     </div></> : null}
     {plotted.length ? <div className={styles.plotWrap} onMouseLeave={() => setPoint(current => current?.locked ? current : null)}>
       <svg className={styles.plot} style={{ minWidth: Math.max(460, indexes.length * 42) }} viewBox="0 0 640 215" role="img"
-        aria-label={pick(language, `Graphique ${title}; valeurs exactes dans le tableau`, `${title} chart; exact values in the table`)}>
+        aria-label={tr(language, `Graphique ${title}; valeurs exactes dans le tableau`, `${title} chart; exact values in the table`)}>
         {[min, (min + max) / 2, max].map((tick, i) => <g key={i}><line x1="52" x2="616" y1={y(tick)} y2={y(tick)} className={styles.gridLine} />
           <text x="47" y={y(tick) + 3} textAnchor="end" className={styles.axisText}>{normalized ? Math.round(tick) : format(tick, true)}</text></g>)}
         <line x1="52" x2="616" y1={y(0)} y2={y(0)} className={styles.zeroLine} />
@@ -179,27 +176,27 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
       </svg>
       {point && activePosition >= 0 ? <div className={styles.tooltip} role="status" data-focus-tooltip
         style={{ left: `${Math.min(82, Math.max(18, x(activePosition) / 640 * 100))}%` }}>
-        <div className={styles.tooltipHead}><strong>{periods[point.index]}</strong><button type="button" aria-label={pick(language, "Fermer les détails", "Close details")} onClick={() => setPoint(null)}>×</button></div>
+        <div className={styles.tooltipHead}><strong>{periods[point.index]}</strong><button type="button" aria-label={tr(language, "Fermer les détails", "Close details")} onClick={() => setPoint(null)}>×</button></div>
         {visible.map(item => { const actual = item.values[point.index], adjusted = chartValue(item, point.index), change = focusChartChange(item.values, indexes, point.index);
           return <div className={styles.tooltipSeries} key={item.id}><strong>{item.label}</strong>
-            <small>{item.nature === "estimate" || forecast ? pick(language, "Estimation", "Estimate") : pick(language, "Donnée publiée", "Published data")}</small>
+            <small>{item.nature === "estimate" || forecast ? tr(language, "Estimation", "Estimate") : tr(language, "Donnée publiée", "Published data")}</small>
             <span>{actual === null || actual === undefined || !Number.isFinite(actual) ? "N/D" : format(actual, false, periodCurrencies?.[point.index] ?? currency)}
               {normalized && adjusted !== null && adjusted !== undefined ? ` · ${adjusted.toFixed(2)} Base 100` : ""}</span>
-            <small>{unitLabel}{change ? ` · ${change.percent === null ? format(change.delta) : `${change.percent > 0 ? "+" : ""}${change.percent.toFixed(2)} %`} ${pick(language, "depuis", "since")} ${periods[change.previous]}` : ""}</small>
+            <small>{unitLabel}{change ? ` · ${change.percent === null ? format(change.delta) : `${change.percent > 0 ? "+" : ""}${change.percent.toFixed(2)} %`} ${tr(language, "depuis", "since")} ${periods[change.previous]}` : ""}</small>
             {forecast && item.lows?.[point.index] !== null && item.lows?.[point.index] !== undefined && item.highs?.[point.index] !== null && item.highs?.[point.index] !== undefined
-              ? <small>{pick(language, "Bas", "Low")}: {format(item.lows[point.index] as number)} · {pick(language, "Consensus", "Consensus")}: {actual === null ? "N/D" : format(actual as number)} · {pick(language, "Haut", "High")}: {format(item.highs[point.index] as number)}</small> : null}</div>;
+              ? <small>{tr(language, "Bas", "Low")}: {format(item.lows[point.index] as number)} · {tr(language, "Consensus", "Consensus")}: {actual === null ? "N/D" : format(actual as number)} · {tr(language, "Haut", "High")}: {format(item.highs[point.index] as number)}</small> : null}</div>;
         })}
-        <small>{pick(language, "Source", "Source")}: {periodSources?.[point.index] ?? source ?? "N/D"}</small>
+        <small>{tr(language, "Source", "Source")}: {periodSources?.[point.index] ?? source ?? "N/D"}</small>
       </div> : null}
-    </div> : !mixedCurrencies ? <p className={styles.empty}>{pick(language, "Série insuffisante pour tracer une tendance.", "Not enough observations to plot a trend.")}</p> : null}
-    <details className={styles.data}><summary>{pick(language, "Données exactes du graphique", "Exact chart data")}</summary>
-      <div className={styles.dataScroll}><table><thead><tr><th scope="col">{pick(language, "Période", "Period")}</th>
+    </div> : !mixedCurrencies ? <p className={styles.empty}>{tr(language, "Série insuffisante pour tracer une tendance.", "Not enough observations to plot a trend.")}</p> : null}
+    <details className={styles.data}><summary>{tr(language, "Données exactes du graphique", "Exact chart data")}</summary>
+      <div className={styles.dataScroll}><table><thead><tr><th scope="col">{tr(language, "Période", "Period")}</th>
         {visible.map(item => <th scope="col" key={item.id}>{item.label} ({unitLabel})</th>)}
-        {periodSources ? <th scope="col">{pick(language, "Source", "Source")}</th> : null}</tr></thead><tbody>
+        {periodSources ? <th scope="col">{tr(language, "Source", "Source")}</th> : null}</tr></thead><tbody>
         {indexes.map(index => <tr key={`${periods[index]}-${index}`}><th scope="row">{periods[index]}</th>
           {visible.map(item => <td key={item.id}>{item.values[index] === null || item.values[index] === undefined ? "N/D" : format(item.values[index] as number, false, periodCurrencies?.[index] ?? currency)}</td>)}
           {periodSources ? <td>{periodSources[index] ?? "N/D"}</td> : null}</tr>)}
       </tbody></table></div></details>
-    {source ? <small className={styles.source}>{pick(language, "Source", "Source")}: {source}</small> : null}
+    {source ? <small className={styles.source}>{tr(language, "Source", "Source")}: {source}</small> : null}
   </section>;
 }

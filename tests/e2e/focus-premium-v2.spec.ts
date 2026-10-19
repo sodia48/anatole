@@ -74,10 +74,13 @@ test("V2 earnings, estimates and analysts remain usable on mobile", async ({ pag
   await page.getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByText("2026-Q1").first()).toBeVisible();
   await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("analysts");
+  await expect(page.getByRole("heading", { name: "Conserver", exact: true })).toBeVisible();
   await page.getByRole("group", { name: "Mode du consensus analystes" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByRole("img", { name: /Achat fort: 1/ })).toBeVisible();
   await page.getByRole("group", { name: "Mode du consensus analystes" }).getByRole("button", { name: "Vue tableau" }).click();
-  await expect(page.getByRole("row", { name: /Objectif médian/ })).toContainText("105");
+  const medianTarget = page.getByRole("row", { name: /Objectif médian/ });
+  await expect(medianTarget).toContainText("105");
+  await expect(medianTarget).not.toContainText("CAD");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 

@@ -118,8 +118,8 @@ describe("mobile Focus parity", () => {
     const comparison = { target: "RY.TO", sector: "Financials", sector_family: "bank", universe_source: "XIC",
       universe_as_of: "2026-10-15", method_fr: "Même secteur, taille comparable.", method_en: "Same sector, comparable size.",
       selected: ["TD.TO"], excluded: {}, candidates: [
-        { ticker: "TD", name: "Toronto-Dominion", sector: "Financials", selection_basis: "same sector" },
-        { ticker: "BMO", name: "Bank of Montreal", sector: "Financials", selection_basis: "same sector" },
+        { ticker: "TD", name: "Toronto-Dominion", sector: "Financials", selection_basis: "verified", comparability: "direct" },
+        { ticker: "BMO", name: "Bank of Montreal", sector: "Financials", selection_basis: "verified", comparability: "direct" },
       ], measures: [{ key: "revenue_growth", label_fr: "Croissance des revenus", label_en: "Revenue growth", basis: "annual",
         unit: "percent", median: null, rank: null, sample_size: 2, minimum_sample_size: 6,
         explanation_fr: "Échantillon insuffisant.", explanation_en: "Insufficient sample.", values: [
@@ -132,7 +132,8 @@ describe("mobile Focus parity", () => {
     const onSelect = jest.fn();
     const view = await render(<MobileFocusPeers comparison={comparison} error={null} loading={false} onRetry={jest.fn()} onSelect={onSelect} />);
     expect(view.getByText(/Échantillon insuffisant/)).toBeTruthy();
-    expect(view.getByText(/Issuer report/)).toBeTruthy();
+    await fireEvent.press(view.getByText("Voir les sources"));
+    expect(view.getAllByText(/Issuer report/).length).toBeGreaterThan(0);
     await fireEvent.press(view.getByText(/Choisir ou remplacer les sociétés/));
     await fireEvent.press(view.getByText(/BMO · Bank of Montreal/));
     expect(onSelect).toHaveBeenCalledWith(["TD", "BMO"]);
