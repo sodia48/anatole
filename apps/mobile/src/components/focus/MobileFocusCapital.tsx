@@ -37,6 +37,7 @@ export function MobileFocusCapital({ research, loading, error, onRetry }: {
   const [showSources, setShowSources] = useState(false);
   const [showMissing, setShowMissing] = useState(false);
   const [showExact, setShowExact] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const unavailable = research ? metrics.filter(item => research.periods.every(period => period[item.key].value === null)) : [];
   const shown = metrics.filter(item => selected.includes(item.key) && (showMissing || !unavailable.includes(item)));
   const latest = research?.periods[0];
@@ -58,6 +59,10 @@ export function MobileFocusCapital({ research, loading, error, onRetry }: {
           return <View key={item.key} style={styles.kpi}><Text style={styles.note}>{pick(item.fr, item.en)}</Text><Text style={styles.value}>{formatted(latest![item.key], latest!.currency, language, item.percent)}</Text>
             {prior !== null && prior !== undefined ? <Text style={styles.note}>{pick("Variation annuelle", "Yearly change")} : {formatFinancialNumber(current - prior, { language, unit: item.percent ? "percent" : "money", currency: item.percent ? null : latest!.currency })}</Text> : null}</View>;
         })}</View></Card>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHistory }} onPress={() => setShowHistory(!showHistory)} style={styles.choice}>
+          <Text style={styles.link}>{pick("Historique financier et autres indicateurs", "Financial history and other metrics")} {showHistory ? "▴" : "▾"}</Text>
+        </Pressable>
+        {showHistory ? <>
         {unavailable.length ? <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: showMissing }} onPress={() => setShowMissing(!showMissing)}><Text style={styles.link}>{pick("Afficher les indicateurs indisponibles", "Show unavailable metrics")} ({unavailable.length})</Text></Pressable> : null}
         <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: showExact }} onPress={() => setShowExact(!showExact)}><Text style={styles.link}>{pick("Afficher les chiffres complets", "Show exact figures")}</Text></Pressable>
         <MobileFocusViewMode mode={mode} choose={choose} modes={modes} />
@@ -74,6 +79,7 @@ export function MobileFocusCapital({ research, loading, error, onRetry }: {
           {shown.map(item => <View key={item.key} style={styles.metric}><Text style={styles.label}>{pick(item.fr, item.en)} · {formatted(period[item.key], period.currency, language, item.percent)}</Text>
             {mode === "charts" ? <View style={styles.track}><View style={styles.zero} /><View style={[styles.bar, (period[item.key].value ?? 0) < 0 && styles.negative, signedBar(period[item.key].value,
               Math.max(1, ...research.periods.map(value => Math.abs(value[item.key].value ?? 0))))]} /></View> : null}</View>)}</Card>) : null}
+        </> : null}
       </> : <Card title={pick("Allocation du capital", "Capital allocation")}><Text style={styles.note}>{pick("Aucun exercice annuel vérifiable.", "No verifiable annual fiscal year.")}</Text></Card>}
       <Card title={pick("Sources, formules et valeurs exactes", "Sources, formulas and exact values")}><Pressable accessibilityRole="button" onPress={() => setShowSources(!showSources)}><Text style={styles.link}>{showSources ? pick("Masquer", "Hide") : pick("Voir les sources", "View sources")}</Text></Pressable>
         {showSources ? research.periods.map(period => <View key={period.period_end} style={styles.metric}><Text style={styles.label}>{period.period_end.slice(0, 10)} · {period.currency ?? "N/D"} · {period.source_confidence}</Text>

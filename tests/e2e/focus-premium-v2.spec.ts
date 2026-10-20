@@ -36,7 +36,8 @@ async function openFundamentals(page: import("@playwright/test").Page, language:
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: language === "fr" ? "Fondamentaux" : "Fundamentals", exact: true }).click();
   await page.getByRole("navigation", { name: language === "fr" ? "Vues fondamentales" : "Fundamental views" })
-    .getByRole("button", { name: language === "fr" ? "Synthèse" : "Overview" }).click();
+    .getByRole("button", { name: language === "fr" ? "Explorer" : "Explore" }).click();
+  await page.getByRole("combobox", { name: language === "fr" ? "Contenu à explorer" : "Explore content" }).selectOption("fundamentals");
 }
 
 test("V2 modes preserve exact annual and quarterly evidence without refetch", async ({ page }) => {
@@ -48,7 +49,8 @@ test("V2 modes preserve exact annual and quarterly evidence without refetch", as
   await page.getByText("Données exactes du graphique").first().click();
   await expect(page.getByRole("row", { name: /2025-12-31/ }).first()).toContainText("Issuer annual 2025");
   const before = requests;
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("financials");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("financials");
   await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Annuel" }).click();
   await page.getByRole("group", { name: "Mode d’affichage des états financiers" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByTestId("financials-chart-view")).toBeVisible();
@@ -65,22 +67,29 @@ test("V2 modes preserve exact annual and quarterly evidence without refetch", as
 
 test("V2 earnings, estimates and analysts remain usable on mobile", async ({ page }) => {
   await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: snapshot }));
+  await page.route("**/stocks/RY/fundamental-intelligence/capital", route => route.fulfill({ json: {
+    ticker: "RY.TO", status: "partial", financial_currency: "CAD", stale: false, periods: [],
+    analysts: { status: "partial", as_of: "2026-10-12T00:00:00Z", source_name: "Verified analyst fixture",
+      source_confidence: "secondary_snapshot", recommendation_key: "hold", distribution: { strong_buy: 1, buy: 2, hold: 5, sell: 2, strong_sell: 0 },
+      target_low: 80, target_mean: 110, target_median: 105, target_high: 130, target_currency: null, estimates: [],
+      actual_vs_consensus: [], revision_history_status: "unavailable", revision_history_reason_fr: "Révisions non vérifiables.",
+      revision_history_reason_en: "Revisions unverified." }, limitations_fr: [], limitations_en: [],
+  } }));
   await openFundamentals(page);
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("financials");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("financials");
   await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Estimations" }).click();
   await page.getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByText("Prévisions / consensus").first()).toBeVisible();
   await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "BPA & calendrier" }).click();
   await page.getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByText("2026-Q1").first()).toBeVisible();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("analysts");
-  await expect(page.getByRole("heading", { name: "Conserver", exact: true })).toBeVisible();
-  await page.getByRole("group", { name: "Mode du consensus analystes" }).getByRole("button", { name: "Vue graphiques" }).click();
-  await expect(page.getByRole("img", { name: /Achat fort: 1/ })).toBeVisible();
-  await page.getByRole("group", { name: "Mode du consensus analystes" }).getByRole("button", { name: "Vue tableau" }).click();
-  const medianTarget = page.getByRole("row", { name: /Objectif médian/ });
-  await expect(medianTarget).toContainText("105");
-  await expect(medianTarget).not.toContainText("CAD");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("capital");
+  await expect(page.getByRole("heading", { name: "Consensus analystes actuel" })).toBeVisible();
+  await expect(page.getByText("Conserver", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Achat fort · 1/)).toBeVisible();
+  await expect(page.getByText("devise non vérifiée")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
@@ -93,8 +102,8 @@ test("English chart labels, source and saved mode survive navigation", async ({ 
   await page.getByRole("group", { name: "Summary display mode" }).getByRole("button", { name: "Chart view" }).click();
   await expect(page.getByRole("heading", { name: "Published growth and profitability" })).toBeVisible();
   await expect(page.getByText("Verified fixture source").first()).toBeVisible();
-  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("combobox", { name: "Open a module" }).selectOption("financials");
-  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("button", { name: "Overview" }).click();
+  await page.getByRole("combobox", { name: "Explore content" }).selectOption("financials");
+  await page.getByRole("combobox", { name: "Explore content" }).selectOption("fundamentals");
   await expect(page.getByRole("group", { name: "Summary display mode" }).getByRole("button", { name: "Chart view" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
 });

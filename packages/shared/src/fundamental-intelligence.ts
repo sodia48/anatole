@@ -92,6 +92,21 @@ export type FundamentalDiagnostic = {
   global_score: null;
 };
 
+/** Choose published or calculated values that actually exist in this snapshot. */
+export function selectOverviewMeasures(diagnostic: FundamentalDiagnostic): FundamentalMeasure[] {
+  const preferred = diagnostic.sector_family === "bank" || diagnostic.sector_family === "insurance"
+    ? ["net_income", "net_margin", "revenue_growth", "cash_conversion"]
+    : diagnostic.sector_family === "mining"
+      ? ["revenue", "operating_cash_flow", "free_cash_flow", "revenue_growth"]
+      : ["revenue_growth", "operating_margin", "free_cash_flow", "cash_conversion"];
+  const available = diagnostic.measures.filter(measure => measure.status === "available" &&
+    Number.isFinite(measure.observations[0]?.value));
+  return [
+    ...preferred.map(key => available.find(measure => measure.key === key)).filter((measure): measure is FundamentalMeasure => Boolean(measure)),
+    ...available.filter(measure => !preferred.includes(measure.key)),
+  ].slice(0, 4);
+}
+
 export type PeerCandidate = {
   ticker: string;
   name: string;

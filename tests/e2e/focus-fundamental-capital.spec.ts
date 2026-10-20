@@ -22,7 +22,8 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("capital");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("capital");
   const panel = page.getByRole("region", { name: "Allocation du capital" });
   await expect(panel.getByText("Aucun historique daté des révisions n'est fourni.")).toBeVisible();
   await testInfo.attach("capital-cartes", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
@@ -30,6 +31,7 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/annual-2025.pdf");
   await expect(panel.getByText("Achat", { exact: true })).toBeVisible();
   await expect(panel.getByText("devise non vérifiée")).toBeVisible();
+  await panel.getByText("Historique financier et autres indicateurs").click();
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue tableau" }).click();
   await expect(panel.getByRole("table")).toContainText("35 CAD");
   await testInfo.attach("capital-tableau", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

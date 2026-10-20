@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
-import type { FundamentalDiagnostic, FundamentalMeasure, FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
+import { selectOverviewMeasures, type FundamentalDiagnostic, type FundamentalMeasure, type FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
 import { Card, QueryState, uiStyles } from "@/src/components/ui";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
@@ -45,18 +45,45 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
   const { language, pick } = useLocale();
   const [mode, choose] = useMobileFocusMode("anatole.focus.mobile.diagnostic.view.v1", modes);
   const [showMissingSector, setShowMissingSector] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const byKey = useMemo(() => new Map(diagnostic?.measures.map(measure => [measure.key, measure]) ?? []), [diagnostic]);
   const availableSector = diagnostic?.sector_metrics.filter(item => item.value !== null && item.status === "available") ?? [];
   const missingSector = diagnostic?.sector_metrics.filter(item => item.value === null || item.status !== "available") ?? [];
+  const essentials = diagnostic ? selectOverviewMeasures(diagnostic) : [];
+  const chartMeasure = essentials.find(item => item.observations.length >= 2);
+  const chartPoints = chartMeasure ? [...chartMeasure.observations].sort((a, b) => a.period_end.localeCompare(b.period_end)) : [];
   return <View style={styles.stack} testID="focus-diagnostic-section">
     <QueryState error={!diagnostic ? error : null} loading={loading} onRetry={onRetry} />
     {diagnostic ? <>
       <Card title={pick("Diagnostic financier 360°", "Financial diagnostic 360°")}>
-        <Text style={styles.note}>{diagnostic.name} · {diagnostic.financial_currency ?? pick("devise N/D", "currency N/A")}</Text>
+        <Text style={styles.note}>{diagnostic.name} · {diagnostic.ticker} · {essentials[0]?.observations[0]?.period_end.slice(0, 10) ?? pick("période indisponible", "period unavailable")}</Text>
         {diagnostic.stale ? <Text style={styles.note}>{pick("Instantané périmé; actualisation en cours ou différée.", "Stale snapshot; refresh in progress or delayed.")}</Text> : null}
-        <Text style={styles.note}>{pick(diagnostic.methodology_fr, diagnostic.methodology_en)}</Text>
       </Card>
+      {essentials.length ? <View style={styles.overviewGrid} testID="focus-diagnostic-essentials">{essentials.map(measure => <View key={measure.key} style={styles.overviewCard}>
+        <Text style={styles.overviewLabel}>{pick(measure.label_fr, measure.label_en)}</Text>
+        <Text style={styles.value}>{formatted(measure.observations[0], language)}</Text>
+        <Text style={styles.note}>{measure.observations[0]?.period_end.slice(0, 10)}</Text>
+        <Pressable accessibilityRole="button" onPress={() => { setShowDetails(true); setExpandedGroup(["liquidity", "leverage"].includes(measure.dimension) ? "financial_strength" : ["earnings_quality", "cash_flow"].includes(measure.dimension) ? "earnings_quality" : measure.dimension); }}><Text style={styles.link}>{pick("Voir la source et la méthode", "View source and method")}</Text></Pressable>
+      </View>)}</View> : <Text style={styles.note}>{pick("Données financières insuffisantes pour présenter des indicateurs.", "Insufficient financial data to show key measures.")}</Text>}
+      {chartMeasure ? <MobileFocusSeries storageKey="mobile.diagnostic.overview" title={pick(chartMeasure.label_fr, chartMeasure.label_en)}
+        periods={chartPoints.map(point => point.period_end.slice(0, 10))}
+        series={[{ id: chartMeasure.key, fr: chartMeasure.label_fr, en: chartMeasure.label_en, values: chartPoints.map(point => point.value) }]}
+        currency={chartPoints[0]?.currency ?? diagnostic.financial_currency ?? ""} currencies={chartPoints.map(point => point.currency)}
+        source={chartPoints[chartPoints.length - 1]?.source_name ?? ""}
+        sources={chartPoints.map(point => `${point.source_name} · ${point.filed_at?.slice(0, 10) ?? "N/D"}`)}
+        unit={chartMeasure.unit === "ratio" ? "number" : chartMeasure.unit} /> : null}
+      {diagnostic.findings.length ? <Card title={pick("Constats fondés sur les données", "Data-backed findings")}>
+        {diagnostic.findings.slice(0, 4).map((finding, index) => <View key={`${finding.kind}-${index}`} style={styles.findingCard}>
+          <Text style={styles.findingKind}>{pick(finding.kind === "strength" ? "Point fort" : finding.kind === "vulnerability" ? "Point de vigilance" : "Observation", finding.kind === "strength" ? "Strength" : finding.kind === "vulnerability" ? "Watch point" : "Observation")}</Text>
+          <Text style={styles.finding}>{pick(finding.text_fr, finding.text_en)}</Text>
+        </View>)}
+      </Card> : null}
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showDetails }} onPress={() => setShowDetails(!showDetails)} style={styles.missingToggle}>
+        <Text style={styles.link}>{pick("Voir les analyses détaillées, sources et méthodes", "View detailed analysis, sources and methods")} {showDetails ? "▴" : "▾"}</Text>
+      </Pressable>
+      {showDetails ? <>
+      <Text style={styles.note}>{pick(diagnostic.methodology_fr, diagnostic.methodology_en)}</Text>
       <View style={styles.overviewGrid} testID="focus-diagnostic-overview">{([
         { key: "profitability", fr: "Rentabilité", en: "Profitability", keys: ["profitability"] },
         { key: "financial_strength", fr: "Solidité financière", en: "Financial strength", keys: ["liquidity", "leverage"] },
@@ -86,13 +113,6 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
             .filter((item): item is FundamentalMeasure => Boolean(item)).map(measure => <Measure key={measure.key} measure={measure} />) : null}
         </View>;
       })}</View>
-      {diagnostic.findings.length ? <Card title={pick("Constats fondés sur les données", "Data-backed findings")}>
-        {diagnostic.findings.map((finding, index) => <View key={`${finding.kind}-${index}`} style={styles.findingCard}>
-          <Text style={styles.findingKind}>{pick(finding.kind === "strength" ? "Point fort" : finding.kind === "vulnerability" ? "Point de vigilance" : "Observation", finding.kind === "strength" ? "Strength" : finding.kind === "vulnerability" ? "Watch point" : "Observation")}</Text>
-          <Text style={styles.finding}>{pick(finding.text_fr, finding.text_en)}</Text>
-          <Text style={styles.note}>{finding.measure_keys.map(key => pick(byKey.get(key)?.label_fr ?? key, byKey.get(key)?.label_en ?? key)).join(" · ")}</Text>
-        </View>)}
-      </Card> : null}
       {(diagnostic.sector_metrics ?? []).length ? <Card title={pick("Indicateurs propres au secteur", "Sector-specific metrics")}>
         <Text style={styles.note}>{pick("Seules les valeurs explicitement publiées sont affichées.", "Only explicitly published values are shown.")}</Text>
         {availableSector.map(item => <View key={item.key} style={styles.measure}>
@@ -140,7 +160,8 @@ export function MobileFocusDiagnostic({ diagnostic, loading, error, onRetry }: {
           })}{members.map(measure => <Measure key={measure.key} measure={measure} />)}</> : null}
         </Card>;
       })}
-      {diagnostic.missing_data.length ? <Card title={pick("Données manquantes", "Missing data")}>{diagnostic.missing_data.map((item, index) => <Text key={`${item}-${index}`} style={styles.note}>{item}</Text>)}</Card> : null}
+      {diagnostic.missing_data.length ? <Card title={pick("Données non disponibles", "Unavailable data")}>{diagnostic.missing_data.map((item, index) => <Text key={`${item}-${index}`} style={styles.note}>{item}</Text>)}</Card> : null}
+      </> : null}
       <Text style={uiStyles.label}>{pick("Aucun score global ni recommandation d’achat ou de vente.", "No global score or buy/sell recommendation.")}</Text>
     </> : null}
   </View>;

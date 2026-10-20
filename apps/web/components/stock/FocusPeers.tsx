@@ -52,7 +52,9 @@ export function FocusPeers({ ticker }: { ticker: string }) {
   const current = data?.target.replace(/\.TO$/i, "").toUpperCase() === code(ticker) ? data : null;
   const selected = current?.selected.map(code) ?? [];
   const pending = loading && selection ? selection.filter(item => !selected.includes(item)) : [];
-  const shown = current?.measures.filter(item => keys.includes(item.key)) ?? [];
+  const shown = current?.measures.filter(item => keys.includes(item.key) && item.values.length >= 2)
+    .sort((a, b) => b.values.length - a.values.length) ?? [];
+  const showSectorStats = shown.some(item => item.sample_size >= item.minimum_sample_size && item.median !== null);
   const candidates = current?.candidates.filter(item => `${item.ticker} ${item.name} ${item.industry ?? ""}`.toLowerCase().includes(search.toLowerCase())).slice(0, 20) ?? [];
   const toggle = (item: string) => {
     const next = selected.includes(item) ? selected.filter(value => value !== item) : [...selected, item];
@@ -62,11 +64,11 @@ export function FocusPeers({ ticker }: { ticker: string }) {
   return <section className={styles.panel} aria-label={tr(language, "Comparateur sectoriel", "Sector peer comparison")}>
     <header><span className="eyebrow">FUNDAMENTAL INTELLIGENCE 360</span>
       <h2>{tr(language, "Comparateur sectoriel", "Sector peer comparison")}</h2>
-      {current ? <p className={styles.muted}>{language === "fr" ? current.method_fr : current.method_en}</p> : null}
-      {current ? <p className={styles.muted}>{current.universe_source} · {current.universe_as_of ?? "N/D"}</p> : null}
+      {current ? <p>{tr(language, "Entreprises comparées", "Compared companies")} : {code(current.target)}{selected.length ? ` · ${selected.join(" · ")}` : ` · ${tr(language, "aucun pair admissible", "no eligible peer")}`}</p> : null}
     </header>
     {current ? <>
-      <details><summary>{tr(language, "Choisir ou remplacer les sociétés", "Choose or replace peers")} ({selected.length}/8)</summary>
+      <details><summary>{tr(language, "Recherche et filtres avancés", "Search and advanced filters")} ({selected.length}/8)</summary>
+        <p className={styles.muted}>{language === "fr" ? current.method_fr : current.method_en} · {current.universe_source} · {current.universe_as_of ?? "N/D"}</p>
         <p>{tr(language, "Pairs admissibles", "Eligible peers")} : {selected.join(", ") || tr(language, "aucun", "none")}{pending.length ? ` · ${tr(language, "Validation en cours", "Validating")}: ${pending.join(", ")}` : ""}</p>
         <label>{tr(language, "Rechercher un pair", "Search peers")}<input value={search} onChange={event => setSearch(event.target.value)} /></label>
         <div className={styles.candidates}>{candidates.map((item, index) => <div key={item.ticker} className={styles.candidate}>
@@ -91,13 +93,13 @@ export function FocusPeers({ ticker }: { ticker: string }) {
           {language === "fr" ? item.label_fr : item.label_en}</label>)}
       </fieldset>
       {mode !== "charts" ? <div className={`${styles.tableWrap} ${mode === "cards" ? styles.cardTable : ""}`}><table><caption>{tr(language, "Comparaison des indicateurs sélectionnés", "Selected metric comparison")}</caption>
-        <thead><tr><th>{tr(language, "Indicateur", "Metric")}</th><th>{code(current.target)}</th>{current.selected.map(item => <th key={item}>{code(item)}</th>)}{current.selected.length === 1 ? <th>{tr(language, "Écart cible – pair", "Target – peer difference")}</th> : null}<th>{tr(language, "Médiane", "Median")}</th><th>{tr(language, "Rang", "Rank")}</th></tr></thead>
+        <thead><tr><th>{tr(language, "Indicateur", "Metric")}</th><th>{code(current.target)}</th>{current.selected.map(item => <th key={item}>{code(item)}</th>)}{current.selected.length === 1 ? <th>{tr(language, "Écart cible – pair", "Target – peer difference")}</th> : null}{showSectorStats ? <><th>{tr(language, "Médiane", "Median")}</th><th>{tr(language, "Rang", "Rank")}</th></> : null}</tr></thead>
         <tbody>{shown.map(item => <tr key={item.key}><th>{language === "fr" ? item.label_fr : item.label_en}<small>{item.sample_size} {tr(language, "sociétés avec cette donnée", "companies with this value")}</small><small>{language === "fr" ? item.explanation_fr : item.explanation_en}</small></th>
           {[current.target, ...current.selected].map(tickerValue => { const value = item.values.find(point => point.ticker === tickerValue);
             return <td key={tickerValue} title={value ? exactFinancialNumber(value.value, language) : undefined}><b className={styles.cardTicker}>{code(tickerValue)}</b>{number(value?.value ?? null, item.unit, language)}{value ? <small>{value.period_end.slice(0, 10)}</small> : null}</td>; })}
           {current.selected.length === 1 ? <td><b className={styles.cardTicker}>{tr(language, "Écart cible – pair", "Target – peer difference")}</b>{comparableDelta(item.values.find(value => value.ticker === current.target)?.value,
             item.values.find(value => value.ticker === current.selected[0])?.value, language, item.unit) ?? "N/D"}</td> : null}
-          <td><b className={styles.cardTicker}>{tr(language, "Médiane", "Median")}</b>{number(item.median, item.unit, language)}</td><td><b className={styles.cardTicker}>{tr(language, "Rang", "Rank")}</b>{item.rank ?? "N/D"}</td></tr>)}</tbody></table></div> : null}
+          {showSectorStats ? <><td><b className={styles.cardTicker}>{tr(language, "Médiane", "Median")}</b>{number(item.median, item.unit, language)}</td><td><b className={styles.cardTicker}>{tr(language, "Rang", "Rank")}</b>{item.rank ?? "N/D"}</td></> : null}</tr>)}</tbody></table></div> : null}
       {mode === "charts" ? <div className={styles.cards}>{shown.map(item => {
         const bound = Math.max(...item.values.map(point => Math.abs(point.value)), 1);
         const a = item.values.find(value => value.ticker === current.target)?.value;

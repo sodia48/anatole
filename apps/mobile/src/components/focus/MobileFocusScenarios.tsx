@@ -9,7 +9,7 @@ import { createThemedStyles } from "@/src/theme/palettes";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 import { MobileFocusViewMode, useMobileFocusMode } from "./MobileFocusViewMode";
 
-const modes = ["table", "cards", "charts"] as const;
+const modes = ["cards", "table", "charts"] as const;
 type MetricKey = "revenue" | "operating_income" | "net_income" | "operating_cash_flow" | "free_cash_flow" | "operating_margin" | "free_cash_flow_margin";
 const labels: Record<ScenarioKey, [string, string]> = { prudent: ["Prudent", "Prudent"], central: ["Central", "Central"], optimistic: ["Optimiste", "Optimistic"] };
 const fields: { key: keyof Omit<ScenarioAssumptions, "key" | "commodity_price_change_percent" | "commodity_revenue_exposure_percent">; fr: string; en: string; min: number; max: number }[] = [
@@ -48,6 +48,7 @@ export function MobileFocusScenarios({ simulation, loading, error, onRetry, onCa
   const [draft, setDraft] = useState<Record<string, string>>(initialDraft);
   const [dcfEnabled, setDcfEnabled] = useState(false);
   const [inputError, setInputError] = useState(false);
+  const [showAssumptions, setShowAssumptions] = useState(false);
   const [selectedMetrics, setSelectedMetrics] = useState<MetricKey[]>(["revenue", "net_income", "free_cash_flow"]);
   const set = (key: string, value: string) => setDraft(previous => ({ ...previous, [key]: value }));
   const calculate = () => {
@@ -73,30 +74,6 @@ export function MobileFocusScenarios({ simulation, loading, error, onRetry, onCa
     <Card title={pick("Simulateur et valorisation", "Scenario simulator and valuation")}>
       <Text style={styles.note}>{pick("Sensibilités illustratives, sans prévision ni cours certain.", "Illustrative sensitivities, not forecasts or certain market prices.")}</Text>
     </Card>
-    {defaultScenarioRequest.scenarios.map(scenario => <Card key={scenario.key} title={pick(...labels[scenario.key])}>
-      {fields.map(field => <View key={field.key} style={styles.field}><Text style={styles.label}>{pick(field.fr, field.en)}</Text>
-        <TextInput accessibilityLabel={`${pick(...labels[scenario.key])} · ${pick(field.fr, field.en)}`}
-          keyboardType="numbers-and-punctuation" value={draft[`${scenario.key}_${field.key}`]}
-          onChangeText={value => set(`${scenario.key}_${field.key}`, value)} style={styles.input} /></View>)}
-      {simulation?.sector_family === "mining" ? <>
-        {(["commodity_price_change_percent", "commodity_revenue_exposure_percent"] as const).map(field => <View key={field} style={styles.field}>
-          <Text style={styles.label}>{field === "commodity_price_change_percent" ? pick("Variation du prix de la matière première (%)", "Commodity price change (%)") : pick("Part des revenus exposée (%)", "Exposed revenue share (%)")}</Text>
-          <TextInput keyboardType="numbers-and-punctuation" value={draft[`${scenario.key}_${field}`]}
-            onChangeText={value => set(`${scenario.key}_${field}`, value)} style={styles.input} /></View>)}
-      </> : null}
-    </Card>)}
-    <Card title={pick("Valorisation DCF conditionnelle", "Conditional DCF valuation")}>
-      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: dcfEnabled }} onPress={() => setDcfEnabled(!dcfEnabled)} style={styles.choice}>
-        <Text style={styles.label}>{dcfEnabled ? "☑" : "□"} {pick("Saisir mes taux et calculer la DCF", "Enter my rates and calculate DCF")}</Text></Pressable>
-      {dcfEnabled ? ([
-        ["discount_rate_percent", "Taux d'actualisation (%)", "Discount rate (%)"],
-        ["terminal_growth_percent", "Croissance terminale (%)", "Terminal growth (%)"],
-        ["forecast_fcf_growth_percent", "Croissance des flux projetés (%)", "Projected cash-flow growth (%)"],
-      ] as const).map(([key, fr, en]) => <View key={key} style={styles.field}><Text style={styles.label}>{pick(fr, en)}</Text>
-        <TextInput keyboardType="numbers-and-punctuation" value={draft[key]} onChangeText={value => set(key, value)} style={styles.input} /></View>) : null}
-    </Card>
-    <Pressable accessibilityRole="button" disabled={loading} onPress={calculate} style={styles.action}><Text style={styles.actionText}>{pick("Calculer les scénarios", "Calculate scenarios")}</Text></Pressable>
-    {inputError ? <Text style={styles.note}>{pick("Vérifiez les valeurs saisies.", "Check the entered values.")}</Text> : null}
     {simulation ? <>
       <Card title={pick("Référence publiée", "Published baseline")}>
         <Text style={styles.note}>{simulation.baseline_period_end?.slice(0, 10) ?? "N/D"} · {simulation.currency ?? "N/D"}</Text>
@@ -129,6 +106,35 @@ export function MobileFocusScenarios({ simulation, loading, error, onRetry, onCa
       <Card title={pick("Hypothèses et limites", "Assumptions and limits")}>
         {(language === "fr" ? simulation.limitations_fr : simulation.limitations_en).map(item => <Text key={item} style={styles.note}>• {item}</Text>)}
       </Card>
+    </> : null}
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: showAssumptions }} onPress={() => setShowAssumptions(!showAssumptions)} style={styles.choice}>
+      <Text style={styles.label}>{pick("Personnaliser les hypothèses", "Customize assumptions")} {showAssumptions ? "▴" : "▾"}</Text>
+    </Pressable>
+    {showAssumptions ? <>
+    {defaultScenarioRequest.scenarios.map(scenario => <Card key={scenario.key} title={pick(...labels[scenario.key])}>
+      {fields.map(field => <View key={field.key} style={styles.field}><Text style={styles.label}>{pick(field.fr, field.en)}</Text>
+        <TextInput accessibilityLabel={`${pick(...labels[scenario.key])} · ${pick(field.fr, field.en)}`}
+          keyboardType="numbers-and-punctuation" value={draft[`${scenario.key}_${field.key}`]}
+          onChangeText={value => set(`${scenario.key}_${field.key}`, value)} style={styles.input} /></View>)}
+      {simulation?.sector_family === "mining" ? <>
+        {(["commodity_price_change_percent", "commodity_revenue_exposure_percent"] as const).map(field => <View key={field} style={styles.field}>
+          <Text style={styles.label}>{field === "commodity_price_change_percent" ? pick("Variation du prix de la matière première (%)", "Commodity price change (%)") : pick("Part des revenus exposée (%)", "Exposed revenue share (%)")}</Text>
+          <TextInput keyboardType="numbers-and-punctuation" value={draft[`${scenario.key}_${field}`]}
+            onChangeText={value => set(`${scenario.key}_${field}`, value)} style={styles.input} /></View>)}
+      </> : null}
+    </Card>)}
+    <Card title={pick("Valorisation DCF conditionnelle", "Conditional DCF valuation")}>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: dcfEnabled }} onPress={() => setDcfEnabled(!dcfEnabled)} style={styles.choice}>
+        <Text style={styles.label}>{dcfEnabled ? "☑" : "□"} {pick("Saisir mes taux et calculer la DCF", "Enter my rates and calculate DCF")}</Text></Pressable>
+      {dcfEnabled ? ([
+        ["discount_rate_percent", "Taux d'actualisation (%)", "Discount rate (%)"],
+        ["terminal_growth_percent", "Croissance terminale (%)", "Terminal growth (%)"],
+        ["forecast_fcf_growth_percent", "Croissance des flux projetés (%)", "Projected cash-flow growth (%)"],
+      ] as const).map(([key, fr, en]) => <View key={key} style={styles.field}><Text style={styles.label}>{pick(fr, en)}</Text>
+        <TextInput keyboardType="numbers-and-punctuation" value={draft[key]} onChangeText={value => set(key, value)} style={styles.input} /></View>) : null}
+    </Card>
+    <Pressable accessibilityRole="button" disabled={loading} onPress={calculate} style={styles.action}><Text style={styles.actionText}>{pick("Calculer les scénarios", "Calculate scenarios")}</Text></Pressable>
+    {inputError ? <Text style={styles.note}>{pick("Vérifiez les valeurs saisies.", "Check the entered values.")}</Text> : null}
     </> : null}
   </View>;
 }

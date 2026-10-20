@@ -1,8 +1,8 @@
-.fd-panel { display: grid; gap: 24px; max-width: 1200px; margin: 20px auto; padding: clamp(18px, 3vw, 34px); border: 1px solid var(--border); border-radius: 18px; background: var(--panel); color: var(--text); }
+.fd-panel { display: grid; gap: 24px; width: min(100%, 1100px); box-sizing: border-box; margin: 20px auto; padding: clamp(18px, 3vw, 34px); border: 1px solid var(--border); border-radius: 18px; background: var(--panel); color: var(--text); }
 .fd-panel h2, .fd-panel h3 { margin: 0 0 8px; }
 .fd-panel p { margin: 6px 0; }
 .fd-overviewGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.fd-overviewCard { display: grid; align-content: start; gap: 12px; min-height: 190px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2, var(--panel)); color: var(--text); text-decoration: none; scroll-margin-top: 100px; }
+.fd-overviewCard { display: grid; align-content: start; gap: 12px; min-height: 145px; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2, var(--panel)); color: var(--text); text-decoration: none; scroll-margin-top: 100px; }
 .fd-overviewCard:hover { border-color: var(--blue); }
 .fd-overviewCard:focus-within { border-color: var(--blue); }
 .fd-cardTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -28,6 +28,7 @@
 .fd-findingCard details { font-size: 12px; }
 .fd-findingCard a { display: block; margin-top: 5px; }
 .fd-dimension { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+details.fd-dimension:not([open]) > :not(summary) { display: none; }
 .fd-dimension[id] { scroll-margin-top: 90px; }
 .fd-dimension h3 { display: flex; align-items: center; gap: 8px; }
 .fd-dimension h3 svg { color: var(--blue); }

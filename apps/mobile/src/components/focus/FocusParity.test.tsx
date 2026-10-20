@@ -11,12 +11,11 @@ import { MobileFocusFundamentals } from "./MobileFocusFundamentals";
 import { MobileFocusValuation } from "./MobileFocusValuation";
 import { MobileFocusNavigation } from "./MobileFocusNavigation";
 import { MobileFocusFundamentalTabs } from "./MobileFocusFundamentalTabs";
-import { MobileFundamentalPortal } from "./MobileFundamentalPortal";
 import { MobileFocusPro } from "./MobileFocusPro";
 import { focusPeriods } from "./MobileFocusOverview";
 import { liveQuoteStatus } from "./liveStatus";
 import type { FinancialPeriod, FundamentalMetrics, FundamentalSnapshot } from "@/src/lib/api/types";
-import type { FundamentalDiagnostic, PeerComparison } from "@anatole/shared/fundamental-intelligence";
+import { selectOverviewMeasures, type FundamentalDiagnostic, type PeerComparison } from "@anatole/shared/fundamental-intelligence";
 import { defaultScenarioRequest, type ScenarioSimulation } from "@anatole/shared/fundamental-scenarios";
 import type { FundamentalDocumentResearch } from "@anatole/shared/fundamental-documents";
 import type { FundamentalCapitalResearch } from "@anatole/shared/fundamental-capital";
@@ -46,6 +45,15 @@ const snapshot: FundamentalSnapshot = {
 };
 
 describe("mobile Focus parity", () => {
+  it("selects available sector-aware measures without turning missing values into zero", () => {
+    const measure = (key: string, value: number | null) => ({ key, label_fr: key, label_en: key,
+      dimension: "profitability", unit: "money" as const, observations: value === null ? [] : [{ value }],
+      status: value === null ? "insufficient" : "available" });
+    const base = { sector_family: "mining", measures: [measure("net_income", null), measure("revenue", 10),
+      measure("operating_cash_flow", 8), measure("free_cash_flow", 0), measure("revenue_growth", 2), measure("other", 1)] } as unknown as FundamentalDiagnostic;
+    expect(selectOverviewMeasures(base).map(item => item.key)).toEqual(["revenue", "operating_cash_flow", "free_cash_flow", "revenue_growth"]);
+    expect(selectOverviewMeasures({ ...base, sector_family: "bank" }).map(item => item.key)).toEqual(["revenue_growth", "revenue", "operating_cash_flow", "free_cash_flow"]);
+  });
   it("keeps LIVE as the first mobile Focus period", () => {
     expect(focusPeriods[0]).toEqual({ label: "LIVE", range: "1d", interval: "1m" });
   });
@@ -65,27 +73,17 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Intelligence")).toBeTruthy();
     await fireEvent.press(view.getByText("Pro")); expect(onChange).toHaveBeenCalledWith("pro");
   });
-  it("nests Results and Analysts under Fundamentals", async () => {
+  it("offers four fundamental spaces and one explorer destination per data set", async () => {
     const onChange = jest.fn();
-    const view = await render(<MobileFocusFundamentalTabs view="portal" onChange={onChange} />);
-    expect(view.getByText("Intelligence 360°")).toBeTruthy();
-    await fireEvent.press(view.getByText(/Autres vues/));
-    expect(view.getByText("Résultats")).toBeTruthy();
-    expect(view.getByText("Analystes")).toBeTruthy();
-    expect(view.getByText("Diagnostic 360°")).toBeTruthy();
-    await fireEvent.press(view.getByText("Résultats"));
-    await fireEvent.press(view.getByText(/Autres vues/));
-    await fireEvent.press(view.getByText("Analystes"));
+    const view = await render(<MobileFocusFundamentalTabs view="diagnostic" onChange={onChange} />);
+    expect(view.getByText("Vue d’ensemble")).toBeTruthy();
+    expect(view.getByText("Comparer")).toBeTruthy();
+    expect(view.getByText("Simuler")).toBeTruthy();
+    await fireEvent.press(view.getByText("Explorer"));
     expect(onChange).toHaveBeenCalledWith("financials");
-    expect(onChange).toHaveBeenCalledWith("analysts");
-  });
-  it("opens the diagnostic from the eight-module native portal", async () => {
-    const onOpen = jest.fn();
-    const view = await render(<MobileFundamentalPortal ticker="RY" onOpen={onOpen} />);
-    expect(view.getByText("Anatole Fundamental Intelligence 360")).toBeTruthy();
-    expect(view.getByTestId("fundamental-portal-assistant")).toBeTruthy();
-    await fireEvent.press(view.getByTestId("fundamental-portal-diagnostic"));
-    expect(onOpen).toHaveBeenCalledWith("diagnostic");
+    const explorer = await render(<MobileFocusFundamentalTabs view="financials" onChange={onChange} />);
+    await fireEvent.press(explorer.getByText("Capital et consensus"));
+    expect(onChange).toHaveBeenCalledWith("capital");
   });
   it("renders sourced diagnostic values and switches all three native modes", async () => {
     const point = { value: 15, period_end: "2025-12-31T00:00:00Z", period_type: "annual" as const,
@@ -108,7 +106,8 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Marge publiée.")).toBeTruthy();
     expect(view.getByText(/Instantané périmé/)).toBeTruthy();
     expect(view.getByText("15 %")).toBeTruthy();
-    expect(view.getByText(/Issuer report/)).toBeTruthy();
+    await fireEvent.press(view.getByText(/Voir les analyses détaillées/));
+    expect(view.getAllByText(/Issuer report/).length).toBeGreaterThan(0);
     await fireEvent.press(view.getByText("Tableau"));
     expect(view.getByText("Dernière valeur")).toBeTruthy();
     await fireEvent.press(view.getByText("Graphiques"));
@@ -161,6 +160,7 @@ describe("mobile Focus parity", () => {
     const view = await render(<MobileFocusScenarios simulation={simulation} error={null} loading={false}
       onRetry={jest.fn()} onCalculate={onCalculate} />);
     expect(view.getByText(/Pas des prévisions\./)).toBeTruthy();
+    await fireEvent.press(view.getByText(/Personnaliser les hypothèses/));
     await fireEvent.press(view.getByText("Calculer les scénarios"));
     expect(onCalculate).toHaveBeenCalledWith(expect.objectContaining({ scenarios: expect.arrayContaining([
       expect.objectContaining({ key: "prudent", revenue_change_percent: -15 }),
@@ -204,6 +204,7 @@ describe("mobile Focus parity", () => {
         revision_history_reason_en: "No dated revision history." }, limitations_fr: ["Calcul illustratif."], limitations_en: ["Illustrative calculation."] };
     const view = await render(<MobileFocusCapital research={research} error={null} loading={false} onRetry={jest.fn()} />);
     expect(view.getByText("Aucun historique daté des révisions.")).toBeTruthy();
+    await fireEvent.press(view.getByText(/Historique financier et autres indicateurs/));
     await fireEvent.press(view.getByText("Tableau"));
     expect(view.getByText("Indicateur")).toBeTruthy();
     await fireEvent.press(view.getByText("Graphiques"));

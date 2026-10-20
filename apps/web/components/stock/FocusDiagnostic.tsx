@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
-import type { FundamentalDiagnostic, FundamentalMeasure, FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
+import { selectOverviewMeasures, type FundamentalDiagnostic, type FundamentalMeasure, type FundamentalObservation } from "@anatole/shared/fundamental-intelligence";
 import { formatFinancialNumber } from "@anatole/shared/financial-display";
 import { getFundamentalDiagnostic } from "@/lib/api";
 import { pick } from "@/lib/i18n";
@@ -73,6 +73,7 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
   const [data, setData] = useState<FundamentalDiagnostic | null>(null);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(focusSection === "sector");
   useEffect(() => {
     const controller = new AbortController();
     void getFundamentalDiagnostic(ticker, controller.signal).then(value => {
@@ -90,48 +91,35 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
     {error ? <button type="button" onClick={() => { setError(false); setRetry(value => value + 1); }}>{tr(language, "Réessayer", "Retry")}</button> : null}
   </section>;
   const measures = new Map(current.measures.map(item => [item.key, item]));
-  const overviewGroups = [
-    { key: "profitability", fr: "Rentabilité", en: "Profitability", keys: ["profitability"], icon: "Activity" },
-    { key: "financial_strength", fr: "Solidité financière", en: "Financial strength", keys: ["liquidity", "leverage"], icon: "ShieldCheck" },
-    { key: "earnings_quality", fr: "Qualité des bénéfices", en: "Earnings quality", keys: ["earnings_quality", "cash_flow"], icon: "BarChart3" },
-    { key: "growth", fr: "Croissance", en: "Growth", keys: ["growth"], icon: "TrendingUp" },
-  ] as const;
+  const essentials = selectOverviewMeasures(current);
+  const chartMeasure = essentials.find(item => item.observations.length >= 2);
+  const chartPoints = chartMeasure ? [...chartMeasure.observations].sort((a, b) => a.period_end.localeCompare(b.period_end)) : [];
   const availableSector = (current.sector_metrics ?? []).filter(item => item.value !== null && item.status === "available");
   const missingSector = (current.sector_metrics ?? []).filter(item => item.value === null || item.status !== "available");
   return <section className="fd-panel" aria-label={tr(language, "Diagnostic financier 360°", "Financial diagnostic 360°")}>
     <header><span className="eyebrow">FUNDAMENTAL INTELLIGENCE 360</span>
       <h2>{tr(language, "Diagnostic financier 360°", "Financial diagnostic 360°")}</h2>
-      <p>{current.name} · {current.financial_currency ?? tr(language, "devise N/D", "currency N/A")}</p>
+      <p>{current.name} · {current.ticker} · {essentials[0]?.observations[0]?.period_end.slice(0, 10) ?? tr(language, "période indisponible", "period unavailable")}</p>
       {current.stale ? <p role="status">{tr(language, "Dernier instantané disponible; actualisation en cours ou différée.",
         "Latest available snapshot; refresh in progress or delayed.")}</p> : null}
-      <p className="fd-muted">{language === "fr" ? current.methodology_fr : current.methodology_en}</p>
     </header>
-    <div className="fd-overviewGrid" aria-label={tr(language, "Dimensions du diagnostic", "Diagnostic dimensions")}>
-      {overviewGroups.map(group => {
-        const dimensions = current.dimensions.filter(item => (group.keys as readonly string[]).includes(item.key));
-        const coverage = dimensions.reduce((total, item) => total + item.available_count, 0);
-        const possible = dimensions.reduce((total, item) => total + item.measure_keys.length, 0);
-        const first = dimensions[0];
-        return <article key={group.key} className="fd-overviewCard">
-          <div className="fd-cardTop"><span className="fd-cardIcon"><FocusGlyph name={group.icon} size={21} /></span><span className="fd-coverage">{coverage}/{possible} {tr(language, "indicateurs", "measures")}</span></div>
-          <strong>{tr(language, group.fr, group.en)}</strong>
-          {dimensions.length ? dimensions.map(dimension => {
-            const scored = dimension.score_status === "directional" && dimension.score !== null && Number.isFinite(dimension.score);
-            return <div key={dimension.key} className="fd-subdimension">
-              {dimensions.length > 1 ? <span className="fd-subdimensionName">{language === "fr" ? dimension.label_fr : dimension.label_en}</span> : null}
-              {scored ? <div className="fd-scoreRow"><span className="fd-scoreRing" style={{ "--score": `${Math.min(100, Math.max(0, dimension.score!))}%` } as CSSProperties}><b>{Math.round(dimension.score!)}</b></span>
-                <span>{tr(language, "Indice de direction historique", "Historical direction index")}</span></div>
-                : <div className="fd-unavailable"><FocusGlyph name="CircleHelp" size={18} /><span>{tr(language, dimension.score_status === "not_applicable" ? "Non applicable" : "Données insuffisantes", dimension.score_status === "not_applicable" ? "Not applicable" : "Insufficient data")}</span></div>}
-              <span className="fd-cardExplanation">{language === "fr" ? dimension.explanation_fr : dimension.explanation_en}</span>
-            </div>;
-          }) : <div className="fd-unavailable"><FocusGlyph name="CircleHelp" size={18} /><span>{tr(language, "Données insuffisantes dans cet instantané", "Insufficient data in this snapshot")}</span></div>}
-          {first ? <a className="fd-cardAction" href={`#diagnostic-dimension-${first.key}`}>{tr(language, "Voir les calculs détaillés →", "View detailed calculations →")}</a> : null}
-        </article>;
-      })}
-    </div>
+    {essentials.length ? <div className="fd-overviewGrid" aria-label={tr(language, "Indicateurs essentiels", "Key measures")}>
+      {essentials.map(measure => <article key={measure.key} className="fd-overviewCard">
+        <strong>{language === "fr" ? measure.label_fr : measure.label_en}</strong>
+        <span className="fd-value">{valueText(measure.observations[0], language)}</span>
+        <span className="fd-muted">{measure.observations[0]?.period_end.slice(0, 10)}</span>
+        <a href={`#fundamental-metric-${measure.key}`} onClick={() => setDetailsOpen(true)}>{tr(language, "Voir la source et la méthode", "View source and method")}</a>
+      </article>)}
+    </div> : <p>{tr(language, "Données insuffisantes.", "Insufficient data.")}</p>}
+    {chartMeasure ? <FocusSeriesChart storageKey="diagnostic.overview" title={language === "fr" ? chartMeasure.label_fr : chartMeasure.label_en}
+      periods={chartPoints.map(point => point.period_end.slice(0, 10))} periodSources={chartPoints.map(point => point.source_name)}
+      periodCurrencies={chartMeasure.unit === "money" ? chartPoints.map(point => point.currency) : undefined}
+      series={[{ id: chartMeasure.key, label: language === "fr" ? chartMeasure.label_fr : chartMeasure.label_en, values: chartPoints.map(point => point.value) }]}
+      unit={chartMeasure.unit === "ratio" ? "number" : chartMeasure.unit} currency={chartPoints[0]?.currency ?? ""} language={language}
+      source={chartPoints[chartPoints.length - 1]?.source_name ?? ""} /> : null}
     {current.findings.length ? <div className="fd-findings">
       <h3>{tr(language, "Constats fondés sur les données", "Data-backed findings")}</h3>
-      <div className="fd-findingGrid">{current.findings.map((finding, index) => {
+      <div className="fd-findingGrid">{current.findings.slice(0, 4).map((finding, index) => {
         const icon = finding.kind === "strength" ? "ArrowUpRight" : finding.kind === "vulnerability" ? "ArrowDownRight" : "AlertTriangle";
         return <article key={`${finding.kind}-${index}`} className="fd-findingCard" data-kind={finding.kind}>
           <div className="fd-findingHead"><FocusGlyph name={icon} size={19} /><strong>{tr(language,
@@ -139,16 +127,18 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
             finding.kind === "strength" ? "Strength" : finding.kind === "vulnerability" ? "Watch point" : "Observation")}</strong></div>
           <p>{language === "fr" ? finding.text_fr : finding.text_en}</p>
           {finding.measure_keys.length ? <details><summary>{tr(language, "Indicateurs et sources", "Measures and sources")}</summary>
-            {finding.measure_keys.map(key => <a key={key} href={`#fundamental-metric-${key}`}>
+            {finding.measure_keys.map(key => <a key={key} href={`#fundamental-metric-${key}`} onClick={() => setDetailsOpen(true)}>
               {language === "fr" ? measures.get(key)?.label_fr ?? key : measures.get(key)?.label_en ?? key}</a>)}
           </details> : null}
         </article>;
       })}</div>
     </div> : null}
+    <details className="fd-dimension" open={detailsOpen} onToggle={event => setDetailsOpen(event.currentTarget.open)}><summary>{tr(language, "Détails, sources et méthodes", "Details, sources and methods")}</summary>
+    <p className="fd-muted">{language === "fr" ? current.methodology_fr : current.methodology_en}</p>
     {(current.sector_metrics ?? []).length ? <section id="diagnostic-sector" className="fd-dimension">
       <h3><FocusGlyph name="Landmark" size={20} />{tr(language, "Indicateurs propres au secteur", "Sector-specific metrics")}</h3>
-      <p className="fd-muted">{tr(language, "Uniquement les valeurs explicitement présentes dans une publication officielle sont affichées.",
-        "Only values explicitly present in an official publication are shown.")}</p>
+      <p className="fd-muted">{tr(language, "Valeurs publiées dans des sources officielles.",
+        "Values published by official sources.")}</p>
       {availableSector.length ? <div className="fd-cards">{availableSector.map(item => <div className="fd-measure" key={item.key}>
         <strong>{language === "fr" ? item.label_fr : item.label_en}</strong>
         <span className="fd-value">{formatFinancialNumber(item.value, { language, unit: item.unit === "percent" || item.unit === "ratio" ? item.unit : "plain" })} {item.unit === "percent" || item.unit === "ratio" ? "" : item.unit}</span>
@@ -157,7 +147,7 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
           : <span className="fd-muted">{tr(language, "Publication officielle non disponible", "Official publication unavailable")}</span>}
       </div>)}</div> : null}
       {missingSector.length ? <details className="fd-missingSector"><summary>{tr(language, `${missingSector.length} indicateur${missingSector.length > 1 ? "s" : ""} sans publication vérifiable`, `${missingSector.length} metric${missingSector.length > 1 ? "s" : ""} without a verifiable publication`)}</summary>
-        <p>{tr(language, "Aucune valeur vérifiable avec unité compatible dans l’instantané courant. Aucune valeur n’est estimée.", "No verifiable value with a compatible unit in the current snapshot. No value is estimated.")}</p>
+        <p>{tr(language, "Aucune valeur vérifiable; aucune estimation ajoutée.", "No verified value; no estimated replacement.")}</p>
         <ul>{missingSector.map(item => <li key={item.key}>{language === "fr" ? item.label_fr : item.label_en}</li>)}</ul>
       </details> : null}
     </section> : null}
@@ -184,8 +174,10 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
           return item ? <MeasureDetails key={key} measure={item} language={language} /> : null; })}
       </div> : null}
     </section>)}
-    {current.missing_data.length ? <section className="fd-dimension"><h3>{tr(language, "Données manquantes", "Missing data")}</h3>
+    {current.missing_data.length || missingSector.length ? <section className="fd-dimension"><h3>{tr(language, "Données non disponibles", "Unavailable data")}</h3>
+      <p>{current.missing_data.length + missingSector.length} {tr(language, "éléments à vérifier", "items to review")}</p>
       <ul>{current.missing_data.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></section> : null}
+    </details>
     <p className="fd-muted">{tr(language, "Aucun score global ni recommandation d’achat ou de vente.", "No global score or buy/sell recommendation.")}</p>
   </section>;
 }

@@ -1,50 +1,27 @@
 import { test, expect } from "@playwright/test";
 
-test("Focus keeps analyst snapshot while refreshing and uses compact empty state", async ({ page }) => {
-  const analysts = Object.fromEntries([
-    "recommendation_key", "recommendation_mean", "analyst_count", "target_low", "target_mean",
-    "target_median", "target_high", "current_price", "upside_to_mean_percent", "strong_buy", "buy", "hold", "sell", "strong_sell",
-  ].map(key => [key, null]));
-  const snapshot = { ticker: "RY.TO", symbol: "RY", name: "Royal Bank fixture", currency: "CAD",
-    financial_currency: "CAD", sector: "Financials", industry: "Bank", status: "partial", message: null,
-    metrics: {}, annual_financials: [], quarterly_financials: [], ttm: {}, highlights: {},
-    earnings_history: [], earnings_estimates: [], analysts,
-    events: { earnings_dates: [], ex_dividend_date: null, dividend_date: null },
-    official_coverage: {}, source: "Deterministic test fixture", generated_at: new Date().toISOString(),
-    refresh_in_progress: false, refresh_after_seconds: 1800 };
-  let blocked = false;
-  let release!: () => void;
-  let consensus = false;
-  let fail = false;
-  await page.route("**/stocks/RY/fundamentals", async route => {
-    if (fail) { await route.fulfill({ status: 503, body: "offline" }); return; }
-    if (blocked) await new Promise<void>(resolve => { release = resolve; });
-    await route.fulfill({ json: { ...snapshot, analysts: consensus ? { ...analysts, target_mean: 42, analyst_count: 5 } : analysts } });
-  });
-  await page.goto("/focus/RY");
-  await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
-  await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("analysts");
-  await expect(page.getByText("Consensus analystes temporairement indisponible.", { exact: true })).toBeVisible();
-  await expect(page.getByText("Répartition des recommandations", { exact: true })).toHaveCount(0);
-  consensus = true;
-  const refresh = page.getByRole("button", { name: "Actualiser", exact: true });
-  await refresh.click();
-  await page.getByRole("group", { name: "Mode du consensus analystes" })
-    .getByRole("button", { name: "Vue cartes" }).click();
-  await expect(page.getByText("Répartition des recommandations", { exact: true })).toBeVisible();
-  blocked = true;
-  await refresh.click();
-  await expect(refresh).toBeDisabled();
-  await expect(page.getByText("Royal Bank fixture", { exact: true })).toBeVisible();
-  await expect(page.getByText("Répartition des recommandations", { exact: true })).toBeVisible();
-  await expect(page.getByText("Chargement des données fondamentales…", { exact: true })).toHaveCount(0);
-  await expect.poll(() => Boolean(release)).toBe(true);
-  release();
-  await expect(refresh).toBeEnabled();
-  blocked = false;
-  fail = true;
-  await refresh.click();
-  await expect(page.getByRole("status").filter({ hasText: "Dernières données disponibles" })).toBeVisible();
-  await expect(page.getByText("Répartition des recommandations", { exact: true })).toBeVisible();
+test("Legacy analyst and capital links reach the same sourced consensus", async ({ page }) => {
+  let available = false;
+  await page.route("**/stocks/RY/fundamental-intelligence/capital", route => route.fulfill({ json: {
+    ticker: "RY.TO", status: "partial", financial_currency: "CAD", stale: false, periods: [],
+    analysts: { status: available ? "partial" : "unavailable", as_of: "2026-10-12T00:00:00Z",
+      source_name: "Verified analyst fixture", source_confidence: "secondary_snapshot",
+      recommendation_key: available ? "hold" : null,
+      distribution: available ? { strong_buy: 1, buy: 2, hold: 5, sell: 0, strong_sell: 0 }
+        : { strong_buy: null, buy: null, hold: null, sell: null, strong_sell: null },
+      target_low: null, target_mean: available ? 42 : null, target_median: null, target_high: null,
+      target_currency: "CAD", estimates: [], actual_vs_consensus: [], revision_history_status: "unavailable",
+      revision_history_reason_fr: "Aucun historique daté des révisions.", revision_history_reason_en: "No dated revisions." },
+    limitations_fr: [], limitations_en: [],
+  } }));
+  await page.goto("/focus/RY?view=analysts");
+  const explorer = page.getByRole("combobox", { name: "Contenu à explorer" });
+  await expect(explorer).toHaveValue("capital");
+  await expect(page.getByText("Consensus indisponible.")).toBeVisible();
+  available = true;
+  await page.goto("/focus/RY?view=capital");
+  await expect(explorer).toHaveValue("capital");
+  await expect(page.getByText("Conserver", { exact: true })).toBeVisible();
+  await expect(page.getByText("42", { exact: true })).toBeVisible();
+  await expect(page.getByText("Aucun historique daté des révisions.")).toBeVisible();
 });

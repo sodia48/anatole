@@ -7,7 +7,6 @@ import {
   useMemo,
   useReducer,
   useState,
-  type ReactNode,
 } from "react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
@@ -92,15 +91,21 @@ const SECTIONS: Array<{ id: Section; fr: string; en: string }> = [
 
   { id: "ecosystem", fr: "Écosystème", en: "Ecosystem" },
 ];
+const RESEARCH_SPACES = [
+  { id: "diagnostic", fr: "Vue d’ensemble", en: "Overview" },
+  { id: "peers", fr: "Comparer", en: "Compare" },
+  { id: "scenarios", fr: "Simuler", en: "Simulate" },
+  { id: "financials", fr: "Explorer", en: "Explore" },
+] as const;
 
-export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView, initialDiagnosticSection, portal }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts"; initialDiagnosticSection?: "sector"; portal?: ReactNode }) {
+export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView, initialDiagnosticSection }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts"; initialDiagnosticSection?: "sector" }) {
   const { preferences, updatePreferences } = usePreferences();
   const { user, refreshAccount } = useAccount();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
   const [section, setSection] = useState<Section>(embedded ? "chart" : initialFundamentalView ? "fundamentals" : "overview");
-  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "portal" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView ?? "portal");
-  const [diagnosticSection, setDiagnosticSection] = useState<"sector" | undefined>(initialDiagnosticSection);
+  const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView === "analysts" ? "capital" : initialFundamentalView ?? "diagnostic");
+  const diagnosticSection = initialDiagnosticSection;
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
   const [layouts, setLayouts] = useState<FocusLayout[]>([]);
@@ -394,6 +399,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
       detail: `${trade.side.toUpperCase()} ${trade.quantity} @ ${trade.price.toFixed(2)} CAD · PAPER`,
       source: "PAPER",
     }));
+  const activeResearchSpace = fundamentalView === "diagnostic" || fundamentalView === "peers" || fundamentalView === "scenarios" ? fundamentalView : "financials";
 
   return (
     <div className="focus-page" data-focus-embedded={embedded ? "true" : "false"} data-focus-ready={clientReady ? "true" : "false"}>
@@ -404,25 +410,23 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
           {section === "overview" ? (
             <FocusRangeChart ticker={ticker} initialSnapshot={initialSnapshot} language={language} />
           ) : null}
-          {section === "fundamentals" ? <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className="fp-fundamentalSubtabs">
-            <button type="button" className="fp-tabButton" aria-pressed={fundamentalView === "portal"} onClick={() => setFundamentalView("portal")}>{pick(language, "Intelligence 360°", "Intelligence 360°")}</button>
-            <button type="button" className="fp-tabButton" aria-pressed={fundamentalView === "fundamentals"} onClick={() => setFundamentalView("fundamentals")}>{pick(language, "Synthèse", "Overview")}</button>
-            <label className="fp-modulePicker">{pick(language, "Accès direct", "Quick access")}
-              <select aria-label={pick(language, "Ouvrir un module", "Open a module")} value={fundamentalView === "portal" || fundamentalView === "fundamentals" ? "" : fundamentalView}
-                onChange={event => { setDiagnosticSection(undefined); setFundamentalView(event.target.value as typeof fundamentalView); }}>
-                <option value="">{pick(language, "Choisir un module", "Choose a module")}</option>
-                <option value="diagnostic">{pick(language, "Diagnostic 360°", "360° diagnostic")}</option>
-                <option value="peers">{pick(language, "Comparateur sectoriel", "Sector comparison")}</option>
-                <option value="scenarios">{pick(language, "Simulateur", "Simulator")}</option>
-                <option value="documents">{pick(language, "Analyse documentaire", "Document research")}</option>
-                <option value="capital">{pick(language, "Capital", "Capital")}</option>
-                <option value="financials">{pick(language, "Résultats", "Financials")}</option>
-                <option value="analysts">{pick(language, "Analystes", "Analysts")}</option>
+          {section === "fundamentals" ? <>
+            <nav aria-label={pick(language, "Vues fondamentales", "Fundamental views")} className="fp-fundamentalSubtabs">
+              {RESEARCH_SPACES.map(space => <button key={space.id} type="button" className="fp-tabButton" aria-pressed={activeResearchSpace === space.id}
+                onClick={() => setFundamentalView(space.id)}>{pick(language, space.fr, space.en)}</button>)}
+            </nav>
+            {activeResearchSpace === "financials" ? <label className="fp-modulePicker">{pick(language, "Contenu à explorer", "Explore content")}
+              <select aria-label={pick(language, "Contenu à explorer", "Explore content")} value={fundamentalView}
+                onChange={event => setFundamentalView(event.target.value as typeof fundamentalView)}>
+                <option value="financials">{pick(language, "États financiers", "Financial statements")}</option>
+                <option value="capital">{pick(language, "Capital et consensus", "Capital and consensus")}</option>
+                <option value="documents">{pick(language, "Documents officiels", "Official documents")}</option>
+                <option value="fundamentals">{pick(language, "Métriques avancées", "Advanced metrics")}</option>
               </select>
-            </label>
-          </nav> : null}
-          {section === "fundamentals" && fundamentalView === "portal" ? portal
-            : section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} focusSection={diagnosticSection} />
+            </label> : null}
+            <div className="fp-inlineActions"><Link className="fp-button" href={`/alertes?symbol=${encodeURIComponent(ticker)}`}>{pick(language, "Créer une alerte", "Create an alert")}</Link><Link className="fp-button" href={`/assistant?symbol=${encodeURIComponent(ticker)}&surface=stock`}>{pick(language, "Interroger Anatole", "Ask Anatole")}</Link></div>
+          </> : null}
+          {section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} focusSection={diagnosticSection} />
             : section === "fundamentals" && fundamentalView === "peers" ? <FocusPeers key={ticker} ticker={ticker} />
               : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} />
                 : section === "fundamentals" && fundamentalView === "documents" ? <FocusDocuments key={ticker} ticker={ticker} />
