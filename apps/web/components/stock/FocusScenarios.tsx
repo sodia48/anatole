@@ -12,7 +12,7 @@ import styles from "./FocusScenarios.module.css";
 
 const tr = pick;
 
-const modes = ["table", "cards", "charts"] as const;
+const modes = ["cards", "table", "charts"] as const;
 type Language = "fr" | "en";
 type MetricKey = "revenue" | "operating_income" | "net_income" | "operating_cash_flow" | "free_cash_flow" | "operating_margin" | "free_cash_flow_margin";
 const metrics: { key: MetricKey; fr: string; en: string }[] = [
@@ -85,29 +85,6 @@ export function FocusScenarios({ ticker }: { ticker: string }) {
     <header><span className="eyebrow">FUNDAMENTAL INTELLIGENCE 360</span><h2>{tr(language, "Simulateur et valorisation", "Scenario simulator and valuation")}</h2>
       <p>{tr(language, "Hypothèses illustratives modifiables; aucun résultat n'est un cours certain.",
         "Editable illustrative assumptions; no result is a certain market price.")}</p></header>
-    <form onSubmit={calculate} className={styles.form}>
-      {defaultScenarioRequest.scenarios.map(defaults => <fieldset key={defaults.key}>
-        <legend>{tr(language, labels[defaults.key].fr, labels[defaults.key].en)}</legend>
-        {fields.map(field => <label key={field.key}>{tr(language, field.fr, field.en)}
-          <input type="number" name={`${defaults.key}_${field.key}`} min={field.min} max={field.max} step="0.1" required defaultValue={defaults[field.key] ?? 0} /></label>)}
-        {current?.sector_family === "mining" ? <>
-          <label>{tr(language, "Variation du prix de la matière première (%)", "Commodity price change (%)")}
-            <input type="number" name={`${defaults.key}_commodity_price_change_percent`} min={-80} max={200} step="0.1" defaultValue="0" required /></label>
-          <label>{tr(language, "Part des revenus exposée (%)", "Exposed revenue share (%)")}
-            <input type="number" name={`${defaults.key}_commodity_revenue_exposure_percent`} min={0} max={100} step="0.1" defaultValue="0" required /></label>
-        </> : null}
-      </fieldset>)}
-      <fieldset><legend>{tr(language, "Valorisation DCF conditionnelle", "Conditional DCF valuation")}</legend>
-        <label><input type="checkbox" checked={dcfEnabled} onChange={event => setDcfEnabled(event.target.checked)} />
-          {tr(language, "Saisir mes taux et calculer la DCF", "Enter my rates and calculate DCF")}</label>
-        {dcfEnabled ? <div className={styles.rates}>
-          <label>{tr(language, "Taux d'actualisation (%)", "Discount rate (%)")}<input type="number" name="discount_rate_percent" min={2} max={30} step="0.1" required defaultValue="10" /></label>
-          <label>{tr(language, "Croissance terminale (%)", "Terminal growth (%)")}<input type="number" name="terminal_growth_percent" min={-5} max={8} step="0.1" required defaultValue="2" /></label>
-          <label>{tr(language, "Croissance des flux projetés (%)", "Projected cash-flow growth (%)")}<input type="number" name="forecast_fcf_growth_percent" min={-20} max={25} step="0.1" required defaultValue="3" /></label>
-        </div> : null}
-      </fieldset>
-      <button type="submit" disabled={loading}>{tr(language, "Calculer les scénarios", "Calculate scenarios")}</button>
-    </form>
     {loading ? <p role="status">{tr(language, "Calcul des sensibilités…", "Calculating sensitivities…")}</p> : null}
     {error ? <p role="alert">{tr(language, "Hypothèses invalides ou simulation indisponible.", "Invalid assumptions or simulation unavailable.")}</p> : null}
     {current ? <>
@@ -149,5 +126,30 @@ export function FocusScenarios({ ticker }: { ticker: string }) {
         {current.outcomes.map(item => item.dcf.reason ? <p key={item.key}>DCF {tr(language, labels[item.key].fr, labels[item.key].en)} : {scenarioDcfReason(item.dcf.reason, language)}</p> : null)}
       </div>
     </> : null}
+    <details className={styles.assumptions}><summary>{tr(language, "Personnaliser les hypothèses", "Customize assumptions")}</summary>
+    <form onSubmit={calculate} className={styles.form}>
+      {defaultScenarioRequest.scenarios.map(defaults => <fieldset key={defaults.key}>
+        <legend>{tr(language, labels[defaults.key].fr, labels[defaults.key].en)}</legend>
+        {fields.map(field => <label key={field.key}>{tr(language, field.fr, field.en)}
+          <input type="number" name={`${defaults.key}_${field.key}`} min={field.min} max={field.max} step="0.1" required defaultValue={defaults[field.key] ?? 0} /></label>)}
+        {current?.sector_family === "mining" ? <>
+          <label>{tr(language, "Variation du prix de la matière première (%)", "Commodity price change (%)")}
+            <input type="number" name={`${defaults.key}_commodity_price_change_percent`} min={-80} max={200} step="0.1" defaultValue="0" required /></label>
+          <label>{tr(language, "Part des revenus exposée (%)", "Exposed revenue share (%)")}
+            <input type="number" name={`${defaults.key}_commodity_revenue_exposure_percent`} min={0} max={100} step="0.1" defaultValue="0" required /></label>
+        </> : null}
+      </fieldset>)}
+      <fieldset><legend>{tr(language, "Valorisation DCF conditionnelle", "Conditional DCF valuation")}</legend>
+        <label><input type="checkbox" checked={dcfEnabled} onChange={event => setDcfEnabled(event.target.checked)} />
+          {tr(language, "Saisir mes taux et calculer la DCF", "Enter my rates and calculate DCF")}</label>
+        {dcfEnabled ? <div className={styles.rates}>
+          <label>{tr(language, "Taux d'actualisation (%)", "Discount rate (%)")}<input type="number" name="discount_rate_percent" min={2} max={30} step="0.1" required defaultValue="10" /></label>
+          <label>{tr(language, "Croissance terminale (%)", "Terminal growth (%)")}<input type="number" name="terminal_growth_percent" min={-5} max={8} step="0.1" required defaultValue="2" /></label>
+          <label>{tr(language, "Croissance des flux projetés (%)", "Projected cash-flow growth (%)")}<input type="number" name="forecast_fcf_growth_percent" min={-20} max={25} step="0.1" required defaultValue="3" /></label>
+        </div> : null}
+      </fieldset>
+      <button type="submit" disabled={loading}>{tr(language, "Calculer les scénarios", "Calculate scenarios")}</button>
+    </form>
+    </details>
   </section>;
 }

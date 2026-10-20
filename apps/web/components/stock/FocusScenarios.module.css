@@ -2,6 +2,9 @@
 .panel h2, .panel h3 { margin: 0 0 8px; }
 .muted { color: var(--text-secondary); font-size: 13px; }
 .form, .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.assumptions { padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
+.assumptions summary { font-size: 14px; font-weight: 700; }
+.assumptions[open] > form { margin-top: 16px; }
 .form fieldset, .metrics, .card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
 .form legend, .metrics legend { font-weight: 700; }
 .form label { display: grid; gap: 4px; margin: 7px 0; font-size: 13px; }

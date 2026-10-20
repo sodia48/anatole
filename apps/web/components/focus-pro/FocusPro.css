@@ -577,7 +577,7 @@
   }
 }
 
-/* Focus: results and analysts are subviews of Fundamentals. */
+/* Four research spaces; the Explorer selector appears only inside Explorer. */
 .fp-fundamentalSubtabs {
   display: flex;
   flex-wrap: wrap;
@@ -592,7 +592,7 @@
 }
 .fp-modulePicker { display: flex; align-items: center; gap: 8px; margin-left: auto; color: var(--text-secondary); font-size: 12px; }
 .fp-modulePicker select { min-height: 44px; max-width: 230px; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); font: inherit; }
-@media (max-width: 640px) { .fp-modulePicker { width: 100%; margin-left: 0; justify-content: space-between; } .fp-modulePicker select { max-width: 60%; } }
+@media (max-width: 640px) { .fp-fundamentalSubtabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .fp-modulePicker { width: 100%; margin-left: 0; justify-content: space-between; } .fp-modulePicker select { max-width: 60%; } }
 /* Focus tabs: selected state comes from aria-pressed (no JS class condition). */
 .fp-bottomTabs .fp-tabButton[aria-pressed="true"],
 .fp-fundamentalSubtabs .fp-tabButton[aria-pressed="true"] {

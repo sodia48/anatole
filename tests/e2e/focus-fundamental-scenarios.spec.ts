@@ -34,10 +34,11 @@ test("Focus scenarios separate editable assumptions, sourced results and conditi
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("scenarios");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Simuler" }).click();
   const panel = page.getByRole("region", { name: "Simulateur fondamental" });
   await expect(panel.getByText(/Sensibilités illustratives, pas des prévisions/)).toBeVisible();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ })).toHaveAttribute("href", "https://issuer.example/report.pdf");
+  await panel.getByText("Personnaliser les hypothèses").click();
   await panel.getByRole("group", { name: "Prudent" }).getByRole("spinbutton", { name: "Variation des revenus (%)" }).fill("-20");
   await panel.getByRole("checkbox", { name: "Saisir mes taux et calculer la DCF" }).check();
   await panel.getByRole("button", { name: "Calculer les scénarios" }).click();

@@ -3,13 +3,11 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { AppState, InteractionManager, Pressable, Text, View } from "react-native";
 import { MobileFocusActions } from "@/src/components/focus/MobileFocusActions";
-import { MobileFocusAnalysts } from "@/src/components/focus/MobileFocusAnalysts";
 import { MobileFocusEcosystem } from "@/src/components/focus/MobileFocusEcosystem";
 import { MobileFocusDiagnostic } from "@/src/components/focus/MobileFocusDiagnostic";
 import { MobileFocusFinancials } from "@/src/components/focus/MobileFocusFinancials";
 import { MobileFocusFundamentals } from "@/src/components/focus/MobileFocusFundamentals";
 import { MobileFocusFundamentalTabs, type MobileFundamentalView } from "@/src/components/focus/MobileFocusFundamentalTabs";
-import { MobileFundamentalPortal } from "@/src/components/focus/MobileFundamentalPortal";
 import { MobileFocusHeader } from "@/src/components/focus/MobileFocusHeader";
 import { MobileFocusInsights } from "@/src/components/focus/MobileFocusInsights";
 import { MobileFocusNavigation, type MobileFocusSection } from "@/src/components/focus/MobileFocusNavigation";
@@ -33,12 +31,14 @@ import { defaultScenarioRequest, type ScenarioRequest } from "@anatole/shared/fu
 
 export default function StockDetailScreen() {
   useMobileTheme();
-  const params = useLocalSearchParams<{ ticker: string }>();
+  const params = useLocalSearchParams<{ ticker: string; view?: string }>();
   const ticker = normalizeTicker(String(params.ticker ?? "RY"));
   const { language, pick } = useLocale();
   const { workspace, saveWorkspace } = useMobileAccount();
-  const [section, setSection] = useState<MobileFocusSection>("overview");
-  const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>("portal");
+  const initialResearchView = (["diagnostic", "sector", "peers", "scenarios", "documents", "capital", "financials", "analysts", "fundamentals"] as string[]).includes(params.view ?? "")
+    ? params.view : undefined;
+  const [section, setSection] = useState<MobileFocusSection>(initialResearchView ? "fundamentals" : "overview");
+  const [fundamentalView, setFundamentalView] = useState<MobileFundamentalView>(initialResearchView === "sector" ? "diagnostic" : initialResearchView === "analysts" ? "capital" : initialResearchView as MobileFundamentalView ?? "diagnostic");
   const [peerSelection, setPeerSelection] = useState<string[] | undefined>(undefined);
   const [scenarioRequest, setScenarioRequest] = useState<ScenarioRequest>(defaultScenarioRequest);
   const [documentQuery, setDocumentQuery] = useState("");
@@ -93,7 +93,6 @@ export default function StockDetailScreen() {
       {section === "pro" || preloadedProTicker === ticker ? <View pointerEvents={section === "pro" ? "auto" : "none"} style={section === "pro" ? styles.proVisible : styles.proPreloaded} testID="focus-pro-persistent"><MobileFocusPro key={ticker} onOpenClassic={() => setSection("overview")} ticker={ticker} /></View> : null}
       {section === "fundamentals" ? <>
         <MobileFocusFundamentalTabs view={fundamentalView} onChange={setFundamentalView} />
-        {fundamentalView === "portal" ? <MobileFundamentalPortal ticker={ticker} onOpen={setFundamentalView} /> : null}
         {fundamentalView === "diagnostic" ? <MobileFocusDiagnostic diagnostic={diagnostic.data} error={!diagnostic.data ? diagnostic.error : null} loading={diagnostic.isLoading} onRetry={() => void diagnostic.refetch()} /> : null}
         {fundamentalView === "peers" ? <MobileFocusPeers comparison={peers.data} error={peers.error} loading={peers.isFetching} onRetry={() => void peers.refetch()} selection={peerSelection} onSelect={setPeerSelection} /> : null}
         {fundamentalView === "scenarios" ? <MobileFocusScenarios simulation={scenarios.data} error={!scenarios.data ? scenarios.error : null} loading={scenarios.isLoading} onRetry={() => void scenarios.refetch()} onCalculate={setScenarioRequest} /> : null}
@@ -101,7 +100,6 @@ export default function StockDetailScreen() {
         {fundamentalView === "capital" ? <MobileFocusCapital research={capital.data} error={!capital.data ? capital.error : null} loading={capital.isLoading} onRetry={() => void capital.refetch()} /> : null}
         {fundamentalView === "fundamentals" ? <MobileFocusFundamentals error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
         {fundamentalView === "financials" ? <MobileFocusFinancials error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
-        {fundamentalView === "analysts" ? <MobileFocusAnalysts error={!fundamentals.data ? fundamentals.error : null} loading={fundamentals.isLoading} onRetry={() => void fundamentals.refetch()} snapshot={fundamentals.data} /> : null}
       </> : null}
 
 

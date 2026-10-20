@@ -24,7 +24,8 @@ test("Focus official reports show exact passages, verified pages and bounded com
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("documents");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("documents");
   const panel = page.getByRole("region", { name: "Recherche dans les rapports officiels" });
   await expect(panel.getByText("Revenue increased to 100 CAD in the annual period.").first()).toBeVisible();
   await expect(panel.getByRole("link", { name: /Annual report 2025 · page 3/ }).first()).toHaveAttribute("href", "https://issuer.example/annual-2025.pdf#page=3");

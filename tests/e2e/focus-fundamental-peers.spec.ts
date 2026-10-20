@@ -28,7 +28,7 @@ test("Focus peers explain coverage, preserve provenance and allow replacement", 
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("peers");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Comparer" }).click();
   const panel = page.getByRole("region", { name: "Comparateur sectoriel" });
   await panel.getByRole("group", { name: "Mode des comparaisons" }).getByRole("button", { name: "Vue cartes" }).click();
   await expect(panel.getByText("Médiane indisponible : échantillon insuffisant.").first()).toBeVisible();
@@ -36,7 +36,7 @@ test("Focus peers explain coverage, preserve provenance and allow replacement", 
   await testInfo.attach("comparateur-cartes", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByText("Voir les sources et valeurs exactes").click();
   await expect(panel.getByRole("link", { name: /Issuer annual report/ }).first()).toHaveAttribute("href", "https://issuer.example/RY.pdf");
-  await panel.getByText("Choisir ou remplacer les sociétés").click();
+  await panel.getByText(/Recherche et filtres avancés/).click();
   await panel.getByRole("button", { name: /BMO · Bank of Montreal/ }).click();
   await expect.poll(() => requested.some(url => url.includes("TD%2CBMO"))).toBe(true);
   await expect(panel.getByText(/Pairs admissibles/)).toContainText("TD");

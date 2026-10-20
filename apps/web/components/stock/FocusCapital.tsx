@@ -77,6 +77,7 @@ export function FocusCapital({ ticker }: { ticker: string }) {
           </article>;
         })}</div>
         <p className={styles.muted}>{tr(language, "Données financières", "Financial data")} · {latest?.period_end.slice(0, 4)} · {tr(language, "sources par exercice", "sources by fiscal year")}</p>
+        <details><summary>{tr(language, "Historique financier et autres indicateurs", "Financial history and other metrics")}</summary>
         {unavailable.length ? <label className={styles.muted}><input type="checkbox" checked={showMissing} onChange={event => setShowMissing(event.target.checked)} />
           {tr(language, "Afficher les indicateurs indisponibles", "Show unavailable metrics")} ({unavailable.length})</label> : null}
         <FocusViewMode mode={mode} choose={choose} modes={modes} language={language} label={tr(language, "Mode allocation", "Allocation display mode")} />
@@ -97,6 +98,7 @@ export function FocusCapital({ ticker }: { ticker: string }) {
             <div className={styles.track} role="img" aria-label={`${period.period_end.slice(0, 10)} ${formatted(period[metric.key], period.currency, language, metric.percent)}`}><div className={styles.zero} /><div className={`${styles.bar} ${(period[metric.key].value ?? 0) < 0 ? styles.negative : ""}`} style={signedBar(period[metric.key].value, bound)} /></div>
           </div>)}</article>;
         })}</div> : null}
+        </details>
       </> : <p>{tr(language, "Aucun exercice annuel vérifiable disponible.", "No verifiable annual fiscal year available.")}</p>}
       <details><summary>{tr(language, "Voir les sources, formules et valeurs exactes", "View sources, formulas and exact values")}</summary>
         {data.periods.map(period => <div key={period.period_end}><h4>{period.period_end.slice(0, 10)} · {period.currency ?? "N/D"}</h4><Source period={period} language={language} />

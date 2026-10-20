@@ -1,74 +1,55 @@
-import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 
-export type MobileFundamentalView = "portal" | "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts";
+export type MobileFundamentalView = "fundamentals" | "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts";
 
-const tabs: { id: MobileFundamentalView; fr: string; en: string }[] = [
-  { id: "fundamentals", fr: "Synthèse", en: "Overview" },
-  { id: "diagnostic", fr: "Diagnostic 360°", en: "Diagnostic 360°" },
-  { id: "peers", fr: "Pairs", en: "Peers" },
-  { id: "scenarios", fr: "Scénarios", en: "Scenarios" },
-  { id: "documents", fr: "Rapports", en: "Reports" },
-  { id: "capital", fr: "Capital", en: "Capital" },
-  { id: "financials", fr: "Résultats", en: "Financials" },
-  { id: "analysts", fr: "Analystes", en: "Analysts" },
+const spaces = [
+  { id: "diagnostic", fr: "Vue d’ensemble", en: "Overview" },
+  { id: "peers", fr: "Comparer", en: "Compare" },
+  { id: "scenarios", fr: "Simuler", en: "Simulate" },
+  { id: "financials", fr: "Explorer", en: "Explore" },
+] as const;
+
+const explore: { id: MobileFundamentalView; fr: string; en: string }[] = [
+  { id: "financials", fr: "États financiers", en: "Financial statements" },
+  { id: "capital", fr: "Capital et consensus", en: "Capital and consensus" },
+  { id: "documents", fr: "Documents officiels", en: "Official documents" },
+  { id: "fundamentals", fr: "Métriques avancées", en: "Advanced metrics" },
 ];
 
-export function MobileFocusFundamentalTabs({
-  view,
-  onChange,
-}: {
+export function MobileFocusFundamentalTabs({ view, onChange }: {
   view: MobileFundamentalView;
   onChange: (view: MobileFundamentalView) => void;
 }) {
   useMobileTheme();
   const { pick } = useLocale();
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <View style={styles.row} testID="focus-fundamental-subtabs">
-      <Pressable accessibilityRole="button" accessibilityState={{ selected: view === "portal" }}
-        onPress={() => { onChange("portal"); setExpanded(false); }} style={[styles.tab, view === "portal" && styles.active]}>
-        <Text style={[styles.text, view === "portal" && styles.activeText]}>Intelligence 360°</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{ selected: view === "fundamentals" }}
-        onPress={() => { onChange("fundamentals"); setExpanded(false); }} style={[styles.tab, view === "fundamentals" && styles.active]}>
-        <Text style={[styles.text, view === "fundamentals" && styles.activeText]}>{pick("Synthèse", "Overview")}</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={styles.more}>
-        <Text style={styles.text}>{pick("Autres vues", "More views")} {expanded ? "▴" : "▾"}</Text>
-      </Pressable>
-      {expanded ? tabs.filter(item => item.id !== "fundamentals").map((item) => (
-        <Pressable
-          key={item.id}
-          testID={`focus-fundamental-tab-${item.id}`}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: view === item.id }}
-          onPress={() => { onChange(item.id); setExpanded(false); }}
-          style={[styles.tab, view === item.id && styles.active]}
-        >
-          <Text style={[styles.text, view === item.id && styles.activeText]}>
-            {pick(item.fr, item.en)}
-          </Text>
-        </Pressable>
-      )) : null}
-    </View>
-  );
+  const active = view === "diagnostic" || view === "peers" || view === "scenarios" ? view : "financials";
+  return <View style={styles.stack} testID="focus-fundamental-subtabs">
+    <View style={styles.row} accessibilityRole="tablist">{spaces.map(space => <Pressable key={space.id}
+      testID={`focus-fundamental-tab-${space.id}`} accessibilityRole="tab" accessibilityState={{ selected: active === space.id }}
+      onPress={() => onChange(space.id)} style={[styles.tab, active === space.id && styles.active]}>
+      <Text style={[styles.text, active === space.id && styles.activeText]}>{pick(space.fr, space.en)}</Text>
+    </Pressable>)}</View>
+    {active === "financials" ? <View style={styles.row} accessibilityLabel={pick("Contenu à explorer", "Explore content")}>
+      {explore.map(item => <Pressable key={item.id} testID={`focus-explore-${item.id}`} accessibilityRole="button"
+        accessibilityState={{ selected: view === item.id || (view === "analysts" && item.id === "capital") }}
+        onPress={() => onChange(item.id)} style={styles.choice}>
+        <Text style={[styles.text, (view === item.id || (view === "analysts" && item.id === "capital")) && styles.activeText]}>{pick(item.fr, item.en)}</Text>
+      </Pressable>)}
+    </View> : null}
+  </View>;
 }
 
-const styles = createThemedStyles((colors) => ({
+const styles = createThemedStyles(colors => ({
+  stack: { gap: spacing.xs, width: "100%" },
   row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs, width: "100%" },
-  tab: {
-    flexGrow: 1, minWidth: 85, minHeight: 44, justifyContent: "center",
-    alignItems: "center", paddingHorizontal: spacing.sm,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm,
-    backgroundColor: colors.surfaceRaised,
-  },
+  tab: { flexGrow: 1, minWidth: 130, minHeight: 44, justifyContent: "center", alignItems: "center", paddingHorizontal: spacing.sm,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, backgroundColor: colors.surfaceRaised },
   active: { borderColor: colors.primary, backgroundColor: "rgba(44,156,255,.22)" },
+  choice: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
   text: { ...typography.label, color: colors.textMuted },
   activeText: { color: colors.text },
-  more: { width: "100%", minHeight: 44, justifyContent: "center", paddingHorizontal: spacing.sm },
 }));

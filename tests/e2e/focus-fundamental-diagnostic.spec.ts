@@ -37,11 +37,12 @@ test("Focus diagnostic retains sources, stale status, bilingual modes and avoids
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("diagnostic");
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Vue d’ensemble" }).click();
   const panel = page.getByRole("region", { name: "Diagnostic financier 360°" });
   await expect(panel.getByText("La marge nette s'améliore.")).toBeVisible();
   await expect(panel.getByText(/Dernier instantané disponible/)).toBeVisible();
   await expect(panel.getByText("15 %").first()).toBeVisible();
+  await panel.getByText("Détails, sources et méthodes").click();
   await expect(panel.getByRole("heading", { name: "Indicateurs propres au secteur" })).toBeVisible();
   await expect(panel.getByRole("link", { name: /Issuer capital report/ })).toHaveAttribute("href", "https://issuer.example/capital.pdf");
   await expect(panel.getByRole("link", { name: /Issuer 2025/ })).toHaveAttribute("href", "https://issuer.example/reports/2025.pdf");
@@ -53,7 +54,7 @@ test("Focus diagnostic retains sources, stale status, bilingual modes and avoids
   expect(requests).toBe(beforeModeChange);
 });
 
-test("Intelligence 360 portal and compact diagnostic work on desktop and mobile", async ({ page }, testInfo) => {
+test("Four-space overview keeps sourced details available on desktop and mobile", async ({ page }, testInfo) => {
   await page.route("**/stocks/RY/fundamental-intelligence/diagnostic", route => route.fulfill({ json: {
     ...diagnostic,
     measures: [...diagnostic.measures, { key: "cash_conversion", label_fr: "Conversion de trésorerie", label_en: "Cash conversion",
@@ -76,45 +77,74 @@ test("Intelligence 360 portal and compact diagnostic work on desktop and mobile"
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  const portal = page.getByRole("region", { name: "Anatole Fundamental Intelligence 360" });
-  await expect(portal.getByRole("heading", { name: "Anatole Fundamental Intelligence 360" })).toBeVisible();
-  await expect(portal.getByRole("link")).toHaveCount(8);
-  await expect(portal.getByRole("link", { name: /Surveillance/ })).toHaveAttribute("href", "/alertes");
-  await expect(portal.getByRole("link", { name: /Assistant financier/ })).toHaveAttribute("href", "/assistant?symbol=RY");
-  const accessibility = await new AxeBuilder({ page }).include('[aria-label="Anatole Fundamental Intelligence 360"]')
+  const nav = page.getByRole("navigation", { name: "Vues fondamentales" });
+  await expect(nav.getByRole("button")).toHaveCount(4);
+  await expect(nav.getByRole("button", { name: "Vue d’ensemble" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("link", { name: "Créer une alerte" })).toHaveAttribute("href", "/alertes?symbol=RY");
+  await expect(page.getByRole("link", { name: "Interroger Anatole" })).toHaveAttribute("href", "/assistant?symbol=RY&surface=stock");
+  const accessibility = await new AxeBuilder({ page }).include('[aria-label="Vues fondamentales"]')
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(accessibility.violations).toEqual([]);
-  await page.screenshot({ path: testInfo.outputPath("portal.png"), fullPage: true });
-  for (const [label, value] of [
-    ["Comparateur sectoriel", "peers"], ["Simulateur", "scenarios"],
-    ["Analyse documentaire", "documents"], ["Intelligence sectorielle", "diagnostic"],
-    ["Analystes et capital", "capital"],
-  ]) {
-    await portal.getByRole("link", { name: new RegExp(label) }).click();
-    await expect(page.getByRole("combobox", { name: "Ouvrir un module" })).toHaveValue(value);
-    await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Intelligence 360°" }).click();
-  }
-  await portal.getByRole("link", { name: /Diagnostic 360°/ }).click();
+  await nav.getByRole("button", { name: "Comparer" }).click();
+  await expect(nav.getByRole("button", { name: "Comparer" })).toHaveAttribute("aria-pressed", "true");
+  await nav.getByRole("button", { name: "Simuler" }).click();
+  await expect(nav.getByRole("button", { name: "Simuler" })).toHaveAttribute("aria-pressed", "true");
+  await nav.getByRole("button", { name: "Explorer" }).click();
+  await expect(page.getByRole("combobox", { name: "Contenu à explorer" })).toHaveValue("financials");
+  await nav.getByRole("button", { name: "Vue d’ensemble" }).click();
   const panel = page.getByRole("region", { name: "Diagnostic financier 360°" });
-  await expect(panel.locator('[class*="overviewCard"]')).toHaveCount(4);
-  await expect(panel.getByText("70", { exact: true })).toBeVisible();
-  await expect(panel.getByText("Données insuffisantes").first()).toBeVisible();
+  await expect(panel.locator('[class*="overviewCard"]')).toHaveCount(2);
+  await expect(panel.getByText(/Indice directionnel 70/)).toBeHidden();
   await expect(panel.getByText("Réserves")).toBeHidden();
+  await panel.getByText("Détails, sources et méthodes").click();
+  await expect(panel.getByText(/Indice directionnel 70/)).toBeVisible();
   await panel.getByText(/indicateur sans publication vérifiable/).click();
   await expect(panel.getByText("Réserves")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("diagnostic.png"), fullPage: true });
+  await panel.getByText("Détails, sources et méthodes").click();
+  await page.screenshot({ path: testInfo.outputPath("after-overview.png"), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test("Intelligence 360 portal preserves English and sky theme", async ({ page }, testInfo) => {
+test("Four-space navigation preserves English and sky theme", async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
     theme: "blue", density: "comfortable", decimals: 2, defaultRange: "1y", defaultUniverse: "tsx60", language: "en",
   })));
   await page.goto("/focus/RY");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fundamentals", exact: true }).click();
-  const portal = page.getByRole("region", { name: "Anatole Fundamental Intelligence 360" });
-  await expect(portal.getByText("Sector comparison")).toBeVisible();
-  await expect(portal.getByText("A fully integrated financial research environment")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("portal-blue-en.png"), fullPage: true });
+  const nav = page.getByRole("navigation", { name: "Fundamental views" });
+  await expect(nav.getByRole("button", { name: "Overview" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Compare" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Simulate" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "Explore" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("after-blue-en.png"), fullPage: true });
+});
+
+test("VNP overview shows four available measures and traceable details", async ({ page }, testInfo) => {
+  const measure = (key: string, label: string, latest: number, previous: number, unit: "percent" | "money" = "percent") => ({
+    key, label_fr: label, label_en: label, dimension: "profitability", unit,
+    observations: [observation(latest, 2025), observation(previous, 2024)].map(point => ({ ...point, unit, currency: unit === "money" ? "CAD" : null })), status: "available",
+    reason_fr: null, reason_en: null, method_fr: `${label} : calcul vérifiable.`, method_en: `${label}: verifiable calculation.`,
+  });
+  await page.route("**/stocks/VNP/fundamental-intelligence/diagnostic", route => route.fulfill({ json: {
+    ...diagnostic, ticker: "VNP.TO", name: "VNP fixture", stale: false, sector_family: "industrial",
+    measures: [measure("revenue_growth", "Croissance des revenus", 12, 9),
+      measure("operating_margin", "Marge opérationnelle", 18, 16),
+      measure("free_cash_flow", "Flux disponible", 8, 7, "money"),
+      measure("cash_conversion", "Conversion de trésorerie", 80, 76)],
+    findings: [
+      { kind: "strength", text_fr: "Les revenus progressent.", text_en: "Revenue grows.", measure_keys: ["revenue_growth"] },
+      { kind: "observation", text_fr: "La marge opérationnelle progresse.", text_en: "Operating margin improves.", measure_keys: ["operating_margin"] },
+    ], sector_metrics: [], missing_data: [],
+    dimensions: [{ ...diagnostic.dimensions[0], measure_keys: ["revenue_growth", "operating_margin", "free_cash_flow", "cash_conversion"], available_count: 4 }],
+  } }));
+  await page.goto("/focus/VNP?view=diagnostic");
+  const panel = page.getByRole("region", { name: "Diagnostic financier 360°" });
+  await expect(panel.getByText("VNP fixture · VNP.TO · 2025-12-31")).toBeVisible();
+  await expect(panel.locator('[class*="overviewCard"]')).toHaveCount(4);
+  await expect(panel.getByText("Les revenus progressent.")).toBeVisible();
+  await panel.getByRole("link", { name: "Voir la source et la méthode" }).first().click();
+  await expect(panel.getByRole("link", { name: /Issuer 2025/ }).first()).toHaveAttribute("href", "https://issuer.example/reports/2025.pdf");
+  await panel.getByText("Détails, sources et méthodes").click();
+  await page.screenshot({ path: testInfo.outputPath("after-complete.png"), fullPage: true });
 });

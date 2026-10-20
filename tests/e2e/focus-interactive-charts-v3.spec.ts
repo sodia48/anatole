@@ -31,7 +31,8 @@ async function openSummary(page: import("@playwright/test").Page) {
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Synthèse" }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("fundamentals");
   await page.getByRole("group", { name: "Mode de la synthèse" }).getByRole("button", { name: "Vue graphiques" }).click();
   return page.locator('section[aria-label="Croissance et rentabilité publiées"]');
 }
@@ -96,21 +97,24 @@ test("V3 touch reveals details without horizontal page overflow", async ({ page,
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
 });
 
-test("V3 analyst pie and donut are reserved for complete positive compositions", async ({ page }) => {
-  await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: snapshot }));
-  await openSummary(page);
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("analysts");
-  await page.getByRole("group", { name: "Mode du consensus analystes" }).getByRole("button", { name: "Vue graphiques" }).click();
-  const chartType = page.getByRole("group", { name: "Type de graphique" });
-  await chartType.getByRole("button", { name: "Secteurs" }).click();
-  await expect(page.locator('[data-kind="pie"]')).toBeVisible();
-  await chartType.getByRole("button", { name: "Anneau" }).click();
-  await expect(page.locator('[data-kind="donut"]')).toBeVisible();
-  await page.getByRole("button", { name: "Achat fort: 1" }).click();
-  await expect(page.getByRole("status").filter({ hasText: "Achat fort: 1" })).toContainText("10.0 %");
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Synthèse" }).click();
-  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("combobox", { name: "Ouvrir un module" }).selectOption("analysts");
-  await expect(page.locator('[data-kind="donut"]')).toBeVisible();
+test("V4 keeps one sourced analyst consensus in Explorer", async ({ page }) => {
+  await page.route("**/stocks/RY/fundamental-intelligence/capital", route => route.fulfill({ json: {
+    ticker: "RY.TO", status: "partial", financial_currency: "CAD", stale: false, periods: [],
+    analysts: { status: "partial", as_of: "2026-02-10T00:00:00Z", source_name: "Verified consensus snapshot",
+      source_confidence: "secondary_snapshot", recommendation_key: "hold", distribution: { strong_buy: 1, buy: 2, hold: 5, sell: 2, strong_sell: 0 },
+      target_low: 80, target_mean: 110, target_median: 105, target_high: 130, target_currency: "CAD", estimates: [],
+      actual_vs_consensus: [], revision_history_status: "unavailable", revision_history_reason_fr: "Révisions non vérifiables.",
+      revision_history_reason_en: "Revisions unverified." }, limitations_fr: [], limitations_en: [],
+  } }));
+  await page.goto("/focus/RY?view=analysts");
+  await expect(page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("combobox", { name: "Contenu à explorer" })).toHaveValue("capital");
+  const consensus = page.getByRole("region", { name: "Allocation du capital" });
+  await expect(consensus.getByRole("heading", { name: "Consensus analystes actuel" })).toBeVisible();
+  await expect(consensus.getByText("Verified consensus snapshot")).toBeVisible();
+  await expect(consensus.getByText("Conserver", { exact: true })).toBeVisible();
+  await expect(consensus.getByText(/Achat fort · 1/)).toContainText("10 %");
+  await expect(consensus.getByText("Révisions non vérifiables.")).toBeVisible();
 });
 
 test("V3 refuses to put two published currencies on one axis while retaining exact rows", async ({ page }) => {
@@ -131,14 +135,15 @@ test("V3 keeps chart preferences and English labels after navigation", async ({ 
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fundamentals", exact: true }).click();
-  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("button", { name: "Overview" }).click();
+  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("button", { name: "Explore" }).click();
+  await page.getByRole("combobox", { name: "Explore content" }).selectOption("fundamentals");
   await page.getByRole("group", { name: "Summary display mode" }).getByRole("button", { name: "Chart view" }).click();
   let chart = page.locator('section[aria-label="Published growth and profitability"]');
   await chart.getByLabel("Chart type").selectOption("points");
   await chart.getByLabel("Period").selectOption("3y");
   await chart.getByRole("group", { name: "Metrics and visible series" }).getByRole("button", { name: "Net income" }).click();
-  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("combobox", { name: "Open a module" }).selectOption("financials");
-  await page.getByRole("navigation", { name: "Fundamental views" }).getByRole("button", { name: "Overview" }).click();
+  await page.getByRole("combobox", { name: "Explore content" }).selectOption("financials");
+  await page.getByRole("combobox", { name: "Explore content" }).selectOption("fundamentals");
   chart = page.locator('section[aria-label="Published growth and profitability"]');
   await expect(chart.getByLabel("Chart type")).toHaveValue("points");
   await expect(chart.getByLabel("Period")).toHaveValue("3y");
