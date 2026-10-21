@@ -109,6 +109,30 @@ test("TD shows bank-only sensitivities and opens Anatole in place with scenario 
   await expect(panel.getByRole("button", { name: "Analyser avec Anatole" })).toBeVisible();
 });
 
+test("English sky theme keeps the bank simulator readable without DCF inputs", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("anatole.preferences.v0.4", JSON.stringify({
+    theme: "blue", density: "comfortable", decimals: 2, defaultRange: "1y", defaultUniverse: "tsx60", language: "en",
+  })));
+  await page.route("**/stocks/TD/fundamental-intelligence/scenarios", route => {
+    const body = route.request().postDataJSON() as Request;
+    const result = response(body);
+    return route.fulfill({ json: { ...result, ticker: "TD.TO", sector_family: "bank", status: "partial",
+      outcomes: result.outcomes.map(outcome => ({ ...outcome, net_income: metric(null), operating_income: metric(null),
+        operating_cash_flow: metric(null), free_cash_flow: metric(null), operating_margin: metric(null, "percent"),
+        free_cash_flow_margin: metric(null, "percent"), dcf: { ...outcome.dcf, status: "unavailable",
+          reason: "A generic FCF DCF is not suitable for this business model", per_share: null } })) } });
+  });
+  await page.goto("/focus/TD?view=scenarios");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
+  const panel = page.getByRole("region", { name: "Fundamental simulator" });
+  await expect(panel.getByRole("heading", { name: "Financial simulator — TD" })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Results" })).toBeVisible();
+  await expect(panel.getByText(/generic.*DCF|DCF.*suitable/i)).toBeVisible();
+  await expect(panel.getByRole("checkbox", { name: /DCF/ })).toHaveCount(0);
+  await panel.getByText("Customize assumptions").click();
+  await expect(panel.getByRole("button", { name: "Calculate scenarios" })).toBeVisible();
+});
+
 test("a failed recalculation keeps the last reliable result and accepts a retry", async ({ page }) => {
   let failure = 0;
   await page.route("**/stocks/RY/fundamental-intelligence/scenarios", route => {
