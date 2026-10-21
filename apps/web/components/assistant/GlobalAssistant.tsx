@@ -47,8 +47,7 @@ function PortfolioPositionSummary({ evidence }: { evidence: UnifiedAssistantResp
 }
 
 export function GlobalAssistant() {
-  const { context, label } = useAssistantContext();
-  const [open, setOpen] = useState(false);
+  const { context, label, assistantOpen: open, setAssistantOpen: setOpen, openAssistant } = useAssistantContext();
   const [removedForRoute, setRemovedForRoute] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -160,7 +159,7 @@ export function GlobalAssistant() {
   }
 
   return <>
-    <button type="button" className={styles.launcher} onClick={() => setOpen(true)} aria-label="Ouvrir Anatole Assistant" title="Anatole Assistant">
+    <button type="button" className={styles.launcher} onClick={() => openAssistant()} aria-label="Ouvrir Anatole Assistant" title="Anatole Assistant">
       <Bot size={19} aria-hidden="true" /><span>Anatole Assistant</span>
     </button>
     {open && <div className={styles.backdrop} ref={backdrop} onKeyDown={(event) => {

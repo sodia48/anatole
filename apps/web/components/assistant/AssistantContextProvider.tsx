@@ -6,7 +6,14 @@ import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { assistantContextLabel, deriveAssistantContext, type AssistantContext } from "@/lib/assistant-context";
 import { GlobalAssistant } from "./GlobalAssistant";
 
-type Bridge = { context: AssistantContext; label: string; publish: (extra: Partial<AssistantContext>) => void };
+type Bridge = {
+  context: AssistantContext;
+  label: string;
+  publish: (extra: Partial<AssistantContext>) => void;
+  assistantOpen: boolean;
+  setAssistantOpen: (open: boolean) => void;
+  openAssistant: (extra?: Partial<AssistantContext>) => void;
+};
 const BridgeContext = createContext<Bridge | null>(null);
 
 export function useAssistantContext(): Bridge {
@@ -30,10 +37,16 @@ export function AssistantContextProvider({ children }: { children: ReactNode }) 
   const base = useMemo(() => deriveAssistantContext(route, new URLSearchParams(searchString), preferences.language),
     [route, searchString, preferences.language]);
   const [published, setPublished] = useState<{ route: string; extra: Partial<AssistantContext> } | null>(null);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const publish = useCallback((extra: Partial<AssistantContext>) => setPublished({ route, extra }), [route]);
+  const openAssistant = useCallback((extra?: Partial<AssistantContext>) => {
+    if (extra) setPublished({ route, extra });
+    setAssistantOpen(true);
+  }, [route]);
   const context = useMemo(() => published?.route === route ? { ...base, ...published.extra } : base,
     [base, published, route]);
-  const value = useMemo(() => ({ context, label: assistantContextLabel(context), publish }), [context, publish]);
+  const value = useMemo(() => ({ context, label: assistantContextLabel(context), publish,
+    assistantOpen, setAssistantOpen, openAssistant }), [context, publish, assistantOpen, openAssistant]);
   return <BridgeContext.Provider value={value}>
     {children}
     <Suspense fallback={null}><AssistantQueryObserver onChange={setSearchString} /></Suspense>

@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { useAccount } from "@/components/providers/AccountProvider";
+import { useAssistantContext } from "@/components/assistant/AssistantContextProvider";
 import { CompanyEcosystem } from "@/components/company-network/CompanyEcosystem";
 import { FocusRangeChart } from "@/components/chart/FocusRangeChart";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
@@ -101,10 +102,18 @@ const RESEARCH_SPACES = [
 export function FocusWorkspace({ initialSnapshot, embedded = false, initialFundamentalView, initialDiagnosticSection }: { initialSnapshot: FocusSnapshot; embedded?: boolean; initialFundamentalView?: "diagnostic" | "peers" | "scenarios" | "documents" | "capital" | "financials" | "analysts"; initialDiagnosticSection?: "sector" }) {
   const { preferences, updatePreferences } = usePreferences();
   const { user, refreshAccount } = useAccount();
+  const { publish, openAssistant } = useAssistantContext();
   const language = preferences.language;
   const ticker = initialSnapshot.quote.ticker.replace(/\.TO$/, "");
+  const companyName = initialSnapshot.profile.name ?? ticker;
   const [section, setSection] = useState<Section>(embedded ? "chart" : initialFundamentalView ? "fundamentals" : "overview");
   const [fundamentalView, setFundamentalView] = useState<Exclude<FundamentalView, "valuation"> | "diagnostic" | "peers" | "scenarios" | "documents" | "capital">(initialFundamentalView === "analysts" ? "capital" : initialFundamentalView ?? "diagnostic");
+  const focusAssistantContext = useMemo(() => ({ surface: "stock" as const, symbol: ticker, symbols: [ticker],
+    instrument_type: "stock" as const, metadata: { company: companyName.slice(0, 120),
+      focus_section: section === "fundamentals" ? "fundamentals" : section,
+      focus_module: section === "fundamentals" ? fundamentalView : "" } }),
+  [ticker, companyName, section, fundamentalView]);
+  useEffect(() => { publish(focusAssistantContext); }, [publish, focusAssistantContext]);
   const diagnosticSection = initialDiagnosticSection;
   const [clientReady, setClientReady] = useState(false);
   const [layout, setLayout] = useState(() => createDefaultFocusLayout(ticker));
@@ -424,11 +433,11 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
                 <option value="fundamentals">{pick(language, "Métriques avancées", "Advanced metrics")}</option>
               </select>
             </label> : null}
-            <div className="fp-inlineActions"><Link className="fp-button" href={`/alertes?symbol=${encodeURIComponent(ticker)}`}>{pick(language, "Créer une alerte", "Create an alert")}</Link><Link className="fp-button" href={`/assistant?symbol=${encodeURIComponent(ticker)}&surface=stock`}>{pick(language, "Interroger Anatole", "Ask Anatole")}</Link></div>
+            <div className="fp-inlineActions"><Link className="fp-button" href={`/alertes?symbol=${encodeURIComponent(ticker)}`}>{pick(language, "Créer une alerte", "Create an alert")}</Link><button className="fp-button" type="button" onClick={() => openAssistant(focusAssistantContext)}>{pick(language, "Interroger Anatole", "Ask Anatole")}</button></div>
           </> : null}
           {section === "fundamentals" && fundamentalView === "diagnostic" ? <FocusDiagnostic ticker={ticker} focusSection={diagnosticSection} />
             : section === "fundamentals" && fundamentalView === "peers" ? <FocusPeers key={ticker} ticker={ticker} />
-              : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} />
+              : section === "fundamentals" && fundamentalView === "scenarios" ? <FocusScenarios key={ticker} ticker={ticker} company={companyName} />
                 : section === "fundamentals" && fundamentalView === "documents" ? <FocusDocuments key={ticker} ticker={ticker} />
                   : section === "fundamentals" && fundamentalView === "capital" ? <FocusCapital key={ticker} ticker={ticker} /> : <FocusFundamentals
             key={ticker}

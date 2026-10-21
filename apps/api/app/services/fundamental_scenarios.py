@@ -40,8 +40,6 @@ def _net_debt(row: FinancialPeriod) -> float | None:
 
 def _dcf(snapshot: FundamentalSnapshot, row: FinancialPeriod | None, family: str,
          fcf: ScenarioValue, settings: DCFSettings | None) -> DCFResult:
-    if settings is None:
-        return DCFResult(status="unavailable", reason="Explicit DCF rates and forecast growth are required")
     if family in {"bank", "insurance", "real_estate"}:
         return DCFResult(status="unavailable", reason="A generic FCF DCF is not suitable for this business model", settings=settings)
     age = (datetime.now(UTC).date() - row.period_end.date()).days if row else None
@@ -56,12 +54,14 @@ def _dcf(snapshot: FundamentalSnapshot, row: FinancialPeriod | None, family: str
     if (len(comparable) < 2 or comparable[0].period_end != row.period_end
             or not 300 <= (comparable[0].period_end - comparable[1].period_end).days <= 430):
         return DCFResult(status="unavailable", reason="Two consecutive sourced positive annual cash flows are required", settings=settings)
-    if fcf.value is None or fcf.value <= 0:
-        return DCFResult(status="unavailable", reason="Positive scenario free cash flow is required", settings=settings)
     shares = _finite(snapshot.metrics.shares_outstanding)
     net_debt = _net_debt(row)
     if shares is None or shares <= 0 or net_debt is None:
         return DCFResult(status="unavailable", reason="Reported share count and net debt are required", settings=settings)
+    if fcf.value is None or fcf.value <= 0:
+        return DCFResult(status="unavailable", reason="Positive scenario free cash flow is required", settings=settings)
+    if settings is None:
+        return DCFResult(status="unavailable", reason="Explicit DCF rates and forecast growth are required")
 
     growth = settings.forecast_fcf_growth_percent / 100
     projected = [fcf.value * (1 + growth) ** year for year in range(5)]

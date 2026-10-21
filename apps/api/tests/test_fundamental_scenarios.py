@@ -58,6 +58,9 @@ def test_missing_inputs_financial_sector_and_stale_snapshot_never_invent_a_dcf()
     snapshot.industry = "Banks"
     result = simulate_financial_scenarios(snapshot, request(dcf=True))
     assert all(item.operating_income.value is None and item.dcf.status == "unavailable" for item in result.outcomes)
+    assert all("not suitable" in item.dcf.reason for item in result.outcomes)
+    result = simulate_financial_scenarios(snapshot, request())
+    assert all("not suitable" in item.dcf.reason for item in result.outcomes)
     snapshot = financial_snapshot()
     snapshot.stale = True
     result = simulate_financial_scenarios(snapshot, request(dcf=True))

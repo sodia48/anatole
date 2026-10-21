@@ -27,6 +27,8 @@ from app.services.canada_360_assistant import canada_360_assistant_service
 from app.services.etf_holdings import etf_holdings_service
 from app.services.assistant_etf_history import EtfHistoryQuery, ETF_HISTORY_SKILLS, historical_answer, history_query
 from app.services.fundamentals import fundamentals_service
+from app.schemas.fundamental_scenarios import ScenarioRequest
+from app.services.fundamental_scenarios import simulate_financial_scenarios
 from app.services.fundamental_assistant import answer_fundamental_question, fundamental_question_kind, FOCUS_VIEW
 from app.services.market_data import market_data_service
 from app.services.stock_research import build_stock_research_bundle, format_stock_research
@@ -57,6 +59,7 @@ logger = logging.getLogger(__name__)
 SESSION_SECONDS = 2 * 60 * 60
 _ETF_SYMBOLS = {item["ticker"] for item in ETF_CATALOG}
 _ALIASES = {"shopify": "SHOP", "lightspeed": "LSPD"}
+_FINANCIAL_TERMS = {"DCF", "FCF", "EBITDA", "ROE", "ROIC", "EPS", "MACD", "SMA"}
 _PORTFOLIO_CUES = ("portefeuille", "positions", "allocation", "concentration", "mes risques", "mon risque", "my portfolio", "my positions", "my risk", "chevauch", "overlap", "diversification", "sous-perform", "sous perform", "underperform", "doublonn", "cluster", "contribue au risque")
 _GOVERNMENT_CUES = ("canada 360", "gouvernement", "statistique canad", "statistique canada", "province", "prestation", "soins dentaires", "impôt", "assurance emploi", "government", "benefit", "dental", "unemployment rate", "taux de chômage", "inflation canad", "inflation au canada", "macro canadien", "passeport", "quebec", "québec", "ontario", "alberta")
 _MACRO_CUES = ("inflation", "taux directeur", "pétrole", "cad", "macro", "interest rate", "oil price")
@@ -115,7 +118,7 @@ def _evidence_source_to_assistant_source(source: EvidenceSource) -> AssistantSou
 def _explicit_symbols(message: str) -> list[str]:
     # French elisions such as "l'ETF" must not resolve to the listed ticker L.
     without_elisions = re.sub(r"\b[ldjcmnstqu]['’](?=\w)", "", message, flags=re.IGNORECASE)
-    return _symbols(without_elisions, None)
+    return [symbol for symbol in _symbols(without_elisions, None) if symbol not in _FINANCIAL_TERMS]
 
 
 def _clean_symbols(message: str, context: AssistantContext, previous: list[str]) -> list[str]:
@@ -649,13 +652,66 @@ class AnatoleAssistantOrchestrator:
         if skill == "portfolio_analysis":
             state.portfolio_authorized = True
         government_profile = None
+        scenario_context_applied = False
         if skill == "guardrail":
             logger.info("assistant_guardrail skill=guardrail")
             base = await assistant_service._guardrail(AssistantRequest(message=request.message,
                                                                       context_symbol=symbols[0] if symbols else None))
             bundle = _bundle_from_response(skill, base, symbols)
         elif skill == "stock_analysis" and symbols:
-            base, bundle = await self._stock(symbols[0], context.language, request.message)
+            raw_scenario = context.metadata.get("scenario_request")
+            base, bundle = await self._stock(symbols[0], context.language,
+                                             "" if raw_scenario else request.message)
+            if (raw_scenario and context.surface == "stock" and context.symbol == symbols[0]
+                    and context.metadata.get("focus_module") == "scenarios"):
+                try:
+                    scenario_request = ScenarioRequest.model_validate_json(raw_scenario)
+                    snapshot = await fundamentals_service.get_snapshot(symbols[0])
+                    simulation = simulate_financial_scenarios(snapshot, scenario_request)
+                    language = context.language
+                    lines = ["## Simulation demandée dans Focus" if language == "fr" else "## Requested Focus simulation",
+                             ("Hypothèses de l’utilisateur, distinctes des résultats publiés; "
+                              "sensibilités illustratives, pas des prévisions ni un conseil d’investissement."
+                              if language == "fr" else
+                              "User assumptions, separate from reported results; illustrative sensitivities, "
+                              "not forecasts or investment advice.")]
+                    for outcome in simulation.outcomes:
+                        label = {"prudent": "Prudent", "central": "Central", "optimistic": "Optimiste" if language == "fr" else "Optimistic"}[outcome.key]
+                        values = [f"{'variation des revenus' if language == 'fr' else 'revenue change'} "
+                                  f"{outcome.assumptions.revenue_change_percent:+g} %"]
+                        if simulation.sector_family not in {"bank", "insurance"} and outcome.assumptions.operating_margin_change_points:
+                            values.append(f"{'variation de marge' if language == 'fr' else 'margin change'} "
+                                          f"{outcome.assumptions.operating_margin_change_points:+g} points")
+                        for name, metric in (("Revenus" if language == "fr" else "Revenue", outcome.revenue),
+                                             ("Bénéfice net" if language == "fr" else "Net income", outcome.net_income),
+                                             ("Flux disponible" if language == "fr" else "Free cash flow", outcome.free_cash_flow)):
+                            if metric.value is not None and (simulation.sector_family not in {"bank", "insurance"} or metric is outcome.revenue):
+                                values.append(f"{name} {metric.value:,.2f} {simulation.currency or ''}".strip())
+                        if outcome.dcf.per_share is not None:
+                            values.append(f"DCF {outcome.dcf.per_share:,.2f} {simulation.currency or ''}/"
+                                          f"{'action' if language == 'fr' else 'share'}")
+                        lines.append(f"- {label} : " + ("; ".join(values) if values else
+                            ("données insuffisantes" if language == "fr" else "insufficient data")))
+                    if simulation.sector_family in {"bank", "insurance"}:
+                        lines.append("Le bénéfice net simulé n’est pas calculable avec ces seules hypothèses de revenus."
+                                     if language == "fr" else
+                                     "Simulated net income cannot be calculated from revenue assumptions alone.")
+                        lines.append("DCF générique inadaptée à ce secteur." if language == "fr" else
+                                     "Generic DCF is unsuitable for this sector.")
+                    prudent = next(item for item in simulation.outcomes if item.key == "prudent")
+                    optimistic = next(item for item in simulation.outcomes if item.key == "optimistic")
+                    if prudent.revenue.value is not None and optimistic.revenue.value is not None:
+                        delta = optimistic.revenue.value - prudent.revenue.value
+                        lines.append(("Écart de revenus optimiste–prudent" if language == "fr" else
+                                      "Optimistic–prudent revenue gap") + f" : {delta:,.2f} {simulation.currency or ''}.")
+                    if simulation.baseline_stale:
+                        lines.append("Données de référence périmées." if language == "fr" else "Stale baseline data.")
+                    base.answer += "\n\n" + "\n".join(lines)
+                    bundle.limitations.append("Scénarios calculés avec les hypothèses explicites de l’utilisateur")
+                    scenario_context_applied = True
+                except Exception:
+                    bundle.missing_data.append("Simulation Focus temporairement indisponible")
+                    logger.info("assistant_focus_scenario_unavailable skill=stock_analysis")
         elif skill in ETF_HISTORY_SKILLS:
             answer, bundle = await historical_answer(etf_query, context.language)
             base = self._simple(skill, "Performance historique ETF", answer,
@@ -754,7 +810,7 @@ class AnatoleAssistantOrchestrator:
         bundle.navigation_actions.extend(actions)
         base.intent = skill
         synthesis = None
-        if skill not in {"canada360", "guardrail"} and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
+        if skill not in {"canada360", "guardrail"} and not scenario_context_applied and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
             macro_suffix = ("\n\n## Contexte macro Canada 360" +
                             base.answer.split("\n\n## Contexte macro Canada 360", 1)[1]
                             if mixed_macro and skill == "portfolio_analysis"

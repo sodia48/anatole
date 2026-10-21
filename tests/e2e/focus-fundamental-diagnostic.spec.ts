@@ -81,7 +81,7 @@ test("Four-space overview keeps sourced details available on desktop and mobile"
   await expect(nav.getByRole("button")).toHaveCount(4);
   await expect(nav.getByRole("button", { name: "Vue d’ensemble" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("link", { name: "Créer une alerte" })).toHaveAttribute("href", "/alertes?symbol=RY");
-  await expect(page.getByRole("link", { name: "Interroger Anatole" })).toHaveAttribute("href", "/assistant?symbol=RY&surface=stock");
+  await expect(page.getByRole("button", { name: "Interroger Anatole" })).toBeVisible();
   const accessibility = await new AxeBuilder({ page }).include('[aria-label="Vues fondamentales"]')
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
   expect(accessibility.violations).toEqual([]);
