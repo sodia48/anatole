@@ -101,6 +101,7 @@ test("public research flows from institutional Assistant through Focus evidence 
   await dialog.getByRole("link", { name: /Voir scénarios dans Focus/ }).click();
   await expect(page).toHaveURL(/\/focus\/RY\?view=scenarios/);
   const scenarios = page.getByRole("region", { name: "Simulateur fondamental" });
+  await scenarios.getByText("Méthodologie et limites").click();
   await expect(scenarios.getByRole("link", { name: /Issuer annual report/ })).toHaveAttribute("href", source);
   await expect(scenarios).toContainText("pas des prévisions");
 

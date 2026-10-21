@@ -72,8 +72,11 @@ class AssistantContext(BaseModel):
     @field_validator("metadata")
     @classmethod
     def limited_metadata(cls, value: dict[str, str]) -> dict[str, str]:
-        allowed = {"selected_metric", "sector", "region", "view"}
-        if any(key not in allowed or len(item) > 60 for key, item in value.items()):
+        limits = {"selected_metric": 60, "sector": 60, "region": 60, "view": 60,
+                  "company": 120, "focus_section": 40, "focus_module": 40,
+                  "scenario_request": 2400}
+        if any(key not in limits or not isinstance(item, str) or len(item) > limits[key]
+               for key, item in value.items()):
             raise ValueError("Invalid context metadata")
         return value
 

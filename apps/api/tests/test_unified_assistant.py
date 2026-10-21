@@ -21,6 +21,7 @@ from app.services.market_data import market_data_service
 from app.services.portfolio import portfolio_service
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
+from test_fundamental_scenarios import financial_snapshot, request as scenario_request
 
 
 NOW = datetime(2026, 10, 1, tzinfo=UTC)
@@ -82,6 +83,32 @@ async def test_focus_followup_and_compare_keep_shop(unit, stock_tools, monkeypat
     third = await unit.answer(request("Compare-le à LSPD", conversation_id=first.conversation_id))
     assert third.intent == "compare"
     assert third.actions[0].href == "/comparateur?symbols=SHOP,LSPD"
+
+
+@pytest.mark.asyncio
+async def test_focus_scenario_context_recalculates_and_labels_user_assumptions(unit, stock_tools, monkeypatch):
+    snapshot = financial_snapshot()
+    snapshot.sector = "Financial Services"
+    snapshot.industry = "Banks"
+
+    async def fundamentals(_symbol):
+        return snapshot
+
+    monkeypatch.setattr(fundamentals_service, "get_snapshot", fundamentals)
+    payload = request("Pourquoi la DCF ne convient-elle pas ?", surface="stock", symbol="TD")
+    payload.context.metadata = {"company": "Toronto-Dominion Bank", "focus_section": "fundamentals",
+                                "focus_module": "scenarios", "scenario_request": scenario_request().model_dump_json()}
+    assert _clean_symbols(payload.message, payload.context, []) == ["TD"]
+    result = await unit.answer(payload)
+    assert result.intent == "stock_analysis"
+    assert "Simulation demandée dans Focus" in result.answer
+    assert "Hypothèses de l’utilisateur" in result.answer
+    assert "variation des revenus" in result.answer
+    assert "DCF générique inadaptée" in result.answer
+    assert "bénéfice net simulé n’est pas calculable" in result.answer
+    assert "Écart de revenus optimiste–prudent" in result.answer
+    assert "Revenus" in result.answer
+    assert "Bénéfice net" not in result.answer.split("## Simulation demandée dans Focus", 1)[1]
 
 
 @pytest.mark.asyncio
