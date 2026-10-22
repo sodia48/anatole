@@ -69,7 +69,7 @@ export function sizeGroups(series) {
   return major.length && other.length ? { major, other } : null;
 }
 
-export function createLayout(periods, indexes, plotted, shape, width, language) {
+export function createLayout(periods, indexes, plotted, shape, width, language, periodLabels = null) {
   const distances = indexes.slice(1).map((index, position) => {
     const previous = date(periods[indexes[position]]), current = date(periods[index]);
     return previous === null || current === null ? null : (current - previous) / 86_400_000;
@@ -87,15 +87,15 @@ export function createLayout(periods, indexes, plotted, shape, width, language) 
   const left = 82, right = width < 500 ? 64 : 22, plotSpan = width - left - right;
   const x = position => left + (indexes.length === 1 ? plotSpan / 2 : position / (indexes.length - 1) * plotSpan);
   const y = value => 178 - (value - min) / span * 143;
-  const slots = Math.max(2, Math.floor(plotSpan / 78));
+  const hasDetailedLabels = Boolean(periodLabels?.length) || periods.some(period => /\d{4}-Q[1-4]/i.test(period));
+  const slots = Math.max(2, Math.floor(plotSpan / (hasDetailedLabels ? 110 : 78)));
   const step = Math.ceil((indexes.length - 1) / (slots - 1));
   const ticks = indexes.map((_, position) => position).filter(position => position % step === 0);
   if (indexes.length && ticks.at(-1) !== indexes.length - 1) ticks.push(indexes.length - 1);
-  const hasQuarters = periods.some(period => /\d{4}-Q[1-4]/i.test(period));
   const label = period => {
     const quarter = period.match(/(\d{4})-Q([1-4])/i);
-    if (quarter) return language === "fr" ? `T${quarter[2]} ${quarter[1].slice(2)}` : `Q${quarter[2]} '${quarter[1].slice(2)}`;
-    return hasQuarters ? period.slice(0, 7) : period.slice(0, 4);
+    if (quarter) return `Q${quarter[2]} ${quarter[1]}`;
+    return period.slice(0, 4);
   };
   return { gaps, zeroBased, min, max, left, right, x, y, ticks, label };
 }

@@ -60,6 +60,7 @@ test("V3 compares metrics with real date windows, safe chart shapes and Base 100
   await metrics.getByRole("button", { name: "Flux disponible" }).click();
   await expect(chart.getByRole("button", { name: "Base 100" })).toBeEnabled();
   await chart.getByRole("button", { name: "Base 100" }).click();
+  await chart.getByText("Comprendre le graphique").click();
   await expect(chart.getByText(/Base 100 au 2015-12-31/)).toBeVisible();
   await expect(chart.locator("tbody tr").last()).toContainText("Issuer 2025");
   expect(requests).toBe(before);
@@ -164,6 +165,7 @@ test("V6 makes a long annual gap explicit and keeps dates legible at the rendere
     await chart.screenshot({ path: testInfo.outputPath("v6-before-chart.png") });
     return;
   }
+  await chart.getByText("Comprendre le graphique").click();
   await expect(chart.getByText(/Axe par observations/)).toBeVisible();
   await expect(chart.locator('g[aria-label="Intervalle sans données"]')).toHaveCount(1);
   await expect(chart.locator('path[class*="line"]').first()).toBeVisible();

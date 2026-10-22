@@ -18,7 +18,7 @@ const shapes: Shape[] = ["line", "bar", "area", "points", "grouped"];
 type ChartLayout = { gaps: number[]; zeroBased: boolean; min: number; max: number; left: number; right: number;
   x: (position: number) => number; y: (value: number) => number; ticks: number[]; label: (period: string) => string };
 type LayoutModule = { createLayout: (periods: string[], indexes: number[], plotted: number[], shape: Shape,
-  width: number, language: "fr" | "en") => ChartLayout;
+  width: number, language: "fr" | "en", periodLabels?: string[]) => ChartLayout;
   indexes: (periods: string[], range: FocusChartRange) => number[];
   defaultRange: (periods: string[]) => FocusChartRange;
   periodDate: (period: string) => number | null;
@@ -33,9 +33,9 @@ type LayoutModule = { createLayout: (periods: string[], indexes: number[], plott
   formatChartValue: (value: number, compact: boolean, currency: string | undefined,
     unit: string, language: "fr" | "en") => string };
 
-export function FocusSeriesChart({ title, periods, periodSources, periodCurrencies, series, unit, currency, language, source,
+export function FocusSeriesChart({ title, periods, periodLabels, periodSources, periodCurrencies, series, unit, currency, language, source,
   forecast = false, kind = "line", storageKey }: {
-  title: string; periods: string[]; series: FocusChartSeries[];
+  title: string; periods: string[]; periodLabels?: string[]; series: FocusChartSeries[];
   unit: "money" | "per_share" | "percent" | "number"; currency?: string; language: "fr" | "en";
   source?: string; periodSources?: (string | null)[]; periodCurrencies?: (string | null)[];
   forecast?: boolean; kind?: "line" | "bar";
@@ -114,12 +114,13 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
       .filter((number): number is number => number !== null && number !== undefined && Number.isFinite(number));
   }));
   const columns = shape === "bar" || shape === "grouped";
-  const layout = layoutModule?.createLayout(periods, indexes, plotted, shape, plotWidth, language);
+  const layout = layoutModule?.createLayout(periods, indexes, plotted, shape, plotWidth, language, periodLabels);
   const { gaps = [], zeroBased = false, min = 0, max = 0, left = 82, right = 22,
     x = () => 0, y = () => 0, ticks: tickPositions = [],
     label: periodLabel = (period: string) => period } = layout ?? {};
   const format = (number: number, compact = false, actualCurrency = currency) =>
     layoutModule?.formatChartValue(number, compact, actualCurrency, unit, language) ?? String(number);
+  const labelFor = (index: number) => periodLabels?.[index] ?? periodLabel(periods[index]);
   const copy = (key: "gap" | "adjusted" | "unknown" | "mixed" | "positive" | "base100" | "single" | "major" | "other" | "disparity" | "type" | "range" | "scale" | "actual" | "all" | "core" | "reset" | "groups" | "legend" | "source" | "estimate" | "published" | "since" | "low" | "consensus" | "high" | "financial" | "details", period?: string) => layoutModule?.chartCopy(language, key, period);
   const unitLabel = layoutModule?.unitLabel(language, unit, currency, mixedCurrencies, normalized) ?? (currency ?? unit);
   const activePosition = point ? indexes.indexOf(point.index) : -1;
@@ -149,12 +150,15 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
           onClick={() => save({ base100: true })}>Base 100</button>
       </div>
     </div>
-    {periods.length < 2 ? <small className={styles.explanation}>{copy("single")}</small> : null}
-    {normalized && base !== null ? <small className={styles.explanation}>{copy("base100", periods[base])}</small> : null}
-    {gaps.length ? <small className={styles.explanation} role="note">{copy("gap")}</small> : null}
-    {groups && ids.some(id => groups.major.includes(id)) && ids.some(id => groups.other.includes(id))
-      ? <small className={styles.explanation}>{copy("disparity")}</small> : null}
-    {!zeroBased && min > 0 ? <small className={styles.explanation}>{copy("adjusted")}</small> : null}
+    {periods.length < 2 || normalized && base !== null || gaps.length || groups || !zeroBased && min > 0
+      ? <details className={styles.help}><summary>{tr(language, "Comprendre le graphique", "About this chart")}</summary>
+        {periods.length < 2 ? <p>{copy("single")}</p> : null}
+        {normalized && base !== null ? <p>{copy("base100", periods[base])}</p> : null}
+        {gaps.length ? <p>{copy("gap")}</p> : null}
+        {groups && ids.some(id => groups.major.includes(id)) && ids.some(id => groups.other.includes(id))
+          ? <p>{copy("disparity")}</p> : null}
+        {!zeroBased && min > 0 ? <p>{copy("adjusted")}</p> : null}
+      </details> : null}
     {mixedCurrencies ? <p className={styles.explanation} role="status">{copy(unknownCurrency ? "unknown" : "mixed")}</p> : null}
     {series.length > 1 ? <><div className={styles.presets} role="group" aria-label={copy("groups")}>
       <button type="button" onClick={() => save({ ids: series.map(item => item.id) })}>{copy("all")}</button>
@@ -180,7 +184,7 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
           <text x={(x(position - 1) + x(position)) / 2} y="28" textAnchor="middle" className={styles.axisText}>⋯</text></g>)}
         {activePosition >= 0 ? <line x1={x(activePosition)} x2={x(activePosition)} y1="30" y2="180" className={styles.guide} /> : null}
         {tickPositions.map(position => <text key={`${periods[indexes[position]]}-${position}`} x={x(position)} y="207" textAnchor="middle" className={styles.axisText}>
-          {periodLabel(periods[indexes[position]])}</text>)}
+          {labelFor(indexes[position])}</text>)}
         {visible.map((item, seriesPosition) => {
           const segments: string[][] = []; let part: string[] = [];
           indexes.forEach((index, position) => { const v = chartValue(item, index);
@@ -197,7 +201,9 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
               const low = item.lows?.[index], high = item.highs?.[index], actual = item.values[index];
               const validRange = !normalized && low !== null && low !== undefined && high !== null && high !== undefined
                 && actual !== null && Number.isFinite(low) && Number.isFinite(high) && low <= actual && actual <= high;
-              const detail = `${item.label}, ${periods[index]}: ${format(actual as number, false, periodCurrencies ? periodCurrencies[index] ?? "" : currency)}`;
+              const detailedLabel = periodLabels?.[index] && periodLabels[index] !== periods[index].slice(0, 4)
+                ? `${labelFor(index)}, ` : "";
+              const detail = `${item.label}, ${detailedLabel}${periods[index]}: ${format(actual as number, false, periodCurrencies ? periodCurrencies[index] ?? "" : currency)}`;
               const columnX = x(position) + (seriesPosition - (visible.length - 1) / 2) * width - width / 2;
               return <g key={`${item.id}-${index}`}>
                 {validRange ? <line x1={x(position)} x2={x(position)} y1={y(low)} y2={y(high)} className={styles.range} /> : null}
@@ -213,7 +219,7 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
       </svg>
       {point && activePosition >= 0 ? <div className={styles.tooltip} role="status" data-focus-tooltip
         style={{ left: `${Math.min(82, Math.max(18, x(activePosition) / plotWidth * 100))}%` }}>
-        <div className={styles.tooltipHead}><strong>{periods[point.index]}</strong><button type="button" aria-label={tr(language, "Fermer les détails", "Close details")} onClick={() => setPoint(null)}>×</button></div>
+        <div className={styles.tooltipHead}><strong>{labelFor(point.index)} · {periods[point.index]}</strong><button type="button" aria-label={tr(language, "Fermer les détails", "Close details")} onClick={() => setPoint(null)}>×</button></div>
         {visible.map(item => { const actual = item.values[point.index], adjusted = chartValue(item, point.index), change = layoutModule?.chartChange(item.values, indexes, point.index);
           return <div className={styles.tooltipSeries} key={item.id}><strong>{item.label}</strong>
             <small>{copy(item.nature === "estimate" || forecast ? "estimate" : "published")}</small>
@@ -227,11 +233,11 @@ export function FocusSeriesChart({ title, periods, periodSources, periodCurrenci
         {!hasSeriesSources ? <small>{copy("source")}: {periodSources?.[point.index] ?? source ?? "N/D"}</small> : null}
       </div> : null}
     </div> : !plotted.length && !mixedCurrencies ? <p className={styles.empty}>{tr(language, "Série insuffisante pour tracer une tendance.", "Not enough observations to plot a trend.")}</p> : null}
-    <details className={styles.data}><summary>{copy("financial")} · {indexes.length ? `${periodLabel(periods[indexes[0]])}–${periodLabel(periods[indexes.at(-1) as number])}` : "N/D"} · {copy("details")}</summary>
+    <details className={styles.data}><summary>{copy("financial")} · {indexes.length ? `${labelFor(indexes[0])}–${labelFor(indexes.at(-1) as number)}` : "N/D"} · {copy("details")}</summary>
       <div className={styles.dataScroll}><table><thead><tr><th scope="col">{tr(language, "Période", "Period")}</th>
         {visible.map(item => <th scope="col" key={item.id}>{item.label} ({unitLabel})</th>)}
         {periodSources && !hasSeriesSources ? <th scope="col">{tr(language, "Source", "Source")}</th> : null}</tr></thead><tbody>
-        {indexes.map(index => <tr key={`${periods[index]}-${index}`}><th scope="row">{periods[index]}</th>
+        {indexes.map(index => <tr key={`${periods[index]}-${index}`}><th scope="row">{labelFor(index)} · {periods[index]}</th>
           {visible.map(item => <td key={item.id}>{item.values[index] === null || item.values[index] === undefined ? "N/D" : format(item.values[index] as number, false, periodCurrencies ? periodCurrencies[index] ?? "" : currency)}
             {item.sources?.[index] ? <small className={styles.cellSource}>{item.sources[index]}</small> : null}</td>)}
           {periodSources && !hasSeriesSources ? <td>{periodSources[index] ?? "N/D"}</td> : null}</tr>)}

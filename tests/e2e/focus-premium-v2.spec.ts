@@ -66,6 +66,40 @@ test("V2 modes preserve exact annual and quarterly evidence without refetch", as
   expect(requests).toBe(before);
 });
 
+test("financial charts identify fiscal quarters, retain exact closes and keep annual years", async ({ page }, testInfo) => {
+  const fiscalAnnual = [2024, 2025].map(year => ({ ...annual[0], period_end: `${year}-01-31`,
+    source: { ...annual[0].source, confidence: "official" } }));
+  const fiscalQuarters = ["2023-04-30", "2023-07-31", "2023-10-31", "2024-01-31"].map((period_end, index) => ({
+    ...quarterly[0], period_end, total_revenue: 31 + index, source: { source_name: `Issuer ${period_end}`, filed_at: "2024-03-01" },
+  }));
+  await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: {
+    ...snapshot, annual_financials: fiscalAnnual, quarterly_financials: fiscalQuarters,
+  } }));
+  await openFundamentals(page);
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("financials");
+  await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Trimestriel" }).click();
+  await page.getByRole("group", { name: "Mode d’affichage des états financiers" }).getByRole("button", { name: "Vue graphiques" }).click();
+  const chart = page.getByTestId("financials-chart-view").locator("section[aria-label]").first();
+  const axisLabels = await chart.locator('svg text[y="207"]').allTextContents();
+  expect(axisLabels[0]).toBe("Q1 2024");
+  expect(axisLabels.at(-1)).toBe("Q4 2024");
+  expect(axisLabels.every(label => /^Q[1-4] 2024$/.test(label))).toBe(true);
+  await chart.screenshot({ path: testInfo.outputPath("quarterly-after.png") });
+  await chart.getByText("Données exactes du graphique").click();
+  for (const label of ["Q1 2024", "Q2 2024", "Q3 2024", "Q4 2024"])
+    await expect(chart.getByRole("row", { name: new RegExp(label) })).toBeVisible();
+  const point = chart.getByRole("button", { name: /Revenus, Q1 2024, 2023-04-30/ });
+  await point.click();
+  await expect(chart.getByRole("status")).toContainText("2023-04-30");
+  await expect(chart.getByRole("status")).toContainText("Issuer 2023-04-30");
+  await chart.screenshot({ path: testInfo.outputPath("quarterly-detail-after.png") });
+  await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Annuel" }).click();
+  const annualChart = page.getByTestId("financials-chart-view").locator("section[aria-label]").first();
+  await expect(annualChart.locator('svg text[y="207"]')).toContainText(["2024", "2025"]);
+  await annualChart.screenshot({ path: testInfo.outputPath("annual-after.png") });
+});
+
 test("V2 earnings, estimates and analysts remain usable on mobile", async ({ page }) => {
   await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: snapshot }));
   await page.route("**/stocks/RY/fundamental-intelligence/capital", route => route.fulfill({ json: {
