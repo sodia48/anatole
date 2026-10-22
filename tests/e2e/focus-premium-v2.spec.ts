@@ -54,6 +54,7 @@ test("V2 modes preserve exact annual and quarterly evidence without refetch", as
   await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Annuel" }).click();
   await page.getByRole("group", { name: "Mode d’affichage des états financiers" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(page.getByTestId("financials-chart-view")).toBeVisible();
+  await page.getByTestId("financials-chart-view").getByRole("button", { name: "Autres montants" }).click();
   await expect(page.getByTestId("financials-chart-view").getByLabel(/Bénéfice net, 2025-12-31/)).toHaveCount(1);
   const chartPoint = page.getByTestId("financials-chart-view").locator('circle[tabindex="0"]').first();
   await chartPoint.focus();
@@ -83,7 +84,10 @@ test("V2 earnings, estimates and analysts remain usable on mobile", async ({ pag
   await expect(page.getByText("Prévisions / consensus").first()).toBeVisible();
   await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "BPA & calendrier" }).click();
   await page.getByRole("button", { name: "Vue graphiques" }).click();
-  await expect(page.getByText("2026-Q1").first()).toBeVisible();
+  const earningsChart = page.getByTestId("earnings-chart-view");
+  await expect(earningsChart).toBeVisible();
+  await earningsChart.getByText("Données exactes du graphique").first().click();
+  await expect(earningsChart.getByRole("row", { name: /2026-Q1/ }).first()).toBeVisible();
   await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
   await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("capital");
   await expect(page.getByRole("heading", { name: "Consensus analystes actuel" })).toBeVisible();
