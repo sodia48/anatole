@@ -80,6 +80,10 @@ export type FundamentalDiagnostic = {
   generated_at: string;
   source_generated_at: string;
   stale: boolean;
+  refresh_in_progress?: boolean;
+  source_message?: string | null;
+  coverage_status?: string | null;
+  coverage_message?: string | null;
   financial_currency: string | null;
   status: "available" | "partial" | "unavailable";
   measures: FundamentalMeasure[];
@@ -95,7 +99,7 @@ export type FundamentalDiagnostic = {
 /** Choose published or calculated values that actually exist in this snapshot. */
 export function selectOverviewMeasures(diagnostic: FundamentalDiagnostic): FundamentalMeasure[] {
   const preferred = diagnostic.sector_family === "bank" || diagnostic.sector_family === "insurance"
-    ? ["net_income", "net_margin", "revenue_growth", "cash_conversion"]
+    ? ["net_income", "revenue", "net_margin", "revenue_growth"]
     : diagnostic.sector_family === "mining"
       ? ["revenue", "operating_cash_flow", "free_cash_flow", "revenue_growth"]
       : ["revenue_growth", "operating_margin", "free_cash_flow", "cash_conversion"];

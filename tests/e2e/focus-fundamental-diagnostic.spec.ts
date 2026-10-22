@@ -54,6 +54,32 @@ test("Focus diagnostic retains sources, stale status, bilingual modes and avoids
   expect(requests).toBe(beforeModeChange);
 });
 
+test("V6 refreshes a pending RY diagnostic and replaces the compact unavailable state with sourced observations", async ({ page }, testInfo) => {
+  let requests = 0;
+  let refreshed = false;
+  await page.route("**/stocks/RY/fundamental-intelligence/diagnostic", async route => {
+    requests++;
+    return route.fulfill({ json: !refreshed ? {
+      ...diagnostic, status: "unavailable", stale: false, refresh_in_progress: true,
+      source_message: "Synchronisation des données fondamentales en cours.",
+      measures: diagnostic.measures.map(item => ({ ...item, status: "insufficient", observations: [] })),
+      dimensions: diagnostic.dimensions.map(item => ({ ...item, available_count: 0, score: null })),
+      sector_metrics: diagnostic.sector_metrics.map(item => ({ ...item, status: "unavailable", value: null })),
+      findings: [],
+    } : { ...diagnostic, stale: false, refresh_in_progress: false } });
+  });
+  await page.goto("/focus/RY?view=diagnostic");
+  const panel = page.getByRole("region", { name: "Diagnostic financier 360°" });
+  await expect(panel.getByText(/Les sources sont encore en cours/)).toBeVisible();
+  await expect(panel.locator(".fd-tableWrap")).toHaveCount(0);
+  refreshed = true;
+  await expect(panel.getByText("La marge nette s'améliore.")).toBeVisible({ timeout: 10_000 });
+  expect(requests).toBeGreaterThanOrEqual(2);
+  await panel.getByText("Détails, sources et méthodes").click();
+  await expect(panel.getByRole("link", { name: /Issuer 2025/ })).toBeVisible();
+  if (process.env.CAPTURE_V6_STAGE === "after") await panel.screenshot({ path: testInfo.outputPath("v6-after-diagnostic.png") });
+});
+
 test("Four-space overview keeps sourced details available on desktop and mobile", async ({ page }, testInfo) => {
   await page.route("**/stocks/RY/fundamental-intelligence/diagnostic", route => route.fulfill({ json: {
     ...diagnostic,

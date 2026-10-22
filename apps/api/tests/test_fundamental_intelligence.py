@@ -83,6 +83,34 @@ def test_bank_does_not_inherit_industrial_leverage_and_liquidity_scores() -> Non
     assert dimensions["liquidity"].score_status == "not_applicable"
     assert dimensions["leverage"].score_status == "not_applicable"
     assert measures["debt_to_equity"].status == "not_applicable"
+    assert measures["cash_conversion"].status == "not_applicable"
+    assert measures["operating_margin"].status == "not_applicable"
+    assert len(measures["net_income"].observations) == 3
+
+
+def test_diagnostic_marks_background_refresh_and_does_not_invent_bank_data() -> None:
+    snapshot = sample_snapshot(sector="Financial Services, Banks")
+    snapshot.annual_financials = []
+    snapshot.status = "unavailable"
+    snapshot.message = "Synchronisation des données fondamentales en cours."
+    snapshot.refresh_in_progress = True
+    result = build_fundamental_diagnostic(snapshot)
+    assert result.refresh_in_progress is True
+    assert result.source_message == snapshot.message
+    assert all(not measure.observations for measure in result.measures)
+    assert all(metric.value is None for metric in result.sector_metrics)
+
+
+def test_diagnostic_uses_field_provenance_after_source_merge() -> None:
+    snapshot = sample_snapshot()
+    secondary = FinancialSource(source_type="yahoo_structured", source_name="Yahoo structured", confidence="secondary")
+    snapshot.annual_financials[0].field_sources = {"net_income": secondary}
+    result = build_fundamental_diagnostic(snapshot)
+    income = next(item for item in result.measures if item.key == "net_income")
+    margin = next(item for item in result.measures if item.key == "net_margin")
+    assert income.observations[0].source_name == "Yahoo structured"
+    assert income.observations[0].source_confidence == "secondary"
+    assert all(item.period_end.year != 2025 for item in margin.observations)
 
 
 def test_directional_index_requires_consecutive_fiscal_years() -> None:

@@ -89,6 +89,10 @@ class FundamentalDiagnostic(BaseModel):
     generated_at: datetime
     source_generated_at: datetime
     stale: bool
+    refresh_in_progress: bool = False
+    source_message: str | None = None
+    coverage_status: str | None = None
+    coverage_message: str | None = None
     financial_currency: str | None = None
     status: Literal["available", "partial", "unavailable"]
     measures: list[FundamentalMeasure]

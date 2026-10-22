@@ -290,17 +290,26 @@ def _merge_period(
     fallback: FinancialPeriod,
     stronger: FinancialPeriod,
 ) -> FinancialPeriod:
+    if fallback.currency and stronger.currency and fallback.currency != stronger.currency:
+        return stronger  # Do not combine monetary fields from different reporting currencies.
     data = fallback.model_dump()
     calculated = set(fallback.calculated_fields)
+    field_sources = dict(fallback.field_sources)
+    for field in VALUE_FIELDS:
+        if getattr(fallback, field) is not None:
+            field_sources.setdefault(field, fallback.source)
 
     for field in VALUE_FIELDS:
         value = getattr(stronger, field)
         if value is not None:
             data[field] = value
             calculated.discard(field)
+            field_sources[field] = stronger.field_sources.get(field, stronger.source)
 
     calculated.update(stronger.calculated_fields)
     data["calculated_fields"] = sorted(calculated)
+    data["field_sources"] = field_sources
+    data["period_end"] = stronger.period_end
 
     if stronger.currency:
         data["currency"] = stronger.currency

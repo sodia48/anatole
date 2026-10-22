@@ -141,7 +141,7 @@ def _observation(
     calculated: bool,
     inputs: list[str],
 ) -> FundamentalObservation:
-    source = row.source
+    source = row.field_sources[definition.numerator] if definition.numerator in row.field_sources else row.source
     derived = calculated or definition.numerator in row.calculated_fields
     return FundamentalObservation(
         value=round(value, 8),
@@ -161,12 +161,14 @@ def _observation(
 
 
 def _measure(snapshot: FundamentalSnapshot, rows: list[FinancialPeriod], definition: MeasureDefinition, family: str) -> FundamentalMeasure:
-    if family in {"bank", "insurance"} and definition.dimension in {"liquidity", "leverage"}:
+    if family in {"bank", "insurance"} and (definition.dimension in {"liquidity", "leverage"}
+            or definition.key in {"operating_margin", "free_cash_flow_margin", "operating_cash_flow_margin",
+                                  "cash_conversion", "free_cash_flow_conversion"}):
         return FundamentalMeasure(
             key=definition.key, label_fr=definition.label_fr, label_en=definition.label_en,
             dimension=definition.dimension, unit=definition.unit, status="not_applicable",
-            reason_fr="Ratios génériques non interprétables pour cette activité financière.",
-            reason_en="Generic ratios are not interpretable for this financial business.",
+            reason_fr="Ratio générique non interprétable pour cette activité financière.",
+            reason_en="Generic ratio is not interpretable for this financial business.",
             method_fr=definition.method_fr, method_en=definition.method_en,
         )
     observations: list[FundamentalObservation] = []
@@ -181,9 +183,11 @@ def _measure(snapshot: FundamentalSnapshot, rows: list[FinancialPeriod], definit
                 days = (row.period_end - prior.period_end).days
                 current, previous = _period_value(row, definition.numerator), _period_value(prior, definition.numerator)
                 currency = _currency(row, snapshot)
-                same_definition = (row.source is None and prior.source is None) or (
-                    row.source is not None and prior.source is not None
-                    and row.source.source_type == prior.source.source_type
+                current_source = row.field_sources[definition.numerator] if definition.numerator in row.field_sources else row.source
+                previous_source = prior.field_sources[definition.numerator] if definition.numerator in prior.field_sources else prior.source
+                same_definition = (current_source is None and previous_source is None) or (
+                    current_source is not None and previous_source is not None
+                    and current_source.source_type == previous_source.source_type
                 )
                 if 300 <= days <= 430 and currency is not None and currency == _currency(prior, snapshot) and same_definition and current is not None and previous is not None and previous > 0 and current >= 0:
                     value = (current / previous - 1) * definition.multiplier
@@ -191,7 +195,12 @@ def _measure(snapshot: FundamentalSnapshot, rows: list[FinancialPeriod], definit
         else:
             numerator = _period_value(row, definition.numerator)
             denominator = _period_value(row, definition.denominator or "")
-            if numerator is not None and denominator is not None and denominator > 0:
+            numerator_source = row.field_sources[definition.numerator] if definition.numerator in row.field_sources else row.source
+            denominator_source = row.field_sources[definition.denominator or ""] if definition.denominator in row.field_sources else row.source
+            comparable_sources = (numerator_source is None and denominator_source is None) or (
+                numerator_source is not None and denominator_source is not None
+                and numerator_source.source_type == denominator_source.source_type)
+            if comparable_sources and numerator is not None and denominator is not None and denominator > 0:
                 value = numerator / denominator * definition.multiplier
                 inputs.append(definition.denominator or "")
                 if definition.operation == "net_debt_to_ebitda" and row.net_debt is None:
@@ -333,6 +342,9 @@ def build_fundamental_diagnostic(snapshot: FundamentalSnapshot) -> FundamentalDi
         ticker=snapshot.ticker, name=snapshot.name, sector=snapshot.sector,
         industry=snapshot.industry, sector_family=family, generated_at=datetime.now(UTC),
         source_generated_at=snapshot.generated_at, stale=snapshot.stale,
+        refresh_in_progress=snapshot.refresh_in_progress, source_message=snapshot.message,
+        coverage_status=snapshot.official_coverage.status if snapshot.official_coverage else None,
+        coverage_message=snapshot.official_coverage.message if snapshot.official_coverage else None,
         financial_currency=snapshot.financial_currency, status=snapshot.status,
         measures=measures, dimensions=_dimensions(measures, rows, family),
         findings=_findings(measures),
