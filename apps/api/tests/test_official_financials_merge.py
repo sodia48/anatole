@@ -61,6 +61,23 @@ def test_official_values_override_only_when_present() -> None:
     assert merged.total_cash == 25
     assert merged.source is not None
     assert merged.source.confidence == "official"
+    assert merged.field_sources["total_cash"].confidence == "official"
+    assert merged.field_sources["total_revenue"] is None  # Unsourced fallback is not called an official observation.
+
+
+def test_merge_retains_original_currency_and_field_provenance() -> None:
+    secondary = FinancialSource(source_type="yahoo_structured", source_name="Yahoo structured", confidence="secondary")
+    fallback = period(revenue=100, cash=10, official=False).model_copy(update={"source": secondary})
+    official = period(revenue=None, cash=25, official=True)
+    merged = merge_periods([fallback], [official], limit=12)[0]
+    assert merged.field_sources["total_revenue"].source_type == "yahoo_structured"
+    assert merged.field_sources["total_cash"].source_type == "sec_edgar_xbrl"
+    assert merged.total_revenue == 100
+    usd = official.model_copy(update={"currency": "USD"})
+    incompatible = merge_periods([fallback], [usd], limit=12)
+    assert len(incompatible) == 1
+    assert incompatible[0].currency == "USD"
+    assert incompatible[0].total_revenue is None
 
 
 def test_public_status_reflects_real_coverage_and_source_failures() -> None:

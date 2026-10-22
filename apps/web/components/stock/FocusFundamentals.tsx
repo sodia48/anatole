@@ -149,7 +149,11 @@ type FinancialPeriod = {
   free_cash_flow_growth_yoy: number | null;
   calculated_fields: string[];
   source: FinancialSource | null;
+  field_sources?: Record<string, FinancialSource | null>;
 };
+
+const seriesSources = (rows: FinancialPeriod[], field: keyof FinancialPeriod) =>
+  rows.map(row => (row.field_sources && field in row.field_sources ? row.field_sources[field] : row.source)?.source_name ?? null);
 
 type TTMSummary = {
   period_end: string | null;
@@ -465,14 +469,14 @@ function Fundamentals({
         language={language} label={tr(language, "Mode de la synthèse", "Summary display mode")} />
       {mode === "charts" ? <FocusSeriesChart storageKey="summary" title={tr(language, "Croissance et rentabilité publiées", "Published growth and profitability")}
         periods={annual.map(row => row.period_end.slice(0, 10))}
-        periodCurrencies={annual.map(row => row.currency ?? currency)}
+        periodCurrencies={annual.map(row => row.currency)}
         periodSources={annual.map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)}
         series={[
-          { id: "revenue", label: tr(language, "Revenus", "Revenue"), values: annual.map(row => row.total_revenue) },
-          { id: "ebitda", label: tr(language, "BAIIA", "EBITDA"), values: annual.map(row => row.ebitda) },
-          { id: "operating", label: tr(language, "Résultat opérationnel", "Operating income"), values: annual.map(row => row.operating_income) },
-          { id: "income", label: tr(language, "Bénéfice net", "Net income"), values: annual.map(row => row.net_income) },
-          { id: "fcf", label: tr(language, "Flux disponible", "Free cash flow"), values: annual.map(row => row.free_cash_flow) },
+          { id: "revenue", label: tr(language, "Revenus", "Revenue"), values: annual.map(row => row.total_revenue), sources: seriesSources(annual, "total_revenue") },
+          { id: "ebitda", label: tr(language, "BAIIA", "EBITDA"), values: annual.map(row => row.ebitda), sources: seriesSources(annual, "ebitda") },
+          { id: "operating", label: tr(language, "Résultat opérationnel", "Operating income"), values: annual.map(row => row.operating_income), sources: seriesSources(annual, "operating_income") },
+          { id: "income", label: tr(language, "Bénéfice net", "Net income"), values: annual.map(row => row.net_income), sources: seriesSources(annual, "net_income") },
+          { id: "fcf", label: tr(language, "Flux disponible", "Free cash flow"), values: annual.map(row => row.free_cash_flow), sources: seriesSources(annual, "free_cash_flow") },
         ]} unit="money" currency={currency} language={language} source={snapshot.source} /> : null}
     <div className="ff-fundamentalsGrid" data-mode={mode}>
 
@@ -670,12 +674,13 @@ function StatementCharts({ rows, view, frequency, currency, language, source }: 
   return <div className="ff-chartGrid" data-testid="financials-chart-view">
     {moneyGroups.map((group, index) => {
       const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: tr(language, field.fr, field.en),
-        values: chronological.map(row => row[field.key] as number | null) }));
+        values: chronological.map(row => row[field.key] as number | null),
+        sources: seriesSources(chronological, field.key) }));
       return <FocusSeriesChart key={`${view}-${index}`} storageKey={`statements.${frequency}.${view}.${index}`} title={tr(language,
         view === "income" && index === 1 ? "BPA dilué publié" : "Évolution des données publiées",
         view === "income" && index === 1 ? "Published diluted EPS" : "Published data over time")}
         periods={chronological.map(row => row.period_end.slice(0, 10))}
-        periodCurrencies={chronological.map(row => row.currency ?? currency)}
+        periodCurrencies={chronological.map(row => row.currency)}
         periodSources={chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`)} series={series}
         unit={view === "margins" ? "percent" : view === "income" && index === 1 ? "per_share" : "money"} currency={currency} language={language} source={source} />;
     })}
@@ -798,7 +803,7 @@ function Financials({
           {overviewMode === "charts" ? <FocusSeriesChart storageKey="overview"
             title={tr(language, "Historique annuel publié", "Published annual history")}
             periods={annualChronological.map(row => row.period_end.slice(0, 10))}
-            periodCurrencies={annualChronological.map(row => row.currency ?? currency)}
+            periodCurrencies={annualChronological.map(row => row.currency)}
             periodSources={annualChronological.map(row => `${row.source?.source_name ?? snapshot.source} · ${row.source?.filed_at ?? "N/D"}`)}
             series={[
               { id: "revenue", label: tr(language, "Revenus", "Revenue"), values: annualChronological.map(row => row.total_revenue) },

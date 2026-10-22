@@ -121,6 +121,7 @@ test("V3 refuses to put two published currencies on one axis while retaining exa
   const mixed = { ...snapshot, annual_financials: annual.map((row, index) => index === 0 ? { ...row, currency: "USD" } : row) };
   await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: mixed }));
   const chart = await openSummary(page);
+  await chart.getByLabel("Période").selectOption("all");
   await expect(chart.getByRole("status")).toContainText("plusieurs devises");
   await chart.getByText("Données exactes du graphique").click();
   await expect(chart.locator("tbody tr")).toHaveCount(6);
@@ -148,4 +149,71 @@ test("V3 keeps chart preferences and English labels after navigation", async ({ 
   await expect(chart.getByLabel("Chart type")).toHaveValue("points");
   await expect(chart.getByLabel("Period")).toHaveValue("3y");
   await expect(chart.getByRole("group", { name: "Metrics and visible series" }).getByRole("button", { name: "Net income" })).toHaveAttribute("aria-pressed", "false");
+});
+
+test("V6 makes a long annual gap explicit and keeps dates legible at the rendered width", async ({ page }, testInfo) => {
+  const sparse = [2012, 2013, 2014, 2025, 2026].map((year, index) => ({
+    ...annual[0], period_end: `${year}-03-31`, total_revenue: 100 + index * 20,
+    ebitda: 20 + index * 3, net_income: 10 + index * 2,
+    source: { source_name: `Filed ${year}`, filed_at: `${year}-06-30` },
+  }));
+  await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: { ...snapshot, annual_financials: sparse } }));
+  const chart = await openSummary(page);
+  await chart.getByLabel("Période").selectOption("all");
+  if (process.env.CAPTURE_V6_STAGE === "before") {
+    await chart.screenshot({ path: testInfo.outputPath("v6-before-chart.png") });
+    return;
+  }
+  await expect(chart.getByText(/Axe par observations/)).toBeVisible();
+  await expect(chart.locator('g[aria-label="Intervalle sans données"]')).toHaveCount(1);
+  await expect(chart.locator('path[class*="line"]').first()).toBeVisible();
+  const ticks = await chart.locator('svg text[y="207"]').evaluateAll(nodes => nodes.map(node => {
+    const box = node.getBoundingClientRect();
+    return { left: box.left, right: box.right, text: node.textContent };
+  }));
+  expect(ticks[0]?.text).toBe("2012");
+  expect(ticks.at(-1)?.text).toBe("2026");
+  expect(ticks.every((tick, index) => index === 0 || ticks[index - 1].right + 4 < tick.left)).toBe(true);
+  await chart.getByText("Données exactes du graphique").click();
+  await expect(chart.locator("tbody tr")).toHaveCount(5);
+  await expect(chart.locator("tbody tr").first()).toContainText("2012-03-31");
+  if (process.env.CAPTURE_V6_STAGE === "after") await chart.screenshot({ path: testInfo.outputPath("v6-after-chart.png") });
+});
+
+test("V6 retains signed, zero and missing EPS without enabling invalid Base 100", async ({ page }) => {
+  const eps = [1.2, -0.4, 0, null, 1.5];
+  const rows = [2021, 2022, 2023, 2024, 2025].map((year, index) => ({
+    ...annual[0], period_end: `${year}-12-31`, diluted_eps: eps[index],
+    source: { source_name: `Issuer ${year}`, filed_at: `${year + 1}-02-10` },
+  }));
+  await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: { ...snapshot, annual_financials: rows } }));
+  await page.goto("/focus/RY");
+  await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
+  await page.getByRole("navigation", { name: "Focus sections" }).getByRole("button", { name: "Fondamentaux", exact: true }).click();
+  await page.getByRole("navigation", { name: "Vues fondamentales" }).getByRole("button", { name: "Explorer" }).click();
+  await page.getByRole("combobox", { name: "Contenu à explorer" }).selectOption("financials");
+  await page.getByRole("navigation", { name: "Vues des résultats financiers" }).getByRole("button", { name: "Annuel" }).click();
+  await page.getByRole("group", { name: "Mode d’affichage des états financiers" }).getByRole("button", { name: "Vue graphiques" }).click();
+  const chart = page.locator('section[aria-label="BPA dilué publié"]');
+  await chart.getByLabel("Type de graphique").selectOption("bar");
+  await expect(chart.getByRole("button", { name: "Base 100" })).toBeDisabled();
+  await expect(chart.locator('svg rect')).toHaveCount(4);
+  await chart.getByText("Données exactes du graphique").click();
+  await expect(chart.locator("tbody tr").nth(2)).toContainText("0");
+  await expect(chart.locator("tbody tr").nth(3)).toContainText("N/D");
+});
+
+test("V6 separates financial orders of magnitude into selectable axes", async ({ page }) => {
+  const distant = annual.map(row => ({ ...row, total_revenue: 1_000_000_000_000,
+    ebitda: 12_000_000_000, operating_income: 8_000_000_000, net_income: 3_000_000_000,
+    free_cash_flow: 2_000_000_000 }));
+  await page.route("**/stocks/RY/fundamentals", route => route.fulfill({ json: { ...snapshot, annual_financials: distant } }));
+  const chart = await openSummary(page);
+  const legend = chart.getByRole("group", { name: "Indicateurs et séries affichées" });
+  await expect(legend.getByRole("button", { name: "Revenus" })).toHaveAttribute("aria-pressed", "true");
+  await expect(legend.getByRole("button", { name: "BAIIA" })).toHaveAttribute("aria-pressed", "false");
+  const majorAxis = await chart.locator("svg").textContent();
+  await chart.getByRole("button", { name: "Autres montants" }).click();
+  await expect(legend.getByRole("button", { name: "BAIIA" })).toHaveAttribute("aria-pressed", "true");
+  expect(await chart.locator("svg").textContent()).not.toBe(majorAxis);
 });

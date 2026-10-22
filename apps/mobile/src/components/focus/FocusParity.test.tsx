@@ -52,7 +52,7 @@ describe("mobile Focus parity", () => {
     const base = { sector_family: "mining", measures: [measure("net_income", null), measure("revenue", 10),
       measure("operating_cash_flow", 8), measure("free_cash_flow", 0), measure("revenue_growth", 2), measure("other", 1)] } as unknown as FundamentalDiagnostic;
     expect(selectOverviewMeasures(base).map(item => item.key)).toEqual(["revenue", "operating_cash_flow", "free_cash_flow", "revenue_growth"]);
-    expect(selectOverviewMeasures({ ...base, sector_family: "bank" }).map(item => item.key)).toEqual(["revenue_growth", "revenue", "operating_cash_flow", "free_cash_flow"]);
+    expect(selectOverviewMeasures({ ...base, sector_family: "bank" }).map(item => item.key)).toEqual(["revenue", "revenue_growth", "operating_cash_flow", "free_cash_flow"]);
   });
   it("keeps LIVE as the first mobile Focus period", () => {
     expect(focusPeriods[0]).toEqual({ label: "LIVE", range: "1d", interval: "1m" });

@@ -22,7 +22,10 @@ function valueText(observation: FundamentalObservation | undefined, language: La
 }
 
 function sourceLink(observation: FundamentalObservation, language: Language) {
-  const label = `${observation.source_name} · ${observation.period_end.slice(0, 10)}${observation.filed_at ? ` · ${observation.filed_at.slice(0, 10)}` : ""}`;
+  const confidence = observation.source_confidence === "official"
+    ? tr(language, "officielle", "official")
+    : tr(language, "secondaire", "secondary");
+  const label = `${observation.source_name} · ${confidence} · ${observation.source_type ?? "N/D"} · ${observation.period_end.slice(0, 10)}${observation.filed_at ? ` · ${observation.filed_at.slice(0, 10)}` : ""}`;
   return observation.source_url?.startsWith("https://")
     ? <a href={observation.source_url} target="_blank" rel="noopener noreferrer">{label}</a>
     : <span>{label} · {tr(language, "URL indisponible", "URL unavailable")}</span>;
@@ -38,7 +41,7 @@ function MeasureDetails({ measure, language }: { measure: FundamentalMeasure; la
     <details><summary>{tr(language, "Méthode et historique", "Method and history")}</summary>
       <p>{language === "fr" ? measure.method_fr : measure.method_en}</p>
       {measure.observations.map(item => <p key={item.period_end}>
-        {item.period_end.slice(0, 10)} · {valueText(item, language)} · {tr(language,
+        {item.period_end.slice(0, 10)} · {valueText(item, language)} · {item.currency ?? ""} · {tr(language,
           item.nature === "published" ? "publié" : "calculé", item.nature === "published" ? "published" : "calculated")} · {sourceLink(item, language)}
       </p>)}
     </details>
@@ -76,10 +79,15 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
   const [detailsOpen, setDetailsOpen] = useState(focusSection === "sector");
   useEffect(() => {
     const controller = new AbortController();
-    void getFundamentalDiagnostic(ticker, controller.signal).then(value => {
-      if (!controller.signal.aborted) { setData(value); setError(false); }
-    }).catch(() => { if (!controller.signal.aborted) setError(true); });
-    return () => controller.abort();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let polls = 0;
+    const load = () => { void getFundamentalDiagnostic(ticker, controller.signal).then(value => {
+      if (controller.signal.aborted) return;
+      setData(value); setError(false);
+      if (value.refresh_in_progress && polls++ < 10) timer = setTimeout(load, 3_000);
+    }).catch(() => { if (!controller.signal.aborted) setError(true); }); };
+    load();
+    return () => { controller.abort(); clearTimeout(timer); };
   }, [ticker, retry]);
   const current = data?.ticker.replace(/\.TO$/i, "").toUpperCase() === ticker.replace(/\.TO$/i, "").toUpperCase() ? data : null;
   useEffect(() => {
@@ -96,12 +104,16 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
   const chartPoints = chartMeasure ? [...chartMeasure.observations].sort((a, b) => a.period_end.localeCompare(b.period_end)) : [];
   const availableSector = (current.sector_metrics ?? []).filter(item => item.value !== null && item.status === "available");
   const missingSector = (current.sector_metrics ?? []).filter(item => item.value === null || item.status !== "available");
+  const visibleDimensions = current.dimensions.filter(item => item.available_count > 0);
+  const unavailableDimensions = current.dimensions.filter(item => item.available_count === 0 && item.score_status !== "not_applicable");
   return <section className="fd-panel" aria-label={tr(language, "Diagnostic financier 360°", "Financial diagnostic 360°")}>
     <header><span className="eyebrow">FUNDAMENTAL INTELLIGENCE 360</span>
       <h2>{tr(language, "Diagnostic financier 360°", "Financial diagnostic 360°")}</h2>
       <p>{current.name} · {current.ticker} · {essentials[0]?.observations[0]?.period_end.slice(0, 10) ?? tr(language, "période indisponible", "period unavailable")}</p>
       {current.stale ? <p role="status">{tr(language, "Dernier instantané disponible; actualisation en cours ou différée.",
         "Latest available snapshot; refresh in progress or delayed.")}</p> : null}
+      {current.refresh_in_progress ? <p role="status">{tr(language, "Recherche des états financiers en cours…", "Financial statements are being retrieved…")}</p> : null}
+      {error ? <p role="status">{tr(language, "Actualisation échouée. Réessayez.", "Refresh failed. Retry.")}</p> : null}
     </header>
     {essentials.length ? <div className="fd-overviewGrid" aria-label={tr(language, "Indicateurs essentiels", "Key measures")}>
       {essentials.map(measure => <article key={measure.key} className="fd-overviewCard">
@@ -110,7 +122,18 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
         <span className="fd-muted">{measure.observations[0]?.period_end.slice(0, 10)}</span>
         <a href={`#fundamental-metric-${measure.key}`} onClick={() => setDetailsOpen(true)}>{tr(language, "Voir la source et la méthode", "View source and method")}</a>
       </article>)}
-    </div> : <p>{tr(language, "Données insuffisantes.", "Insufficient data.")}</p>}
+    </div> : <div className="fd-empty" role="status"><p>{current.refresh_in_progress
+      ? tr(language, "Les sources sont encore en cours de récupération. Le diagnostic se mettra à jour automatiquement.",
+        "Sources are still loading. The diagnostic will update automatically.")
+      : current.stale ? tr(language, "Instantané périmé; aucun exercice exploitable.",
+        "Stale snapshot; no usable annual periods.")
+      : current.status === "unavailable" ? tr(language, "Les sources financières sont temporairement inaccessibles.",
+        "Financial sources are temporarily unavailable.")
+      : tr(language, "Aucun exercice annuel vérifiable reçu.",
+        "No verifiable annual period received.")}</p>
+      {current.source_message && language === "fr" ? <p className="fd-muted">{current.source_message}</p> : null}
+      <button type="button" onClick={() => { setError(false); setRetry(value => value + 1); }}>{tr(language, "Vérifier les données", "Check data")}</button>
+    </div>}
     {chartMeasure ? <FocusSeriesChart storageKey="diagnostic.overview" title={language === "fr" ? chartMeasure.label_fr : chartMeasure.label_en}
       periods={chartPoints.map(point => point.period_end.slice(0, 10))} periodSources={chartPoints.map(point => point.source_name)}
       periodCurrencies={chartMeasure.unit === "money" ? chartPoints.map(point => point.currency) : undefined}
@@ -153,7 +176,7 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
     </section> : null}
     <FocusViewMode mode={mode} choose={choose} modes={modes} language={language}
       label={tr(language, "Mode du diagnostic", "Diagnostic display mode")} />
-    {current.dimensions.map(dimension => <section id={`diagnostic-dimension-${dimension.key}`} className="fd-dimension" key={dimension.key}>
+    {visibleDimensions.map(dimension => <section id={`diagnostic-dimension-${dimension.key}`} className="fd-dimension" key={dimension.key}>
       <h3>{language === "fr" ? dimension.label_fr : dimension.label_en}</h3>
       <details><summary>{dimension.score === null ? tr(language, "Indice non calculable", "Index unavailable")
         : `${tr(language, "Indice directionnel", "Directional index")} ${dimension.score}/100`}</summary>
@@ -174,9 +197,12 @@ export function FocusDiagnostic({ ticker, focusSection }: { ticker: string; focu
           return item ? <MeasureDetails key={key} measure={item} language={language} /> : null; })}
       </div> : null}
     </section>)}
-    {current.missing_data.length || missingSector.length ? <section className="fd-dimension"><h3>{tr(language, "Données non disponibles", "Unavailable data")}</h3>
-      <p>{current.missing_data.length + missingSector.length} {tr(language, "éléments à vérifier", "items to review")}</p>
-      <ul>{current.missing_data.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></section> : null}
+    {unavailableDimensions.length || current.missing_data.length || current.coverage_message ? <details className="fd-dimension"><summary>{tr(language, "Voir les détails techniques", "View technical details")}</summary>
+      {current.coverage_message ? <p>{language === "fr" ? current.coverage_message
+        : "Coverage and source availability are reported by the financial data service."}</p> : null}
+      {unavailableDimensions.length ? <p>{tr(language, "Groupes sans observation compatible", "Groups without compatible observations")}: {unavailableDimensions.map(item => language === "fr" ? item.label_fr : item.label_en).join(", ")}</p> : null}
+      {current.missing_data.length ? <p>{tr(language, "Calculs sans entrées comparables", "Calculations without comparable inputs")}: {current.missing_data.join(", ")}</p> : null}
+    </details> : null}
     </details>
     <p className="fd-muted">{tr(language, "Aucun score global ni recommandation d’achat ou de vente.", "No global score or buy/sell recommendation.")}</p>
   </section>;

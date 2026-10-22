@@ -176,6 +176,7 @@ class FinancialPeriod(BaseModel):
     free_cash_flow_growth_yoy: float | None = None
     calculated_fields: list[str] = Field(default_factory=list)
     source: FinancialSource | None = None
+    field_sources: dict[str, FinancialSource | None] = Field(default_factory=dict)
 
 
 class IssuerDocumentCandidate(BaseModel):

@@ -18,6 +18,8 @@
 .fd-cardAction { align-self: end; margin-top: 3px; color: var(--accent-text); font-size: 12px; font-weight: 750; text-decoration: none; }
 .fd-cardAction:hover, .fd-cardAction:focus-visible { text-decoration: underline; }
 .fd-muted { color: var(--text-secondary); font-size: 13px; }
+.fd-empty { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2, var(--panel)); }
+.fd-empty button { min-height: 38px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); color: var(--text); cursor: pointer; }
 .fd-findings { display: grid; gap: 10px; }
 .fd-findingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .fd-findingCard { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--panel-2, var(--panel)); }
