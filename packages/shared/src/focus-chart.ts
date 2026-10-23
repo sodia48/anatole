@@ -8,7 +8,8 @@ type AnnualPeriod = { period_end: string; source?: { confidence?: string } | nul
 export function focusFiscalYearEndMonth(annual: AnnualPeriod[]): number | null {
   const months = annual.filter(row => row.source?.confidence === "official")
     .map(row => /^\d{4}-\d{2}-\d{2}/.test(row.period_end) ? Number(row.period_end.slice(5, 7)) : 0);
-  return months.length && months.every(month => month >= 1 && month <= 12 && month === months[0]) ? months[0] : null;
+  return months.length > 0 && months.every(month => month >= 1 && month <= 12 && month === months[0])
+    ? months[0] ?? null : null;
 }
 
 /** A fiscal quarter is asserted only when a verified annual close supports it. */
