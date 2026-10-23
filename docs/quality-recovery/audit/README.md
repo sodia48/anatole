@@ -26,17 +26,20 @@ Le Quality Gate complet de la PR #162 a validé `api-tests`, `web-build`, `mobil
 | P1 | Les dates trimestrielles étaient réduites à des années répétées; un graphique pouvait être trompeur. | Corrigé dans la PR #162, fusionnée après quatre contrôles verts. |
 | P1 | Le flux Atom de Statistique Canada pouvait répondre HTTP 200 avec une page HTML; quatre catégories affichaient la même erreur XML. | Corrigé dans la PR #163, à fusionner seulement après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
 | P1 | Le tableau de bord mettait en avant des cartes N/D et utilisait parfois une devise TTM erronée. | Corrigé dans la PR #164, à fusionner seulement après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
-| P1 — dépendance externe | Les anciens RSS officiels de Nouvelle-Écosse ne fournissent plus de document RSS exploitable. | Bloqué par la source officielle; détail ci-dessous. Ne pas inventer de publications. |
+| P2 — source ancienne | Les anciens RSS de communiqués de Nouvelle-Écosse ne fournissent plus de document RSS exploitable. | Le mode provincial prioritaire fonctionne avec d'autres pages statistiques officielles et StatCan; documenter le flux obsolète sans inventer de communiqués. |
 
 ### Flux de Nouvelle-Écosse : preuve et limite
 
-Le 23 octobre 2026, les trois URL publiées sur la [page RSS officielle](https://novascotia.ca/news/rss/) et utilisées pour le flux général, Économie (`dept=135`) et Finances (`dept=10`) ont toutes renvoyé `HTTP 200`, `Content-Type: application/rss+xml; Charset=utf-8`, sans redirection et avec **25 octets** : `<?xml version="1.0"?>` suivi de lignes vides. Cette réponse n'a ni racine RSS ni item; le parseur ne peut donc pas produire d'actualité fiable. Le [site officiel actuel des communiqués](https://news.novascotia.ca/) publie encore des articles, mais aucune URL RSS de remplacement n'a été trouvée dans sa page d'accueil. Une conversion HTML non documentée serait fragile. Conserver le dernier instantané valide s'il existe, signaler l'indisponibilité et demander une URL ou une API officielle maintenue est le suivi nécessaire. Aucun horodatage de dernière collecte ne doit être fabriqué après redémarrage.
+Le 23 octobre 2026, les trois URL publiées sur la [page RSS officielle](https://novascotia.ca/news/rss/) pour le flux général, Économie (`dept=135`) et Finances (`dept=10`) ont toutes renvoyé `HTTP 200`, `Content-Type: application/rss+xml; Charset=utf-8`, sans redirection et avec **25 octets** : `<?xml version="1.0"?>` suivi de lignes vides. Cette réponse n'a ni racine RSS ni item; le parseur ne peut donc pas en déduire une actualité fiable. Le [site officiel actuel des communiqués](https://news.novascotia.ca/) publie encore des articles, mais aucune URL RSS de remplacement n'a été trouvée dans sa page d'accueil. Une conversion HTML non documentée serait fragile.
+
+Le parcours réel de la preview Vercel #163 reste fonctionnel : le 23 octobre, le filtre Nouvelle-Écosse montrait **deux publications datées**, l'une de Nova Scotia Economics and Statistics, l'autre de Statistique Canada, et leurs deux états de source étaient « disponible ». Ce mode prioritaire utilise les pages statistiques officielles et StatCan, pas les anciens RSS de communiqués. Le suivi P2 consiste à retirer ou remplacer ces URL vieillies uniquement quand une source officielle maintenue est confirmée; ne pas inventer d'articles ni de date de collecte.
 
 ## Qualité P2 à traiter par ordre
 
 1. Vérifier par géométrie et captures les actions flottantes sur les petits écrans et les pages longues; corriger uniquement les chevauchements qui masquent effectivement un contrôle ou une donnée.
-2. Faire une passe visuelle FR/EN et sombre/bleu ciel sur les pages Focus, Actualités et Portefeuille avec données partielles, après intégration des PR #163 et #164.
-3. Répéter un test de bout en bout sur les previews Vercel et le backend Render si l'accès et les données de test le permettent. Les mocks locaux et GitHub Actions ne prouvent pas le comportement du déploiement réel.
+2. Remplacer ou retirer les anciens RSS de Nouvelle-Écosse après confirmation d'un flux officiel maintenu. Le mode provincial actuel doit continuer à utiliser ses sources statistiques officielles valides.
+3. Faire une passe visuelle FR/EN et sombre/bleu ciel sur les pages Focus, Actualités et Portefeuille avec données partielles, après intégration des PR #163 et #164.
+4. Répéter un test de bout en bout sur les previews Vercel et le backend Render si l'accès et les données de test le permettent. La preview Vercel #163 a été consultée; cela ne prouve pas le comportement du backend Render de production.
 
 ## Règle de sortie
 
