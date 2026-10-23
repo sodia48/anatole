@@ -37,3 +37,22 @@ for (const state of ["unavailable", "available"] as const) {
     await expect(details.locator("article")).toBeVisible();
   });
 }
+
+test("provincial feed still renders after its filtering module loads", async ({ page }) => {
+  await page.route("**/api/anatole/api/v1/discovery/news?**", (route) => route.fulfill({ json: {
+    items: [], source_statuses: [], generated_at: collectedAt, refresh_after_seconds: 60,
+  } }));
+  await page.route("**/api/anatole/api/v1/discovery/provincial-macro?**", (route) => route.fulfill({ json: {
+    region: "QC", province: "Québec", language: "fr", mode: "province-first",
+    latest_releases: [{ id: "qc-direct", region: "QC", province: "Québec", title: "Emploi au Québec",
+      summary: "Publication provinciale officielle", category: "Travail", importance: "Élevée",
+      importance_score: 80, source: "Institut de la statistique du Québec", source_kind: "statistics",
+      source_url: "https://statistique.quebec.ca/fr/communique", published_at: collectedAt,
+      period: null, official: true, specificity: "province-direct" }],
+    upcoming_events: [], sources: [], generated_at: collectedAt, refresh_after_seconds: 60, message: null,
+  } }));
+  await page.goto("/actualites");
+  await page.getByRole("combobox", { name: "Région" }).selectOption("QC");
+  await expect(page.getByText("Emploi au Québec")).toBeVisible();
+  await expect(page.getByText("Publication provinciale officielle")).toBeVisible();
+});

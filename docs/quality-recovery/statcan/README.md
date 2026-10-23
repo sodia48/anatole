@@ -12,6 +12,8 @@ Les journaux indiquent désormais l'URL demandée, l'URL finale, le statut HTTP,
 
 Le fournisseur produit un seul état technique. Les catégories Travail, Comptes économiques, Commerce international et Énergie restent des filtres éditoriaux. Lors d'une panne, les dernières publications valides conservées en mémoire restent visibles comme périmées; la date de dernière collecte StatCan réussie est transmise lorsque cette instance l'a vérifiée. Après redémarrage sans collecte antérieure, aucune date n'est inventée. L'interface n'affiche qu'un avis compact et range les états techniques dans « État des sources ». Les erreurs de parseur ne sont plus affichées au public.
 
+Le filtrage spécialisé des publications provinciales se charge uniquement lorsqu'une province est sélectionnée. L'ordre des sources provinciales directes et le repli StatCan sont préservés; les tests couvrent ce chargement sur ordinateur et mobile. Cette séparation maintient le budget JavaScript web existant sans augmenter ses seuils.
+
 ## Captures avant/après
 
 Les captures utilisent les mêmes données simulées sur `main` (`0cf524e5d3c1486e980e65bfc06a60177cad81cc`) et sur cette branche. Elles valident le rendu, pas la disponibilité du fournisseur en production.
@@ -27,8 +29,9 @@ Les captures utilisent les mêmes données simulées sur `main` (`0cf524e5d3c148
 
 - Réponse HTML avec commentaire initial et statut 200; retry puis Atom valide.
 - Atom valide avec type MIME erroné, repli last-good daté, état fournisseur unique et détail public sûr.
-- Test E2E du fil macro sur Chromium ordinateur et Pixel 7 : 4 parcours réussis.
-- `python -m pytest apps/api/tests -q --basetemp .pytest-tmp/api-basetemp-20261022` : 847 tests réussis (7 avertissements sans échec).
-- `pnpm typecheck:web` et `pnpm lint:web` : réussis; le lint conserve six avertissements préexistants dans Advisor.
+- Test E2E du fil macro et du mode provincial sur Chromium ordinateur et Pixel 7 : 6 parcours réussis.
+- `python -m pytest apps/api/tests -q --basetemp .pytest-tmp/api-basetemp-final` : 847 tests réussis (3 avertissements sans échec).
+- `pnpm typecheck:web`, `pnpm build:web` et `pnpm lint:web` : réussis; le lint conserve six avertissements préexistants dans Advisor.
+- `pnpm check:performance` : 2 209 531 octets de chunks web, sous le seuil inchangé de 2 209 777 octets.
 
 Les autres sources provinciales ont leurs propres flux. Une erreur XML éventuelle chez l'une d'elles doit être diagnostiquée séparément; elle ne prouve pas une panne du fil StatCan.
