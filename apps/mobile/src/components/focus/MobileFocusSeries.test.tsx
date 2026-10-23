@@ -14,10 +14,11 @@ it("selects multiple native metrics, an exact touch point, chart type and a real
   await fireEvent.press(screen.getByText("Aire"));
   await fireEvent.press(screen.getByText("1y"));
   await fireEvent.press(screen.getByTestId("focus-point-revenue-5"));
-  expect(screen.getAllByText("2025-12-31").length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/2025-12-31/).length).toBeGreaterThan(0);
   expect(screen.getByText("Source: Issuer 2025-12-31")).toBeTruthy();
   await fireEvent.press(screen.getAllByText("Bénéfice net")[0]!);
   await fireEvent.press(screen.getByText("Tout"));
   await fireEvent.press(screen.getByText("Base 100"));
+  await fireEvent.press(screen.getByText("Comprendre le graphique"));
   expect(screen.getByText(/Base 100 au 2015-12-31/)).toBeTruthy();
 });

@@ -15,6 +15,7 @@ import { FocusViewMode, useFocusMode, type FocusMode } from "./FocusViewMode";
 import { localeFor, pick } from "@/lib/i18n";
 import { getFocusFundamentalOverlay } from "@/lib/api";
 import { analystRecommendation, formatFinancialNumber } from "@anatole/shared/financial-display";
+import { focusFiscalYearEndMonth, focusPeriodLabel } from "@anatole/shared/focus-chart";
 
 const tr = pick;
 
@@ -643,9 +644,9 @@ function FinancialTable({
   );
 }
 
-function StatementCharts({ rows, view, frequency, currency, language, source }: {
+function StatementCharts({ rows, view, frequency, fiscalYearEndMonth, currency, language, source }: {
   rows: FinancialPeriod[]; view: StatementView; currency: string;
-  language: "fr" | "en"; source: string; frequency: "annual" | "quarterly";
+  language: "fr" | "en"; source: string; frequency: "annual" | "quarterly"; fiscalYearEndMonth: number | null;
 }) {
   type SeriesField = { key: keyof FinancialPeriod; fr: string; en: string };
   const moneyGroups: SeriesField[][] = view === "income" ? [[
@@ -671,6 +672,10 @@ function StatementCharts({ rows, view, frequency, currency, language, source }: 
       { key: "eps_growth_yoy", fr: "Croissance BPA", en: "EPS growth" },
     ]];
   const chronological = [...rows].sort((a, b) => a.period_end.localeCompare(b.period_end));
+  const periods = chronological.map(row => row.period_end.slice(0, 10));
+  const periodLabels = chronological.map(row => focusPeriodLabel(row.period_end, frequency, fiscalYearEndMonth));
+  const periodCurrencies = chronological.map(row => row.currency);
+  const periodSources = chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`);
   return <div className="ff-chartGrid" data-testid="financials-chart-view">
     {moneyGroups.map((group, index) => {
       const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: tr(language, field.fr, field.en),
@@ -679,9 +684,8 @@ function StatementCharts({ rows, view, frequency, currency, language, source }: 
       return <FocusSeriesChart key={`${view}-${index}`} storageKey={`statements.${frequency}.${view}.${index}`} title={tr(language,
         view === "income" && index === 1 ? "BPA dilué publié" : "Évolution des données publiées",
         view === "income" && index === 1 ? "Published diluted EPS" : "Published data over time")}
-        periods={chronological.map(row => row.period_end.slice(0, 10))}
-        periodCurrencies={chronological.map(row => row.currency)}
-        periodSources={chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`)} series={series}
+        periods={periods} periodLabels={periodLabels} periodCurrencies={periodCurrencies}
+        periodSources={periodSources} series={series}
         unit={view === "margins" ? "percent" : view === "income" && index === 1 ? "per_share" : "money"} currency={currency} language={language} source={source} />;
     })}
   </div>;
@@ -861,6 +865,7 @@ function Financials({
             label={tr(language, "Mode d’affichage des états financiers", "Financial statements display mode")} />
           {mode === "charts" ? <StatementCharts rows={subview === "quarterly" ? quarterly : annual}
             view={statementView} frequency={subview === "quarterly" ? "quarterly" : "annual"}
+            fiscalYearEndMonth={focusFiscalYearEndMonth(annual)}
             currency={currency} language={language} source={snapshot.source} />
             : <FinancialTable rows={subview === "quarterly" ? quarterly : annual}
               view={statementView} currency={currency} mode={mode} />}
