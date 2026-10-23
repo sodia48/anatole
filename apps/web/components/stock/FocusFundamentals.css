@@ -121,6 +121,14 @@
 .ff-trendValue { color: var(--text); text-align: right; font-size: 11px; }
 .ff-trendValue[data-tone="negative"] { color: var(--negative-text); }
 .ff-dashboardMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.ff-overviewFreshness, .ff-overviewEmpty { margin: 0 0 12px; color: var(--text-secondary); font-size: 12px; }
+.ff-missingData { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.ff-missingData summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+.ff-missingData ul { margin: 12px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 16px; }
+.ff-missingData li { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border); padding: 8px 0; font-size: 12px; }
+.ff-missingData li span { min-width: 0; overflow-wrap: anywhere; }
+.ff-missingData li small { color: var(--text-secondary); text-align: right; }
+.ff-missingData > .ff-dashboardMetrics { margin-top: 12px; }
 .ff-analystsStack { display: grid; gap: 14px; }
 .ff-analystsHero { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; padding: 18px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel-2); }
 .ff-analystsRating { margin: 5px 0 8px; font-size: 28px; }
