@@ -10,7 +10,10 @@
 .scale button[aria-pressed="true"] { border-color: var(--interactive); color: var(--interactive); }
 .scale button:disabled { opacity: .5; cursor: not-allowed; }
 .explanation { color: var(--text-secondary); font-size: 11px; }
-.scale button:focus-visible, .presets button:focus-visible, .controls select:focus-visible, .legend button:focus-visible, .data summary:focus-visible, .tooltip button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
+.help { color: var(--text-secondary); font-size: 11px; }
+.help summary { cursor: pointer; width: fit-content; }
+.help p { margin: 5px 0 0; }
+.scale button:focus-visible, .presets button:focus-visible, .controls select:focus-visible, .legend button:focus-visible, .data summary:focus-visible, .help summary:focus-visible, .tooltip button:focus-visible { outline: 2px solid var(--interactive); outline-offset: 2px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .legend button { border-left: 4px solid var(--series-color); }
 .legend button[aria-pressed="false"] { opacity: .55; }
@@ -39,5 +42,5 @@
 .data th, .data td { padding: 8px; border-bottom: 1px solid var(--border); text-align: right; }
 .data th:first-child { text-align: left; }
 .cellSource { display: block; color: var(--text-secondary); font-size: 10px; }
-@media (max-width: 700px) { .chart { padding: 12px 12px calc(100px + env(safe-area-inset-bottom)); } .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .controls select { width: 100%; } .scale { grid-column: 1 / -1; } .tooltip { position: sticky; left: 0 !important; bottom: auto; width: auto; transform: none; margin: 0 5px 8px; } }
+@media (max-width: 700px) { .chart { padding: 12px 12px calc(100px + env(safe-area-inset-bottom)); } .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .controls select { width: 100%; } .scale { grid-column: 1 / -1; } .presets, .legend { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } .presets button, .legend button { flex: 0 0 auto; } .tooltip { position: sticky; left: 0 !important; bottom: auto; width: auto; transform: none; margin: 0 5px 8px; } }
 @media (prefers-reduced-motion: reduce) { .area, .point { transition: none; } }

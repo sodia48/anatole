@@ -2,6 +2,32 @@
 export type FocusChartRange = "1y" | "3y" | "5y" | "10y" | "all";
 export type FocusChartShape = "line" | "bar" | "area" | "points";
 export type FocusChartInput = { id: string; values: (number | null)[] };
+type AnnualPeriod = { period_end: string; source?: { confidence?: string } | null };
+
+/** Only published annual closes can establish the issuer's fiscal year end. */
+export function focusFiscalYearEndMonth(annual: AnnualPeriod[]): number | null {
+  const months = annual.filter(row => row.source?.confidence === "official")
+    .map(row => /^\d{4}-\d{2}-\d{2}/.test(row.period_end) ? Number(row.period_end.slice(5, 7)) : 0);
+  return months.length > 0 && months.every(month => month >= 1 && month <= 12 && month === months[0])
+    ? months[0] ?? null : null;
+}
+
+/** A fiscal quarter is asserted only when a verified annual close supports it. */
+export function focusPeriodLabel(period: string, frequency: "annual" | "quarterly", fiscalYearEndMonth: number | null = null): string {
+  const explicit = period.match(/(?:^|\D)(\d{4})-Q([1-4])(?:\D|$)/i);
+  if (frequency === "quarterly" && explicit) return `Q${explicit[2]} ${explicit[1]}`;
+  const match = period.match(/(?:^|\D)(\d{4})-(\d{2})-(\d{2})(?:\D|$)/);
+  if (!match || focusPeriodDate(period) === null) return period;
+  const year = Number(match[1]), month = Number(match[2]);
+  if (frequency === "annual") return String(year);
+  if (fiscalYearEndMonth !== null && Number.isInteger(fiscalYearEndMonth)
+      && fiscalYearEndMonth >= 1 && fiscalYearEndMonth <= 12
+      && (month - fiscalYearEndMonth + 12) % 3 === 0) {
+    const quarter = Math.floor(((month - fiscalYearEndMonth + 11) % 12) / 3) + 1;
+    return `Q${quarter} ${month <= fiscalYearEndMonth ? year : year + 1}`;
+  }
+  return `Q${Math.ceil(month / 3)} ${year} (cal.)`;
+}
 
 const years: Record<Exclude<FocusChartRange, "all">, number> = {
   "1y": 1, "3y": 3, "5y": 5, "10y": 10,

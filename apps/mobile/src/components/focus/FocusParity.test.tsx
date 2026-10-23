@@ -242,7 +242,7 @@ describe("mobile Focus parity", () => {
     expect(view.getByText("Évolution des résultats publiés")).toBeTruthy();
     await fireEvent.press(view.getByText("Tableau"));
     expect(view.getByText("États financiers publiés")).toBeTruthy();
-    expect(view.getByText("2025-12-31")).toBeTruthy();
+    expect(view.getByText("2025 · 2025-12-31")).toBeTruthy();
   });
   it("uses pie and donut only for a valid native analyst distribution", async () => {
     const view = await render(<MobileFocusAnalysts error={null} loading={false} onRetry={jest.fn()} snapshot={snapshot} />);
