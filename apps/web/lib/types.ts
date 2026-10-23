@@ -341,6 +341,7 @@ export type FeedStatus = {
   source: string;
   status: string;
   detail: string | null;
+  last_success_at?: string | null;
 };
 
 export type NewsItem = {

@@ -487,6 +487,19 @@ export function NewsClient() {
   const activeData = provinceMode
     ? provincialData ?? data
     : data;
+  const statcanFeeds = (data?.source_statuses ?? []).filter((item) =>
+    item.source.startsWith("Statistique Canada"),
+  );
+  const statcanFeedStatus = statcanFeeds.length ? {
+    key: "statcan-feed",
+    label: "Statistique Canada",
+    status: statcanFeeds.some((item) => item.status === "ok") ? "available"
+      : statcanFeeds.some((item) => item.status === "stale") ? "stale" : "unavailable",
+    detail: statcanFeeds.some((item) => item.status === "ok")
+      ? pick(language, "Flux officiel accessible", "Official feed available")
+      : pick(language, "Flux officiel temporairement indisponible", "Official feed temporarily unavailable"),
+    lastSuccessAt: statcanFeeds.map((item) => item.last_success_at).filter((date): date is string => Boolean(date)).sort().at(-1) ?? null,
+  } : null;
   const sourceStatuses = provinceMode
     ? Array.from(
         items.reduce((grouped, item) => {
@@ -502,12 +515,12 @@ export function NewsClient() {
           `${count} publication${count === 1 ? "" : "s"} officielle${count === 1 ? "" : "s"} datée${count === 1 ? "" : "s"}.`,
           `${count} dated official release${count === 1 ? "" : "s"}.`,
         ),
+        lastSuccessAt: null as string | null,
       }))
-    : (data?.source_statuses ?? [])
-        .filter((item) =>
-          item.source.startsWith("Statistique Canada") ||
-          item.source.startsWith("Banque du Canada"),
-        )
+    : [
+        ...(statcanFeedStatus ? [statcanFeedStatus] : []),
+        ...(data?.source_statuses ?? [])
+        .filter((item) => item.source.startsWith("Banque du Canada"))
         .map((item) => ({
           key: item.source,
           label: item.source,
@@ -518,7 +531,15 @@ export function NewsClient() {
                 ? "stale"
               : "unavailable",
           detail: item.detail,
-        }));
+          lastSuccessAt: item.last_success_at ?? null,
+        })),
+      ];
+  const statcanIssue = sourceStatuses.find((item) =>
+    item.label.startsWith("Statistique Canada") && item.status !== "available",
+  );
+  const sourceIssueCount = sourceStatuses.filter((item) =>
+    item.status === "unavailable" || item.status === "stale",
+  ).length;
 
   if (!activeData && !error) {
     return (
@@ -617,6 +638,14 @@ export function NewsClient() {
         </div>
       ) : null}
 
+      {statcanIssue ? <p className="source-status-notice" role="status">
+        {pick(language,
+          "Certaines publications de Statistique Canada sont temporairement indisponibles.",
+          "Some Statistics Canada releases are temporarily unavailable.")}
+        {statcanIssue.lastSuccessAt ? ` ${pick(language, "Dernière collecte réussie", "Last successful collection")}: ${new Date(statcanIssue.lastSuccessAt).toLocaleDateString(localeFor(language))}.` : null}
+      </p> : null}
+      <details className="panel source-status-details">
+        <summary>{pick(language, "État des sources", "Source status")}{sourceIssueCount ? ` · ${sourceIssueCount}` : ""}</summary>
       <section className="source-status-grid">
         {sourceStatuses.map(
           (item) => (
@@ -665,6 +694,7 @@ export function NewsClient() {
           ),
         )}
       </section>
+      </details>
 
       <section className="panel filter-bar">
         <label className="filter-search">

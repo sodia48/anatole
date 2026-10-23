@@ -191,6 +191,10 @@ export function localizeFeedDetail(
   const cleaned =
     cleanRelayMention(value);
 
+  if (/XML invalide|réponse HTML reçue|racine XML non reconnue/i.test(cleaned)) {
+    return pick(language, "Source temporairement indisponible", "Source temporarily unavailable");
+  }
+
   if (
     language === "fr" ||
     !cleaned
