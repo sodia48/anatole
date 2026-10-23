@@ -672,6 +672,10 @@ function StatementCharts({ rows, view, frequency, fiscalYearEndMonth, currency, 
       { key: "eps_growth_yoy", fr: "Croissance BPA", en: "EPS growth" },
     ]];
   const chronological = [...rows].sort((a, b) => a.period_end.localeCompare(b.period_end));
+  const periods = chronological.map(row => row.period_end.slice(0, 10));
+  const periodLabels = chronological.map(row => focusPeriodLabel(row.period_end, frequency, fiscalYearEndMonth));
+  const periodCurrencies = chronological.map(row => row.currency);
+  const periodSources = chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`);
   return <div className="ff-chartGrid" data-testid="financials-chart-view">
     {moneyGroups.map((group, index) => {
       const series: FocusChartSeries[] = group.map(field => ({ id: field.key, label: tr(language, field.fr, field.en),
@@ -680,10 +684,8 @@ function StatementCharts({ rows, view, frequency, fiscalYearEndMonth, currency, 
       return <FocusSeriesChart key={`${view}-${index}`} storageKey={`statements.${frequency}.${view}.${index}`} title={tr(language,
         view === "income" && index === 1 ? "BPA dilué publié" : "Évolution des données publiées",
         view === "income" && index === 1 ? "Published diluted EPS" : "Published data over time")}
-        periods={chronological.map(row => row.period_end.slice(0, 10))}
-        periodLabels={chronological.map(row => focusPeriodLabel(row.period_end, frequency, fiscalYearEndMonth))}
-        periodCurrencies={chronological.map(row => row.currency)}
-        periodSources={chronological.map(row => `${row.source?.source_name ?? source} · ${row.source?.filed_at ?? "N/D"}`)} series={series}
+        periods={periods} periodLabels={periodLabels} periodCurrencies={periodCurrencies}
+        periodSources={periodSources} series={series}
         unit={view === "margins" ? "percent" : view === "income" && index === 1 ? "per_share" : "money"} currency={currency} language={language} source={source} />;
     })}
   </div>;

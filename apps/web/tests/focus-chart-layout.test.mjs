@@ -14,12 +14,19 @@ test("browser chart calculations preserve the shared financial rules", () => {
   const selected = browser.indexes(periods, "all");
   assert.equal(browser.base100Reference(series, selected), shared.focusBase100Reference(series, selected));
   assert.equal(browser.chartValue(120, 100), shared.focusChartValue(120, 100));
+  assert.equal(browser.seriesValue(series[0], 2, selected, false, null), 0);
+  assert.deepEqual(browser.plottedValues(series, selected, false, null, false), [2, -1, 0, 3]);
   assert.deepEqual(browser.chartChange(series[0].values, selected, 4), shared.focusChartChange(series[0].values, selected, 4));
   const layout = browser.createLayout(periods, selected, [2, -1, 0, 3], "line", 320, "fr");
   assert.deepEqual(layout.gaps, [3]);
   assert.deepEqual(layout.ticks, [0, 4]);
   assert.equal(layout.label(periods[0]), "2012");
   assert.ok(layout.x(4) <= 320);
+  assert.deepEqual(browser.lineSegments(series[0], selected, layout.gaps, false, null, layout.x, layout.y)
+    .map(part => part.length), [3, 1]);
+  assert.deepEqual(browser.currencyState([0, 1], ["CAD", "USD"], "CAD", "money"),
+    { unknown: false, mixed: true });
+  assert.deepEqual(browser.rangeAt({ values: [5], lows: [4], highs: [6] }, 0, false), [4, 6]);
 });
 
 test("quarter labels respect verified fiscal closes and do not invent a fiscal quarter", () => {

@@ -6,13 +6,9 @@ type AnnualPeriod = { period_end: string; source?: { confidence?: string } | nul
 
 /** Only published annual closes can establish the issuer's fiscal year end. */
 export function focusFiscalYearEndMonth(annual: AnnualPeriod[]): number | null {
-  const official = annual.filter(row => row.source?.confidence === "official");
-  const months = official.map(row => {
-    const match = row.period_end.match(/^\d{4}-(\d{2})-\d{2}/);
-    return match ? Number(match[1]) : null;
-  });
-  return months.length && months.every(month => month !== null && month >= 1 && month <= 12 && month === months[0])
-    ? months[0] ?? null : null;
+  const months = annual.filter(row => row.source?.confidence === "official")
+    .map(row => /^\d{4}-\d{2}-\d{2}/.test(row.period_end) ? Number(row.period_end.slice(5, 7)) : 0);
+  return months.length && months.every(month => month >= 1 && month <= 12 && month === months[0]) ? months[0] : null;
 }
 
 /** A fiscal quarter is asserted only when a verified annual close supports it. */

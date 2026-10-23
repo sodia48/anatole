@@ -49,6 +49,43 @@ export function base100Reference(series, selected) {
 export const chartValue = (value, reference) => value !== null && value !== undefined && Number.isFinite(value)
   && reference !== null && reference !== undefined && Number.isFinite(reference) && reference > 0
   ? value / reference * 100 : null;
+export const seriesValue = (item, index, selected, normalized, base) => normalized
+  ? selected.indexOf(index) < selected.indexOf(base) ? null : chartValue(item.values[index], item.values[base])
+  : item.values[index];
+export const plottedValues = (series, selected, normalized, base, mixedCurrencies) => mixedCurrencies ? []
+  : series.flatMap(item => selected.flatMap(index => {
+    const value = seriesValue(item, index, selected, normalized, base);
+    return (normalized ? [value] : [value, item.lows?.[index], item.highs?.[index]])
+      .filter(number => number !== null && number !== undefined && Number.isFinite(number));
+  }));
+export function lineSegments(item, selected, gaps, normalized, base, x, y) {
+  const segments = []; let part = [];
+  selected.forEach((index, position) => {
+    const value = seriesValue(item, index, selected, normalized, base);
+    if (value === null || value === undefined || !Number.isFinite(value)) {
+      if (part.length) segments.push(part);
+      part = [];
+    } else {
+      if (gaps.includes(position) && part.length) { segments.push(part); part = []; }
+      part.push(`${x(position)} ${y(value)}`);
+    }
+  });
+  if (part.length) segments.push(part);
+  return segments;
+}
+export function currencyState(selected, periodCurrencies, currency, unit) {
+  if (unit !== "money" && unit !== "per_share") return { unknown: false, mixed: false };
+  const values = selected.map(index => periodCurrencies ? periodCurrencies[index] : currency);
+  const unknown = Boolean(periodCurrencies?.length) && values.some(value => !value);
+  return { unknown, mixed: unknown || new Set(values.filter(Boolean)).size > 1 };
+}
+export function rangeAt(item, index, normalized) {
+  if (normalized) return null;
+  const low = item.lows?.[index], high = item.highs?.[index], value = item.values[index];
+  return low !== null && low !== undefined && high !== null && high !== undefined
+    && value !== null && Number.isFinite(low) && Number.isFinite(high) && low <= value && value <= high
+    ? [low, high] : null;
+}
 export function chartChange(values, selected, at) {
   const position = selected.indexOf(at), value = values[at];
   if (position < 1 || value === null || value === undefined || !Number.isFinite(value)) return null;
@@ -127,6 +164,10 @@ const copy = {
     source: "Source", estimate: "Estimation", published: "Donnée publiée", since: "depuis",
     low: "Bas", consensus: "Consensus", high: "Haut",
     financial: "Sources financières", details: "Voir les détails · Données exactes du graphique",
+    forecast: "Prévisions / consensus", observations: "Observations publiées", help: "Comprendre le graphique",
+    unavailableChart: "Graphique temporairement indisponible; données exactes ci-dessous.",
+    chartValues: "Graphique {period}; valeurs exactes dans le tableau", gapLabel: "Intervalle sans données",
+    close: "Fermer les détails", period: "Période", noTrend: "Série insuffisante pour tracer une tendance.",
   },
   en: {
     gap: "Observation axis: missing intervals are marked and lines are broken.",
@@ -145,9 +186,21 @@ const copy = {
     source: "Source", estimate: "Estimate", published: "Published data", since: "since",
     low: "Low", consensus: "Consensus", high: "High",
     financial: "Financial sources", details: "View details · Exact chart data",
+    forecast: "Forecasts / consensus", observations: "Published observations", help: "About this chart",
+    unavailableChart: "Chart temporarily unavailable; exact data below.",
+    chartValues: "{period} chart; exact values in the table", gapLabel: "Missing data interval",
+    close: "Close details", period: "Period", noTrend: "Not enough observations to plot a trend.",
   },
 };
 export const chartCopy = (language, key, period = "") => copy[language][key].replace("{period}", period);
+export const helpNotes = (language, periods, normalized, base, gaps, groups, ids, zeroBased, min) => [
+  periods.length < 2 && chartCopy(language, "single"),
+  normalized && base !== null && chartCopy(language, "base100", periods[base]),
+  gaps.length > 0 && chartCopy(language, "gap"),
+  groups && ids.some(id => groups.major.includes(id)) && ids.some(id => groups.other.includes(id))
+    && chartCopy(language, "disparity"),
+  !zeroBased && min > 0 && chartCopy(language, "adjusted"),
+].filter(Boolean);
 export const shapeLabel = (language, shape) => ({
   fr: { line: "Courbe", bar: "Barres", area: "Aire", points: "Points", grouped: "Colonnes groupées" },
   en: { line: "Line", bar: "Bars", area: "Area", points: "Points", grouped: "Grouped columns" },
