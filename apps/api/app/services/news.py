@@ -652,10 +652,15 @@ def _parse_entries(
     content_type: str,
     source: str,
 ) -> list[ParsedEntry]:
-    prefix = content.lstrip()[:64].lower()
+    prefix = re.sub(
+        rb"^(?:\s|<!--.*?-->|<\?xml.*?\?>)*",
+        b"",
+        content[:2048],
+        flags=re.DOTALL,
+    ).lower()
     media_type = content_type.split(";", 1)[0].strip().casefold()
 
-    if prefix.startswith(b"<!doctype html") or prefix.startswith(b"<html"):
+    if prefix.startswith(b"<!doctype html") or re.match(rb"<html(?:\s|>)", prefix):
         raise FeedFormatError("Réponse HTML reçue au lieu d’un flux")
 
     try:
@@ -848,6 +853,7 @@ class NewsService:
             str,
             NewsSnapshot,
         ] = {}
+        self._statcan_last_success_at: dict[str, datetime] = {}
         self._locks = {
             language: asyncio.Lock()
             for language in NEWS_LANGUAGES
@@ -888,13 +894,14 @@ class NewsService:
         *,
         source_label: str,
         url: str,
+        headers: dict[str, str] | None = None,
     ) -> tuple[list[ParsedEntry], str | None]:
         last_error: Exception | None = None
 
         for attempt in range(1, self.max_attempts + 1):
             started = monotonic()
             try:
-                response = await client.get(url)
+                response = await client.get(url, headers=headers)
                 duration_ms = round((monotonic() - started) * 1000)
                 content_type = response.headers.get("content-type", "")
                 size = len(response.content)
@@ -902,7 +909,7 @@ class NewsService:
                 retryable_status = response.status_code == 429 or 500 <= response.status_code < 600
                 logger.info(
                     "news_feed_http source=%r url=%r attempt=%d duration_ms=%d "
-                    "status_code=%d content_type=%r size_bytes=%d",
+                    "status_code=%d content_type=%r size_bytes=%d final_url=%r redirects=%d",
                     source_label,
                     url,
                     attempt,
@@ -910,6 +917,8 @@ class NewsService:
                     response.status_code,
                     content_type,
                     size,
+                    str(response.url),
+                    len(response.history),
                 )
 
                 if retryable_status:
@@ -957,15 +966,18 @@ class NewsService:
                 )
             except (FeedFormatError, ElementTree.ParseError) as exc:
                 last_error = exc
+                retryable = isinstance(exc, FeedFormatError) and "HTML" in str(exc)
                 logger.warning(
-                    "news_feed_error source=%r url=%r attempt=%d exception=%s detail=%r retryable=false",
+                    "news_feed_error source=%r url=%r attempt=%d exception=%s detail=%r retryable=%s",
                     source_label,
                     url,
                     attempt,
                     type(exc).__name__,
                     str(exc),
+                    retryable,
                 )
-                break
+                if not retryable:
+                    break
             except Exception as exc:  # Defensive: do not make the discovery route fail.
                 last_error = exc
                 logger.exception(
@@ -1208,23 +1220,26 @@ class NewsService:
                     client,
                     source_label=source_label,
                     url=statcan_url,
+                    headers={"Accept": "application/atom+xml, application/xml;q=0.9, */*;q=0.1"},
                 )
         else:
             entries, error = await self._download(
                 client,
                 source_label=source_label,
                 url=statcan_url,
+                headers={"Accept": "application/atom+xml, application/xml;q=0.9, */*;q=0.1"},
             )
 
         if error:
-            return [], [
-                FeedStatus(
-                    source=f"{STATCAN_SOURCE} — {category}",
-                    status="unavailable",
-                    detail=error,
-                )
-                for category in STATCAN_CATEGORIES
-            ]
+            logger.warning("news_statcan_unavailable channel=%s reason=%r", channel, error)
+            return [], [FeedStatus(
+                source=source_label,
+                status="unavailable",
+                detail="Flux officiel temporairement indisponible",
+                last_success_at=self._statcan_last_success_at.get(language),
+            )]
+
+        self._statcan_last_success_at[language] = datetime.now(UTC)
 
         grouped: dict[str, list[NewsItem]] = {category: [] for category in STATCAN_CATEGORIES}
         unclassified = 0
@@ -1245,27 +1260,15 @@ class NewsService:
         )
 
         items: list[NewsItem] = []
-        statuses: list[FeedStatus] = []
         for category in STATCAN_CATEGORIES:
             category_items = grouped[category]
             items.extend(category_items)
-            if category_items:
-                statuses.append(
-                    FeedStatus(
-                        source=f"{STATCAN_SOURCE} — {category}",
-                        status="ok",
-                        detail=f"{len(category_items)} éléments",
-                    )
-                )
-            else:
-                statuses.append(
-                    FeedStatus(
-                        source=f"{STATCAN_SOURCE} — {category}",
-                        status="unavailable",
-                        detail="Aucune publication pertinente dans le flux officiel",
-                    )
-                )
-        return items, statuses
+        return items, [FeedStatus(
+            source=source_label,
+            status="ok",
+            detail=f"{len(items)} éléments pertinents",
+            last_success_at=self._statcan_last_success_at[language],
+        )]
 
     @staticmethod
     def _status_item_key(status_source: str) -> tuple[str, str] | None:
@@ -1316,7 +1319,8 @@ class NewsService:
                 if status.detail:
                     detail = f"{detail} ({status.detail})"
                 merged_statuses.append(
-                    FeedStatus(source=status.source, status="stale", detail=detail)
+                    FeedStatus(source=status.source, status="stale", detail=detail,
+                               last_success_at=status.last_success_at)
                 )
             else:
                 merged_statuses.append(status)

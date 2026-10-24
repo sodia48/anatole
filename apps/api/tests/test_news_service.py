@@ -70,6 +70,11 @@ def test_parse_atom_namespace_and_alternate_link() -> None:
     assert entries[0].image_url is None
 
 
+def test_valid_atom_is_parsed_even_if_content_type_is_mislabeled() -> None:
+    entries = _parse_entries(ATOM_SAMPLE, content_type="text/html", source="Statistique Canada")
+    assert len(entries) == 1
+
+
 @pytest.mark.parametrize(
     ("metadata", "expected"),
     [
@@ -214,6 +219,71 @@ def test_reject_html_response() -> None:
             content_type="text/html",
             source="Test",
         )
+
+
+def test_reject_statcan_html_error_page_after_comment() -> None:
+    with pytest.raises(FeedFormatError, match="HTML"):
+        _parse_entries(
+            b"<!--Last modified Dec 16, 2021--><!DOCTYPE html><html><body>We're sorry</body></html>",
+            content_type="text/html; charset=utf-8",
+            source="Statistique Canada",
+        )
+
+
+@pytest.mark.asyncio
+async def test_statcan_retries_transient_html_then_parses_atom(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("STATCAN_PROXY_URL", raising=False)
+    calls = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        assert str(request.url) == STATCAN_URLS["en"]
+        assert "application/atom+xml" in request.headers["accept"]
+        if calls == 1:
+            return httpx.Response(200, content=b"<!--edge--><!DOCTYPE html><html><body>Unavailable</body></html>",
+                                  headers={"content-type": "text/html"}, request=request)
+        return httpx.Response(200, content=ATOM_SAMPLE,
+                              headers={"content-type": "application/atom+xml"}, request=request)
+
+    service = NewsService()
+    service.retry_delays = (0, 0)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        items, statuses = await service._fetch_statcan(client, "en")
+    assert len(items) == 1
+    assert len(statuses) == 1
+    assert statuses[0].status == "ok"
+    assert statuses[0].last_success_at is not None
+    assert calls == 2
+
+
+@pytest.mark.asyncio
+async def test_statcan_failure_is_one_safe_status_with_last_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("STATCAN_PROXY_URL", raising=False)
+    verified_at = datetime(2026, 7, 15, 14, tzinfo=UTC)
+    item = _to_news_item(
+        ParsedEntry(title="Labour Force Survey", summary="Official release.",
+                    url="https://www150.statcan.gc.ca/labour", published_at=verified_at),
+        source="Statistique Canada", category="Travail",
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"<!--edge--><!DOCTYPE html><html>Unavailable</html>",
+                              headers={"content-type": "text/html"}, request=request)
+
+    service = NewsService()
+    service.retry_delays = (0, 0)
+    service._statcan_last_success_at["fr"] = verified_at
+    service._last_good["fr"] = NewsSnapshot(items=[item], source_statuses=[], generated_at=verified_at)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        items, statuses = await service._fetch_statcan(client, "fr")
+    items, statuses = service._merge_last_good_for_failed_sources("fr", items, statuses)
+    assert items == [item]
+    assert len(statuses) == 1
+    assert statuses[0].status == "stale"
+    assert statuses[0].source == "Statistique Canada — Tous les sujets"
+    assert statuses[0].last_success_at == verified_at
+    assert "XML invalide" not in (statuses[0].detail or "")
 
 
 def test_reject_empty_feed() -> None:
