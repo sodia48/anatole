@@ -373,11 +373,17 @@ export type NewsBriefRequest = {
   category: string;
   region: string;
   language: "fr" | "en";
+  context?: "macro" | "stock";
+  ticker?: string;
+  company?: string;
+  published_at?: string | null;
+  related_tickers?: string[];
 };
 
 export type NewsBriefFigure = {
   value: string;
   context: string;
+  kind?: "actual" | "forecast" | "opinion" | "date" | "other";
 };
 
 export type NewsBriefResponse = {
@@ -389,9 +395,14 @@ export type NewsBriefResponse = {
   watch: string[];
   source_url: string;
   source_name: string;
-  source_mode: "official_page" | "feed_summary";
+  source_mode: "official_page" | "article_page" | "feed_summary" | "title_only";
   source_note: string;
   generated_at: string;
+  availability?: "article" | "publisher_excerpt" | "limited";
+  source_language?: "fr" | "en" | "unknown";
+  translation_status?: "original" | "automatic" | "unavailable";
+  relevance?: "direct" | "related" | "unclear" | "not_applicable";
+  detail_available?: boolean;
 };
 
 export type EconomicEvent = {

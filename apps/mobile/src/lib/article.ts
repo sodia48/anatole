@@ -9,6 +9,11 @@ export type ArticleRouteParams = {
   publishedAt: string;
   summary: string;
   imageUrl: string;
+  context: "macro" | "stock";
+  category: string;
+  region: string;
+  ticker: string;
+  relatedTickers: string;
 };
 
 type RouteValue = string | string[] | undefined;
@@ -48,6 +53,11 @@ export function articleHref(item: NewsItem | StockNewsItem): Href | null {
       publishedAt: limited(item.published_at, 64),
       summary: limited(item.summary, 900),
       imageUrl,
+      context: "publisher" in item ? "stock" : "macro",
+      category: "category" in item ? limited(item.category, 80) : "stock",
+      region: "regions" in item ? limited(item.regions[0], 20) : "CA",
+      ticker: "related_tickers" in item ? limited(item.related_tickers[0]?.replace(/\.TO$/i, ""), 16) : "",
+      relatedTickers: "related_tickers" in item ? limited(item.related_tickers.join(","), 120) : "",
     } satisfies ArticleRouteParams,
   } as Href;
 }
@@ -62,6 +72,11 @@ export function parseArticleParams(params: Record<string, RouteValue>): ArticleR
     publishedAt: limited(first(params.publishedAt), 64),
     summary: limited(first(params.summary), 900),
     imageUrl: safeWebUrl(first(params.imageUrl)) ?? "",
+    context: first(params.context) === "stock" ? "stock" : "macro",
+    category: limited(first(params.category), 80),
+    region: limited(first(params.region), 20),
+    ticker: limited(first(params.ticker), 16),
+    relatedTickers: limited(first(params.relatedTickers), 120),
   };
 }
 

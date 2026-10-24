@@ -333,19 +333,6 @@ class StockNewsService:
         return payload
 
     @staticmethod
-    def _fallback_summary(
-        item: StockNewsItem,
-        *,
-        language: str,
-    ) -> str:
-        if language == "fr":
-            return (
-                f"Selon {item.publisher}, cette nouvelle porte sur : "
-                f"« {item.title} »"
-            )
-        return f"According to {item.publisher}, this article covers: “{item.title}”"
-
-    @staticmethod
     async def _load_article_summary(url: str) -> str:
         response = await shared_http_client.request(
             "GET",
@@ -380,7 +367,9 @@ class StockNewsService:
                 type(exc).__name__,
             )
             summary = ""
-        return summary or self._fallback_summary(item, language=language)
+        # No excerpt is more honest than a title restated as if it came from
+        # the publisher. The brief service will label this "title only".
+        return summary
 
     async def _enrich_summaries(
         self,

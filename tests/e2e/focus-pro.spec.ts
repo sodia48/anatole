@@ -1,8 +1,29 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Focus Pro workstation", () => {
-  test("shows the selected stock's latest news below the price chart", async ({ page }) => {
+  test("shows the selected stock's latest news below the price chart", async ({ page }, testInfo) => {
     const recentNewsDate = new Date(Date.now() - 30 * 60 * 1_000).toISOString();
+    await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({ json: {
+      ticker: "RY.TO", symbol: "RY", name: "Royal Bank of Canada", exchange: "TSX",
+      currency: "CAD", financial_currency: "CAD", website: null,
+      sector: "Financials", industry: "Banks", status: "partial", message: null,
+      stale: false, refresh_in_progress: false, metrics: {}, annual_financials: [], quarterly_financials: [],
+      ttm: { period_end: "2026-09-30", currency: "CAD", total_revenue: null, gross_profit: null,
+        operating_income: null, ebitda: null, net_income: null, diluted_eps: null,
+        operating_cash_flow: null, capital_expenditure: null, free_cash_flow: null,
+        dividends_paid: null, share_repurchases: null, total_cash: null, total_debt: null,
+        net_debt: null, gross_margin: null, operating_margin: null, net_margin: null,
+        free_cash_flow_margin: null },
+      highlights: { latest_period_end: "2026-09-30", revenue_growth_yoy: null,
+        operating_income_growth_yoy: null, net_income_growth_yoy: null, eps_growth_yoy: null,
+        free_cash_flow_growth_yoy: null, three_year_revenue_cagr: null,
+        three_year_net_income_cagr: null, three_year_free_cash_flow_cagr: null,
+        cash_conversion_percent: null, net_debt_to_ebitda: null },
+      earnings_history: [], earnings_estimates: [], analysts: {},
+      events: { earnings_dates: [], ex_dividend_date: null, dividend_date: null },
+      official_coverage: { status: "mixed", yahoo_statements_error: null },
+      source: "E2E fixture", generated_at: recentNewsDate, refresh_after_seconds: 1800,
+    } }));
     await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -30,6 +51,22 @@ test.describe("Focus Pro workstation", () => {
         refresh_after_seconds: 900,
       }),
     }));
+    await page.route("https://images.example.com/royal-bank.jpg", (route) => route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect width="1200" height="600" fill="#143f68"/><path d="M0 520L380 260L690 460L1200 120V600H0Z" fill="#2d76ff"/><circle cx="970" cy="160" r="105" fill="#9fc8ff"/></svg>',
+    }));
+    await page.route("**/api/anatole/api/v1/discovery/news/brief", (route) => {
+      const request = route.request().postDataJSON() as { title: string; summary: string };
+      return route.fulfill({ json: {
+        title: request.title, summary: request.summary, key_figures: [], changes: [],
+        why_it_matters: "", watch: [], source_url: "https://example.com/royal-bank-news-0",
+        source_name: "Canadian Business Wire", source_mode: "feed_summary",
+        source_note: "Only the publisher's excerpt is available.",
+        availability: "publisher_excerpt", source_language: "en", translation_status: "unavailable",
+        relevance: "direct", detail_available: false, generated_at: recentNewsDate,
+      } });
+    });
 
     await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
@@ -52,7 +89,7 @@ test.describe("Focus Pro workstation", () => {
     await stockNews.getByRole("button").first().click();
     const reader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(reader).toBeVisible();
-    await expect(reader.getByRole("heading", { name: "Résumé" })).toBeVisible();
+    await expect(reader.getByRole("heading", { name: "Texte original · traduction indisponible" })).toBeVisible();
     await expect(reader.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(reader.locator("img")).toHaveCount(1);
     expect(await reader.evaluate((node) => {
@@ -77,7 +114,7 @@ test.describe("Focus Pro workstation", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     const englishNews = page.getByRole("region", { name: "Latest news for RY" });
-    await expect(englishNews.getByText("Read in Anatole").first()).toBeVisible();
+    await expect(englishNews.getByText("Read summary").first()).toBeVisible();
     await englishNews.getByRole("button").first().click();
     const englishReader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(englishReader.getByRole("link", { name: "View original source" })).toBeVisible();
@@ -85,6 +122,7 @@ test.describe("Focus Pro workstation", () => {
       const style = getComputedStyle(node);
       return { background: style.backgroundColor, color: style.color, opacity: style.opacity };
     })).toEqual({ background: "rgb(255, 255, 255)", color: "rgb(7, 27, 44)", opacity: "1" });
+    await page.screenshot({ path: testInfo.outputPath("focus-blue-english-reader.png") });
   });
 
   test("chart, indicators, drawings, layout and comparison", async ({ page }) => {
