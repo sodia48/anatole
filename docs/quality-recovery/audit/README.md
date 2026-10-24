@@ -16,7 +16,7 @@ Les parcours Playwright existants vérifient les pages réellement rendues avec 
 | Assistant | Ouverture, contexte, fournisseur, viewport mobile et Canada 360 (`assistant-*`, `unified-assistant`, `canada360-*`). |
 | Thèmes et langues | Français/anglais, thème sombre/bleu ciel et adaptation mobile (`i18n`, `appearance-theme`, `white-theme`, `app-routes`). |
 
-Le Quality Gate complet de la PR #162 a validé `api-tests`, `web-build`, `mobile-quality` et `e2e` sur `6cfe93a71561edbc0d41a0b88c6a4629c161fdac`. Les huit nouveaux tests ciblés de la PR #164 ont réussi localement sur desktop et Pixel 7; les quatre contrôles GitHub doivent être revérifiés sur son head final avant toute fusion. Les captures comparables sont dans `docs/quality-recovery/charts`, `statcan` (PR #163) et `dashboard` (PR #164).
+Les PR #162, #163 et #164 ont chacune validé `api-tests`, `web-build`, `mobile-quality` et `e2e` sur leur head final avant fusion. Les huit nouveaux tests ciblés de la PR #164 ont aussi réussi localement sur desktop et Pixel 7. Les captures comparables sont dans `docs/quality-recovery/charts`, `statcan` (PR #163) et `dashboard` (PR #164).
 
 ## Incidents classés
 
@@ -25,7 +25,7 @@ Le Quality Gate complet de la PR #162 a validé `api-tests`, `web-build`, `mobil
 | P0 | Aucun P0 reproduit dans les parcours automatisés ci-dessus. | La suite locale ne prouve pas l'absence de P0 en production. |
 | P1 | Les dates trimestrielles étaient réduites à des années répétées; un graphique pouvait être trompeur. | Corrigé dans la PR #162, fusionnée après quatre contrôles verts. |
 | P1 | Le flux Atom de Statistique Canada pouvait répondre HTTP 200 avec une page HTML; quatre catégories affichaient la même erreur XML. | Corrigé dans la PR #163, fusionnée après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
-| P1 | Le tableau de bord mettait en avant des cartes N/D et utilisait parfois une devise TTM erronée. | Corrigé dans la PR #164, à fusionner seulement après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
+| P1 | Le tableau de bord mettait en avant des cartes N/D et utilisait parfois une devise TTM erronée. | Corrigé dans la PR #164, fusionnée après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
 | P2 — source ancienne | Les anciens RSS de communiqués de Nouvelle-Écosse ne fournissent plus de document RSS exploitable. | Le mode provincial prioritaire fonctionne avec d'autres pages statistiques officielles et StatCan; documenter le flux obsolète sans inventer de communiqués. |
 
 ### Flux de Nouvelle-Écosse : preuve et limite
@@ -43,4 +43,4 @@ Le parcours réel de la preview Vercel #163 reste fonctionnel : le 23 octobre, l
 
 ## Règle de sortie
 
-La PR #163 a été fusionnée sur `main` après quatre contrôles verts sur `ea54324cc95a22416da4be5acb22b66a4df55e0c` et autorisation explicite. La PR #164 doit garder ses quatre contrôles verts sur son head final. Toute modification supplémentaire impose de revérifier le head exact. Aucune PR en brouillon ne sera fusionnée sans l'autorisation explicite du propriétaire.
+La PR #163 a été fusionnée sur `main` après quatre contrôles verts sur `ea54324cc95a22416da4be5acb22b66a4df55e0c` et autorisation explicite. La PR #164 a été fusionnée dans les mêmes conditions sur `4821b2dcb1673a9933ee1bbe7da509d2bbfefb8d` (merge commit `74c8fec93186827a1309af9300d98d274284add1`). Toute modification supplémentaire impose de revérifier le head exact. Aucune PR en brouillon ne sera fusionnée sans l'autorisation explicite du propriétaire.
