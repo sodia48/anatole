@@ -1,171 +1,23 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
-import Image from "next/image";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getStockNewsSnapshot } from "@/lib/api";
+import type { ReaderArticle } from "@/components/news/NewsIntelligenceReader";
 import { localeFor, pick } from "@/lib/i18n";
 import type { StockNewsSnapshot } from "@/lib/types";
 
 import styles from "./FocusStockNews.module.css";
 
 const tr = pick;
+const NewsIntelligenceReader = dynamic(
+  () => import("@/components/news/NewsIntelligenceReader").then((module) => module.NewsIntelligenceReader),
+  { ssr: false },
+);
 
 type NewsItem = StockNewsSnapshot["items"][number];
-
-function ArticleReader({
-  item,
-  language,
-  onClose,
-}: {
-  item: NewsItem;
-  language: "fr" | "en";
-  onClose: () => void;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const titleId = useId();
-  const previousFocus = useRef<HTMLElement | null>(null);
-  const formatter = useMemo(
-    () =>
-      new Intl.DateTimeFormat(localeFor(language), {
-        dateStyle: "long",
-        timeStyle: "short",
-        timeZone: "America/Toronto",
-      }),
-    [language],
-  );
-
-  useEffect(() => {
-    previousFocus.current = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const oldOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
-      if (event.key !== "Tab" || !panelRef.current) return;
-      const focusable = Array.from(
-        panelRef.current.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
-        ),
-      );
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable.at(-1);
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = oldOverflow;
-      previousFocus.current?.focus();
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className={styles.readerBackdrop}
-      onMouseDown={(event) => {
-        if (event.currentTarget === event.target) onClose();
-      }}
-    >
-      <div
-        aria-labelledby={titleId}
-        aria-modal="true"
-        className={styles.reader}
-        ref={panelRef}
-        role="dialog"
-      >
-        <header className={styles.readerTopbar}>
-          <span>{item.publisher || tr(language, "Source", "Source")}</span>
-          <button
-            aria-label={tr(language, "Fermer", "Close")}
-            className={styles.closeButton}
-            onClick={onClose}
-            ref={closeRef}
-            type="button"
-          >
-            <FocusGlyph name="X" size={18} />
-          </button>
-        </header>
-        <div className={styles.readerScroll}>
-          {item.image_url ? (
-            <div className={styles.readerImage}>
-              <Image
-                alt=""
-                fill
-                sizes="(max-width: 720px) 100vw, 760px"
-                src={item.image_url}
-                unoptimized
-              />
-            </div>
-          ) : null}
-          <article className={styles.article}>
-            <span className={styles.articleLabel}>
-              {tr(language, "ARTICLE", "ARTICLE")}
-            </span>
-            <div className={styles.articleMeta}>
-              <span>{item.publisher || tr(language, "Source", "Source")}</span>
-              <time dateTime={item.published_at}>
-                {formatter.format(new Date(item.published_at))}
-              </time>
-            </div>
-            <h2 id={titleId}>{item.title}</h2>
-            {item.related_tickers.length ? (
-              <div className={styles.tickers}>
-                {item.related_tickers.map((ticker) => (
-                  <span key={ticker}>{ticker.replace(/\.TO$/, "")}</span>
-                ))}
-              </div>
-            ) : null}
-            <section aria-labelledby={`${titleId}-summary`} className={styles.readerSummary}>
-              <h3 id={`${titleId}-summary`}>
-                {tr(language, "Résumé", "Summary")}
-              </h3>
-              <p>{item.summary}</p>
-            </section>
-            <div className={styles.unavailable}>
-              <strong>
-                {tr(language, "Contenu complet non disponible", "Full article unavailable")}
-              </strong>
-              <span>
-                {pick(
-                  language,
-                  "Cette source ne fournit pas le texte intégral à Anatole. Vous pouvez consulter le résumé ci-dessus ou poursuivre la lecture sur le site de la source.",
-                  "This publisher does not provide the full article to Anatole. You can read the summary above or continue on the publisher’s website.",
-                )}
-              </span>
-            </div>
-            <a
-              className={styles.originalLink}
-              href={item.url}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              {tr(language, "Voir la source originale", "View original source")}
-              <FocusGlyph name="ArrowUpRight" size={15} />
-            </a>
-          </article>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function FocusStockNews({
   ticker,
@@ -181,6 +33,20 @@ export function FocusStockNews({
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NewsItem | null>(null);
   const closeReader = useCallback(() => setSelected(null), []);
+  const selectedArticle = useMemo<ReaderArticle | null>(() => selected ? {
+    title: selected.title,
+    summary: selected.summary,
+    url: selected.url,
+    source: selected.publisher,
+    category: "stock",
+    region: "Canada",
+    publishedAt: selected.published_at,
+    imageUrl: selected.image_url,
+    context: "stock",
+    ticker,
+    company: snapshot?.company || company,
+    relatedTickers: selected.related_tickers,
+  } : null, [selected, ticker, company, snapshot?.company]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -295,16 +161,21 @@ export function FocusStockNews({
                 </time>
               </div>
               <h3>{item.title}</h3>
-              <p className={styles.summary}>{item.summary}</p>
+              {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
               <span className={styles.open}>
-                {tr(language, "Lire dans Anatole", "Read in Anatole")}
+                {tr(language, "Lire le résumé", "Read summary")}
               </span>
             </button>
           ))}
         </div>
       ) : null}
-      {selected ? (
-        <ArticleReader item={selected} language={language} onClose={closeReader} />
+      {selected && selectedArticle ? (
+        <NewsIntelligenceReader
+          key={selected.id}
+          article={selectedArticle}
+          language={language}
+          onClose={closeReader}
+        />
       ) : null}
     </section>
   );

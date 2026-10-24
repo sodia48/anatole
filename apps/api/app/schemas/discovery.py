@@ -74,11 +74,17 @@ class NewsBriefRequest(BaseModel):
     category: str
     region: str = "Canada"
     language: Literal["fr", "en"] = "fr"
+    context: Literal["macro", "stock"] = "macro"
+    ticker: str | None = None
+    company: str | None = None
+    published_at: datetime | None = None
+    related_tickers: list[str] = Field(default_factory=list)
 
 
 class NewsBriefFigure(BaseModel):
     value: str
     context: str
+    kind: Literal["actual", "forecast", "opinion", "date", "other"] = "other"
 
 
 class NewsBriefResponse(BaseModel):
@@ -90,9 +96,14 @@ class NewsBriefResponse(BaseModel):
     watch: list[str] = Field(default_factory=list)
     source_url: str
     source_name: str
-    source_mode: Literal["official_page", "feed_summary"]
+    source_mode: Literal["official_page", "article_page", "feed_summary", "title_only"]
     source_note: str
     generated_at: datetime
+    availability: Literal["article", "publisher_excerpt", "limited"] = "publisher_excerpt"
+    source_language: Literal["fr", "en", "unknown"] = "unknown"
+    translation_status: Literal["original", "automatic", "unavailable"] = "original"
+    relevance: Literal["direct", "related", "unclear", "not_applicable"] = "not_applicable"
+    detail_available: bool = False
 
 
 class EconomicEvent(BaseModel):

@@ -1,0 +1,241 @@
+.backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 18px;
+  background: rgba(1, 10, 18, .72);
+  backdrop-filter: blur(5px);
+}
+.reader {
+  --reader-bg: #071521;
+  --reader-surface: #0e2434;
+  --reader-border: #28536d;
+  --reader-text: #f4f9fd;
+  --reader-muted: #b9cbd8;
+  --reader-accent: #9fc8ff;
+  width: min(760px, 100%);
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid var(--reader-border);
+  border-radius: 14px;
+  background: var(--reader-bg);
+  color: var(--reader-text);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, .28);
+}
+:global(html[data-theme="blue"]) .reader {
+  --reader-bg: #fff;
+  --reader-surface: #f2f5f8;
+  --reader-border: #bdc8d2;
+  --reader-text: #071b2c;
+  --reader-muted: #405263;
+  --reader-accent: #075f99;
+}
+.topbar {
+  flex: 0 0 auto;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 12px 7px 20px;
+  border-bottom: 1px solid var(--reader-border);
+  color: var(--reader-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+.close {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border: 1px solid var(--reader-border);
+  border-radius: 50%;
+  background: var(--reader-surface);
+  color: var(--reader-text);
+  cursor: pointer;
+  font-size: 27px;
+  line-height: 1;
+}
+.close:focus-visible, .original:focus-visible, .views button:focus-visible, .fallback button:focus-visible {
+  outline: 2px solid var(--reader-accent);
+  outline-offset: 2px;
+}
+.scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--reader-border) var(--reader-bg);
+}
+.hero {
+  position: relative;
+  width: 100%;
+  height: clamp(150px, 22vw, 220px);
+  overflow: hidden;
+  background: var(--reader-surface);
+}
+.hero img { width: 100%; height: 100%; object-fit: cover; }
+.content {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  padding: 28px clamp(20px, 5vw, 54px) 42px;
+}
+.meta {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--reader-muted);
+  font-size: 12px;
+}
+.meta span { color: var(--reader-accent); font-weight: 750; }
+.content h2 {
+  margin: 0;
+  max-width: 24ch;
+  color: var(--reader-text);
+  font-size: clamp(24px, 3.1vw, 34px);
+  line-height: 1.16;
+}
+.subject {
+  margin: -8px 0 0;
+  color: var(--reader-muted);
+  font-size: 13px;
+}
+.loading, .fallback {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--reader-border);
+  border-radius: 10px;
+  background: var(--reader-surface);
+  color: var(--reader-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.loading { display: flex; align-items: center; }
+.spinner {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid var(--reader-border);
+  border-top-color: var(--reader-accent);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.views {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--reader-border);
+  border-radius: 10px;
+  background: var(--reader-surface);
+}
+.views button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 12px;
+  background: transparent;
+  color: var(--reader-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+.views button[aria-pressed="true"] {
+  background: var(--reader-accent);
+  color: var(--reader-bg);
+}
+.lead {
+  display: grid;
+  gap: 8px;
+}
+.lead > span {
+  color: var(--reader-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+}
+.lead h3, .section h3, .analysis h3, .fallback h3 {
+  margin: 0;
+  color: var(--reader-text);
+  font-size: 17px;
+  line-height: 1.4;
+}
+.lead p {
+  margin: 0;
+  color: var(--reader-text);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.section { display: grid; gap: 11px; }
+.figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.figure {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--reader-border);
+  border-radius: 10px;
+  background: var(--reader-surface);
+}
+.figure strong { overflow-wrap: anywhere; color: var(--reader-text); font-size: 18px; }
+.figure span { color: var(--reader-accent); font-size: 11px; font-weight: 750; }
+.figure p, .analysis p, .fallback p { margin: 0; color: var(--reader-muted); font-size: 13px; line-height: 1.6; }
+.section ul { display: grid; gap: 8px; margin: 0; padding-left: 19px; color: var(--reader-muted); font-size: 13px; line-height: 1.6; }
+.analysis { display: grid; gap: 8px; border-left: 3px solid var(--reader-accent); padding-left: 15px; }
+.analysis small, .limit { color: var(--reader-muted); font-size: 12px; line-height: 1.5; }
+.provenance {
+  display: grid;
+  gap: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--reader-border);
+  color: var(--reader-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.provenance strong { color: var(--reader-text); font-size: 13px; }
+.fallback button {
+  width: fit-content;
+  min-height: 38px;
+  padding: 6px 12px;
+  border: 1px solid var(--reader-border);
+  border-radius: 8px;
+  background: var(--reader-bg);
+  color: var(--reader-text);
+  cursor: pointer;
+  font: inherit;
+}
+.original {
+  width: fit-content;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: #2d76ff;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+@media (max-width: 560px) {
+  .backdrop { padding: 0; }
+  .reader { border: 0; border-radius: 0; }
+  .content { padding: 22px 18px 34px; }
+  .content h2 { max-width: none; }
+  .figures { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}

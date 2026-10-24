@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Linking, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { NewsThumbnail } from "@/src/components/news/NewsThumbnail";
@@ -9,6 +9,8 @@ import { useLocale } from "@/src/lib/i18n";
 import { colors, radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
+import { marketApi } from "@/src/lib/api/market";
+import type { NewsBriefResponse } from "@/src/lib/api/types";
 
 export function ArticleReaderScreen() {
   useMobileTheme();
@@ -17,10 +19,39 @@ export function ArticleReaderScreen() {
   const article = useMemo(() => parseArticleParams(rawParams), [rawParams]);
   const [loading, setLoading] = useState(Boolean(article));
   const [webFailed, setWebFailed] = useState(false);
+  const [brief, setBrief] = useState<NewsBriefResponse | null>(null);
+  const [briefLoading, setBriefLoading] = useState(Boolean(article));
+  const [briefFailed, setBriefFailed] = useState(false);
+  const [briefAttempt, setBriefAttempt] = useState(0);
+  const [detailed, setDetailed] = useState(false);
   const published = article?.publishedAt ? new Date(article.publishedAt) : null;
   const date = published && !Number.isNaN(published.getTime())
     ? published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "long", timeStyle: "short" })
     : "N/D";
+
+  useEffect(() => {
+    if (!article) return;
+    const controller = new AbortController();
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      setBrief(null);
+      setBriefLoading(true);
+      setBriefFailed(false);
+    });
+    void marketApi.newsBrief({
+      title: article.title, summary: article.summary, url: article.url,
+      source: article.source, category: article.category, region: article.region,
+      context: article.context, ticker: article.ticker || undefined,
+      related_tickers: article.relatedTickers ? article.relatedTickers.split(",") : [],
+      published_at: article.publishedAt || undefined, language,
+    }, controller.signal).then((value) => {
+      if (active) setBrief(value);
+    }).catch((reason: unknown) => {
+      if (active && !(reason instanceof Error && reason.name === "AbortError")) setBriefFailed(true);
+    }).finally(() => { if (active) setBriefLoading(false); });
+    return () => { active = false; controller.abort(); };
+  }, [article, language, briefAttempt]);
 
   const openExternally = () => {
     if (article) void Linking.openURL(article.url).catch(() => undefined);
@@ -45,14 +76,36 @@ export function ArticleReaderScreen() {
       <Text style={styles.invalidTitle}>{pick("Lien d’article invalide", "Invalid article link")}</Text>
       <Text style={styles.invalidCopy}>{pick("Anatole a refusé d’ouvrir cette adresse.", "Anatole refused to open this address.")}</Text>
     </View> : <>
-      <View style={styles.storyHeader} testID="article-story">
+      <ScrollView style={styles.storyHeader} contentContainerStyle={styles.storyContent} testID="article-story">
         <Text style={styles.sectionLabel}>{pick("ARTICLE", "ARTICLE")}</Text>
         <Text style={styles.source}>{article.source || pick("Actualité", "News")} · {date}</Text>
         <Text style={styles.title}>{article.title || pick("Article", "Article")}</Text>
         {article.imageUrl ? <NewsThumbnail imageUrl={article.imageUrl} size="hero" source={article.source || "Anatole"} testID="article-hero" /> : null}
-        {article.summary ? <View style={styles.summaryBlock} testID="article-summary"><Text style={styles.summaryLabel}>{pick("Résumé", "Summary")}</Text><Text style={styles.summary}>{article.summary}</Text></View> : null}
+        {brief?.availability !== "limited" ? <View style={styles.summaryBlock} testID="article-summary">
+          <Text style={styles.summaryLabel}>{briefFailed
+            ? pick("Extrait de la source", "Source excerpt")
+            : brief?.translation_status === "unavailable"
+              ? pick("Texte original · traduction indisponible", "Original text · translation unavailable")
+              : pick("Résumé", "Summary")}</Text>
+          {briefLoading ? <ActivityIndicator color={colors.primary} accessibilityLabel={pick("Préparation du résumé", "Preparing the brief")} /> : null}
+          {!briefLoading ? <Text style={styles.summary}>{brief?.summary || article.summary || pick("Seuls le titre et la source sont disponibles.", "Only the title and source are available.")}</Text> : null}
+          {briefFailed ? <Pressable accessibilityRole="button" onPress={() => setBriefAttempt((value) => value + 1)} testID="article-brief-retry"><Text style={styles.actionText}>{pick("Réessayer", "Retry")}</Text></Pressable> : null}
+        </View> : null}
+        {brief ? <>
+          {brief.detail_available ? <View style={styles.modeRow}>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: !detailed }} onPress={() => setDetailed(false)}><Text style={styles.actionText}>{pick("Résumé rapide", "Quick summary")}</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: detailed }} onPress={() => setDetailed(true)}><Text style={styles.actionText}>{pick("Analyse détaillée", "Detailed analysis")}</Text></Pressable>
+          </View> : null}
+          {detailed ? <>
+            {brief.key_figures.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Chiffres clés", "Key figures")}</Text>{brief.key_figures.map((figure, index) => <Text key={index} style={styles.summary}>{figure.value} · {figure.context}</Text>)}</View> : null}
+            {brief.changes.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Ce qui change", "What changed")}</Text>{brief.changes.map((change, index) => <Text key={index} style={styles.summary}>{change}</Text>)}</View> : null}
+            {brief.why_it_matters ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Lecture Anatole", "Anatole read")}</Text><Text style={styles.summary}>{brief.why_it_matters}</Text></View> : null}
+            {brief.watch.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("À surveiller", "What to watch")}</Text>{brief.watch.map((item, index) => <Text key={index} style={styles.summary}>{item}</Text>)}</View> : null}
+          </> : null}
+          <View style={styles.briefSection}><Text style={styles.summaryLabel}>{brief.availability === "article" ? pick("Article consulté", "Article consulted") : brief.availability === "publisher_excerpt" ? pick("Résumé de l’éditeur", "Publisher excerpt") : pick("Informations limitées", "Limited information")}</Text><Text style={styles.summary}>{brief.source_note}</Text></View>
+        </> : null}
         <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-view-original"><Text style={styles.externalText}>{pick("Voir la source originale", "View original source")}</Text></Pressable>
-      </View>
+      </ScrollView>
 
       <View style={styles.browser}>
         <View style={styles.sourceBar}><Text style={styles.sourceBarText}>{pick("Source originale", "Original source")}</Text></View>
@@ -94,13 +147,16 @@ const styles = createThemedStyles((colors) => ({
   publisher: { ...typography.label, flex: 1, color: colors.text, textAlign: "center" },
   actionButton: { minWidth: 72, minHeight: 44, alignItems: "center", justifyContent: "center", paddingHorizontal: spacing.sm },
   actionText: { ...typography.label, color: colors.primary },
-  storyHeader: { gap: spacing.sm, padding: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.background },
+  storyHeader: { maxHeight: "58%", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.background },
+  storyContent: { gap: spacing.sm, padding: spacing.lg },
   sectionLabel: { ...typography.caption, color: colors.primary, fontWeight: "800", letterSpacing: 1.2 },
   source: { ...typography.caption, color: colors.textMuted },
   title: { ...typography.title, color: colors.text },
   summaryBlock: { gap: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
   summaryLabel: { ...typography.label, color: colors.text },
   summary: { ...typography.body, color: colors.textMuted },
+  modeRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm, paddingVertical: spacing.sm },
+  briefSection: { gap: spacing.xs, paddingVertical: spacing.sm },
   browser: { flex: 1, minHeight: 180, overflow: "hidden", backgroundColor: "#ffffff" },
   sourceBar: { minHeight: 36, justifyContent: "center", paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
   sourceBarText: { ...typography.caption, color: colors.textMuted, fontWeight: "800" },

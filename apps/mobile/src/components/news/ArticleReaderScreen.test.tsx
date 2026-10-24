@@ -4,6 +4,7 @@ import { Linking, Share, StyleSheet } from "react-native";
 import { ArticleReaderScreen } from "@/src/components/news/ArticleReaderScreen";
 import type { NewsItem, StockNewsItem } from "@/src/lib/api/types";
 import { articleHref } from "@/src/lib/article";
+import { marketApi } from "@/src/lib/api/market";
 import { originalPalette, setActiveMobileTheme, skyPalette } from "@/src/theme/palettes";
 
 const mockBack = jest.fn();
@@ -14,6 +15,7 @@ jest.mock("expo-router", () => ({
   useLocalSearchParams: () => mockParams,
 }));
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ language: "fr", pick: (fr: string) => fr }) }));
+jest.mock("@/src/lib/api/market", () => ({ marketApi: { newsBrief: jest.fn() } }));
 
 const economic: NewsItem = {
   id: "economic",
@@ -49,6 +51,14 @@ describe("Anatole article reader", () => {
   beforeEach(() => {
     mockBack.mockClear();
     mockParams = paramsFrom(economic);
+    jest.mocked(marketApi.newsBrief).mockClear();
+    jest.mocked(marketApi.newsBrief).mockResolvedValue({
+      summary: "L’emploi a progressé de 2,1 % selon le rapport officiel.",
+      key_figures: [{ value: "2,1 %", context: "L’emploi a progressé de 2,1 %." }],
+      changes: [], why_it_matters: "", watch: ["Le prochain rapport est attendu en octobre."],
+      source_note: "Publication officielle consultée.", source_mode: "official_page",
+      availability: "article", translation_status: "original", detail_available: true,
+    });
   });
 
   afterEach(() => {
@@ -64,14 +74,56 @@ describe("Anatole article reader", () => {
     expect(view.getByText("Source originale")).toBeTruthy();
     expect(view.getByTestId("article-hero-image")).toBeTruthy();
     expect(view.getByTestId("article-webview").props.source).toEqual({ uri: economic.url });
+    expect(await view.findByText("L’emploi a progressé de 2,1 % selon le rapport officiel.")).toBeTruthy();
+    expect(marketApi.newsBrief).toHaveBeenCalledWith(expect.objectContaining({ context: "macro", language: "fr" }), expect.anything());
+    await userEvent.setup().press(view.getByText("Analyse détaillée"));
+    expect(view.getByText("Chiffres clés")).toBeTruthy();
+    expect(view.getByText("À surveiller")).toBeTruthy();
     await view.unmount();
-  });
+  }, 15_000);
 
   it("uses the same route contract for StockNewsItem", () => {
     const href = articleHref(stock) as { pathname: string; params: Record<string, string> };
     expect(href.pathname).toBe("/article");
     expect(href.params.source).toBe("Business Wire");
     expect(href.params.url).toBe(stock.url);
+  });
+
+  it("labels an unavailable brief as a source excerpt and retries", async () => {
+    jest.mocked(marketApi.newsBrief).mockRejectedValueOnce(new Error("temporarily unavailable"));
+    const view = await render(<ArticleReaderScreen />);
+    expect(await view.findByText("Extrait de la source")).toBeTruthy();
+    expect(view.getByText(economic.summary)).toBeTruthy();
+    await userEvent.setup().press(view.getByTestId("article-brief-retry"));
+    expect(await view.findByText("L’emploi a progressé de 2,1 % selon le rapport officiel.")).toBeTruthy();
+    await view.unmount();
+  }, 15_000);
+
+  it("does not repeat a title-only article as an invented summary", async () => {
+    jest.mocked(marketApi.newsBrief).mockResolvedValueOnce({
+      summary: economic.title, key_figures: [], changes: [], why_it_matters: "", watch: [],
+      source_note: "Seuls le titre et les métadonnées sont disponibles.",
+      source_mode: "title_only", availability: "limited", detail_available: false,
+    });
+    const view = await render(<ArticleReaderScreen />);
+    expect(await view.findByText("Informations limitées")).toBeTruthy();
+    expect(view.queryByTestId("article-summary")).toBeNull();
+    await view.unmount();
+  });
+
+  it("labels an untranslated English brief in a French interface", async () => {
+    mockParams = paramsFrom(stock);
+    jest.mocked(marketApi.newsBrief).mockResolvedValueOnce({
+      summary: "The bank published its quarterly figures.", key_figures: [],
+      changes: [], why_it_matters: "", watch: [],
+      source_note: "Texte original conservé : traduction fiable indisponible.",
+      source_mode: "feed_summary", availability: "publisher_excerpt",
+      translation_status: "unavailable", detail_available: false,
+    });
+    const view = await render(<ArticleReaderScreen />);
+    expect(await view.findByText("Texte original · traduction indisponible")).toBeTruthy();
+    expect(marketApi.newsBrief).toHaveBeenCalledWith(expect.objectContaining({ context: "stock", ticker: "RY" }), expect.anything());
+    await view.unmount();
   });
 
   it("refuses an invalid article URL before creating a WebView", async () => {
