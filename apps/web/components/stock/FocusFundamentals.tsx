@@ -375,6 +375,9 @@ function Group({
   );
 }
 
+type OverviewDatum = { label: string; value: string; tone?: "positive" | "negative" };
+const hasFinancialValue = (item: OverviewDatum) => item.value !== "N/D";
+
 
 function Valuation({
   snapshot,
@@ -691,6 +694,18 @@ function StatementCharts({ rows, view, frequency, fiscalYearEndMonth, currency, 
   </div>;
 }
 
+type DashboardData = {
+  headlineAvailable: OverviewDatum[]; otherHeadline: OverviewDatum[];
+  growth: OverviewDatum[]; quality: OverviewDatum[]; longTerm: OverviewDatum[];
+  missing: { item: OverviewDatum; reason: string }[];
+};
+type DashboardInput = {
+  t: TTMSummary; h: FinancialHighlights; currency: string; financialSector: boolean;
+  status: Snapshot["status"]; coverage: OfficialCoverage | null; annualCount: number; quarterlyCount: number;
+  language: "fr" | "en"; compact: typeof compact; money: typeof money; pct: typeof pct; n: typeof n; tone: typeof tone;
+};
+type DashboardLayout = { buildDashboard: (input: DashboardInput) => DashboardData };
+
 function Financials({
   snapshot,
 }: {
@@ -704,12 +719,23 @@ function Financials({
     useState<StatementView>("income");
   const [mode, chooseMode] = useFocusMode("anatole.focus.financials.view.v2", ["table", "cards", "charts"]);
   const [overviewMode, chooseOverviewMode] = useFocusMode("anatole.focus.overview.view.v2", ["table", "cards", "charts"]);
+  const [dashboardLayout, setDashboardLayout] = useState<DashboardLayout | null>(null);
+  useEffect(() => {
+    if (subview !== "overview") return;
+    let active = true;
+    const moduleUrl = "/focus-dashboard-layout.mjs";
+    void import(/* webpackIgnore: true */ /* turbopackIgnore: true */ moduleUrl)
+      .then(value => { if (active) setDashboardLayout(value as DashboardLayout); })
+      .catch(() => { /* Core verified metrics remain visible if the optional layout cannot load. */ });
+    return () => { active = false; };
+  }, [subview]);
 
   const currency =
     snapshot.financial_currency ??
     snapshot.currency ??
     "CAD";
   const t = snapshot.ttm;
+  const dashboardCurrency = t.currency ?? currency;
   const h = snapshot.highlights;
   const annual = snapshot.annual_financials;
   const quarterly = snapshot.quarterly_financials;
@@ -735,6 +761,17 @@ function Financials({
     { key: "balance", label: ["Bilan", "Balance sheet"] },
     { key: "margins", label: ["Marges & croissance", "Margins & growth"] },
   ];
+
+  const financialSector = /bank|financial|finance|assur|insurance/i.test(`${snapshot.sector ?? ""} ${snapshot.industry ?? ""}`);
+  const dashboard = dashboardLayout?.buildDashboard({ t, h, currency: dashboardCurrency, financialSector,
+    status: snapshot.status, coverage: snapshot.official_coverage, annualCount: annual.length,
+    quarterlyCount: quarterly.length, language, compact, money, pct, n, tone });
+  const headlineAvailable = dashboard?.headlineAvailable ?? [
+    { label: tr(language, "Revenus TTM", "TTM revenue"), value: compact(t.total_revenue, dashboardCurrency) },
+    { label: tr(language, "Bénéfice net TTM", "TTM net income"), value: compact(t.net_income, dashboardCurrency) },
+    { label: tr(language, "Flux disponible TTM", "TTM free cash flow"), value: compact(t.free_cash_flow, dashboardCurrency) },
+  ].filter(hasFinancialValue);
+  const { otherHeadline = [], growth = [], quality = [], longTerm = [], missing = [] } = dashboard ?? {};
 
   return (
     <div style={{ display: "grid", gap: 14 }}>
@@ -768,41 +805,34 @@ function Financials({
               {tr(language, "Tableau de bord financier", "Financial dashboard")}
             </h2>
 
-            <div className="ff-dashboardMetrics">{([
-              [tr(language, "Revenus TTM", "TTM revenue"), compact(t.total_revenue, currency)],
-              [tr(language, "Résultat opérationnel TTM", "TTM operating income"), compact(t.operating_income, currency)],
-              [tr(language, "BAIIA TTM", "TTM EBITDA"), compact(t.ebitda, currency)],
-              [tr(language, "Bénéfice net TTM", "TTM net income"), compact(t.net_income, currency)],
-              [tr(language, "BPA dilué TTM", "TTM diluted EPS"), money(t.diluted_eps, currency)],
-              [tr(language, "Flux disponible TTM", "TTM free cash flow"), compact(t.free_cash_flow, currency)],
-              [tr(language, "Dette nette", "Net debt"), compact(t.net_debt, currency)],
-              [tr(language, "Dette nette / BAIIA", "Net debt / EBITDA"), n(h.net_debt_to_ebitda)],
-            ] as const).map(([label, value]) => <Metric key={label} label={label} value={value} />)}</div>
+            {snapshot.stale ? <p className="ff-overviewFreshness">{tr(language,
+              "Dernier instantané disponible · vérifier la date des sources avant toute comparaison.",
+              "Last available snapshot · check source dates before comparing.")}</p> : null}
+            {headlineAvailable.length ? <div className="ff-dashboardMetrics">
+              {headlineAvailable.map(item => <Metric key={item.label} {...item} />)}
+            </div> : <p className="ff-overviewEmpty">{tr(language,
+              "Aucune métrique TTM vérifiée pour cet instantané.", "No verified TTM metric for this snapshot.")}</p>}
           </section>
 
           <div className="ff-fundamentalsGrid">
-            <Group title={tr(language, "Croissance du dernier trimestre", "Latest-quarter growth")} items={[
-              { label: tr(language, "Revenus sur un an", "Revenue year over year"), value: pct(h.revenue_growth_yoy), tone: tone(h.revenue_growth_yoy) },
-              { label: tr(language, "Résultat opérationnel sur un an", "Operating income year over year"), value: pct(h.operating_income_growth_yoy), tone: tone(h.operating_income_growth_yoy) },
-              { label: tr(language, "Bénéfice net sur un an", "Net income year over year"), value: pct(h.net_income_growth_yoy), tone: tone(h.net_income_growth_yoy) },
-              { label: tr(language, "BPA sur un an", "EPS year over year"), value: pct(h.eps_growth_yoy), tone: tone(h.eps_growth_yoy) },
-              { label: tr(language, "Flux disponible sur un an", "Free cash flow year over year"), value: pct(h.free_cash_flow_growth_yoy), tone: tone(h.free_cash_flow_growth_yoy) },
-            ]} />
-
-            <Group title={tr(language, "Qualité des résultats TTM", "TTM earnings quality")} items={[
-              { label: tr(language, "Marge brute", "Gross margin"), value: pct(t.gross_margin) },
-              { label: tr(language, "Marge opérationnelle", "Operating margin"), value: pct(t.operating_margin) },
-              { label: tr(language, "Marge nette", "Net margin"), value: pct(t.net_margin) },
-              { label: tr(language, "Marge de flux disponible", "Free cash flow margin"), value: pct(t.free_cash_flow_margin) },
-              { label: tr(language, "Conversion bénéfice → flux", "Income-to-cash conversion"), value: pct(h.cash_conversion_percent) },
-            ]} />
-
-            <Group title={tr(language, "Croissance annualisée sur trois ans", "Three-year annualized growth")} items={[
-              { label: tr(language, "Revenus", "Revenue"), value: pct(h.three_year_revenue_cagr), tone: tone(h.three_year_revenue_cagr) },
-              { label: tr(language, "Bénéfice net", "Net income"), value: pct(h.three_year_net_income_cagr), tone: tone(h.three_year_net_income_cagr) },
-              { label: tr(language, "Flux disponible", "Free cash flow"), value: pct(h.three_year_free_cash_flow_cagr), tone: tone(h.three_year_free_cash_flow_cagr) },
-            ]} />
+            {growth.length ? <Group title={tr(language, "Croissance du dernier trimestre", "Latest-quarter growth")}
+              items={growth} /> : null}
+            {quality.length ? <Group title={tr(language, "Qualité des résultats TTM", "TTM earnings quality")}
+              items={quality} /> : null}
+            {longTerm.length ? <Group title={tr(language, "Croissance annualisée sur trois ans", "Three-year annualized growth")}
+              items={longTerm} /> : null}
           </div>
+
+          {missing.length ? <details className="ff-missingData"><summary>{tr(language,
+            "Voir les données indisponibles", "View unavailable data")} · {missing.length}</summary>
+            <ul>{missing.map(({ item, reason }, index) => <li key={index}><span>{item.label}</span>
+              <small>{reason}</small></li>)}</ul>
+          </details> : null}
+          {otherHeadline.length ? <details className="ff-missingData"><summary>{tr(language,
+            "Autres indicateurs disponibles", "Other available metrics")} · {otherHeadline.length}</summary>
+            <div className="ff-dashboardMetrics">{otherHeadline.map(item =>
+              <Metric key={item.label} label={item.label} value={item.value} tone={item.tone} />)}</div>
+          </details> : null}
 
           {overviewMode === "charts" ? <FocusSeriesChart storageKey="overview"
             title={tr(language, "Historique annuel publié", "Published annual history")}
