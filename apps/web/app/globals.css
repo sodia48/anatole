@@ -426,6 +426,10 @@ html[data-density="compact"] .watchlist-page { gap: 11px; }
 .filter-bar input[type="range"] { width: 160px; accent-color: var(--blue); }
 .filter-bar label em { color: var(--text); font-style: normal; font-weight: 800; }
 .source-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.source-status-notice { margin: 0; padding: 10px 14px; border: 1px solid var(--border); border-left: 3px solid var(--blue); border-radius: 8px; color: var(--muted); font-size: 12px; }
+.source-status-details { padding: 10px 14px; }
+.source-status-details summary { cursor: pointer; font-size: 12px; font-weight: 700; }
+.source-status-details .source-status-grid { margin-top: 10px; }
 .source-status { padding: 14px; display: grid; gap: 4px; }
 .source-status span { color: var(--teal); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; }
 .source-status strong { font-size: 12px; }

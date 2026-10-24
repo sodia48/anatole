@@ -47,7 +47,6 @@ import {
 } from "@/lib/regions";
 import type {
   NewsBriefResponse,
-  NewsItem,
   NewsSnapshot,
 } from "@/lib/types";
 import {
@@ -70,88 +69,10 @@ type NewsDisplayItem = {
   region: string;
 };
 
-const DIRECT_PROVINCIAL_MACRO_PATTERN = new RegExp(
-  [
-    "inflation",
-    "indice des prix",
-    "consumer price",
-    "emploi",
-    "chômage",
-    "population active",
-    "employment",
-    "unemployment",
-    "labour force",
-    "produit intérieur brut",
-    "gross domestic product",
-    "\\bpib\\b",
-    "\\bgdp\\b",
-    "commerce de détail",
-    "commerce de gros",
-    "retail trade",
-    "wholesale trade",
-    "exportations",
-    "importations",
-    "exports",
-    "imports",
-    "budget",
-    "déficit",
-    "excédent",
-    "comptes publics",
-    "fiscal",
-    "croissance économique",
-    "economic growth",
-    "mises en chantier",
-    "permis de bâtir",
-    "housing starts",
-    "building permits",
-  ].join("|"),
-  "i",
-);
-
-function hasPublishedDate(value: string | null): value is string {
-  if (!value) return false;
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) return false;
-  const age = Date.now() - timestamp;
-  return age >= -86_400_000 && age <= 180 * 86_400_000;
-}
-
-function isStatCan(source: string): boolean {
-  return /statistique canada|statistics canada/i.test(source);
-}
-
-function isEssentialProvincialItem(item: NewsItem): boolean {
-  return isStatCan(item.source) ||
-    DIRECT_PROVINCIAL_MACRO_PATTERN.test(`${item.title} ${item.summary}`);
-}
-
-function dedupeNewsItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    const canonicalUrl = item.url.split("?", 1)[0].replace(/\/+$/, "").toLowerCase();
-    const key = canonicalUrl || `${item.source}|${item.title}`.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function provinceFirstItems(items: NewsDisplayItem[]): NewsDisplayItem[] {
-  const newestFirst = (left: NewsDisplayItem, right: NewsDisplayItem) =>
-    Date.parse(right.publishedAt ?? "") - Date.parse(left.publishedAt ?? "");
-  const direct = items.filter((item) => !isStatCan(item.source)).sort(newestFirst);
-  const statcan = items.filter((item) => isStatCan(item.source)).sort(newestFirst);
-
-  // StatCan is a resilience layer, not the main provincial feed. Once a direct
-  // provincial source is available, it must remain at least as prominent as
-  // the federal complement. If no direct source responds, retain a small,
-  // transparent StatCan fallback rather than showing an empty screen.
-  const statcanLimit = direct.length > 0
-    ? Math.min(direct.length, 6)
-    : 6;
-
-  return [...direct, ...statcan.slice(0, statcanLimit)];
-}
+type ProvinceModule = { provinceItems: (releases: ProvincialMacroSnapshot["latest_releases"],
+  official: NewsSnapshot["items"], region: RegionCode, provinceName: string) => NewsDisplayItem[];
+  provinceStatuses: (items: NewsDisplayItem[], language: "fr" | "en") => Array<{
+    key: string; label: string; status: string; detail: string; lastSuccessAt: null }> };
 
 export function NewsClient() {
   const { preferences } =
@@ -241,6 +162,16 @@ export function NewsClient() {
 
   const provinceMode =
     isProvinceRegion(region);
+  const [provinceTools, setProvinceTools] = useState<ProvinceModule | null>(null);
+  useEffect(() => {
+    if (!provinceMode || provinceTools) return;
+    let active = true;
+    const moduleUrl = "/news-province-items.mjs";
+    void import(/* webpackIgnore: true */ /* turbopackIgnore: true */ moduleUrl)
+      .then((module) => { if (active) setProvinceTools(module as ProvinceModule); })
+      .catch(() => { if (active) setError(pick(language, "Le fil provincial ne peut pas être affiché.", "Provincial feed cannot be displayed.")); });
+    return () => { active = false; };
+  }, [provinceMode, provinceTools, language]);
 
   useEffect(() => {
     let active = true;
@@ -345,52 +276,8 @@ export function NewsClient() {
 
   const items = useMemo<NewsDisplayItem[]>(() => {
     if (provinceMode) {
-      const directItems = (provincialData?.latest_releases ?? [])
-        .filter(
-          (item) =>
-            item.source_kind !== "dashboard" &&
-            hasPublishedDate(item.published_at),
-        )
-        .map(
-          (item) => ({
-            id: item.id,
-            title: item.title,
-            summary: item.summary,
-            url: item.source_url,
-            source: item.source,
-            category: item.category,
-            publishedAt: item.published_at,
-            sentiment: null,
-            sentimentScore: null,
-            importance: item.importance,
-            region: item.province,
-          }),
-        );
-
-      const officialFallback = (data?.items ?? [])
-        .filter(
-          (item) =>
-            item.regions?.includes(region) &&
-            hasPublishedDate(item.published_at) &&
-            isEssentialProvincialItem(item),
-        )
-        .map((item) => ({
-          id: `official-${item.id}`,
-          title: item.title,
-          summary: item.summary,
-          url: item.url,
-          source: item.source,
-          category: item.category,
-          publishedAt: item.published_at,
-          sentiment: null,
-          sentimentScore: null,
-          importance: null,
-          region: regionLabel(region, language),
-        }));
-
-      return provinceFirstItems(
-        dedupeNewsItems([...directItems, ...officialFallback]),
-      );
+      return provinceTools?.provinceItems(provincialData?.latest_releases ?? [], data?.items ?? [],
+        region, regionLabel(region, language)) ?? [];
     }
 
     return (data?.items ?? [])
@@ -421,6 +308,7 @@ export function NewsClient() {
     data,
     language,
     provinceMode,
+    provinceTools,
     provincialData,
     region,
   ]);
@@ -485,29 +373,29 @@ export function NewsClient() {
   ]);
 
   const activeData = provinceMode
-    ? provincialData ?? data
+    ? provinceTools ? provincialData ?? data : null
     : data;
+  const statcanFeeds = (data?.source_statuses ?? []).filter((item) =>
+    item.source.startsWith("Statistique Canada"),
+  );
+  const statcanFeed = statcanFeeds.find((item) => item.status === "ok")
+    ?? statcanFeeds.find((item) => item.status === "stale") ?? statcanFeeds[0];
+  const statcanFeedStatus = statcanFeed ? {
+    key: "statcan-feed",
+    label: "Statistique Canada",
+    status: statcanFeed.status === "ok" ? "available"
+      : statcanFeed.status === "stale" ? "stale" : "unavailable",
+    detail: statcanFeed.status === "ok"
+      ? pick(language, "Flux officiel accessible", "Official feed available")
+      : pick(language, "Flux officiel temporairement indisponible", "Official feed temporarily unavailable"),
+    lastSuccessAt: statcanFeeds.find((item) => item.last_success_at)?.last_success_at ?? null,
+  } : null;
   const sourceStatuses = provinceMode
-    ? Array.from(
-        items.reduce((grouped, item) => {
-          grouped.set(item.source, (grouped.get(item.source) ?? 0) + 1);
-          return grouped;
-        }, new Map<string, number>()),
-      ).map(([label, count]) => ({
-        key: `display-${label}`,
-        label,
-        status: "available",
-        detail: pick(
-          language,
-          `${count} publication${count === 1 ? "" : "s"} officielle${count === 1 ? "" : "s"} datée${count === 1 ? "" : "s"}.`,
-          `${count} dated official release${count === 1 ? "" : "s"}.`,
-        ),
-      }))
-    : (data?.source_statuses ?? [])
-        .filter((item) =>
-          item.source.startsWith("Statistique Canada") ||
-          item.source.startsWith("Banque du Canada"),
-        )
+    ? provinceTools?.provinceStatuses(items, language) ?? []
+    : [
+        ...(statcanFeedStatus ? [statcanFeedStatus] : []),
+        ...(data?.source_statuses ?? [])
+        .filter((item) => item.source.startsWith("Banque du Canada"))
         .map((item) => ({
           key: item.source,
           label: item.source,
@@ -518,7 +406,15 @@ export function NewsClient() {
                 ? "stale"
               : "unavailable",
           detail: item.detail,
-        }));
+          lastSuccessAt: item.last_success_at ?? null,
+        })),
+      ];
+  const statcanIssue = sourceStatuses.find((item) =>
+    item.label.startsWith("Statistique Canada") && item.status !== "available",
+  );
+  const sourceIssueCount = sourceStatuses.filter((item) =>
+    item.status === "unavailable" || item.status === "stale",
+  ).length;
 
   if (!activeData && !error) {
     return (
@@ -617,6 +513,14 @@ export function NewsClient() {
         </div>
       ) : null}
 
+      {statcanIssue ? <p className="source-status-notice" role="status">
+        {pick(language,
+          "Certaines publications de Statistique Canada sont temporairement indisponibles.",
+          "Some Statistics Canada releases are temporarily unavailable.")}
+        {statcanIssue.lastSuccessAt ? ` ${pick(language, "Dernière collecte réussie", "Last successful collection")}: ${new Date(statcanIssue.lastSuccessAt).toLocaleDateString(localeFor(language))}.` : null}
+      </p> : null}
+      <details className="panel source-status-details">
+        <summary>{pick(language, "État des sources", "Source status")}{sourceIssueCount ? ` · ${sourceIssueCount}` : ""}</summary>
       <section className="source-status-grid">
         {sourceStatuses.map(
           (item) => (
@@ -665,6 +569,7 @@ export function NewsClient() {
           ),
         )}
       </section>
+      </details>
 
       <section className="panel filter-bar">
         <label className="filter-search">

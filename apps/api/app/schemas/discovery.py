@@ -42,6 +42,7 @@ class FeedStatus(BaseModel):
     source: str
     status: str
     detail: str | None = None
+    last_success_at: datetime | None = None
 
 
 class NewsItem(BaseModel):
