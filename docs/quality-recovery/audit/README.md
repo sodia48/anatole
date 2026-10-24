@@ -1,6 +1,6 @@
 # Audit transversal — programme Quality Recovery
 
-Date de vérification : 23 octobre 2026. Base du rapport : `main` après la PR [#162](https://github.com/sodia48/anatole/pull/162). Les PR [#163](https://github.com/sodia48/anatole/pull/163) et [#164](https://github.com/sodia48/anatole/pull/164) restent des corrections indépendantes en attente de revue. Ce rapport ne les fusionne pas.
+Date de vérification initiale : 23 octobre 2026. Base initiale : `main` après la PR [#162](https://github.com/sodia48/anatole/pull/162). Les correctifs du programme sont suivis dans les PR [#163](https://github.com/sodia48/anatole/pull/163) et [#164](https://github.com/sodia48/anatole/pull/164); leur état de fusion courant est indiqué par GitHub.
 
 ## Méthode et portée
 
@@ -24,7 +24,7 @@ Le Quality Gate complet de la PR #162 a validé `api-tests`, `web-build`, `mobil
 | --- | --- | --- |
 | P0 | Aucun P0 reproduit dans les parcours automatisés ci-dessus. | La suite locale ne prouve pas l'absence de P0 en production. |
 | P1 | Les dates trimestrielles étaient réduites à des années répétées; un graphique pouvait être trompeur. | Corrigé dans la PR #162, fusionnée après quatre contrôles verts. |
-| P1 | Le flux Atom de Statistique Canada pouvait répondre HTTP 200 avec une page HTML; quatre catégories affichaient la même erreur XML. | Corrigé dans la PR #163, à fusionner seulement après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
+| P1 | Le flux Atom de Statistique Canada pouvait répondre HTTP 200 avec une page HTML; quatre catégories affichaient la même erreur XML. | Corrigé dans la PR #163, fusionnée après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
 | P1 | Le tableau de bord mettait en avant des cartes N/D et utilisait parfois une devise TTM erronée. | Corrigé dans la PR #164, à fusionner seulement après les quatre contrôles verts sur son head final et autorisation du propriétaire. |
 | P2 — source ancienne | Les anciens RSS de communiqués de Nouvelle-Écosse ne fournissent plus de document RSS exploitable. | Le mode provincial prioritaire fonctionne avec d'autres pages statistiques officielles et StatCan; documenter le flux obsolète sans inventer de communiqués. |
 
@@ -43,4 +43,4 @@ Le parcours réel de la preview Vercel #163 reste fonctionnel : le 23 octobre, l
 
 ## Règle de sortie
 
-La PR #163 a été mise à jour avec `main` après #162 : ses contrôles doivent être relancés sur ce nouveau head. La PR #164 doit garder ses quatre contrôles verts. Toute modification supplémentaire impose de revérifier le head exact. Aucune PR en brouillon ne sera fusionnée sans l'autorisation explicite du propriétaire.
+La PR #163 a été fusionnée sur `main` après quatre contrôles verts sur `ea54324cc95a22416da4be5acb22b66a4df55e0c` et autorisation explicite. La PR #164 doit garder ses quatre contrôles verts sur son head final. Toute modification supplémentaire impose de revérifier le head exact. Aucune PR en brouillon ne sera fusionnée sans l'autorisation explicite du propriétaire.
