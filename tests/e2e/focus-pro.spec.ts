@@ -92,7 +92,7 @@ test.describe("Focus Pro workstation", () => {
     await articleButtons.first().click();
     const reader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(reader).toBeVisible();
-    await expect(reader.getByRole("heading", { name: "Résumé en langue originale" })).toBeVisible();
+    await expect(reader.getByRole("heading", { name: "Résumé" })).toBeVisible();
     await expect(reader.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(reader.locator("img")).toHaveCount(1);
     expect(await reader.evaluate((node) => {

@@ -32,6 +32,7 @@ _OFFICIAL_HOSTS = (
 # excerpt supplied by the feed; they are never fetched by the brief service.
 _PRESS_RELEASE_HOSTS = ("newswire.ca", "globenewswire.com", "businesswire.com")
 _ENBRIDGE_HOST = "www.enbridge.com"
+_FIVE_N_HOST = "www.5nplus.com"
 logger = logging.getLogger(__name__)
 _IGNORED = {"script", "style", "noscript", "svg", "nav", "footer", "form", "aside"}
 _CAPTURE = {"h1", "p", "li", "h2", "h3", "h4"}
@@ -81,16 +82,18 @@ _UNSAFE_LINK = re.compile(r"https?://", re.I)
 _SYMBOL = re.compile(r"\b(?:TSX|NYSE|NASDAQ)\s*:\s*([A-Z][A-Z0-9.-]{0,7})\b")
 _YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
 _PERIOD_RANGE = re.compile(r"\b((?:19|20)\d{2})\s*(?:to|through|until|à|au|[-–])\s*((?:19|20)\d{2})\b", re.I)
-_LABEL_END = re.compile(r"\b(?:is|was|were|are|est|sont|atteint|atteindra|a atteint|should|will|could|s'élève|s'établit|a progressé|ont progressé|a augmenté|ont augmenté|a diminué|ont diminué|a été révisée|has increased|have increased|grew|rose|fell)\b.*$", re.I)
+_LABEL_END = re.compile(r"\b(?:is|was|were|are|est|sont|atteint|atteindra|a atteint|should|will|could|s'élève|s'établit|a progressé|ont progressé|a augmenté|ont augmenté|a diminué|ont diminué|a été révisée|has increased|have increased|increased|decreased|declined|grew|rose|fell)\b.*$", re.I)
 _QUARTER = re.compile(r"\b(premier|deuxième|troisième|quatrième|first|second|third|fourth|Q[1-4])\s+(?:trimestre|quarter)\b", re.I)
 _MONTH_YEAR = re.compile(r"\b(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+((?:19|20)\d{2})\b", re.I)
 _VALUE_UNIT = re.compile(r"\b(milliards?|billions?|millions?|thousands?|milliers?|GJ|PJ|TJ|MWh|GWh|TWh|m3|m³|points?|pts?)\b|%", re.I)
 
 
 class ArticleParser(HTMLParser):
-    def __init__(self, *, main_only: bool = False) -> None:
+    def __init__(self, *, main_only: bool = False, section_class: str | None = None) -> None:
         super().__init__(convert_charrefs=True)
         self.main_only = main_only
+        self.section_class = section_class
+        self.section_depth = 0
         self.in_main = False
         self.blocks: list[str] = []
         self.ignored = 0
@@ -99,9 +102,14 @@ class ArticleParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        classes = (dict(attrs).get("class") or "").split()
+        if self.section_class and tag == "section" and self.section_class in classes:
+            self.section_depth = 1
+        elif self.section_depth and tag == "section":
+            self.section_depth += 1
         if tag == "main":
             self.in_main = True
-        if self.main_only and not self.in_main:
+        if (self.main_only and not self.in_main) or (self.section_class and not self.section_depth):
             return
         if tag in _IGNORED:
             self.ignored += 1
@@ -112,7 +120,7 @@ class ArticleParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
-        if self.main_only and not self.in_main:
+        if (self.main_only and not self.in_main) or (self.section_class and not self.section_depth):
             return
         if tag == "main":
             self.in_main = False
@@ -125,9 +133,11 @@ class ArticleParser(HTMLParser):
                 if len(value) >= 25:
                     self.blocks.append(value)
                 self.buffer = []
+        if tag == "section" and self.section_depth:
+            self.section_depth -= 1
 
     def handle_data(self, data: str) -> None:
-        if (not self.main_only or self.in_main) and not self.ignored and self.capture:
+        if (not self.main_only or self.in_main) and (not self.section_class or self.section_depth) and not self.ignored and self.capture:
             value = _clean(data)
             if value:
                 self.buffer.append(value)
@@ -235,6 +245,11 @@ def _safe_url(url: str, context: str) -> bool:
     if context == "stock" and host == _ENBRIDGE_HOST:
         query = parse_qs(parsed.query)
         return parsed.path.lower() == "/media-center/news/details" and query.get("id", [""])[0].isdigit()
+    if context == "stock" and host == _FIVE_N_HOST:
+        slug = parsed.path.rstrip("/").rsplit("/", 1)[-1].casefold()
+        return (slug not in {"press-releases", "communiques-de-presse", "actualites"}
+                and bool(re.fullmatch(r"/(?:en/news|fr/nouvelles)/[a-z0-9-]+/", parsed.path, re.I))
+                and not parsed.query)
     hosts = _OFFICIAL_HOSTS + (_PRESS_RELEASE_HOSTS if context == "stock" else ())
     return any(host == suffix or host.endswith("." + suffix) for suffix in hosts)
 
@@ -283,8 +298,10 @@ def _numbers(value: str) -> list[str]:
 
 def _figure_label(sentence: str, first_value_start: int, title: str) -> str:
     prefix = sentence[:first_value_start].strip(" ,:;–—-")
+    prefix = re.sub(r"^.{0,80}?\b(?:reported|reports|announced|publie|a publié)\s+", "", prefix, flags=re.I)
     prefix = re.sub(r"^(?:the|a|an|le|la|les|un|une)\s+", "", prefix, flags=re.I)
     prefix = _LABEL_END.sub("", prefix).strip(" ,:;–—-")
+    prefix = re.sub(r"\s+(?:of|de|en)\s+(?:USD|CAD)$", "", prefix, flags=re.I)
     if not 4 <= len(prefix) <= 85:
         prefix = title.strip()[:85]
     return prefix[:1].upper() + prefix[1:]
@@ -318,15 +335,28 @@ def _figure_period(sentence: str, start: int, end: int) -> str | None:
     return nearest.group()
 
 
+def _figure_unit(value: str) -> str | None:
+    """Keep only units stated next to the source value; never infer a currency."""
+    explicit_currency = re.search(r"\b(?:CAD|USD)\b", value, re.I)
+    scale = _VALUE_UNIT.search(value)
+    pieces = [explicit_currency.group().upper()] if explicit_currency else ["$"] if "$" in value else []
+    if scale:
+        pieces.append(scale.group())
+    return " ".join(pieces) or None
+
+
 def _dedupe_sentences(values: list[str], used: list[str]) -> list[str]:
     result: list[str] = []
-    keys = [set(re.findall(r"[\wÀ-ÿ]{4,}", item.casefold())) for item in used]
+    keys = [(set(re.findall(r"[\wÀ-ÿ]{4,}", item.casefold())), sorted(_numbers(item))) for item in used]
     for value in values:
         tokens = set(re.findall(r"[\wÀ-ÿ]{4,}", value.casefold()))
-        if any(tokens and len(tokens & old) / max(1, min(len(tokens), len(old))) > 0.78 for old in keys):
+        numbers = sorted(_numbers(value))
+        if any(tokens and numbers == old_numbers and
+               len(tokens & old) / max(1, min(len(tokens), len(old))) > 0.78
+               for old, old_numbers in keys):
             continue
         result.append(value)
-        keys.append(tokens)
+        keys.append((tokens, numbers))
     return result
 
 
@@ -374,7 +404,9 @@ class NewsBriefService:
                     raw = b"".join(chunks).decode(response.encoding or "utf-8", "replace")
                     if "html" not in content_type:
                         return _clean(raw)[:10_000]
-                    parser = ArticleParser(main_only=urlsplit(current).hostname == _ENBRIDGE_HOST)
+                    host = urlsplit(current).hostname
+                    parser = ArticleParser(main_only=host == _ENBRIDGE_HOST,
+                                           section_class="news-details" if host == _FIVE_N_HOST else None)
                     parser.feed(raw)
                     return "\n".join(parser.blocks[:140])[:10_000]
         raise ValueError("article_redirect_limit")
@@ -389,17 +421,22 @@ class NewsBriefService:
         if not sentences and request.summary:
             sentences = _sentences([request.summary])
         ranked = sorted(enumerate(sentences), key=lambda pair: (-_score(pair[1], request.title), pair[0]))
-        lead = ranked[0][1] if ranked else _clean(request.summary or request.title)
-        if source_mode == "article_page" and request.context == "stock":
-            content = [sentence for sentence in sentences if sentence.casefold() != request.title.casefold()]
+        content = [sentence for sentence in sentences if sentence.casefold() != request.title.casefold()]
+        lead_parts: list[str] = []
+        if source_mode == "official_page" or (source_mode == "article_page" and request.context == "stock"):
             if content:
-                lead = content[0]
-                highlight = next((sentence for sentence in content[1:14]
-                                  if 45 <= len(sentence) <= 280 and _MEASURE.search(sentence)
-                                  and sentence.casefold() not in lead.casefold()), "")
-                if highlight:
-                    lead = f"{lead} {highlight}"
-        remaining = _dedupe_sentences([sentence for sentence in sentences if sentence != lead], [lead])
+                lead_parts.append(content[0])
+        for _, sentence in ranked:
+            if len(lead_parts) >= 2:
+                break
+            if sentence in lead_parts or sentence.casefold() == request.title.casefold() or _WATCH.search(sentence):
+                continue
+            if _dedupe_sentences([sentence], lead_parts):
+                lead_parts.append(sentence)
+        if not lead_parts and content:
+            lead_parts = [content[0]]
+        lead = " ".join(lead_parts) if lead_parts else _clean(request.summary or request.title)
+        remaining = _dedupe_sentences([sentence for sentence in sentences if sentence not in lead_parts], lead_parts)
         figures: list[NewsBriefFigure] = []
         seen_figures: set[tuple[str, str | None, str]] = set()
         for sentence in sentences:
@@ -407,12 +444,17 @@ class NewsBriefService:
             label = _figure_label(sentence, matches[0].start(), request.title) if matches else ""
             for match in matches:
                 value = _clean(match.group())
+                prefix = re.search(r"\b(?:USD|CAD)\s*$", sentence[max(0, match.start() - 8):match.start()], re.I)
+                if prefix and not value.startswith(("$", "€", "£")):
+                    value = f"{prefix.group().strip().upper()} {value}"
                 period = _figure_period(sentence, match.start(), match.end())
+                if "%" in value and re.match(r"\s+from\b", sentence[match.end():], re.I):
+                    period = None
                 key = (value.casefold(), period, label.casefold())
                 if key in seen_figures:
                     continue
                 seen_figures.add(key)
-                figures.append(NewsBriefFigure(value=value, label=label, period=period,
+                figures.append(NewsBriefFigure(value=value, unit=_figure_unit(value), label=label, period=period,
                                                context=sentence[:420], kind=_kind(sentence)))
                 if len(figures) >= 10:
                     break
@@ -508,8 +550,12 @@ class NewsBriefService:
             for source, value in zip(texts, translated, strict=True):
                 if not isinstance(value, str) or len(value) > max(100, len(source) * 2) or _UNSAFE_LINK.search(value):
                     return brief
+                if not source.strip() and value.strip():
+                    return brief
                 if sorted(_numbers(source)) != sorted(_numbers(value)):
                     return brief
+            if _language(translated[0]) not in {"unknown", language}:
+                return brief
             count_changes = len(brief.changes)
             count_watch = len(brief.watch)
             changes = translated[1:1 + count_changes]

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getStockNewsSnapshot } from "@/lib/api";
 import type { ReaderArticle } from "@/components/news/NewsIntelligenceReader";
@@ -38,6 +38,7 @@ export function FocusStockNews({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NewsItem | null>(null);
+  const readerTrigger = useRef<HTMLButtonElement | null>(null);
   const [filter, setFilter] = useState<"all" | "direct" | "sector">("all");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const closeReader = useCallback(() => setSelected(null), []);
@@ -191,7 +192,7 @@ export function FocusStockNews({
                 {readable ? tr(language, "Lire le résumé", "Read summary") : tr(language, "Voir l'article", "View article")}
               </span>
             </>;
-            return readable ? <button className={styles.card} key={item.id} onClick={() => setSelected(item)} type="button">{contents}</button>
+            return readable ? <button className={styles.card} key={item.id} onClick={(event) => { readerTrigger.current = event.currentTarget; setSelected(item); }} type="button">{contents}</button>
               : <a className={styles.card} key={item.id} href={item.url} target="_blank" rel="noopener noreferrer">{contents}</a>;
           })}
         </div>
@@ -205,6 +206,7 @@ export function FocusStockNews({
           article={selectedArticle}
           language={language}
           onClose={closeReader}
+          returnFocusRef={readerTrigger}
         />
       ) : null}
     </section>

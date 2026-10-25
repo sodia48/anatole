@@ -387,6 +387,7 @@ export type NewsBriefRequest = {
 
 export type NewsBriefFigure = {
   value: string;
+  unit?: string | null;
   context: string;
   kind?: "actual" | "forecast" | "opinion" | "date" | "other";
   label?: string;
