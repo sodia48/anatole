@@ -44,7 +44,7 @@ test("macro reader shows grounded quick and detailed briefs across viewports", a
   await page.screenshot({ path: testInfo.outputPath("news-reader-quick.png") });
 
   await reader.getByRole("button", { name: "Analyse détaillée" }).click();
-  await expect(reader.getByRole("heading", { name: "Chiffres clés" })).toBeVisible();
+  await expect(reader.getByRole("heading", { name: "Chiffres importants" })).toBeVisible();
   await expect(reader.getByText("Donnée publiée")).toBeVisible();
   await expect(reader.getByRole("heading", { name: "À surveiller" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("news-reader-detail.png") });
@@ -92,12 +92,13 @@ test("Focus CNQ shares the reader and ignores an obsolete article response", asy
   await page.goto("/focus/CNQ");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   const news = page.getByRole("region", { name: /Dernières nouvelles pour CNQ|Latest news for CNQ/i });
-  await expect(news.getByRole("button")).toHaveCount(2);
-  await news.getByRole("button").first().click();
+  const cards = news.getByRole("button", { name: /Lire le résumé/ });
+  await expect(cards).toHaveCount(2);
+  await cards.first().click();
   const firstReader = page.getByRole("dialog", { name: "Canadian Natural Resources reports quarterly results" });
   await expect(firstReader).toBeVisible();
   await firstReader.getByRole("button", { name: "Fermer" }).click();
-  await news.getByRole("button").nth(1).click();
+  await cards.nth(1).click();
   const limited = page.getByRole("dialog", { name: "Canadian Natural Resources announces an update" });
   await expect(limited.getByText("Informations limitées")).toBeVisible();
   await expect(limited.getByText("$10 billion")).toHaveCount(0);
@@ -105,7 +106,7 @@ test("Focus CNQ shares the reader and ignores an obsolete article response", asy
   await page.waitForTimeout(700);
   await expect(limited.getByText("Informations limitées")).toBeVisible();
   await limited.getByRole("button", { name: "Fermer" }).click();
-  await news.getByRole("button").first().click();
+  await cards.first().click();
   const results = page.getByRole("dialog", { name: "Canadian Natural Resources reports quarterly results" });
   await expect(results.getByText("Résumé de l’éditeur")).toBeVisible();
   await results.getByRole("button", { name: "Analyse détaillée" }).click();

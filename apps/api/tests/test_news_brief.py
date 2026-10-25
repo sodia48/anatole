@@ -51,7 +51,7 @@ def test_brief_fallback_is_explicit() -> None:
         source_mode="feed_summary",
     )
     assert brief.source_mode == "feed_summary"
-    assert "distinct" in brief.source_note.lower()
+    assert "extrait" in brief.source_note.lower()
     assert brief.availability == "publisher_excerpt"
     assert brief.watch == []  # No future event was stated in the excerpt.
 
@@ -170,6 +170,16 @@ def test_translation_preserves_numbers_and_rejects_invented_ones(monkeypatch: py
     rejected = asyncio.run(service._translate(brief, "fr"))
     assert rejected.translation_status == "unavailable"
 
+    async def changed_scale(*, prompt: str, **kwargs):
+        source = json.loads(prompt.split("Input: ", 1)[1])
+        return SimpleNamespace(success=True, answer=json.dumps({
+            "texts": ["La banque a déclaré des revenus de $18,4 millions et ses actions ont augmenté de 4,2%.",
+                      *source[1:]],
+        }))
+
+    monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", changed_scale)
+    assert asyncio.run(service._translate(brief, "fr")).translation_status == "unavailable"
+
 
 def test_safe_fetch_rejects_redirect_to_unapproved_host(monkeypatch: pytest.MonkeyPatch) -> None:
     original_client = httpx.AsyncClient
@@ -247,3 +257,68 @@ def test_legacy_http_endpoint_stays_compatible(monkeypatch: pytest.MonkeyPatch) 
     assert response.status_code == 200
     assert response.json()["source_mode"] == "feed_summary"
     assert response.json()["availability"] == "publisher_excerpt"
+
+
+def test_antimony_forecast_is_grouped_by_year_without_repeated_paragraphs() -> None:
+    article = (
+        "The global antimony market is forecast to reach USD 4.94 billion in 2025, "
+        "USD 5.26 billion in 2026 and USD 6.65 billion by 2030. "
+        "A CAGR of 6.6% is expected from 2025 to 2026. "
+        "A CAGR of 6.1% is expected from 2026 to 2030."
+    )
+    brief = NewsBriefService().build_from_text(make_request(
+        title="Global antimony market forecast", summary=article, language="en",
+    ), article, source_mode="feed_summary")
+    market = next(group for group in brief.figure_series if "antimony" in group.label.lower())
+    assert [(figure.period, figure.value) for figure in market.figures] == [
+        ("2025", "4.94 billion"), ("2026", "5.26 billion"), ("2030", "6.65 billion"),
+    ]
+    assert all(figure.kind == "forecast" for figure in market.figures)
+    assert all("antimony" not in figure.context.lower() or figure.context == article.split(". A CAGR")[0] + "." for figure in market.figures)
+    assert all(figure.value not in [row.value for row in brief.key_figures] for figure in market.figures)
+    rates = [figure for group in brief.figure_series if "CAGR" in group.label for figure in group.figures]
+    assert [(figure.period, figure.value) for figure in rates] == [("2025–2026", "6.6%"), ("2026–2030", "6.1%")]
+
+
+def test_five_figures_in_one_sentence_do_not_create_five_visible_cards() -> None:
+    sentence = "Revenue was $1 million in 2021, $2 million in 2022, $3 million in 2023, $4 million in 2024 and $5 million in 2025."
+    brief = NewsBriefService().build_from_text(make_request(title="Revenue forecast", language="en"), sentence, source_mode="feed_summary")
+    assert len(brief.figure_series) == 1
+    assert len(brief.figure_series[0].figures) == 5
+    assert brief.key_figures == []
+
+
+def test_article_without_numbers_has_no_financial_cards() -> None:
+    article = "The company announced a change to its board of directors after its annual meeting."
+    brief = NewsBriefService().build_from_text(make_request(language="en"), article, source_mode="feed_summary")
+    assert brief.key_figures == []
+    assert brief.figure_series == []
+
+
+def test_translation_accepts_decimal_comma_and_equivalent_billion_unit(monkeypatch: pytest.MonkeyPatch) -> None:
+    request = make_request(
+        title="Antimony market projection", language="fr",
+        summary="The antimony market is projected at USD 4.94 billion in 2025 and USD 5.26 billion in 2026.",
+    )
+    service = NewsBriefService()
+    brief = service.build_from_text(request, request.summary, source_mode="feed_summary")
+    assert brief.translation_status == "unavailable"
+    monkeypatch.setattr(brief_module.provider_router, "available", lambda: [object()])
+
+    async def translate(*, prompt: str, **kwargs):
+        values = json.loads(prompt.split("Input: ", 1)[1])
+        values[0] = "Le marché de l'antimoine est estimé à 4,94 milliards USD en 2025 et 5,26 milliards USD en 2026."
+        return SimpleNamespace(success=True, answer=json.dumps({"texts": values}))
+
+    monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", translate)
+    translated = asyncio.run(service._translate(brief, "fr"))
+    assert translated.translation_status == "automatic"
+    assert "4,94 milliards USD" in translated.summary
+
+    async def wrong_currency(*, prompt: str, **kwargs):
+        values = json.loads(prompt.split("Input: ", 1)[1])
+        values[0] = "Le marché de l'antimoine est estimé à 4,94 milliards CAD en 2025 et 5,26 milliards USD en 2026."
+        return SimpleNamespace(success=True, answer=json.dumps({"texts": values}))
+
+    monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", wrong_currency)
+    assert asyncio.run(service._translate(brief, "fr")).translation_status == "unavailable"

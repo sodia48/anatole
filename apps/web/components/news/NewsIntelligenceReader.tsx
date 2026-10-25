@@ -48,11 +48,6 @@ function NewsBriefProvenance({ brief, language }: {
     <aside className={styles.provenance} aria-label={pick(language, "Provenance et limites", "Provenance and limits")}>
       <strong>{label}</strong>
       <span>{brief.source_note}</span>
-      {brief.translation_status === "unavailable" &&
-        brief.source_language && brief.source_language !== "unknown" &&
-        brief.source_language !== language ? (
-          <span>{pick(language, "Texte original conservé : traduction fiable indisponible.", "Original text retained: reliable translation unavailable.")}</span>
-        ) : null}
     </aside>
   );
 }
@@ -61,25 +56,44 @@ function NewsBriefFigures({ brief, language }: {
   brief: NewsBriefResponse;
   language: "fr" | "en";
 }) {
-  if (!brief.key_figures.length) return null;
+  const [expanded, setExpanded] = useState(false);
+  const series = brief.figure_series ?? [];
+  if (!brief.key_figures.length && !series.length) return null;
+  const visible = expanded ? brief.key_figures : brief.key_figures.slice(0, 3);
   return (
     <section className={styles.section}>
-      <h3>{pick(language, "Chiffres clés", "Key figures")}</h3>
+      <h3>{pick(language, "Chiffres importants", "Important figures")}</h3>
+      {series.map((group, index) => (
+        <div className={styles.series} key={group.label + index}>
+          <strong>{group.label}</strong>
+          <table>
+            <thead><tr><th scope="col">{pick(language, "Période", "Period")}</th><th scope="col">{pick(language, "Valeur", "Value")}</th></tr></thead>
+            <tbody>{group.figures.map((figure, figureIndex) => (
+              <tr key={figure.period + figure.value + figureIndex}><th scope="row">{figure.period}</th><td>{figure.value}</td></tr>
+            ))}</tbody>
+          </table>
+          <details><summary>{pick(language, "Justification", "Source evidence")}</summary><p>{group.figures[0]?.context}</p></details>
+        </div>
+      ))}
       <div className={styles.figures}>
-        {brief.key_figures.map((figure, index) => (
+        {visible.map((figure, index) => (
           <div className={styles.figure} key={figure.value + index}>
+            {figure.label ? <span className={styles.figureLabel}>{figure.label}</span> : null}
             <strong>{figure.value}</strong>
-            <span>{figure.kind === "forecast"
+            <span>{figure.period ? figure.period + " · " : ""}{figure.kind === "forecast"
               ? pick(language, "Prévision", "Forecast")
               : figure.kind === "opinion"
                 ? pick(language, "Opinion d’analyste", "Analyst opinion")
                 : figure.kind === "date"
                   ? pick(language, "Date annoncée", "Announced date")
                 : pick(language, "Donnée publiée", "Published figure")}</span>
-            <p>{figure.context}</p>
+            <details><summary>{pick(language, "Justification", "Source evidence")}</summary><p>{figure.context}</p></details>
           </div>
         ))}
       </div>
+      {brief.key_figures.length > 3 ? <button type="button" className={styles.more} onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>
+        {expanded ? pick(language, "Masquer les détails", "Hide details") : pick(language, "Voir les détails", "See details")}
+      </button> : null}
     </section>
   );
 }
@@ -99,7 +113,7 @@ function NewsBriefAnalysis({ brief, language, context }: {
       ) : null}
       {brief.why_it_matters ? (
         <section className={styles.analysis}>
-          <h3>{pick(language, "Lecture Anatole", "Anatole read")}</h3>
+          <h3>{pick(language, "Ce que cela signifie", "What this means")}</h3>
           <p>{brief.why_it_matters}</p>
           <small>{pick(language, "Interprétation fondée sur le contenu disponible.", "Interpretation based on available content.")}</small>
         </section>
@@ -135,7 +149,7 @@ function NewsBrief({ brief, language, context, view }: {
         <section className={styles.lead}>
           <span>{pick(language, "L’ESSENTIEL", "THE ESSENTIALS")}</span>
           <h3>{untranslated
-            ? pick(language, "Texte original · traduction indisponible", "Original text · translation unavailable")
+            ? pick(language, "Résumé en langue originale", "Summary in original language")
             : pick(language, "Résumé", "Summary")}</h3>
           <p lang={untranslated ? brief.source_language : undefined}>{brief.summary}</p>
         </section>
@@ -294,13 +308,6 @@ export function NewsIntelligenceReader({ article, language, onClose }: {
                   </div>
                 ) : null}
                 <NewsBrief brief={brief} language={language} context={article.context} view={view} />
-                {brief.availability !== "article" ? (
-                  <div className={styles.limit}>
-                    {pick(language,
-                      "Cette source ne fournit pas le texte intégral à Anatole. L’analyse se limite aux informations disponibles.",
-                      "This source does not provide the full article to Anatole. Analysis is limited to available information.")}
-                  </div>
-                ) : null}
               </>
             ) : (
               <div className={styles.fallback} role={failed ? "alert" : undefined}>

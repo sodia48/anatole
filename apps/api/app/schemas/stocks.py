@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -80,6 +81,8 @@ class StockNewsItem(BaseModel):
     published_at: datetime
     related_tickers: list[str] = Field(default_factory=list)
     image_url: str | None = None
+    relevance: Literal["direct", "sector"] = "direct"
+    origin: Literal["publisher", "company_release"] = "publisher"
 
 
 class StockNewsSnapshot(BaseModel):
@@ -89,5 +92,6 @@ class StockNewsSnapshot(BaseModel):
     items: list[StockNewsItem]
     status: str = "ok"
     detail: str | None = None
+    coverage_note: str | None = None
     generated_at: datetime
     refresh_after_seconds: int = 900

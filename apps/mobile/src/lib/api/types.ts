@@ -154,8 +154,8 @@ export type NewsItem = {
   image_url?: string | null;
 };
 export type NewsSnapshot = { items: NewsItem[]; source_statuses: FeedStatus[]; generated_at: string; refresh_after_seconds: number };
-export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[]; image_url?: string | null };
-export type StockNewsSnapshot = { ticker: string; symbol: string; company: string; items: StockNewsItem[]; status: string; detail: string | null; generated_at: string; refresh_after_seconds: number };
+export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[]; image_url?: string | null; relevance?: "direct" | "sector"; origin?: "publisher" | "company_release" };
+export type StockNewsSnapshot = { ticker: string; symbol: string; company: string; items: StockNewsItem[]; status: string; detail: string | null; coverage_note?: string | null; generated_at: string; refresh_after_seconds: number };
 export type NewsBriefRequest = {
   title: string; summary: string; url: string; source: string; category: string; region: string;
   language: "fr" | "en"; context: "macro" | "stock";
@@ -163,7 +163,8 @@ export type NewsBriefRequest = {
 };
 export type NewsBriefResponse = {
   summary: string; changes: string[]; why_it_matters: string; watch: string[];
-  key_figures: { value: string; context: string; kind?: "actual" | "forecast" | "opinion" | "date" }[];
+  key_figures: { value: string; context: string; kind?: "actual" | "forecast" | "opinion" | "date"; label?: string; period?: string | null }[];
+  figure_series?: { label: string; figures: { value: string; context: string; kind?: "actual" | "forecast" | "opinion" | "date"; label?: string; period?: string | null }[] }[];
   source_note: string; source_mode: "official_page" | "article_page" | "feed_summary" | "title_only";
   availability?: "article" | "publisher_excerpt" | "limited";
   translation_status?: "original" | "automatic" | "unavailable";
