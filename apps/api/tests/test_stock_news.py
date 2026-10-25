@@ -13,6 +13,7 @@ from app.services.stock_news import (
     _safe_url,
     _description_from_html,
     _thumbnail_url,
+    _parse_enbridge_releases,
 )
 
 
@@ -266,7 +267,7 @@ def test_short_canadian_feed_is_completed_with_us_news(monkeypatch) -> None:
     )
 
     assert calls == [("en", "CA"), ("en", "US")]
-    assert len(snapshot.items) == 10
+    assert len(snapshot.items) == 12
     assert all(item.summary for item in snapshot.items)
 
 
@@ -373,7 +374,7 @@ def test_secondary_source_failure_keeps_yahoo_direct_news(monkeypatch) -> None:
     snapshot = asyncio.run(service._load(symbol="CNQ.TO", company="Canadian Natural Resources", language="en"))
     assert snapshot.status == "ok"
     assert len(snapshot.items) == 1
-    assert snapshot.coverage_note == "Only one relevant publisher is available."
+    assert snapshot.coverage_note == "Recent coverage is limited to available sources."
 
 
 def test_no_direct_or_sector_news_is_honest(monkeypatch) -> None:
@@ -387,3 +388,70 @@ def test_no_direct_or_sector_news_is_honest(monkeypatch) -> None:
     snapshot = asyncio.run(service._load(symbol="CNQ.TO", company="Canadian Natural Resources", language="en"))
     assert snapshot.status == "partial"
     assert snapshot.items == []
+
+
+def test_enbridge_index_uses_official_dates_links_and_excerpts() -> None:
+    page = '''<div class="news-items">
+      <div class="news-feed-item"><p class="news-feed-date">October 5, 2026</p>
+        <h3 class="news-item-title">Enbridge Reports Third Quarter Results</h3>
+        <p class="news-feed-intro">Enbridge reported revenue of CDN$4.2 billion, compared with CDN$4.0 billion a year earlier.</p>
+        <a href="/media-center/news/details?id=123892&amp;lang=en">Read More</a></div>
+      <div class="news-feed-item"><p class="news-feed-date">September 9, 2026</p>
+        <h3 class="news-item-title">Enbridge to Acquire Tallgrass Transport Business</h3>
+        <p class="news-feed-intro">Enbridge agreed to acquire the crude transportation business.</p>
+        <a href="/media-center/news/details?id=123889&amp;lang=en">Read More</a></div>
+      <div class="news-feed-item"><p class="news-feed-date">September 99, 2026</p>
+        <h3 class="news-item-title">Enbridge Invalid Date</h3>
+        <a href="/media-center/news/details?id=123900">Read More</a></div>
+      <div class="news-feed-item"><p class="news-feed-date">October 4, 2026</p>
+        <h3 class="news-item-title">Enbridge Unsafe Link</h3>
+        <a href="https://evil.example/article">Read More</a></div>
+    </div>'''
+    items = _parse_enbridge_releases(page, "ENB.TO")
+    assert len(items) == 2
+    assert items[0].published_at.date().isoformat() == "2026-10-05"
+    assert items[0].url == "https://www.enbridge.com/media-center/news/details?id=123892&lang=en"
+    assert "CDN$4.2 billion" in items[0].summary
+    assert [item.event_type for item in items] == ["results", "acquisition"]
+
+
+def test_enbridge_index_structure_change_is_reported() -> None:
+    import pytest
+    with pytest.raises(ValueError, match="structure_changed"):
+        _parse_enbridge_releases("<html><h1>News Releases</h1></html>", "ENB.TO")
+
+
+def test_enbridge_aggregates_official_events_beyond_three_yahoo_results(monkeypatch) -> None:
+    service = StockNewsService()
+    yahoo = [
+        _news_row("Enbridge reports third quarter earnings", "Wire", 1, ticker="ENB.TO"),
+        _news_row("Enbridge announces acquisition of Tallgrass", "Wire", 2, ticker="ENB.TO"),
+        _news_row("Enbridge announces new pipeline operations", "Wire", 3, ticker="ENB.TO"),
+    ]
+    async def search(*, query: str, language: str, region: str = "CA"):
+        return {"news": yahoo}
+    async def releases(symbol: str):
+        assert symbol == "ENB.TO"
+        return _parse_enbridge_releases('''
+          <div class="news-feed-item"><p class="news-feed-date">October 20, 2026</p>
+            <h3 class="news-item-title">Enbridge announces acquisition of Tallgrass</h3>
+            <p class="news-feed-intro">Enbridge signed the Tallgrass acquisition agreement.</p>
+            <a href="/media-center/news/details?id=1001">Read More</a></div>
+          <div class="news-feed-item"><p class="news-feed-date">October 18, 2026</p>
+            <h3 class="news-item-title">Enbridge closes equity financing</h3>
+            <p class="news-feed-intro">Enbridge closed its common equity financing.</p>
+            <a href="/media-center/news/details?id=1002">Read More</a></div>
+          <div class="news-feed-item"><p class="news-feed-date">October 16, 2026</p>
+            <h3 class="news-item-title">Enbridge appoints new chief executive officer</h3>
+            <p class="news-feed-intro">The board appointed a new chief executive officer.</p>
+            <a href="/media-center/news/details?id=1003">Read More</a></div>
+          <div class="news-feed-item"><p class="news-feed-date">October 14, 2026</p>
+            <h3 class="news-item-title">Enbridge declares quarterly dividend</h3>
+            <p class="news-feed-intro">The company declared a quarterly dividend.</p>
+            <a href="/media-center/news/details?id=1004">Read More</a></div>''', symbol)
+    monkeypatch.setattr(service, "_search", search)
+    monkeypatch.setattr(service, "_company_releases", releases)
+    snapshot = asyncio.run(service._load(symbol="ENB.TO", company="Enbridge Inc.", language="en"))
+    assert len(snapshot.items) > len(yahoo)
+    assert sum(item.origin == "company_release" for item in snapshot.items) >= 3
+    assert len({item.event_type for item in snapshot.items}) >= 3

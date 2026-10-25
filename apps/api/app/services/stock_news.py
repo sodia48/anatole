@@ -9,10 +9,11 @@ import logging
 import re
 import unicodedata
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
-from typing import Any
-from urllib.parse import urljoin, urlparse
+from typing import Any, Callable
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from app.core.config import settings
 from app.core.resilience import AsyncStaleCache, shared_http_client
@@ -24,16 +25,83 @@ logger = logging.getLogger(__name__)
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 CNQ_RELEASES_URL = "https://www.cnrl.com/investors/news-releases/"
+ENB_RELEASES_URL = "https://www.enbridge.com/media-center/news"
 _GENERIC = re.compile(r"\b(?:TFSA|RRSP|CELI|REER|best stocks?|top \d+|stocks? to buy|dividend stocks?|passive income|portfolio strateg|retirement|watchlist|millionaire|wealth building|buy and hold|where I.d put|I keep coming back|what you should know|fully priced|can the run continue|vs\.)\b", re.I)
 _EVENT = re.compile(r"\b(?:results?|earnings?|revenue|profit|dividend|production|guidance|forecast|budget|acquisition|merger|sale|transaction|contract|appoint|CEO|quarter|annual|financing|notes|debt|buyback|issuer bid|operat\w*|announce\w*|report\w*|update|upgrade|downgrade|price target|open\w*|launch\w*|expand\w*|résultats?|bénéfices?|revenus?|dividende|production|prévisions?|acquisition|direction|trimestre|annonce|rachat|objectif de cours|ouvre|lance)\b", re.I)
 _DIVIDEND_ACTION = re.compile(r"\b(?:announc\w*|declar\w*|rais\w*|increas\w*|cut\w*|boost\w*|hik\w*|pay\w*|record date|déclar\w*|annonce\w*|hausse|verse\w*)\b", re.I)
 _SECTOR_TERMS = {
     "CNQ": re.compile(r"\b(?:oil sands?|crude oil|natural gas|energy sector|petroleum|bitumen|pétrole|gaz naturel|sables bitumineux)\b", re.I),
+    "ENB": re.compile(r"\b(?:pipeline|natural gas|crude oil|energy infrastructure|pétrole|gaz naturel|oléoduc|gazoduc)\b", re.I),
     "AEM": re.compile(r"\b(?:gold|mining|minerals?|mines?|minier)\b", re.I),
     "RY": re.compile(r"\b(?:banks?|banking|financial sector|banques?|bancaire)\b", re.I),
 }
 _RELEASE_YEAR = re.compile(r'<cnrl-tab\s+title="((?:19|20)\d{2})"[^>]*>(.*?)</cnrl-tab>', re.I | re.S)
 _RELEASE_CARD = re.compile(r'<cnrl-news-release-card\s+link="([^"]+)"\s+day="(\d{1,2})"\s+month="(\d{1,2})"[^>]*>\s*<h1[^>]*>(.*?)</h1>', re.I | re.S)
+
+
+def _event_type(title: str) -> str:
+    checks = (("results", r"\b(?:results?|earnings?|résultats?)\b"),
+              ("dividend", r"\b(?:dividend|dividende)\b"),
+              ("acquisition", r"\b(?:acqui\w*|merger|joint venture)\b"),
+              ("financing", r"\b(?:offering|debt|notes|financ\w*|equity)\b"),
+              ("leadership", r"\b(?:CEO|president|appoint\w*|retire\w*)\b"),
+              ("operations", r"\b(?:pipeline|production|project|operat\w*)\b"))
+    return next((kind for kind, pattern in checks if re.search(pattern, title, re.I)), "other")
+
+
+class _EnbridgeIndexParser(HTMLParser):
+    """Read only the public release cards; fail closed if their structure changes."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.cards: list[dict[str, str]] = []
+        self.card: dict[str, str] | None = None
+        self.depth = 0
+        self.field = ""
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        classes = (values.get("class") or "").split()
+        if tag == "div" and "news-feed-item" in classes and self.card is None:
+            self.card, self.depth = {}, 1
+            return
+        if self.card is None:
+            return
+        if tag == "div":
+            self.depth += 1
+        if tag == "p" and "news-feed-date" in classes:
+            self.field, self.parts = "date", []
+        elif tag == "h3" and "news-item-title" in classes:
+            self.field, self.parts = "title", []
+        elif tag == "p" and "news-feed-intro" in classes:
+            self.field, self.parts = "summary", []
+        elif tag == "a" and values.get("href", "").startswith("/media-center/news/details?"):
+            self.card["url"] = values["href"] or ""
+
+    def handle_data(self, data: str) -> None:
+        if self.card is not None and self.field:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.card is None:
+            return
+        if (tag == "h3" and self.field == "title") or (tag == "p" and self.field in {"date", "summary"}):
+            self.card[self.field] = " ".join(self.parts).strip()
+            self.field = ""
+            self.parts = []
+        if tag == "div":
+            self.depth -= 1
+            if self.depth == 0:
+                self.cards.append(self.card)
+                self.card = None
+
+
+@dataclass(frozen=True)
+class OfficialReleaseSource:
+    index_url: str
+    publisher: str
+    parse: Callable[[str, str], list[StockNewsItem]]
 LEGAL_WORDS = {
     "and",
     "class",
@@ -232,10 +300,73 @@ def _description_from_html(value: str) -> str:
     return parser.summary
 
 
+def _parse_cnq_releases(page: str, symbol: str) -> list[StockNewsItem]:
+    releases: list[StockNewsItem] = []
+    for tab in _RELEASE_YEAR.finditer(page):
+        year = int(tab.group(1))
+        for card in _RELEASE_CARD.finditer(tab.group(2)):
+            url = urljoin(CNQ_RELEASES_URL, html.unescape(card.group(1)))
+            parsed = urlparse(url)
+            if parsed.scheme != "https" or parsed.hostname != "www.cnrl.com" or not parsed.path.lower().endswith(".pdf"):
+                continue
+            try:
+                published = datetime(year, int(card.group(3)), int(card.group(2)), tzinfo=UTC)
+            except ValueError:
+                continue
+            title = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", card.group(4)))).strip()
+            if title:
+                releases.append(StockNewsItem(
+                    id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
+                    summary="", url=url, publisher="Canadian Natural Resources",
+                    published_at=published, related_tickers=[symbol],
+                    relevance="direct", origin="company_release", event_type=_event_type(title),
+                ))
+    if not releases:
+        raise ValueError("official_release_structure_changed")
+    return releases[:30]
+
+
+def _parse_enbridge_releases(page: str, symbol: str) -> list[StockNewsItem]:
+    parser = _EnbridgeIndexParser()
+    parser.feed(page)
+    releases: list[StockNewsItem] = []
+    for card in parser.cards:
+        url = urljoin(ENB_RELEASES_URL, html.unescape(card.get("url", "")))
+        parsed = urlparse(url)
+        query = parse_qs(parsed.query)
+        if (parsed.scheme != "https" or parsed.hostname != "www.enbridge.com"
+                or parsed.path.lower() != "/media-center/news/details"
+                or not query.get("id", [""])[0].isdigit()):
+            continue
+        try:
+            published = datetime.strptime(card["date"].strip(), "%B %d, %Y").replace(tzinfo=UTC)
+        except (KeyError, ValueError):
+            continue
+        title = re.sub(r"\s+", " ", html.unescape(card.get("title", ""))).strip()
+        if not title or "enbridge" not in title.casefold():
+            continue
+        summary = _clean_summary(card.get("summary", ""))
+        releases.append(StockNewsItem(
+            id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
+            summary=summary, url=url, publisher="Enbridge Inc.",
+            published_at=published, related_tickers=[symbol],
+            relevance="direct", origin="company_release", event_type=_event_type(title),
+        ))
+    if not releases:
+        raise ValueError("official_release_structure_changed")
+    return releases[:30]
+
+
+OFFICIAL_RELEASE_SOURCES: dict[str, OfficialReleaseSource] = {
+    "CNQ.TO": OfficialReleaseSource(CNQ_RELEASES_URL, "Canadian Natural Resources", _parse_cnq_releases),
+    "ENB.TO": OfficialReleaseSource(ENB_RELEASES_URL, "Enbridge Inc.", _parse_enbridge_releases),
+}
+
+
 class StockNewsService:
     refresh_after_seconds = 900
     stale_seconds = 86_400
-    max_items = 10
+    max_items = 24
 
     def __init__(self) -> None:
         self._cache: AsyncStaleCache[str, StockNewsSnapshot] = (
@@ -344,6 +475,7 @@ class StockNewsService:
                     ),
                     image_url=_thumbnail_url(row),
                     relevance=relevance,
+                    event_type=_event_type(title),
                 )
             )
         return items
@@ -362,7 +494,7 @@ class StockNewsService:
             params={
                 "q": query,
                 "quotesCount": "10",
-                "newsCount": "30",
+                "newsCount": "50",
                 "enableFuzzyQuery": "false",
                 "quotesQueryId": "tss_match_phrase_query",
                 "newsQueryId": "news_cie_vespa",
@@ -437,35 +569,15 @@ class StockNewsService:
 
     @staticmethod
     async def _company_releases(symbol: str) -> list[StockNewsItem]:
-        """Use only explicitly verified, public company release indexes."""
-        if symbol.upper() != "CNQ.TO":
+        """Only explicit, verified sources can enter this registry."""
+        source = OFFICIAL_RELEASE_SOURCES.get(symbol.upper())
+        if source is None:
             return []
-        response = await shared_http_client.request("GET", CNQ_RELEASES_URL, attempts=1)
+        response = await shared_http_client.request("GET", source.index_url, attempts=1)
         response.raise_for_status()
         if "html" not in response.headers.get("content-type", "").casefold() or len(response.content) > 600_000:
             raise ValueError("invalid_official_release_index")
-        releases: list[StockNewsItem] = []
-        for tab in _RELEASE_YEAR.finditer(response.text):
-            year = int(tab.group(1))
-            for card in _RELEASE_CARD.finditer(tab.group(2)):
-                url = urljoin(CNQ_RELEASES_URL, html.unescape(card.group(1)))
-                parsed = urlparse(url)
-                if parsed.scheme != "https" or parsed.hostname != "www.cnrl.com" or not parsed.path.lower().endswith(".pdf"):
-                    continue
-                try:
-                    published = datetime(year, int(card.group(3)), int(card.group(2)), tzinfo=UTC)
-                except ValueError:
-                    continue
-                title = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", card.group(4)))).strip()
-                if not title:
-                    continue
-                releases.append(StockNewsItem(
-                    id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
-                    summary="", url=url, publisher="Canadian Natural Resources",
-                    published_at=published, related_tickers=[symbol],
-                    relevance="direct", origin="company_release",
-                ))
-        return releases[:20]
+        return source.parse(response.text, symbol)
 
     @classmethod
     def _rank_and_select(cls, candidates: list[StockNewsItem], rejected: Counter[str]) -> list[StockNewsItem]:
@@ -527,7 +639,21 @@ class StockNewsService:
                 provider_counts[key] = 0
                 rejected[f"{key}_unavailable"] += 1
                 logger.info("stock_news_provider_unavailable provider=%s error=%s", key, type(exc).__name__)
+        initial_items = self._items_from_payloads(payloads, symbol=symbol, company=company)
+        if len(initial_items) < 8:
+            ticker_query = self._ticker(symbol)
+            for region in ("CA", "US"):
+                key = f"yahoo:ticker:{region}"
+                try:
+                    payload = await self._search(query=ticker_query, language="en", region=region)
+                    payloads.append(payload)
+                    provider_counts[key] = len(payload.get("news") or [])
+                except Exception as exc:  # noqa: BLE001
+                    provider_counts[key] = 0
+                    rejected[f"{key}_unavailable"] += 1
+                    logger.info("stock_news_provider_unavailable provider=%s error=%s", key, type(exc).__name__)
         items = self._items_from_payloads(payloads, symbol=symbol, company=company, rejected=rejected)
+        yahoo_accepted = len(items)
         try:
             official = await self._company_releases(symbol)
         except Exception as exc:  # noqa: BLE001
@@ -538,11 +664,15 @@ class StockNewsService:
         items = self._rank_and_select([*items, *official], rejected)
         items = await self._enrich_summaries(items, language=language)
         publishers = dict(Counter(item.publisher for item in items))
-        coverage_note = ("Une seule source pertinente est disponible." if len(publishers) == 1 and language == "fr" else
+        coverage_note = ("La couverture récente est limitée aux sources disponibles." if len(items) <= 3 and language == "fr" else
+                         "Recent coverage is limited to available sources." if len(items) <= 3 else
+                         "Une seule source pertinente est disponible." if len(publishers) == 1 and language == "fr" else
                          "Only one relevant publisher is available." if len(publishers) == 1 else None)
         logger.info("stock_news_selection %s", json.dumps({
             "symbol": symbol, "providers": provider_counts,
-            "accepted": len(items), "rejected": dict(rejected),
+            "yahoo_accepted": yahoo_accepted, "accepted": len(items), "rejected": dict(rejected),
+            "with_excerpt": sum(bool(item.summary) for item in items),
+            "public_release_pages": sum(item.origin == "company_release" and urlparse(item.url).hostname == "www.enbridge.com" for item in items),
             "publishers": publishers,
             "latest_published_at": max((item.published_at.isoformat() for item in items), default=None),
         }, sort_keys=True))
@@ -595,7 +725,7 @@ class StockNewsService:
 
         key = f"{language}|{symbol}|{_normalise_text(company)}"
         try:
-            return await self._cache.get_or_load(
+            snapshot = await self._cache.get_or_load(
                 key,
                 lambda: self._load(
                     symbol=symbol,
@@ -605,6 +735,9 @@ class StockNewsService:
                 fresh_seconds=float(self.refresh_after_seconds),
                 stale_seconds=float(self.stale_seconds),
             )
+            if (datetime.now(UTC) - snapshot.generated_at).total_seconds() > snapshot.refresh_after_seconds:
+                return snapshot.model_copy(update={"stale": True})
+            return snapshot
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "stock_news_unavailable symbol=%s exception=%s",

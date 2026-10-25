@@ -85,7 +85,7 @@ export function ArticleReaderScreen() {
         <Text style={styles.source}>{article.source || pick("Actualité", "News")} · {date}</Text>
         <Text style={styles.title}>{article.title || pick("Article", "Article")}</Text>
         {article.imageUrl ? <NewsThumbnail imageUrl={article.imageUrl} size="hero" source={article.source || "Anatole"} testID="article-hero" /> : null}
-        {brief?.availability !== "limited" ? <View style={styles.summaryBlock} testID="article-summary">
+        {brief?.availability === "limited" ? <Text style={styles.summary}>{pick("Seuls le titre et la source sont disponibles. Ouvrez l’article original pour en savoir plus.", "Only the title and source are available. Open the original article for details.")}</Text> : <View style={styles.summaryBlock} testID="article-summary">
           <Text style={styles.summaryLabel}>{briefFailed
             ? pick("Extrait de la source", "Source excerpt")
             : brief?.translation_status === "unavailable"
@@ -94,7 +94,7 @@ export function ArticleReaderScreen() {
           {briefLoading ? <ActivityIndicator color={colors.primary} accessibilityLabel={pick("Préparation du résumé", "Preparing the brief")} /> : null}
           {!briefLoading ? <Text style={styles.summary}>{brief?.summary || article.summary || pick("Seuls le titre et la source sont disponibles.", "Only the title and source are available.")}</Text> : null}
           {briefFailed ? <Pressable accessibilityRole="button" onPress={() => setBriefAttempt((value) => value + 1)} testID="article-brief-retry"><Text style={styles.actionText}>{pick("Réessayer", "Retry")}</Text></Pressable> : null}
-        </View> : null}
+        </View>}
         {brief ? <>
           {brief.detail_available ? <View style={styles.modeRow}>
             <Pressable accessibilityRole="button" accessibilityState={{ selected: !detailed }} onPress={() => setDetailed(false)}><Text style={styles.actionText}>{pick("Résumé rapide", "Quick summary")}</Text></Pressable>
@@ -121,7 +121,7 @@ export function ArticleReaderScreen() {
             {brief.why_it_matters ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Ce que cela signifie", "What this means")}</Text><Text style={styles.summary}>{brief.why_it_matters}</Text></View> : null}
             {brief.watch.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("À surveiller", "What to watch")}</Text>{brief.watch.map((item, index) => <Text key={index} style={styles.summary}>{item}</Text>)}</View> : null}
           </> : null}
-          <View style={styles.briefSection}><Text style={styles.summaryLabel}>{brief.availability === "article" ? pick("Article consulté", "Article consulted") : brief.availability === "publisher_excerpt" ? pick("Résumé de l’éditeur", "Publisher excerpt") : pick("Informations limitées", "Limited information")}</Text><Text style={styles.summary}>{brief.source_note}</Text></View>
+          {brief.availability !== "limited" ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{brief.availability === "article" ? pick("Article consulté", "Article consulted") : pick("Résumé de l’éditeur", "Publisher excerpt")}</Text><Text style={styles.summary}>{brief.source_note}</Text></View> : null}
         </> : null}
         <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-view-original"><Text style={styles.externalText}>{pick("Voir la source originale", "View original source")}</Text></Pressable>
       </ScrollView>
@@ -130,7 +130,7 @@ export function ArticleReaderScreen() {
         <View style={styles.sourceBar}><Text style={styles.sourceBarText}>{pick("Source originale", "Original source")}</Text></View>
         {webFailed ? <View accessibilityRole="alert" style={styles.webFallback} testID="article-webview-error">
           <Text style={styles.invalidTitle}>{pick("La page de l’éditeur ne peut pas être affichée ici.", "The publisher page cannot be displayed here.")}</Text>
-          <Text style={styles.invalidCopy}>{pick("Cette source ne fournit pas le texte intégral à Anatole. Vous pouvez consulter le résumé ci-dessus ou poursuivre la lecture sur le site de la source.", "This publisher does not provide the full article to Anatole. You can read the summary above or continue on the publisher’s website.")}</Text>
+          <Text style={styles.invalidCopy}>{pick("Poursuivez la lecture sur le site de la source.", "Continue reading on the publisher’s website.")}</Text>
           <Pressable accessibilityRole="link" onPress={openExternally} style={styles.externalButton} testID="article-open-browser"><Text style={styles.externalText}>{pick("Lire la suite sur le site de la source", "Continue reading on the publisher’s website")}</Text></Pressable>
         </View> : <>
           <WebView

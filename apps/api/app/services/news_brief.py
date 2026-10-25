@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import re
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from html import unescape
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 
 import httpx
 
@@ -30,10 +31,13 @@ _OFFICIAL_HOSTS = (
 # Public press releases only. Publisher article URLs outside this list use the
 # excerpt supplied by the feed; they are never fetched by the brief service.
 _PRESS_RELEASE_HOSTS = ("newswire.ca", "globenewswire.com", "businesswire.com")
+_ENBRIDGE_HOST = "www.enbridge.com"
+logger = logging.getLogger(__name__)
 _IGNORED = {"script", "style", "noscript", "svg", "nav", "footer", "form", "aside"}
-_CAPTURE = {"p", "li", "h2", "h3", "h4"}
+_CAPTURE = {"h1", "p", "li", "h2", "h3", "h4"}
 _SPACE = re.compile(r"\s+")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ0-9])")
+_PRESS_DATELINE = re.compile(r"^.{0,120}?/(?:CNW|PRNewswire)/\s*-{1,2}\s*", re.I)
 _NUMBER = re.compile(
     r"(?<![\w])(?:[$€£]\s*)?[+-]?(?:\d{1,3}(?:[ \u202f,]\d{3})+|\d+)"
     r"(?:[.,]\d+)?\s*(?:%|points?|pts?|CAD|USD|GJ|PJ|TJ|MWh|GWh|TWh|"
@@ -84,8 +88,10 @@ _VALUE_UNIT = re.compile(r"\b(milliards?|billions?|millions?|thousands?|milliers
 
 
 class ArticleParser(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, *, main_only: bool = False) -> None:
         super().__init__(convert_charrefs=True)
+        self.main_only = main_only
+        self.in_main = False
         self.blocks: list[str] = []
         self.ignored = 0
         self.capture = 0
@@ -93,6 +99,10 @@ class ArticleParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
+        if tag == "main":
+            self.in_main = True
+        if self.main_only and not self.in_main:
+            return
         if tag in _IGNORED:
             self.ignored += 1
         elif not self.ignored and tag in _CAPTURE:
@@ -102,6 +112,10 @@ class ArticleParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
+        if self.main_only and not self.in_main:
+            return
+        if tag == "main":
+            self.in_main = False
         if tag in _IGNORED:
             self.ignored = max(0, self.ignored - 1)
         elif not self.ignored and tag in _CAPTURE and self.capture:
@@ -113,7 +127,7 @@ class ArticleParser(HTMLParser):
                 self.buffer = []
 
     def handle_data(self, data: str) -> None:
-        if not self.ignored and self.capture:
+        if (not self.main_only or self.in_main) and not self.ignored and self.capture:
             value = _clean(data)
             if value:
                 self.buffer.append(value)
@@ -218,6 +232,9 @@ def _safe_url(url: str, context: str) -> bool:
             return False
     except ValueError:
         return False
+    if context == "stock" and host == _ENBRIDGE_HOST:
+        query = parse_qs(parsed.query)
+        return parsed.path.lower() == "/media-center/news/details" and query.get("id", [""])[0].isdigit()
     hosts = _OFFICIAL_HOSTS + (_PRESS_RELEASE_HOSTS if context == "stock" else ())
     return any(host == suffix or host.endswith("." + suffix) for suffix in hosts)
 
@@ -357,7 +374,7 @@ class NewsBriefService:
                     raw = b"".join(chunks).decode(response.encoding or "utf-8", "replace")
                     if "html" not in content_type:
                         return _clean(raw)[:10_000]
-                    parser = ArticleParser()
+                    parser = ArticleParser(main_only=urlsplit(current).hostname == _ENBRIDGE_HOST)
                     parser.feed(raw)
                     return "\n".join(parser.blocks[:140])[:10_000]
         raise ValueError("article_redirect_limit")
@@ -366,11 +383,22 @@ class NewsBriefService:
         self, request: NewsBriefRequest, article_text: str, *, source_mode: str,
     ) -> NewsBriefResponse:
         blocks = [block for block in article_text.splitlines() if _clean(block)]
+        if source_mode == "article_page" and request.context == "stock":
+            blocks = [_PRESS_DATELINE.sub("", block) for block in blocks]
         sentences = _sentences(blocks)
         if not sentences and request.summary:
             sentences = _sentences([request.summary])
         ranked = sorted(enumerate(sentences), key=lambda pair: (-_score(pair[1], request.title), pair[0]))
         lead = ranked[0][1] if ranked else _clean(request.summary or request.title)
+        if source_mode == "article_page" and request.context == "stock":
+            content = [sentence for sentence in sentences if sentence.casefold() != request.title.casefold()]
+            if content:
+                lead = content[0]
+                highlight = next((sentence for sentence in content[1:14]
+                                  if 45 <= len(sentence) <= 280 and _MEASURE.search(sentence)
+                                  and sentence.casefold() not in lead.casefold()), "")
+                if highlight:
+                    lead = f"{lead} {highlight}"
         remaining = _dedupe_sentences([sentence for sentence in sentences if sentence != lead], [lead])
         figures: list[NewsBriefFigure] = []
         seen_figures: set[tuple[str, str | None, str]] = set()
@@ -451,7 +479,7 @@ class NewsBriefService:
         )
 
     async def _translate(self, brief: NewsBriefResponse, language: str) -> NewsBriefResponse:
-        if brief.translation_status != "unavailable" or not provider_router.available():
+        if brief.source_mode == "title_only" or brief.translation_status != "unavailable" or not provider_router.available():
             return brief
         texts = ([brief.summary, *brief.changes, brief.why_it_matters, *brief.watch,
                   *(figure.label for figure in brief.key_figures),
@@ -513,11 +541,18 @@ class NewsBriefService:
                 fetched = await self._fetch_text(request.url, request.context)
             except Exception:
                 fetched = ""
-            if len(fetched) >= 120 and _supports_title(request.title, fetched):
+            article_match = (_supports_title(request.title, fetched.splitlines()[0])
+                             if urlsplit(request.url).hostname == _ENBRIDGE_HOST and fetched else
+                             _supports_title(request.title, fetched))
+            if len(fetched) >= 120 and article_match:
                 mode = "article_page" if request.context == "stock" else "official_page"
                 article = fetched
         brief = self.build_from_text(request, article, source_mode=mode)
-        return await self._translate(brief, request.language)
+        translated = await self._translate(brief, request.language)
+        logger.info("news_brief_result source_mode=%s availability=%s translation=%s figures=%d series=%d",
+                    translated.source_mode, translated.availability, translated.translation_status,
+                    len(translated.key_figures), len(translated.figure_series))
+        return translated
 
     async def get_brief(self, request: NewsBriefRequest) -> NewsBriefResponse:
         payload = request.model_dump(mode="json")

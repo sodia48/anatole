@@ -83,6 +83,7 @@ class StockNewsItem(BaseModel):
     image_url: str | None = None
     relevance: Literal["direct", "sector"] = "direct"
     origin: Literal["publisher", "company_release"] = "publisher"
+    event_type: Literal["results", "dividend", "acquisition", "financing", "leadership", "operations", "other"] = "other"
 
 
 class StockNewsSnapshot(BaseModel):
@@ -93,5 +94,6 @@ class StockNewsSnapshot(BaseModel):
     status: str = "ok"
     detail: str | None = None
     coverage_note: str | None = None
+    stale: bool = False
     generated_at: datetime
     refresh_after_seconds: int = 900

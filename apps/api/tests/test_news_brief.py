@@ -212,6 +212,81 @@ def test_safe_fetch_accepts_bounded_official_article(monkeypatch: pytest.MonkeyP
     assert "4.2%" in text
 
 
+def test_enbridge_release_produces_grounded_quarterly_brief_and_http_200(monkeypatch: pytest.MonkeyPatch) -> None:
+    title = "Enbridge Reports Second Quarter Results"
+    page = f'''<html><body><nav><p>Generic investor links and unrelated companies.</p></nav>
+      <div class="news-item"><main><h1>{title}</h1>
+      <p>Enbridge Inc. reported second quarter results and reaffirmed its 2026 guidance.</p>
+      <p>GAAP earnings were CDN$1.4 billion, compared with CDN$2.2 billion in 2025.</p>
+      <li>Operating cash flow reached CDN$4.1 billion, compared with CDN$3.2 billion in 2025.</li>
+      </main></div></body></html>'''
+    original_client = httpx.AsyncClient
+    def client(*args, **kwargs):
+        return original_client(transport=httpx.MockTransport(lambda request: httpx.Response(
+            200, headers={"content-type": "text/html"}, text=page,
+        )), follow_redirects=False, trust_env=False)
+    monkeypatch.setattr(brief_module.httpx, "AsyncClient", client)
+    request = make_request(title=title, summary="Enbridge reported second quarter results.",
+                           url="https://www.enbridge.com/media-center/news/details?id=123885&lang=en",
+                           source="Enbridge Inc.", context="stock", ticker="ENB", company="Enbridge Inc.", language="en")
+    brief = asyncio.run(NewsBriefService()._load(request))
+    assert brief.source_mode == "article_page"
+    assert brief.availability == "article"
+    assert brief.summary != title
+    assert "1.4 billion" in brief.summary
+    assert "2.2 billion" in brief.summary
+    assert all("9.9" not in figure.value for figure in brief.key_figures)
+    response = TestClient(app).post("/api/v1/discovery/news/brief", json=request.model_dump(mode="json"))
+    assert response.status_code == 200
+    assert response.json()["source_mode"] == "article_page"
+
+
+def test_enbridge_press_dateline_does_not_break_opening_summary() -> None:
+    request = make_request(
+        title="Enbridge to Host Third Quarter Results Webcast",
+        summary="", url="https://www.enbridge.com/media-center/news/details?id=123892",
+        source="Enbridge Inc.", context="stock", ticker="ENB", company="Enbridge Inc.", language="en",
+    )
+    for separator in ("-", "--"):
+        article = f"""Enbridge to Host Third Quarter Results Webcast
+CALGARY, AB, Oct. 5, 2026 /CNW/ {separator} Enbridge Inc. will host a conference call on November 6, 2026 to discuss its third quarter results.
+The executive team will answer questions from analysts after its prepared remarks."""
+        brief = NewsBriefService().build_from_text(request, article, source_mode="article_page")
+        assert brief.summary.startswith("Enbridge Inc. will host a conference call")
+        assert "5, 2026 /CNW/" not in brief.summary
+
+
+def test_enbridge_article_mismatch_and_unsafe_redirect_are_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    original_client = httpx.AsyncClient
+    def wrong_page(*args, **kwargs):
+        return original_client(transport=httpx.MockTransport(lambda request: httpx.Response(
+            200, headers={"content-type": "text/html"}, text="<main><h1>Unrelated company results</h1>"
+            "<p>Enbridge Reports Second Quarter Results appears in a navigation list, but this is an unrelated article.</p>"
+            "<p>Other business content continues here with enough text to pass a length threshold.</p></main>",
+        )), follow_redirects=False, trust_env=False)
+    monkeypatch.setattr(brief_module.httpx, "AsyncClient", wrong_page)
+    request = make_request(title="Enbridge Reports Second Quarter Results", summary="",
+                           url="https://www.enbridge.com/media-center/news/details?id=123889",
+                           context="stock", ticker="ENB", company="Enbridge Inc.", language="en")
+    assert asyncio.run(NewsBriefService()._load(request)).source_mode == "title_only"
+
+    def redirect(*args, **kwargs):
+        return original_client(transport=httpx.MockTransport(lambda request: httpx.Response(
+            302, headers={"location": "https://evil.example/article"},
+        )), follow_redirects=False, trust_env=False)
+    monkeypatch.setattr(brief_module.httpx, "AsyncClient", redirect)
+    with pytest.raises(ValueError, match="redirect_not_allowed"):
+        asyncio.run(NewsBriefService()._fetch_text(request.url, "stock"))
+
+
+def test_enbridge_allowlist_only_accepts_release_detail_urls() -> None:
+    service = NewsBriefService()
+    assert service._allowed("https://www.enbridge.com/media-center/news/details?id=123885&lang=en", "stock")
+    assert not service._allowed("https://www.enbridge.com/media-center/news", "stock")
+    assert not service._allowed("https://enbridge.com/media-center/news/details?id=123885", "stock")
+    assert not service._allowed("https://www.enbridge.com/media-center/news/details?id=abc", "stock")
+
+
 def test_generic_access_page_does_not_claim_article_was_consulted(monkeypatch: pytest.MonkeyPatch) -> None:
     service = NewsBriefService()
 
