@@ -154,8 +154,8 @@ export type NewsItem = {
   image_url?: string | null;
 };
 export type NewsSnapshot = { items: NewsItem[]; source_statuses: FeedStatus[]; generated_at: string; refresh_after_seconds: number };
-export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[]; image_url?: string | null; relevance?: "direct" | "sector"; origin?: "publisher" | "company_release" };
-export type StockNewsSnapshot = { ticker: string; symbol: string; company: string; items: StockNewsItem[]; status: string; detail: string | null; coverage_note?: string | null; generated_at: string; refresh_after_seconds: number };
+export type StockNewsItem = { id: string; title: string; summary: string; url: string; publisher: string; published_at: string; related_tickers: string[]; image_url?: string | null; relevance?: "direct" | "sector"; origin?: "publisher" | "company_release"; event_type?: "results" | "dividend" | "acquisition" | "financing" | "leadership" | "operations" | "other" };
+export type StockNewsSnapshot = { ticker: string; symbol: string; company: string; items: StockNewsItem[]; status: string; detail: string | null; coverage_note?: string | null; stale?: boolean; generated_at: string; refresh_after_seconds: number };
 export type NewsBriefRequest = {
   title: string; summary: string; url: string; source: string; category: string; region: string;
   language: "fr" | "en"; context: "macro" | "stock";

@@ -18,6 +18,12 @@ const NewsIntelligenceReader = dynamic(
 );
 
 type NewsItem = StockNewsSnapshot["items"][number];
+const PAGE_SIZE = 6;
+
+function canReadBrief(item: NewsItem): boolean {
+  const excerpt = item.summary?.trim() ?? "";
+  return excerpt.length >= 25 && excerpt.toLocaleLowerCase() !== item.title.trim().toLocaleLowerCase();
+}
 
 export function FocusStockNews({
   ticker,
@@ -33,6 +39,7 @@ export function FocusStockNews({
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NewsItem | null>(null);
   const [filter, setFilter] = useState<"all" | "direct" | "sector">("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const closeReader = useCallback(() => setSelected(null), []);
   const selectedArticle = useMemo<ReaderArticle | null>(() => selected ? {
     title: selected.title,
@@ -42,6 +49,7 @@ export function FocusStockNews({
     category: "stock",
     region: "Canada",
     publishedAt: selected.published_at,
+    dateOnly: selected.origin === "company_release",
     imageUrl: selected.image_url,
     context: "stock",
     ticker,
@@ -57,6 +65,7 @@ export function FocusStockNews({
       setSnapshot(null);
       setSelected(null);
       setFilter("all");
+      setVisibleCount(PAGE_SIZE);
       setLoading(true);
       setError(false);
     });
@@ -104,6 +113,7 @@ export function FocusStockNews({
 
   const items = snapshot?.items ?? [];
   const visibleItems = items.filter((item) => filter === "all" || (item.relevance ?? "direct") === filter);
+  const shownItems = visibleItems.slice(0, visibleCount);
 
   return (
     <section
@@ -135,13 +145,14 @@ export function FocusStockNews({
       {!loading && items.length ? (
         <div className={styles.filters} role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
           {(["all", "direct", "sector"] as const).map((option) => (
-            <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
+            <button key={option} type="button" aria-pressed={filter === option} onClick={() => { setFilter(option); setVisibleCount(PAGE_SIZE); }}>
               {option === "all" ? tr(language, "Toutes", "All") : option === "direct" ? tr(language, "Entreprise", "Company") : tr(language, "Secteur", "Sector")}
             </button>
           ))}
         </div>
       ) : null}
       {snapshot?.coverage_note ? <p className={styles.coverage}>{snapshot.coverage_note}</p> : null}
+      {snapshot?.stale ? <p className={styles.coverage} role="status">{tr(language, "Instantané périmé : actualisation en cours.", "Stale snapshot: refresh in progress.")}</p> : null}
 
       {loading ? (
         <div className={styles.state}>
@@ -159,13 +170,9 @@ export function FocusStockNews({
 
       {visibleItems.length ? (
         <div className={styles.grid}>
-          {visibleItems.map((item) => (
-            <button
-              className={styles.card}
-              key={item.id}
-              onClick={() => setSelected(item)}
-              type="button"
-            >
+          {shownItems.map((item) => {
+            const readable = canReadBrief(item);
+            const contents = <>
               {item.image_url?.startsWith("https:") ? (
                 // The image is supplied by the publisher and is not fetched by our server.
                 // eslint-disable-next-line @next/next/no-img-element
@@ -181,12 +188,17 @@ export function FocusStockNews({
               <h3>{item.title}</h3>
               {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
               <span className={styles.open}>
-                {tr(language, "Lire le résumé", "Read summary")}
+                {readable ? tr(language, "Lire le résumé", "Read summary") : tr(language, "Voir l'article", "View article")}
               </span>
-            </button>
-          ))}
+            </>;
+            return readable ? <button className={styles.card} key={item.id} onClick={() => setSelected(item)} type="button">{contents}</button>
+              : <a className={styles.card} key={item.id} href={item.url} target="_blank" rel="noopener noreferrer">{contents}</a>;
+          })}
         </div>
       ) : null}
+      {visibleCount < visibleItems.length ? <button className={styles.more} type="button" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>
+        {tr(language, "Charger plus", "Load more")}
+      </button> : null}
       {selected && selectedArticle ? (
         <NewsIntelligenceReader
           key={selected.id}

@@ -106,7 +106,8 @@ describe("Anatole article reader", () => {
       source_mode: "title_only", availability: "limited", detail_available: false,
     });
     const view = await render(<ArticleReaderScreen />);
-    expect(await view.findByText("Informations limitées")).toBeTruthy();
+    expect(await view.findByText("Seuls le titre et la source sont disponibles. Ouvrez l’article original pour en savoir plus.")).toBeTruthy();
+    expect(view.queryByText("Informations limitées")).toBeNull();
     expect(view.queryByTestId("article-summary")).toBeNull();
     await view.unmount();
   });

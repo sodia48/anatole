@@ -72,6 +72,7 @@ export type StockNewsItem = {
   image_url?: string | null;
   relevance?: "direct" | "sector";
   origin?: "publisher" | "company_release";
+  event_type?: "results" | "dividend" | "acquisition" | "financing" | "leadership" | "operations" | "other";
 };
 
 export type StockNewsSnapshot = {
@@ -82,6 +83,7 @@ export type StockNewsSnapshot = {
   status: string;
   detail: string | null;
   coverage_note?: string | null;
+  stale?: boolean;
   generated_at: string;
   refresh_after_seconds: number;
 };

@@ -75,6 +75,8 @@ test.describe("Focus Pro workstation", () => {
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
     const articleButtons = stockNews.getByRole("button", { name: /Lire le résumé|Read summary/ });
+    await expect(articleButtons).toHaveCount(6);
+    await stockNews.getByRole("button", { name: "Charger plus" }).click();
     await expect(articleButtons).toHaveCount(10);
     await expect(stockNews.getByText("10 articles")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();

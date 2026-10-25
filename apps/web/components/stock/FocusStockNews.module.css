@@ -63,11 +63,14 @@
   cursor: pointer;
   font: inherit;
   text-align: left;
+  text-decoration: none;
   transition:
     border-color 140ms ease,
     background 140ms ease,
     transform 140ms ease;
 }
+.more { justify-self: center; min-height: 38px; padding: 7px 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--accent-text); cursor: pointer; font: inherit; font-size: 11px; font-weight: 750; }
+.more:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
 .card:hover {
   border-color: var(--light-border, rgba(69, 161, 224, 0.78));

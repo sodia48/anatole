@@ -16,6 +16,7 @@ export type ReaderArticle = {
   category: string;
   region: string;
   publishedAt?: string | null;
+  dateOnly?: boolean;
   imageUrl?: string | null;
   context: "macro" | "stock";
   ticker?: string;
@@ -140,20 +141,23 @@ function NewsBrief({ brief, language, context, view }: {
   context: ReaderArticle["context"];
   view: "quick" | "detail";
 }) {
+  if (brief.availability === "limited") {
+    return <p className={styles.limit}>{pick(language,
+      "Seuls le titre et la source sont disponibles. Ouvrez l’article original pour en savoir plus.",
+      "Only the title and source are available. Open the original article for details.")}</p>;
+  }
   const untranslated = brief.translation_status === "unavailable" &&
     brief.source_language && brief.source_language !== "unknown" &&
     brief.source_language !== language;
   return (
     <>
-      {brief.availability !== "limited" ? (
-        <section className={styles.lead}>
+      <section className={styles.lead}>
           <span>{pick(language, "L’ESSENTIEL", "THE ESSENTIALS")}</span>
           <h3>{untranslated
             ? pick(language, "Résumé en langue originale", "Summary in original language")
             : pick(language, "Résumé", "Summary")}</h3>
           <p lang={untranslated ? brief.source_language : undefined}>{brief.summary}</p>
-        </section>
-      ) : null}
+      </section>
       {view === "detail" ? (
         <>
           <NewsBriefFigures brief={brief} language={language} />
@@ -191,7 +195,8 @@ export function NewsIntelligenceReader({ article, language, onClose }: {
   const published = article.publishedAt ? new Date(article.publishedAt) : null;
   const publishedLabel = published && !Number.isNaN(published.getTime())
     ? new Intl.DateTimeFormat(localeFor(language), {
-      dateStyle: "long", timeStyle: "short", timeZone: "America/Toronto",
+      dateStyle: "long", ...(!article.dateOnly ? { timeStyle: "short" as const } : {}),
+      timeZone: article.dateOnly ? "UTC" : "America/Toronto",
     }).format(published)
     : null;
 
@@ -311,8 +316,8 @@ export function NewsIntelligenceReader({ article, language, onClose }: {
               </>
             ) : (
               <div className={styles.fallback} role={failed ? "alert" : undefined}>
-                <h3>{pick(language, "Résumé indisponible", "Brief unavailable")}</h3>
-                <p>{article.summary || pick(language, "Seuls le titre et la source sont disponibles.", "Only the title and source are available.")}</p>
+                <h3>{failed ? pick(language, "Résumé indisponible", "Brief unavailable") : pick(language, "Informations limitées", "Limited information")}</h3>
+                {article.summary ? <p>{article.summary}</p> : null}
                 {failed ? <button type="button" onClick={() => setAttempt((value) => value + 1)}>{pick(language, "Réessayer", "Retry")}</button> : null}
               </div>
             )}
