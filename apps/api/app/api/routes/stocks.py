@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Query
 
 from app.schemas.stocks import (
@@ -45,12 +47,25 @@ async def stock_news(
     ticker: str,
     company: str | None = Query(None, min_length=1, max_length=160),
     lang: str = Query("fr", pattern="^(fr|en)$"),
+    page: int = Query(1, ge=1, le=100),
+    page_size: int = Query(12, ge=1, le=24),
+    relevance: Literal["all", "direct", "sector", "market", "official"] = Query("all"),
 ) -> StockNewsSnapshot:
-    return await stock_news_service.get_snapshot(
+    snapshot = await stock_news_service.get_snapshot(
         ticker,
         company=company,
         language=lang,
     )
+    items = [item for item in snapshot.items if relevance == "all" or
+             (item.origin == "company_release" if relevance == "official" else item.relevance == relevance)]
+    start = (page - 1) * page_size
+    return snapshot.model_copy(update={
+        "items": items[start:start + page_size],
+        "total_items": len(items),
+        "page": page,
+        "page_size": page_size,
+        "has_more": start + page_size < len(items),
+    })
 
 
 @router.get("/{ticker}/focus", response_model=FocusSnapshot)

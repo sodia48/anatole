@@ -92,9 +92,9 @@ test("Focus CNQ shares the reader and ignores an obsolete article response", asy
   await page.goto("/focus/CNQ");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   const news = page.getByRole("region", { name: /Dernières nouvelles pour CNQ|Latest news for CNQ/i });
-  const cards = news.getByRole("button", { name: /Lire le résumé/ });
+  const cards = news.getByRole("button", { name: /Lire l’analyse/ });
   await expect(cards).toHaveCount(1);
-  await expect(news.getByRole("link", { name: /Voir l'article/ })).toHaveCount(1);
+  await expect(news.getByRole("link", { name: /Voir l’article original/ })).toHaveCount(1);
   await cards.first().click();
   const firstReader = page.getByRole("dialog", { name: "Canadian Natural Resources reports quarterly results" });
   await expect(firstReader).toBeVisible();

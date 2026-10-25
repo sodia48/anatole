@@ -37,8 +37,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
-  gap: 9px;
+  gap: 0;
 }
 
 .filters { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -48,40 +47,27 @@
 .coverage { margin: 0; color: var(--text-secondary); font-size: 11px; }
 
 .card {
-  appearance: none;
   width: 100%;
   min-width: 0;
-  min-height: 150px;
-  padding: 11px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--panel);
+  padding: 16px 4px;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
   color: inherit;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  text-decoration: none;
-  transition:
-    border-color 140ms ease,
-    background 140ms ease,
-    transform 140ms ease;
 }
+.card:not(:has(.thumbnail)) { grid-template-columns: minmax(0, 1fr); }
+.featured { padding: 18px; margin-bottom: 4px; grid-template-columns: minmax(170px, 35%) minmax(0, 1fr); border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.storyBody { min-width: 0; display: grid; align-content: start; gap: 7px; }
+.storyActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 5px; }
+.sources { color: var(--text-secondary); font-size: 11px; }
+.sources summary { cursor: pointer; }
+.sources ul { margin: 8px 0 0; padding-left: 18px; }
+.sources li { margin: 5px 0; }
+.sources a { color: var(--accent-text); }
 .more { justify-self: center; min-height: 38px; padding: 7px 16px; border: 1px solid var(--border); border-radius: 7px; background: var(--panel); color: var(--accent-text); cursor: pointer; font: inherit; font-size: 11px; font-weight: 750; }
 .more:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
 
-.card:hover {
-  border-color: var(--light-border, rgba(69, 161, 224, 0.78));
-  background: var(--panel);
-  transform: translateY(-1px);
-}
-
-.card:focus-visible {
-  outline: 2px solid var(--light-accent, rgba(57, 161, 255, 0.9));
-  outline-offset: 2px;
-}
 
 .meta {
   display: flex;
@@ -104,7 +90,8 @@
 .meta time {
   flex: 0 0 auto;
 }
-.thumbnail { width: 100%; height: 74px; object-fit: cover; border-radius: 5px; }
+.thumbnail { width: 100%; height: 100px; object-fit: cover; border-radius: 7px; }
+.featured .thumbnail { height: 190px; }
 .relevance { width: fit-content; color: var(--text-secondary); font-size: 9px; font-weight: 750; }
 
 .card h3 {
@@ -130,13 +117,19 @@
 }
 
 .open {
-  margin-top: auto;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--accent-text);
+  border-radius: 7px;
+  background: transparent;
   color: var(--accent-text);
-  font-size: 9px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
   font-weight: 750;
+  text-decoration: none;
 }
 
 .state {
@@ -371,6 +364,9 @@
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .card, .featured { grid-template-columns: minmax(0, 1fr); padding: 12px 0; }
+  .featured { padding: 12px; }
+  .thumbnail, .featured .thumbnail { height: 150px; }
 
   .readerBackdrop {
     padding: 0;
