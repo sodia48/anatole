@@ -37,7 +37,10 @@ test("Focus capital shows sourced allocations and refuses invented analyst revis
   await testInfo.attach("capital-tableau", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
   await panel.getByRole("group", { name: "Mode allocation" }).getByRole("button", { name: "Vue graphiques" }).click();
   await expect(panel.getByText("2025-12-31 · 70 CAD")).toBeVisible();
-  await panel.getByRole("checkbox", { name: "Variation de la dette" }).check();
+  const debtChange = panel.getByRole("checkbox", { name: "Variation de la dette" });
+  // The fixed mobile dock can cover the control at the viewport edge.
+  await debtChange.evaluate(element => element.scrollIntoView({ block: "center" }));
+  await debtChange.check();
   await expect(panel.getByText("2025-12-31 · -10 CAD")).toBeVisible();
   await expect.poll(() => panel.evaluate(element => element.getBoundingClientRect().left)).toBeGreaterThanOrEqual(0);
   await testInfo.attach("capital-graphiques", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });

@@ -74,7 +74,8 @@ test.describe("Focus Pro workstation", () => {
     const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
-    await expect(stockNews.getByRole("button")).toHaveCount(10);
+    const articleButtons = stockNews.getByRole("button", { name: /Lire le résumé|Read summary/ });
+    await expect(articleButtons).toHaveCount(10);
     await expect(stockNews.getByText("10 articles")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
     await expect(stockNews.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
@@ -86,22 +87,22 @@ test.describe("Focus Pro workstation", () => {
     expect(stockNewsBox?.y).toBeGreaterThan(performanceBox?.y ?? Number.POSITIVE_INFINITY);
     expect(stockNewsBox?.y).toBeGreaterThan(valuationBox?.y ?? Number.POSITIVE_INFINITY);
 
-    await stockNews.getByRole("button").first().click();
+    await articleButtons.first().click();
     const reader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(reader).toBeVisible();
-    await expect(reader.getByRole("heading", { name: "Texte original · traduction indisponible" })).toBeVisible();
+    await expect(reader.getByRole("heading", { name: "Résumé en langue originale" })).toBeVisible();
     await expect(reader.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(reader.locator("img")).toHaveCount(1);
     expect(await reader.evaluate((node) => {
       const style = getComputedStyle(node);
       return { background: style.backgroundColor, color: style.color, opacity: style.opacity };
     })).toEqual({ background: "rgb(7, 21, 33)", color: "rgb(244, 249, 253)", opacity: "1" });
-    await expect(reader.getByText("Cette source ne fournit pas le texte intégral à Anatole.", { exact: false })).toBeVisible();
+    await expect(reader.getByRole("complementary", { name: "Provenance et limites" }).getByText("Only the publisher's excerpt is available.")).toBeVisible();
     await expect(reader.getByRole("link", { name: "Voir la source originale" })).toHaveAttribute("href", "https://example.com/royal-bank-news-0");
     await page.keyboard.press("Escape");
     await expect(reader).toHaveCount(0);
 
-    await stockNews.getByRole("button").nth(1).click();
+    await articleButtons.nth(1).click();
     const noImageReader = page.getByRole("dialog", { name: "Royal Bank of Canada update 2" });
     await expect(noImageReader).toBeVisible();
     await expect(noImageReader.locator("img")).toHaveCount(0);
@@ -115,7 +116,7 @@ test.describe("Focus Pro workstation", () => {
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     const englishNews = page.getByRole("region", { name: "Latest news for RY" });
     await expect(englishNews.getByText("Read summary").first()).toBeVisible();
-    await englishNews.getByRole("button").first().click();
+    await englishNews.getByRole("button", { name: /Read summary/ }).first().click();
     const englishReader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(englishReader.getByRole("link", { name: "View original source" })).toBeVisible();
     expect(await englishReader.evaluate((node) => {
