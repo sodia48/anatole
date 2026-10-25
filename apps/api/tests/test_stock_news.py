@@ -412,15 +412,19 @@ def test_news_endpoint_filters_and_paginates_cached_events(monkeypatch) -> None:
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
             first = await client.get("/api/v1/stocks/TD/news", params={"page": 1, "page_size": 2, "relevance": "direct"})
             second = await client.get("/api/v1/stocks/TD/news", params={"page": 2, "page_size": 2, "relevance": "direct"})
-            return first, second
+            legacy = await client.get("/api/v1/stocks/TD/news")
+            return first, second, legacy
 
-    first, second = asyncio.run(fetch_pages())
+    first, second, legacy = asyncio.run(fetch_pages())
     assert first.status_code == second.status_code == 200
     assert [item["id"] for item in first.json()["items"]] == ["0", "1"]
     assert [item["id"] for item in second.json()["items"]] == ["2"]
     assert first.json()["has_more"] is True
     assert second.json()["has_more"] is False
     assert first.json()["total_items"] == 3
+    assert legacy.status_code == 200
+    assert legacy.json()["page_size"] == 72
+    assert len(legacy.json()["items"]) == 5
 
 
 def test_company_release_parser_uses_verified_public_pdf_dates(monkeypatch) -> None:

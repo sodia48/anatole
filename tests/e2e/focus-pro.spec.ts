@@ -24,9 +24,7 @@ test.describe("Focus Pro workstation", () => {
       official_coverage: { status: "mixed", yahoo_statements_error: null },
       source: "E2E fixture", generated_at: recentNewsDate, refresh_after_seconds: 1800,
     } }));
-    await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => {
-      const pageNumber = Number(new URL(route.request().url()).searchParams.get("page") ?? "1");
-      return route.fulfill({
+    await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -46,15 +44,13 @@ test.describe("Focus Pro workstation", () => {
           published_at: recentNewsDate,
           related_tickers: ["RY.TO", "RY"],
           image_url: index === 0 ? "https://images.example.com/royal-bank.jpg" : null,
-        })).slice((pageNumber - 1) * 6, pageNumber * 6),
-        total_items: 10, page: pageNumber, page_size: 6, has_more: pageNumber === 1,
+        })),
         status: "ok",
         detail: null,
         generated_at: new Date().toISOString(),
         refresh_after_seconds: 900,
       }),
-      });
-    });
+    }));
     await page.route("https://images.example.com/royal-bank.jpg", (route) => route.fulfill({
       status: 200,
       contentType: "image/svg+xml",
@@ -78,11 +74,11 @@ test.describe("Focus Pro workstation", () => {
     const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
-    const articleButtons = stockNews.getByRole("button", { name: /Lire l’analyse|Read analysis/ });
+    const articleButtons = stockNews.getByRole("button", { name: /Lire le résumé|Read summary/ });
     await expect(articleButtons).toHaveCount(6);
     await stockNews.getByRole("button", { name: "Charger plus" }).click();
     await expect(articleButtons).toHaveCount(10);
-    await expect(stockNews.getByText("10 événements")).toBeVisible();
+    await expect(stockNews.getByText("10 articles")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
     await expect(stockNews.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(stockNews.getByText("Canadian Business Wire").first()).toBeVisible();
@@ -121,8 +117,8 @@ test.describe("Focus Pro workstation", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     const englishNews = page.getByRole("region", { name: "Latest news for RY" });
-    await expect(englishNews.getByText("Read analysis").first()).toBeVisible();
-    await englishNews.getByRole("button", { name: /Read analysis/ }).first().click();
+    await expect(englishNews.getByText("Read summary").first()).toBeVisible();
+    await englishNews.getByRole("button", { name: /Read summary/ }).first().click();
     const englishReader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(englishReader.getByRole("link", { name: "View original source" })).toBeVisible();
     expect(await englishReader.evaluate((node) => {

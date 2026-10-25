@@ -11,8 +11,6 @@
 
 The nine-page user reference is an image-only print of a TD stock page. Pages 1–6 show a clear sequence: quote and chart, compact quote metrics, recent news, returns, earnings trends, analyst targets, grouped statistics, and peers. Pages 7–9 mostly contain the printout's sidebar. The accompanying Anatole capture shows nine valuation cards in one row and five equal-weight news cards. The later Focus Premium PR should improve information hierarchy and mobile reading without reproducing the reference's graphics, figures, proprietary text or locked features.
 
-The [ENB panel before](images/focus-news-coverage-before.png) and [ENB panel after](images/focus-news-coverage-after.png) use the same Playwright news fixture. They demonstrate the change from equal-weight cards to a lead story and compact event list. These are test captures, not production coverage evidence.
-
 ## Source policy and limits
 
 | Source | Current use | Limit |
@@ -27,6 +25,6 @@ Public access or `robots.txt` does not itself grant content reuse rights. All li
 
 ## Contract introduced by News Coverage
 
-The stock news endpoint returns a cached event list with `page`, `page_size`, `total_items` and `has_more`. The server filters by `direct`, `sector`, `market` or `official` before slicing. The legacy item fields remain; `related_sources` preserves distinct publishers covering one event. Numeric amounts, quarter labels, dates and event types constrain grouping so separate announcements remain distinct.
+The stock news endpoint returns a cached event list with `page`, `page_size`, `total_items` and `has_more`. The server filters by `direct`, `sector`, `market` or `official` before slicing. The default page includes all 72 possible events so existing Focus clients continue to receive the full snapshot; new clients can request smaller pages. The legacy item fields remain; `related_sources` preserves distinct publishers covering one event. Numeric amounts, quarter labels, dates and event types constrain grouping so separate announcements remain distinct.
 
-The web news panel reuses the reader, prioritizes one lead story, lists other events compactly, provides a source disclosure per grouped event, and requests subsequent pages from the server. The `market` tier is emitted only for a small explicit set of economic links; it is never inferred from a ticker in `relatedTickers` alone.
+The `market` tier is emitted only for a small explicit set of economic links; it is never inferred from a ticker in `relatedTickers` alone. The editorial panel and its before/after captures are part of the later Focus Premium PR.

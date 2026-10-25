@@ -48,7 +48,7 @@ async def stock_news(
     company: str | None = Query(None, min_length=1, max_length=160),
     lang: str = Query("fr", pattern="^(fr|en)$"),
     page: int = Query(1, ge=1, le=100),
-    page_size: int = Query(12, ge=1, le=24),
+    page_size: int = Query(72, ge=1, le=72),
     relevance: Literal["all", "direct", "sector", "market", "official"] = Query("all"),
 ) -> StockNewsSnapshot:
     snapshot = await stock_news_service.get_snapshot(
