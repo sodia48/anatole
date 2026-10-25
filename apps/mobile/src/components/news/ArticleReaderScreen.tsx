@@ -24,6 +24,8 @@ export function ArticleReaderScreen() {
   const [briefFailed, setBriefFailed] = useState(false);
   const [briefAttempt, setBriefAttempt] = useState(0);
   const [detailed, setDetailed] = useState(false);
+  const [showAllFigures, setShowAllFigures] = useState(false);
+  const [evidenceKey, setEvidenceKey] = useState<string | null>(null);
   const published = article?.publishedAt ? new Date(article.publishedAt) : null;
   const date = published && !Number.isNaN(published.getTime())
     ? published.toLocaleString(language === "fr" ? "fr-CA" : "en-CA", { dateStyle: "long", timeStyle: "short" })
@@ -38,6 +40,8 @@ export function ArticleReaderScreen() {
       setBrief(null);
       setBriefLoading(true);
       setBriefFailed(false);
+      setShowAllFigures(false);
+      setEvidenceKey(null);
     });
     void marketApi.newsBrief({
       title: article.title, summary: article.summary, url: article.url,
@@ -85,7 +89,7 @@ export function ArticleReaderScreen() {
           <Text style={styles.summaryLabel}>{briefFailed
             ? pick("Extrait de la source", "Source excerpt")
             : brief?.translation_status === "unavailable"
-              ? pick("Texte original · traduction indisponible", "Original text · translation unavailable")
+              ? pick("Résumé en langue originale", "Summary in original language")
               : pick("Résumé", "Summary")}</Text>
           {briefLoading ? <ActivityIndicator color={colors.primary} accessibilityLabel={pick("Préparation du résumé", "Preparing the brief")} /> : null}
           {!briefLoading ? <Text style={styles.summary}>{brief?.summary || article.summary || pick("Seuls le titre et la source sont disponibles.", "Only the title and source are available.")}</Text> : null}
@@ -97,9 +101,24 @@ export function ArticleReaderScreen() {
             <Pressable accessibilityRole="button" accessibilityState={{ selected: detailed }} onPress={() => setDetailed(true)}><Text style={styles.actionText}>{pick("Analyse détaillée", "Detailed analysis")}</Text></Pressable>
           </View> : null}
           {detailed ? <>
-            {brief.key_figures.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Chiffres clés", "Key figures")}</Text>{brief.key_figures.map((figure, index) => <Text key={index} style={styles.summary}>{figure.value} · {figure.context}</Text>)}</View> : null}
+            {brief.key_figures.length || brief.figure_series?.length ? <View style={styles.briefSection}>
+              <Text style={styles.summaryLabel}>{pick("Chiffres importants", "Important figures")}</Text>
+              {brief.figure_series?.map((group, index) => <View key={index} style={styles.figureBlock}>
+                <Text style={styles.summaryLabel}>{group.label}</Text>
+                {group.figures.map((figure, row) => <Text key={row} style={styles.summary}>{figure.period ? `${figure.period} · ` : ""}{figure.value}</Text>)}
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: evidenceKey === `series-${index}` }} onPress={() => setEvidenceKey(evidenceKey === `series-${index}` ? null : `series-${index}`)}><Text style={styles.actionText}>{pick("Justification", "Source evidence")}</Text></Pressable>
+                {evidenceKey === `series-${index}` ? <Text style={styles.summary}>{group.figures[0]?.context}</Text> : null}
+              </View>)}
+              {(showAllFigures ? brief.key_figures : brief.key_figures.slice(0, 3)).map((figure, index) => <View key={index} style={styles.figureBlock}>
+                <Text style={styles.summaryLabel}>{figure.label || pick("Donnée publiée", "Published figure")}</Text>
+                <Text style={styles.summary}>{figure.value}{figure.period ? ` · ${figure.period}` : ""}</Text>
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: evidenceKey === `figure-${index}` }} onPress={() => setEvidenceKey(evidenceKey === `figure-${index}` ? null : `figure-${index}`)}><Text style={styles.actionText}>{pick("Justification", "Source evidence")}</Text></Pressable>
+                {evidenceKey === `figure-${index}` ? <Text style={styles.summary}>{figure.context}</Text> : null}
+              </View>)}
+              {brief.key_figures.length > 3 ? <Pressable accessibilityRole="button" accessibilityState={{ expanded: showAllFigures }} onPress={() => setShowAllFigures(!showAllFigures)}><Text style={styles.actionText}>{showAllFigures ? pick("Masquer les détails", "Hide details") : pick("Voir les détails", "See details")}</Text></Pressable> : null}
+            </View> : null}
             {brief.changes.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Ce qui change", "What changed")}</Text>{brief.changes.map((change, index) => <Text key={index} style={styles.summary}>{change}</Text>)}</View> : null}
-            {brief.why_it_matters ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Lecture Anatole", "Anatole read")}</Text><Text style={styles.summary}>{brief.why_it_matters}</Text></View> : null}
+            {brief.why_it_matters ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("Ce que cela signifie", "What this means")}</Text><Text style={styles.summary}>{brief.why_it_matters}</Text></View> : null}
             {brief.watch.length ? <View style={styles.briefSection}><Text style={styles.summaryLabel}>{pick("À surveiller", "What to watch")}</Text>{brief.watch.map((item, index) => <Text key={index} style={styles.summary}>{item}</Text>)}</View> : null}
           </> : null}
           <View style={styles.briefSection}><Text style={styles.summaryLabel}>{brief.availability === "article" ? pick("Article consulté", "Article consulted") : brief.availability === "publisher_excerpt" ? pick("Résumé de l’éditeur", "Publisher excerpt") : pick("Informations limitées", "Limited information")}</Text><Text style={styles.summary}>{brief.source_note}</Text></View>
@@ -157,6 +176,7 @@ const styles = createThemedStyles((colors) => ({
   summary: { ...typography.body, color: colors.textMuted },
   modeRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.sm, paddingVertical: spacing.sm },
   briefSection: { gap: spacing.xs, paddingVertical: spacing.sm },
+  figureBlock: { gap: spacing.xs, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surfaceRaised },
   browser: { flex: 1, minHeight: 180, overflow: "hidden", backgroundColor: "#ffffff" },
   sourceBar: { minHeight: 36, justifyContent: "center", paddingHorizontal: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, backgroundColor: colors.surface },
   sourceBarText: { ...typography.caption, color: colors.textMuted, fontWeight: "800" },

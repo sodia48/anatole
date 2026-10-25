@@ -85,12 +85,20 @@ class NewsBriefFigure(BaseModel):
     value: str
     context: str
     kind: Literal["actual", "forecast", "opinion", "date", "other"] = "other"
+    label: str = ""
+    period: str | None = None
+
+
+class NewsBriefFigureSeries(BaseModel):
+    label: str
+    figures: list[NewsBriefFigure]
 
 
 class NewsBriefResponse(BaseModel):
     title: str
     summary: str
     key_figures: list[NewsBriefFigure] = Field(default_factory=list)
+    figure_series: list[NewsBriefFigureSeries] = Field(default_factory=list)
     changes: list[str] = Field(default_factory=list)
     why_it_matters: str
     watch: list[str] = Field(default_factory=list)

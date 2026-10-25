@@ -70,6 +70,8 @@ export type StockNewsItem = {
   published_at: string;
   related_tickers: string[];
   image_url?: string | null;
+  relevance?: "direct" | "sector";
+  origin?: "publisher" | "company_release";
 };
 
 export type StockNewsSnapshot = {
@@ -79,6 +81,7 @@ export type StockNewsSnapshot = {
   items: StockNewsItem[];
   status: string;
   detail: string | null;
+  coverage_note?: string | null;
   generated_at: string;
   refresh_after_seconds: number;
 };
@@ -384,12 +387,15 @@ export type NewsBriefFigure = {
   value: string;
   context: string;
   kind?: "actual" | "forecast" | "opinion" | "date" | "other";
+  label?: string;
+  period?: string | null;
 };
 
 export type NewsBriefResponse = {
   title: string;
   summary: string;
   key_figures: NewsBriefFigure[];
+  figure_series?: { label: string; figures: NewsBriefFigure[] }[];
   changes: string[];
   why_it_matters: string;
   watch: string[];

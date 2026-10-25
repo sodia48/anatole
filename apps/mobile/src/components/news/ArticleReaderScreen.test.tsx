@@ -77,7 +77,7 @@ describe("Anatole article reader", () => {
     expect(await view.findByText("L’emploi a progressé de 2,1 % selon le rapport officiel.")).toBeTruthy();
     expect(marketApi.newsBrief).toHaveBeenCalledWith(expect.objectContaining({ context: "macro", language: "fr" }), expect.anything());
     await userEvent.setup().press(view.getByText("Analyse détaillée"));
-    expect(view.getByText("Chiffres clés")).toBeTruthy();
+    expect(view.getByText("Chiffres importants")).toBeTruthy();
     expect(view.getByText("À surveiller")).toBeTruthy();
     await view.unmount();
   }, 15_000);
@@ -121,7 +121,7 @@ describe("Anatole article reader", () => {
       translation_status: "unavailable", detail_available: false,
     });
     const view = await render(<ArticleReaderScreen />);
-    expect(await view.findByText("Texte original · traduction indisponible")).toBeTruthy();
+    expect(await view.findByText("Résumé en langue originale")).toBeTruthy();
     expect(marketApi.newsBrief).toHaveBeenCalledWith(expect.objectContaining({ context: "stock", ticker: "RY" }), expect.anything());
     await view.unmount();
   });
@@ -131,6 +131,27 @@ describe("Anatole article reader", () => {
     const view = await render(<ArticleReaderScreen />);
     expect(view.getByTestId("article-invalid-url")).toBeTruthy();
     expect(view.queryByTestId("article-webview")).toBeNull();
+    await view.unmount();
+  });
+
+  it("shows a forecast series once and reveals its evidence on demand", async () => {
+    jest.mocked(marketApi.newsBrief).mockResolvedValueOnce({
+      summary: "Le marché devrait croître selon l'éditeur.", key_figures: [],
+      figure_series: [{ label: "Taille prévue du marché", figures: [
+        { value: "4,94 milliards USD", period: "2025", context: "Source: 2025 4,94 milliards USD." },
+        { value: "5,26 milliards USD", period: "2026", context: "Source: 2026 5,26 milliards USD." },
+      ] }], changes: [], why_it_matters: "", watch: [],
+      source_note: "Seul l'extrait est disponible.", source_mode: "feed_summary",
+      availability: "publisher_excerpt", detail_available: true,
+    });
+    const view = await render(<ArticleReaderScreen />);
+    await view.findByText("Le marché devrait croître selon l'éditeur.");
+    await userEvent.setup().press(view.getByText("Analyse détaillée"));
+    expect(view.getByText("2025 · 4,94 milliards USD")).toBeTruthy();
+    expect(view.getByText("2026 · 5,26 milliards USD")).toBeTruthy();
+    expect(view.queryByText("Source: 2025 4,94 milliards USD.")).toBeNull();
+    await userEvent.setup().press(view.getByText("Justification"));
+    expect(view.getByText("Source: 2025 4,94 milliards USD.")).toBeTruthy();
     await view.unmount();
   });
 

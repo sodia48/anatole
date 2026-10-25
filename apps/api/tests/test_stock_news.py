@@ -1,4 +1,5 @@
 import asyncio
+from collections import Counter
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
@@ -8,6 +9,8 @@ from app.main import app
 from app.schemas.stocks import StockNewsItem
 from app.services.stock_news import (
     StockNewsService,
+    _classification,
+    _safe_url,
     _description_from_html,
     _thumbnail_url,
 )
@@ -141,6 +144,14 @@ def test_yahoo_thumbnail_is_optional() -> None:
     assert item.image_url is None
 
 
+def test_untrusted_publisher_links_reject_private_hosts_and_credentials() -> None:
+    assert _safe_url("https://example.com/article") == "https://example.com/article"
+    assert _safe_url("http://example.com/article") is None
+    assert _safe_url("https://127.0.0.1/private") is None
+    assert _safe_url("https://localhost/private") is None
+    assert _safe_url("https://user@example.com/article") is None
+
+
 def test_article_description_is_cleaned_without_inventing_a_summary() -> None:
     page = """
         <html><head>
@@ -201,7 +212,7 @@ def test_french_empty_feed_falls_back_to_canadian_english(monkeypatch) -> None:
         )
     )
 
-    assert calls == [("fr", "CA"), ("en", "CA")]
+    assert calls == [("fr", "CA"), ("en", "CA"), ("en", "US")]
     assert len(snapshot.items) == 10
     assert all(item.summary.startswith("Résumé ") for item in snapshot.items)
 
@@ -273,3 +284,106 @@ def test_stock_news_route_is_honest_in_demo_mode(monkeypatch) -> None:
     assert payload["symbol"] == "RY.TO"
     assert payload["items"] == []
     assert payload["status"] == "unavailable"
+
+
+def _news_row(title: str, publisher: str, index: int, *, ticker: str = "CNQ.TO") -> dict:
+    return {
+        "uuid": f"{publisher}-{index}", "title": title, "publisher": publisher,
+        "link": f"https://example.com/{publisher.lower().replace(' ', '-')}/{index}",
+        "providerPublishTime": int(datetime(2026, 10, 20, 14, tzinfo=UTC).timestamp()) + index,
+        "relatedTickers": [ticker],
+    }
+
+
+def test_yahoo_ticker_hint_does_not_turn_a_generic_list_into_direct_news() -> None:
+    row = _news_row("5 TSX dividend stocks for your TFSA, including CNQ", "The Motley Fool", 1)
+    relevance, reason = _classification(row, aliases={"CNQ.TO"}, company="Canadian Natural Resources", symbol="CNQ.TO")
+    assert relevance is None
+    assert reason == "generalist"
+
+
+def test_ten_generic_articles_from_one_publisher_are_excluded() -> None:
+    payload = {"news": [_news_row(f"{index} top TSX dividend stocks for your TFSA", "The Motley Fool", index) for index in range(10)]}
+    rejected = Counter()
+    items = StockNewsService._parse_items(payload, aliases={"CNQ.TO"}, company="Canadian Natural Resources", symbol="CNQ.TO", rejected=rejected)
+    assert items == []
+    assert rejected["generalist"] == 10
+
+
+def test_direct_release_and_sector_story_have_distinct_levels() -> None:
+    payload = {"news": [
+        _news_row("Canadian Natural Announces 2026 Third Quarter Results", "Newswire", 1),
+        _news_row("Oil sands production expands in Alberta", "Energy Wire", 2),
+        _news_row("Canadian Natural appears among ten dividend stocks", "Listicle", 3),
+    ]}
+    items = StockNewsService._parse_items(payload, aliases={"CNQ.TO"}, company="Canadian Natural Resources", symbol="CNQ.TO")
+    assert [(item.publisher, item.relevance) for item in items] == [("Newswire", "direct"), ("Energy Wire", "sector")]
+
+
+def test_selection_balances_publishers_without_demoting_direct_news() -> None:
+    payload = {"news": [
+        *[_news_row(f"Canadian Natural announces production update {index}", "Dominant Wire", index) for index in range(8)],
+        _news_row("Canadian Natural reports quarterly earnings", "Second Wire", 20),
+        _news_row("Canadian Natural raises annual guidance", "Third Wire", 21),
+    ]}
+    candidates = StockNewsService._parse_items(payload, aliases={"CNQ.TO"}, company="Canadian Natural Resources", symbol="CNQ.TO")
+    selected = StockNewsService._rank_and_select(candidates, Counter())
+    assert len(selected) == 10
+    assert len({item.publisher for item in selected[:4]}) == 3
+    assert all(item.relevance == "direct" for item in selected)
+
+
+def test_same_announcement_from_two_publishers_is_grouped() -> None:
+    payload = {"news": [
+        _news_row("Canadian Natural reports quarterly earnings", "First Wire", 1),
+        _news_row("Canadian Natural reports quarterly earnings today", "Second Wire", 2),
+    ]}
+    candidates = StockNewsService._parse_items(payload, aliases={"CNQ.TO"}, company="Canadian Natural Resources", symbol="CNQ.TO")
+    rejected = Counter()
+    selected = StockNewsService._rank_and_select(candidates, rejected)
+    assert len(selected) == 1
+    assert rejected["same_announcement"] == 1
+
+
+def test_company_release_parser_uses_verified_public_pdf_dates(monkeypatch) -> None:
+    class Response:
+        headers = {"content-type": "text/html"}
+        text = '<cnrl-tab title="2026"><cnrl-news-release-card link="/wp-content/uploads/results.pdf" day="6" month="8"><h1 slot="heading">Canadian Natural Announces Quarterly Results</h1></cnrl-news-release-card></cnrl-tab>'
+        content = text.encode()
+        def raise_for_status(self):
+            pass
+
+    async def request(*args, **kwargs):
+        return Response()
+
+    monkeypatch.setattr("app.services.stock_news.shared_http_client.request", request)
+    releases = asyncio.run(StockNewsService._company_releases("CNQ.TO"))
+    assert [(item.origin, item.published_at.date().isoformat()) for item in releases] == [("company_release", "2026-08-06")]
+    assert releases[0].url == "https://www.cnrl.com/wp-content/uploads/results.pdf"
+
+
+def test_secondary_source_failure_keeps_yahoo_direct_news(monkeypatch) -> None:
+    service = StockNewsService()
+    async def search(*, query: str, language: str, region: str = "CA"):
+        return {"news": [_news_row("Canadian Natural reports quarterly earnings", "Independent Wire", 1)]}
+    async def unavailable(symbol: str):
+        raise RuntimeError("source offline")
+    monkeypatch.setattr(service, "_search", search)
+    monkeypatch.setattr(service, "_company_releases", unavailable)
+    snapshot = asyncio.run(service._load(symbol="CNQ.TO", company="Canadian Natural Resources", language="en"))
+    assert snapshot.status == "ok"
+    assert len(snapshot.items) == 1
+    assert snapshot.coverage_note == "Only one relevant publisher is available."
+
+
+def test_no_direct_or_sector_news_is_honest(monkeypatch) -> None:
+    service = StockNewsService()
+    async def search(*, query: str, language: str, region: str = "CA"):
+        return {"news": [_news_row("TFSA stocks to buy for retirement", "Listicle", 1)]}
+    async def no_releases(symbol: str):
+        return []
+    monkeypatch.setattr(service, "_search", search)
+    monkeypatch.setattr(service, "_company_releases", no_releases)
+    snapshot = asyncio.run(service._load(symbol="CNQ.TO", company="Canadian Natural Resources", language="en"))
+    assert snapshot.status == "partial"
+    assert snapshot.items == []

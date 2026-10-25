@@ -3,13 +3,16 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import html
+import ipaddress
+import json
 import logging
 import re
 import unicodedata
-from datetime import UTC, datetime
+from collections import Counter
+from datetime import UTC, datetime, timedelta
 from html.parser import HTMLParser
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from app.core.config import settings
 from app.core.resilience import AsyncStaleCache, shared_http_client
@@ -20,6 +23,17 @@ from app.services.session_quotes import session_quote_service
 logger = logging.getLogger(__name__)
 
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
+CNQ_RELEASES_URL = "https://www.cnrl.com/investors/news-releases/"
+_GENERIC = re.compile(r"\b(?:TFSA|RRSP|CELI|REER|best stocks?|top \d+|stocks? to buy|dividend stocks?|passive income|portfolio strateg|retirement|watchlist|millionaire|wealth building|buy and hold|where I.d put|I keep coming back|what you should know|fully priced|can the run continue|vs\.)\b", re.I)
+_EVENT = re.compile(r"\b(?:results?|earnings?|revenue|profit|dividend|production|guidance|forecast|budget|acquisition|merger|sale|transaction|contract|appoint|CEO|quarter|annual|financing|notes|debt|buyback|issuer bid|operat\w*|announce\w*|report\w*|update|upgrade|downgrade|price target|open\w*|launch\w*|expand\w*|résultats?|bénéfices?|revenus?|dividende|production|prévisions?|acquisition|direction|trimestre|annonce|rachat|objectif de cours|ouvre|lance)\b", re.I)
+_DIVIDEND_ACTION = re.compile(r"\b(?:announc\w*|declar\w*|rais\w*|increas\w*|cut\w*|boost\w*|hik\w*|pay\w*|record date|déclar\w*|annonce\w*|hausse|verse\w*)\b", re.I)
+_SECTOR_TERMS = {
+    "CNQ": re.compile(r"\b(?:oil sands?|crude oil|natural gas|energy sector|petroleum|bitumen|pétrole|gaz naturel|sables bitumineux)\b", re.I),
+    "AEM": re.compile(r"\b(?:gold|mining|minerals?|mines?|minier)\b", re.I),
+    "RY": re.compile(r"\b(?:banks?|banking|financial sector|banques?|bancaire)\b", re.I),
+}
+_RELEASE_YEAR = re.compile(r'<cnrl-tab\s+title="((?:19|20)\d{2})"[^>]*>(.*?)</cnrl-tab>', re.I | re.S)
+_RELEASE_CARD = re.compile(r'<cnrl-news-release-card\s+link="([^"]+)"\s+day="(\d{1,2})"\s+month="(\d{1,2})"[^>]*>\s*<h1[^>]*>(.*?)</h1>', re.I | re.S)
 LEGAL_WORDS = {
     "and",
     "class",
@@ -69,11 +83,61 @@ def _company_matches(left: str, right: str) -> bool:
     return len(common) / min(len(left_tokens), len(right_tokens)) >= 0.75
 
 
+def _classification(row: dict[str, Any], *, aliases: set[str], company: str, symbol: str) -> tuple[str | None, str]:
+    title = str(row.get("title") or "")
+    if not title:
+        return None, "missing_title"
+    if _GENERIC.search(title):
+        return None, "generalist"
+    if re.search(r"\b(?:dividend|dividende)\b", title, re.I) and not _DIVIDEND_ACTION.search(title) and not re.search(r"\b(?:earnings?|results?|revenue|profit|bénéfices?|résultats?)\b", title, re.I):
+        return None, "dividend_commentary"
+    title_tokens = _company_tokens(title)
+    company_tokens = _company_tokens(company)
+    direct_name = bool(company_tokens) and len(title_tokens & company_tokens) >= (1 if len(company_tokens) == 1 else 2)
+    ticker_aliases = {alias.upper().removesuffix(".TO") for alias in aliases if len(alias.removesuffix(".TO")) >= 3}
+    direct_ticker = any(re.search(rf"(?<![A-Z0-9]){re.escape(alias)}(?![A-Z0-9])", title.upper()) for alias in ticker_aliases)
+    if (direct_name or direct_ticker) and _EVENT.search(title):
+        return "direct", "direct_title"
+    sector = _SECTOR_TERMS.get(symbol.upper().removesuffix(".TO"))
+    if sector and sector.search(title) and _EVENT.search(title):
+        return "sector", "sector_title"
+    # A Yahoo relatedTicker is a search hint, never proof of a company event.
+    return None, "no_direct_evidence"
+
+
+def _near_duplicate(left: StockNewsItem, right: StockNewsItem) -> bool:
+    if abs((left.published_at - right.published_at).total_seconds()) > 3 * 86400:
+        return False
+    if re.findall(r"\d+(?:[.,]\d+)?", left.title) != re.findall(r"\d+(?:[.,]\d+)?", right.title):
+        return False
+    a, b = _company_tokens(left.title), _company_tokens(right.title)
+    return bool(a and b) and len(a & b) / len(a | b) >= 0.72
+
+
+def _priority(item: StockNewsItem) -> float:
+    age_days = max(0.0, (datetime.now(UTC) - item.published_at).total_seconds() / 86400)
+    event = bool(_EVENT.search(item.title))
+    return ((100 if item.relevance == "direct" else 0) +
+            (20 if item.origin == "company_release" else 0) +
+            (12 if event else 0) + max(0, 20 - age_days / 3))
+
+
 def _safe_url(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
-    parsed = urlparse(value.strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    try:
+        parsed = urlparse(value.strip())
+        host = (parsed.hostname or "").lower().rstrip(".")
+        port = parsed.port
+    except ValueError:
+        return None
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    if parsed.scheme != "https" or not host or parsed.username or parsed.password or port not in {None, 443}:
+        return None
+    if host == "localhost" or host.endswith(".localhost") or (address is not None and not address.is_global):
         return None
     return value.strip()
 
@@ -171,17 +235,11 @@ def _description_from_html(value: str) -> str:
 class StockNewsService:
     refresh_after_seconds = 900
     stale_seconds = 86_400
-    minimum_items = 10
     max_items = 10
-    summary_fresh_seconds = 21_600
-    summary_stale_seconds = 604_800
 
     def __init__(self) -> None:
         self._cache: AsyncStaleCache[str, StockNewsSnapshot] = (
             AsyncStaleCache(max_entries=1000)
-        )
-        self._summary_cache: AsyncStaleCache[str, str] = AsyncStaleCache(
-            max_entries=4000
         )
 
     @staticmethod
@@ -210,28 +268,6 @@ class StockNewsService:
                 aliases.add(quote_symbol)
         return aliases
 
-    @staticmethod
-    def _relevant(
-        row: dict[str, Any],
-        *,
-        aliases: set[str],
-        company: str,
-    ) -> bool:
-        related = {
-            str(value).upper()
-            for value in row.get("relatedTickers") or []
-            if value
-        }
-        if related & aliases:
-            return True
-
-        title_tokens = _company_tokens(str(row.get("title") or ""))
-        company_tokens = _company_tokens(company)
-        if not company_tokens:
-            return False
-        required = 1 if len(company_tokens) == 1 else 2
-        return len(title_tokens & company_tokens) >= required
-
     @classmethod
     def _parse_items(
         cls,
@@ -239,6 +275,8 @@ class StockNewsService:
         *,
         aliases: set[str],
         company: str,
+        symbol: str = "",
+        rejected: Counter[str] | None = None,
     ) -> list[StockNewsItem]:
         items: list[StockNewsItem] = []
         seen: set[str] = set()
@@ -246,11 +284,14 @@ class StockNewsService:
         seen_urls: set[str] = set()
 
         for row in payload.get("news") or []:
-            if not isinstance(row, dict) or not cls._relevant(
-                row,
-                aliases=aliases,
-                company=company,
-            ):
+            if not isinstance(row, dict):
+                if rejected is not None:
+                    rejected["invalid_row"] += 1
+                continue
+            relevance, reason = _classification(row, aliases=aliases, company=company, symbol=symbol)
+            if relevance is None:
+                if rejected is not None:
+                    rejected[reason] += 1
                 continue
             title = str(row.get("title") or "").strip()
             url = _safe_url(row.get("link"))
@@ -260,18 +301,26 @@ class StockNewsService:
                     UTC,
                 )
             except (TypeError, ValueError, OSError, OverflowError):
+                if rejected is not None:
+                    rejected["invalid_date"] += 1
                 continue
             if not title or url is None:
+                if rejected is not None:
+                    rejected["invalid_url_or_title"] += 1
                 continue
-            title_key = _normalise_text(title)
+            title_key = f"{_normalise_text(title)}|{published_at.date().isoformat()}"
             url_key = url.casefold().rstrip("/")
             if title_key in seen_titles or url_key in seen_urls:
+                if rejected is not None:
+                    rejected["duplicate"] += 1
                 continue
 
             identifier = str(row.get("uuid") or "").strip() or hashlib.sha1(
                 f"{url}|{title.casefold()}".encode("utf-8")
             ).hexdigest()[:16]
             if identifier in seen:
+                if rejected is not None:
+                    rejected["duplicate"] += 1
                 continue
             seen.add(identifier)
             seen_titles.add(title_key)
@@ -294,11 +343,10 @@ class StockNewsService:
                         }
                     ),
                     image_url=_thumbnail_url(row),
+                    relevance=relevance,
                 )
             )
-
-        items.sort(key=lambda item: item.published_at, reverse=True)
-        return items[: cls.max_items]
+        return items
 
     async def _search(
         self,
@@ -314,7 +362,7 @@ class StockNewsService:
             params={
                 "q": query,
                 "quotesCount": "10",
-                "newsCount": "10",
+                "newsCount": "30",
                 "enableFuzzyQuery": "false",
                 "quotesQueryId": "tss_match_phrase_query",
                 "newsQueryId": "news_cie_vespa",
@@ -332,44 +380,15 @@ class StockNewsService:
             raise RuntimeError("Stock news payload is invalid")
         return payload
 
-    @staticmethod
-    async def _load_article_summary(url: str) -> str:
-        response = await shared_http_client.request(
-            "GET",
-            url,
-            headers={"Accept": "text/html,application/xhtml+xml"},
-            attempts=1,
-        )
-        content_type = response.headers.get("content-type", "").casefold()
-        if "html" not in content_type:
-            return ""
-        return _description_from_html(response.text)
-
     async def _summary_for_item(
         self,
         item: StockNewsItem,
         *,
         language: str,
     ) -> str:
-        if item.summary:
-            return item.summary
-        try:
-            summary = await self._summary_cache.get_or_load(
-                item.url,
-                lambda: self._load_article_summary(item.url),
-                fresh_seconds=float(self.summary_fresh_seconds),
-                stale_seconds=float(self.summary_stale_seconds),
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.info(
-                "stock_news_summary_unavailable url=%s exception=%s",
-                item.url,
-                type(exc).__name__,
-            )
-            summary = ""
-        # No excerpt is more honest than a title restated as if it came from
-        # the publisher. The brief service will label this "title only".
-        return summary
+        # Yahoo's supplied excerpt is the only publisher text we possess.
+        # Do not crawl arbitrary links from an untrusted search response.
+        return item.summary
 
     async def _enrich_summaries(
         self,
@@ -395,6 +414,7 @@ class StockNewsService:
         *,
         symbol: str,
         company: str,
+        rejected: Counter[str] | None = None,
     ) -> list[StockNewsItem]:
         aliases = {symbol}
         for payload in payloads:
@@ -411,7 +431,77 @@ class StockNewsService:
             },
             aliases=aliases,
             company=company,
+            symbol=symbol,
+            rejected=rejected,
         )
+
+    @staticmethod
+    async def _company_releases(symbol: str) -> list[StockNewsItem]:
+        """Use only explicitly verified, public company release indexes."""
+        if symbol.upper() != "CNQ.TO":
+            return []
+        response = await shared_http_client.request("GET", CNQ_RELEASES_URL, attempts=1)
+        response.raise_for_status()
+        if "html" not in response.headers.get("content-type", "").casefold() or len(response.content) > 600_000:
+            raise ValueError("invalid_official_release_index")
+        releases: list[StockNewsItem] = []
+        for tab in _RELEASE_YEAR.finditer(response.text):
+            year = int(tab.group(1))
+            for card in _RELEASE_CARD.finditer(tab.group(2)):
+                url = urljoin(CNQ_RELEASES_URL, html.unescape(card.group(1)))
+                parsed = urlparse(url)
+                if parsed.scheme != "https" or parsed.hostname != "www.cnrl.com" or not parsed.path.lower().endswith(".pdf"):
+                    continue
+                try:
+                    published = datetime(year, int(card.group(3)), int(card.group(2)), tzinfo=UTC)
+                except ValueError:
+                    continue
+                title = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", card.group(4)))).strip()
+                if not title:
+                    continue
+                releases.append(StockNewsItem(
+                    id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
+                    summary="", url=url, publisher="Canadian Natural Resources",
+                    published_at=published, related_tickers=[symbol],
+                    relevance="direct", origin="company_release",
+                ))
+        return releases[:20]
+
+    @classmethod
+    def _rank_and_select(cls, candidates: list[StockNewsItem], rejected: Counter[str]) -> list[StockNewsItem]:
+        cutoff = datetime.now(UTC) - timedelta(days=120)
+        fresh = [item for item in candidates if item.published_at >= cutoff]
+        rejected["outside_recent_window"] += len(candidates) - len(fresh)
+        ranked = sorted(fresh, key=lambda item: (_priority(item), item.published_at), reverse=True)
+        unique: list[StockNewsItem] = []
+        seen_urls: set[str] = set()
+        for item in ranked:
+            url = item.url.casefold().rstrip("/")
+            if url in seen_urls or any(_near_duplicate(item, existing) for existing in unique):
+                rejected["same_announcement"] += 1
+                continue
+            seen_urls.add(url)
+            unique.append(item)
+        ordered: list[StockNewsItem] = []
+        for tier in ("direct", "sector"):
+            pool = [item for item in unique if item.relevance == tier]
+            selected_ids: set[str] = set()
+            publisher_count: Counter[str] = Counter()
+            for item in pool:
+                publisher = item.publisher.casefold()
+                if len(ordered) < 6 and publisher_count[publisher] >= 2 and len({row.publisher.casefold() for row in pool}) > 1:
+                    continue
+                ordered.append(item)
+                selected_ids.add(item.id)
+                publisher_count[publisher] += 1
+                if len(ordered) >= cls.max_items:
+                    return ordered
+            for item in pool:
+                if item.id not in selected_ids:
+                    ordered.append(item)
+                    if len(ordered) >= cls.max_items:
+                        return ordered
+        return ordered
 
     async def _load(
         self,
@@ -421,42 +511,48 @@ class StockNewsService:
         language: str,
     ) -> StockNewsSnapshot:
         query = company or self._ticker(symbol)
-        canadian = await self._search(
-            query=query,
-            language=language,
-            region="CA",
-        )
-        if language == "fr" and not (canadian.get("news") or []):
-            canadian = await self._search(
-                query=query,
-                language="en",
-                region="CA",
-            )
-        payloads = [canadian]
-        items = self._items_from_payloads(
-            payloads,
-            symbol=symbol,
-            company=company,
-        )
-        if len(items) < self.minimum_items:
-            payloads.append(
-                await self._search(
-                    query=query,
-                    language="en",
-                    region="US",
-                )
-            )
-            items = self._items_from_payloads(
-                payloads,
-                symbol=symbol,
-                company=company,
-            )
+        queries = [(query, language, "CA"), (query, "en", "US")]
+        if language == "fr":
+            queries.insert(1, (query, "en", "CA"))
+        payloads: list[dict[str, Any]] = []
+        provider_counts: dict[str, int] = {}
+        rejected: Counter[str] = Counter()
+        for search_query, search_language, region in queries:
+            key = f"yahoo:{search_language}:{region}"
+            try:
+                payload = await self._search(query=search_query, language=search_language, region=region)
+                payloads.append(payload)
+                provider_counts[key] = len(payload.get("news") or [])
+            except Exception as exc:  # noqa: BLE001
+                provider_counts[key] = 0
+                rejected[f"{key}_unavailable"] += 1
+                logger.info("stock_news_provider_unavailable provider=%s error=%s", key, type(exc).__name__)
+        items = self._items_from_payloads(payloads, symbol=symbol, company=company, rejected=rejected)
+        try:
+            official = await self._company_releases(symbol)
+        except Exception as exc:  # noqa: BLE001
+            official = []
+            rejected["company_release_unavailable"] += 1
+            logger.info("stock_news_provider_unavailable provider=company_release error=%s", type(exc).__name__)
+        provider_counts["company_release"] = len(official)
+        items = self._rank_and_select([*items, *official], rejected)
         items = await self._enrich_summaries(items, language=language)
+        publishers = dict(Counter(item.publisher for item in items))
+        coverage_note = ("Une seule source pertinente est disponible." if len(publishers) == 1 and language == "fr" else
+                         "Only one relevant publisher is available." if len(publishers) == 1 else None)
+        logger.info("stock_news_selection %s", json.dumps({
+            "symbol": symbol, "providers": provider_counts,
+            "accepted": len(items), "rejected": dict(rejected),
+            "publishers": publishers,
+            "latest_published_at": max((item.published_at.isoformat() for item in items), default=None),
+        }, sort_keys=True))
         return StockNewsSnapshot(
             ticker=self._ticker(symbol),
             symbol=symbol,
             company=company,
             items=items,
+            status="ok" if items else "partial",
+            coverage_note=coverage_note,
             generated_at=datetime.now(UTC),
             refresh_after_seconds=self.refresh_after_seconds,
         )

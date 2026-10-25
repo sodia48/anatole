@@ -32,6 +32,7 @@ export function FocusStockNews({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NewsItem | null>(null);
+  const [filter, setFilter] = useState<"all" | "direct" | "sector">("all");
   const closeReader = useCallback(() => setSelected(null), []);
   const selectedArticle = useMemo<ReaderArticle | null>(() => selected ? {
     title: selected.title,
@@ -55,6 +56,7 @@ export function FocusStockNews({
       if (!active) return;
       setSnapshot(null);
       setSelected(null);
+      setFilter("all");
       setLoading(true);
       setError(false);
     });
@@ -101,6 +103,7 @@ export function FocusStockNews({
   );
 
   const items = snapshot?.items ?? [];
+  const visibleItems = items.filter((item) => filter === "all" || (item.relevance ?? "direct") === filter);
 
   return (
     <section
@@ -129,37 +132,52 @@ export function FocusStockNews({
         ) : null}
       </header>
 
+      {!loading && items.length ? (
+        <div className={styles.filters} role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
+          {(["all", "direct", "sector"] as const).map((option) => (
+            <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
+              {option === "all" ? tr(language, "Toutes", "All") : option === "direct" ? tr(language, "Entreprise", "Company") : tr(language, "Secteur", "Sector")}
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {snapshot?.coverage_note ? <p className={styles.coverage}>{snapshot.coverage_note}</p> : null}
+
       {loading ? (
         <div className={styles.state}>
           {tr(language, "Recherche des nouvelles récentes…", "Loading recent news…")}
         </div>
       ) : null}
 
-      {!loading && (error || !items.length) ? (
+      {!loading && (error || !visibleItems.length) ? (
         <div className={styles.state}>
-          {pick(
-            language,
+          {filter === "sector" ? tr(language, "Aucune actualité sectorielle pertinente dans la période récente.", "No relevant recent sector news.") : pick(language,
             `Aucune nouvelle récente directement associée à ${ticker}.`,
-            `No recent news directly associated with ${ticker}.`,
-          )}
+            `No recent news directly associated with ${ticker}.`)}
         </div>
       ) : null}
 
-      {items.length ? (
+      {visibleItems.length ? (
         <div className={styles.grid}>
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <button
               className={styles.card}
               key={item.id}
               onClick={() => setSelected(item)}
               type="button"
             >
+              {item.image_url?.startsWith("https:") ? (
+                // The image is supplied by the publisher and is not fetched by our server.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className={styles.thumbnail} src={item.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+              ) : null}
               <div className={styles.meta}>
                 <span>{item.publisher}</span>
                 <time dateTime={item.published_at}>
-                  {formatter.format(new Date(item.published_at))}
+                  {item.origin === "company_release" ? new Intl.DateTimeFormat(localeFor(language), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(item.published_at)) : formatter.format(new Date(item.published_at))}
                 </time>
               </div>
+              <span className={styles.relevance}>{item.relevance === "sector" ? tr(language, "Secteur", "Sector") : item.origin === "company_release" ? tr(language, "Communiqué officiel", "Official release") : tr(language, "Entreprise", "Company")}</span>
               <h3>{item.title}</h3>
               {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
               <span className={styles.open}>
