@@ -12,19 +12,16 @@ export function NewsImpactPanel({ article, language, onAsk }: {
   onAsk: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [data, setData] = useState<FocusFundamentalOverlaySnapshot | null>(null);
+  const [data, setData] = useState<FocusFundamentalOverlaySnapshot | null>();
   const ticker = article.ticker;
   const tr = (fr: string, en: string) => language === "fr" ? fr : en;
   useEffect(() => {
     if (!open || !ticker) return;
     const controller = new AbortController();
-    let active = true;
     void getFocusFundamentalOverlay(ticker, controller.signal)
-      .then(value => { if (active) setData(value); })
-      .catch(() => { if (active) setData(null); })
-      .finally(() => { if (active) setPending(false); });
-    return () => { active = false; controller.abort(); };
+      .then(value => { if (!controller.signal.aborted) setData(value); })
+      .catch(() => { if (!controller.signal.aborted) setData(null); });
+    return () => controller.abort();
   }, [open, ticker]);
 
   const results = article.eventType === "results";
@@ -38,9 +35,10 @@ export function NewsImpactPanel({ article, language, onAsk }: {
   const source = results ? quarter?.source?.source_name ?? data?.source : data?.source;
   const date = results ? quarter?.period_end : data?.generated_at;
   const url = quarter?.source?.source_url;
+  const pending = open && data === undefined;
   return <section className={styles.impact} aria-label={tr("Impact de la nouvelle", "News impact")}>
     <button type="button" className={styles.more} aria-expanded={open}
-      onClick={() => { if (!open) setPending(true); setOpen(!open); }}>
+      onClick={() => { setData(undefined); setOpen(!open); }}>
       {tr("Comprendre l’impact", "Understand the impact")}
     </button>
     {open ? <div className={styles.impactBody}>
