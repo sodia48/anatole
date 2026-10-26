@@ -41,7 +41,7 @@ test("direct RY results connect sourced facts to fundamentals and the existing a
 
   await page.goto("/focus/RY");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
-  await page.getByRole("button", { name: "Lire le résumé" }).first().click();
+  await page.getByRole("button", { name: `${title} · Lire l’analyse` }).click();
   const reader = page.getByRole("dialog", { name: title });
   const impact = reader.getByRole("region", { name: "Impact de la nouvelle" });
   await impact.getByRole("button", { name: "Comprendre l’impact" }).click();
