@@ -423,10 +423,16 @@ export function getStockNewsSnapshot(
   company: string,
   language: "fr" | "en" = "fr",
   signal?: AbortSignal,
+  page = 1,
+  pageSize = 12,
+  relevance: "all" | "direct" | "sector" | "market" | "official" = "all",
 ): Promise<StockNewsSnapshot> {
   const params = new URLSearchParams({
     company,
     lang: language,
+    page: String(page),
+    page_size: String(pageSize),
+    relevance,
   });
   return apiRequest<StockNewsSnapshot>(
     `/api/v1/stocks/${encodeURIComponent(ticker)}/news?${params.toString()}`,

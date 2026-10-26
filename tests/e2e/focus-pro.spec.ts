@@ -24,7 +24,9 @@ test.describe("Focus Pro workstation", () => {
       official_coverage: { status: "mixed", yahoo_statements_error: null },
       source: "E2E fixture", generated_at: recentNewsDate, refresh_after_seconds: 1800,
     } }));
-    await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => route.fulfill({
+    await page.route("**/api/anatole/api/v1/stocks/RY/news?**", (route) => {
+      const pageNumber = Number(new URL(route.request().url()).searchParams.get("page") ?? "1");
+      return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
@@ -44,13 +46,15 @@ test.describe("Focus Pro workstation", () => {
           published_at: recentNewsDate,
           related_tickers: ["RY.TO", "RY"],
           image_url: index === 0 ? "https://images.example.com/royal-bank.jpg" : null,
-        })),
+        })).slice((pageNumber - 1) * 6, pageNumber * 6),
+        total_items: 10, page: pageNumber, page_size: 6, has_more: pageNumber === 1,
         status: "ok",
         detail: null,
         generated_at: new Date().toISOString(),
         refresh_after_seconds: 900,
       }),
-    }));
+      });
+    });
     await page.route("https://images.example.com/royal-bank.jpg", (route) => route.fulfill({
       status: 200,
       contentType: "image/svg+xml",
@@ -74,11 +78,11 @@ test.describe("Focus Pro workstation", () => {
     const stockNews = page.getByRole("region", { name: /Dernières nouvelles pour RY|Latest news for RY/i });
     await expect(performance).toBeVisible();
     await expect(stockNews).toBeVisible();
-    const articleButtons = stockNews.getByRole("button", { name: /Lire le résumé|Read summary/ });
+    const articleButtons = stockNews.getByRole("button", { name: /Lire l’analyse|Read analysis/ });
     await expect(articleButtons).toHaveCount(6);
     await stockNews.getByRole("button", { name: "Charger plus" }).click();
     await expect(articleButtons).toHaveCount(10);
-    await expect(stockNews.getByText("10 articles")).toBeVisible();
+    await expect(stockNews.getByText("10 événements")).toBeVisible();
     await expect(stockNews.getByText("Royal Bank of Canada announces a strategic investment")).toBeVisible();
     await expect(stockNews.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
     await expect(stockNews.getByText("Canadian Business Wire").first()).toBeVisible();
@@ -117,8 +121,8 @@ test.describe("Focus Pro workstation", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     const englishNews = page.getByRole("region", { name: "Latest news for RY" });
-    await expect(englishNews.getByText("Read summary").first()).toBeVisible();
-    await englishNews.getByRole("button", { name: /Read summary/ }).first().click();
+    await expect(englishNews.getByText("Read analysis").first()).toBeVisible();
+    await englishNews.getByRole("button", { name: /Read analysis/ }).first().click();
     const englishReader = page.getByRole("dialog", { name: "Royal Bank of Canada announces a strategic investment" });
     await expect(englishReader.getByRole("link", { name: "View original source" })).toBeVisible();
     expect(await englishReader.evaluate((node) => {
@@ -132,9 +136,12 @@ test.describe("Focus Pro workstation", () => {
     await page.goto("/focus/RY", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
     await expect(page.getByRole("region", { name: "Performance du titre" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "LIVE", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "1S", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "3M", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "1J", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "5J", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "1M", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "3A", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "MAX", exact: true })).toBeVisible();
+    await expect(page.getByText(/Variation du cours seul, sans dividendes/)).toBeVisible();
     const volumePanel = page.getByRole("complementary", { name: /Volume échangé/i });
     await expect(volumePanel).toBeVisible();
     await expect(volumePanel.getByText(/Somme des volumes des bougies disponibles/)).toBeVisible();
@@ -148,21 +155,31 @@ test.describe("Focus Pro workstation", () => {
     });
     await Promise.all([
       oneWeekRequest,
-      page.getByRole("button", { name: "1S", exact: true }).click(),
+      page.getByRole("button", { name: "5J", exact: true }).click(),
     ]);
-    await expect(page.getByRole("button", { name: "1S", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "5J", exact: true })).toHaveAttribute("aria-pressed", "true");
 
-    const threeMonthRequest = page.waitForRequest((request) => {
+    const oneMonthRequest = page.waitForRequest((request) => {
       const url = new URL(request.url());
       return url.pathname.endsWith("/api/v1/stocks/RY/focus")
-        && url.searchParams.get("range") === "3mo"
+        && url.searchParams.get("range") === "1mo"
         && url.searchParams.get("interval") === "1d";
     });
     await Promise.all([
-      threeMonthRequest,
-      page.getByRole("button", { name: "3M", exact: true }).click(),
+      oneMonthRequest,
+      page.getByRole("button", { name: "1M", exact: true }).click(),
     ]);
-    await expect(page.getByRole("button", { name: "3M", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "1M", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+    const threeYearRequest = page.waitForRequest((request) => {
+      const url = new URL(request.url());
+      return url.pathname.endsWith("/api/v1/stocks/RY/focus")
+        && url.searchParams.get("range") === "5y"
+        && url.searchParams.get("interval") === "1wk";
+    });
+    await Promise.all([threeYearRequest, page.getByRole("button", { name: "3A", exact: true }).click()]);
+    await expect(page.getByRole("button", { name: "3A", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("heading", { name: "RY · 3A" })).toBeVisible();
 
     await page.getByRole("button", { name: /Workstation pro|Pro workstation/i }).click();
     await expect(page.getByRole("region", { name: "Focus Pro chart" })).toBeVisible();

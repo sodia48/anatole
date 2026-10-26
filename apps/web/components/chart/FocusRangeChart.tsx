@@ -56,11 +56,13 @@ type PeriodKey =
   | "live"
   | "1w"
   | "ytd"
-  | "3mo"
+  | "1mo"
   | "6mo"
   | "1y"
+  | "3y"
   | "5y"
-  | "10y";
+  | "10y"
+  | "max";
 
 type PeriodDefinition = {
   key: PeriodKey;
@@ -73,14 +75,14 @@ type PeriodDefinition = {
 const PERIODS: PeriodDefinition[] = [
   {
     key: "live",
-    label: "LIVE",
+    label: "1J",
     range: "1d",
     interval: "1m",
     refreshMs: 15_000,
   },
   {
     key: "1w",
-    label: "1S",
+    label: "5J",
     range: "5d",
     interval: "5m",
     refreshMs: 60_000,
@@ -92,9 +94,9 @@ const PERIODS: PeriodDefinition[] = [
     interval: "1d",
   },
   {
-    key: "3mo",
-    label: "3M",
-    range: "3mo",
+    key: "1mo",
+    label: "1M",
+    range: "1mo",
     interval: "1d",
   },
   {
@@ -110,6 +112,12 @@ const PERIODS: PeriodDefinition[] = [
     interval: "1d",
   },
   {
+    key: "3y",
+    label: "3A",
+    range: "5y",
+    interval: "1wk",
+  },
+  {
     key: "5y",
     label: "5A",
     range: "5y",
@@ -119,6 +127,12 @@ const PERIODS: PeriodDefinition[] = [
     key: "10y",
     label: "10A",
     range: "10y",
+    interval: "1wk",
+  },
+  {
+    key: "max",
+    label: "MAX",
+    range: "max",
     interval: "1wk",
   },
 ];
@@ -426,10 +440,13 @@ export function FocusRangeChart({
     PERIODS.find((candidate) => candidate.key === periodKey) ??
     PERIODS[0];
 
-  const candles = useMemo(
-    () => normalizedCandles(snapshot?.history ?? []),
-    [snapshot],
-  );
+  const candles = useMemo(() => {
+    const rows = normalizedCandles(snapshot?.history ?? []);
+    if (periodKey !== "3y" || !rows.length) return rows;
+    const cutoff = new Date(Number(rows.at(-1)?.time) * 1000);
+    cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 3);
+    return rows.filter((row) => Number(row.time) * 1000 >= cutoff.getTime());
+  }, [snapshot, periodKey]);
 
   const performance = useMemo(
     () => periodPerformance(candles),
@@ -491,7 +508,7 @@ export function FocusRangeChart({
       secondsVisible: false,
       rightOffset: periodKey === "live" ? 6 : 2,
       barSpacing: periodKey === "live" ? 7 : 5,
-      minBarSpacing: periodKey === "10y" ? 0.04 : 0.08,
+      minBarSpacing: periodKey === "10y" || periodKey === "max" ? 0.04 : 0.08,
     });
 
     const candleData: CandlestickData<UTCTimestamp>[] = candles.map(
@@ -777,9 +794,9 @@ export function FocusRangeChart({
       </div>
 
       <p className="frc-note">
-        Pour 5A et 10A, les bougies et les SMA utilisent une
-        fréquence hebdomadaire. Le mode LIVE dépend du délai de la
-        source de marché.
+        3A, 5A, 10A et MAX : bougies hebdomadaires. Variation du cours seul,
+        sans dividendes. Indice : N/D sans séries ajustées et alignées.
+        Le mode LIVE dépend du délai de la source.
       </p>
     </section>
   );

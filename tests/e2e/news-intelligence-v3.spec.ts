@@ -86,15 +86,19 @@ test("publisher excerpt is honest when the full article cannot be read", async (
 });
 
 test("Focus CNQ favors direct announcements and separates sector news", async ({ page }, testInfo) => {
-  await page.route("**/api/anatole/api/v1/stocks/CNQ/news?**", (route) => route.fulfill({ json: {
+  await page.route("**/api/anatole/api/v1/stocks/CNQ/news?**", (route) => {
+    const relevance = new URL(route.request().url()).searchParams.get("relevance") ?? "all";
+    return route.fulfill({ json: {
     ticker: "CNQ", symbol: "CNQ.TO", company: "Canadian Natural Resources", status: "ok", detail: null,
     coverage_note: null, generated_at: published, refresh_after_seconds: 900,
     items: [
       { id: "official", title: "Canadian Natural Announces 2026 Second Quarter Results", summary: "", publisher: "Canadian Natural Resources", url: "https://www.cnrl.com/wp-content/uploads/2026/08/0806-Q226-Front-End.pdf", published_at: "2026-08-06T00:00:00Z", related_tickers: ["CNQ.TO"], relevance: "direct", origin: "company_release", image_url: null },
       { id: "analyst", title: "RBC Raises Price Target on Canadian Natural Resources", summary: "RBC raised its price target on the company.", publisher: "MT Newswires", url: "https://example.com/analyst", published_at: published, related_tickers: ["CNQ.TO"], relevance: "direct", origin: "publisher", image_url: null },
       { id: "sector", title: "Oil sands production expands in Alberta", summary: "Industry output increased in Alberta.", publisher: "Energy Wire", url: "https://example.com/sector", published_at: published, related_tickers: [], relevance: "sector", origin: "publisher", image_url: null },
-    ],
-  } }));
+    ].filter((item) => relevance === "all" || item.relevance === relevance),
+    page: 1, page_size: 6, has_more: false,
+  } });
+  });
   await page.route("**/api/anatole/api/v1/discovery/news/brief", (route) => route.fulfill({ json: {
     title: "Canadian Natural Announces 2026 Second Quarter Results", summary: "", key_figures: [], figure_series: [],
     changes: [], why_it_matters: "", watch: [], source_url: "https://www.cnrl.com/wp-content/uploads/2026/08/0806-Q226-Front-End.pdf",
@@ -105,15 +109,15 @@ test("Focus CNQ favors direct announcements and separates sector news", async ({
   await page.goto("/focus/CNQ");
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   const news = page.getByRole("region", { name: /Dernières nouvelles pour CNQ|Latest news for CNQ/i });
-  const cards = news.getByRole("button", { name: /Lire le résumé/ });
+  const cards = news.getByRole("button", { name: /Lire l’analyse/ });
   await expect(cards).toHaveCount(2);
-  await expect(news.getByRole("link", { name: /Voir l'article/ })).toHaveCount(1);
+  await expect(news.getByRole("link", { name: /Voir l’article original/ })).toHaveCount(1);
   await news.getByRole("button", { name: "Entreprise", exact: true }).click();
   await expect(cards).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("cnq-after.png") });
   await news.getByRole("button", { name: "Secteur", exact: true }).click();
   await expect(cards).toHaveCount(1);
   await news.getByRole("button", { name: "Toutes", exact: true }).click();
-  await expect(news.getByRole("link", { name: /Voir l'article/ })).toHaveAttribute("href", /cnrl\.com/);
+  await expect(news.getByRole("link", { name: /Voir l’article original/ })).toHaveAttribute("href", /cnrl\.com/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });

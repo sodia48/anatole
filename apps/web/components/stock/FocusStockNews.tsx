@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getStockNewsSnapshot } from "@/lib/api";
 import type { ReaderArticle } from "@/components/news/NewsIntelligenceReader";
@@ -19,6 +19,13 @@ const NewsIntelligenceReader = dynamic(
 
 type NewsItem = StockNewsSnapshot["items"][number];
 const PAGE_SIZE = 6;
+const FILTERS = [
+  ["all", "Toutes", "All"],
+  ["direct", "Entreprise", "Company"],
+  ["sector", "Secteur", "Sector"],
+  ["market", "Marché", "Market"],
+  ["official", "Communiqués", "Official releases"],
+] as const;
 
 function canReadBrief(item: NewsItem): boolean {
   const excerpt = item.summary?.trim() ?? "";
@@ -39,9 +46,10 @@ export function FocusStockNews({
   const [error, setError] = useState(false);
   const [selected, setSelected] = useState<NewsItem | null>(null);
   const readerTrigger = useRef<HTMLButtonElement | null>(null);
-  const [filter, setFilter] = useState<"all" | "direct" | "sector">("all");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
-  const closeReader = useCallback(() => setSelected(null), []);
+  const [filter, setFilter] = useState<"all" | "direct" | "sector" | "market" | "official">("all");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const activeQuery = useRef("");
+  const queryKey = `${ticker}|${company}|${language}|${filter}`;
   const selectedArticle = useMemo<ReaderArticle | null>(() => selected ? {
     title: selected.title,
     summary: selected.summary,
@@ -61,13 +69,13 @@ export function FocusStockNews({
 
   useEffect(() => {
     const controller = new AbortController();
+    activeQuery.current = queryKey;
     let active = true;
     queueMicrotask(() => {
-      if (!active) return;
+      if (!active || activeQuery.current !== queryKey) return;
       setSnapshot(null);
       setSelected(null);
-      setFilter("all");
-      setVisibleCount(PAGE_SIZE);
+      setLoadingMore(false);
       setLoading(true);
       setError(false);
     });
@@ -77,29 +85,32 @@ export function FocusStockNews({
       company,
       language,
       controller.signal,
+      1,
+      PAGE_SIZE,
+      filter,
     )
       .then((value) => {
-        if (!active) return;
+        if (!active || activeQuery.current !== queryKey) return;
         setSnapshot(value);
         setError(value.status === "unavailable");
       })
       .catch((reason: unknown) => {
         if (
-          active &&
+          active && activeQuery.current === queryKey &&
           !(reason instanceof DOMException && reason.name === "AbortError")
         ) {
           setError(true);
         }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && activeQuery.current === queryKey) setLoading(false);
       });
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [company, language, ticker]);
+  }, [company, filter, language, ticker, queryKey]);
 
   const formatter = useMemo(
     () =>
@@ -114,8 +125,19 @@ export function FocusStockNews({
   );
 
   const items = snapshot?.items ?? [];
-  const visibleItems = items.filter((item) => filter === "all" || (item.relevance ?? "direct") === filter);
-  const shownItems = visibleItems.slice(0, visibleCount);
+  const loadMore = async () => {
+    if (!snapshot?.has_more || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await getStockNewsSnapshot(ticker, company, language, undefined, (snapshot.page ?? 1) + 1, PAGE_SIZE, filter);
+      if (activeQuery.current !== queryKey) return;
+      setSnapshot((current) => current ? { ...next, items: [...current.items, ...next.items.filter((item) => !current.items.some((old) => old.id === item.id))] } : next);
+    } catch {
+      if (activeQuery.current === queryKey) setError(true);
+    } finally {
+      if (activeQuery.current === queryKey) setLoadingMore(false);
+    }
+  };
 
   return (
     <section
@@ -139,16 +161,16 @@ export function FocusStockNews({
         </div>
         {!loading && items.length ? (
           <span className={styles.count}>
-            {items.length} {tr(language, "articles", "articles")}
+            {snapshot?.total_items ?? items.length} {tr(language, "événements", "events")}
           </span>
         ) : null}
       </header>
 
       {!loading && items.length ? (
         <div className={styles.filters} role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
-          {(["all", "direct", "sector"] as const).map((option) => (
-            <button key={option} type="button" aria-pressed={filter === option} onClick={() => { setFilter(option); setVisibleCount(PAGE_SIZE); }}>
-              {option === "all" ? tr(language, "Toutes", "All") : option === "direct" ? tr(language, "Entreprise", "Company") : tr(language, "Secteur", "Sector")}
+          {FILTERS.map(([option, fr, en]) => (
+            <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
+              {tr(language, fr, en)}
             </button>
           ))}
         </div>
@@ -162,51 +184,60 @@ export function FocusStockNews({
         </div>
       ) : null}
 
-      {!loading && (error || !visibleItems.length) ? (
+      {!loading && (error || !items.length) ? (
         <div className={styles.state}>
-          {filter === "sector" ? tr(language, "Aucune actualité sectorielle pertinente dans la période récente.", "No relevant recent sector news.") : pick(language,
-            `Aucune nouvelle récente directement associée à ${ticker}.`,
-            `No recent news directly associated with ${ticker}.`)}
+          {error ? tr(language, "Les sources d’actualités sont momentanément indisponibles.", "News sources are temporarily unavailable.")
+            : tr(language, "Aucune nouvelle vérifiée dans cette catégorie.", "No verified news in this category.")}
         </div>
       ) : null}
 
-      {visibleItems.length ? (
+      {items.length ? (
         <div className={styles.grid}>
-          {shownItems.map((item) => {
+          {items.map((item, index) => {
             const readable = canReadBrief(item);
             const contents = <>
-              {item.image_url?.startsWith("https:") ? (
+              <div className={styles.meta}>
+                <span>{item.publisher}</span>
+                <time dateTime={item.event_published_at ?? item.published_at}>
+                  {item.origin === "company_release" && !item.event_published_at ? new Intl.DateTimeFormat(localeFor(language), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(item.published_at)) : formatter.format(new Date(item.event_published_at ?? item.published_at))}
+                </time>
+              </div>
+              <span className={styles.relevance}>{item.origin === "company_release" ? tr(language, "Communiqué officiel", "Official release") : item.relevance === "sector" ? tr(language, "Secteur", "Sector") : item.relevance === "market" ? tr(language, "Marché", "Market") : tr(language, "Entreprise", "Company")}</span>
+              <h3>{item.title}</h3>
+              {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
+            </>;
+            return <article className={`${styles.card} ${index === 0 ? styles.featured : ""}`} key={item.id}>
+              {item.image_url?.startsWith("https://") ? (
                 // The image is supplied by the publisher and is not fetched by our server.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className={styles.thumbnail} src={item.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               ) : null}
-              <div className={styles.meta}>
-                <span>{item.publisher}</span>
-                <time dateTime={item.published_at}>
-                  {item.origin === "company_release" ? new Intl.DateTimeFormat(localeFor(language), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(item.published_at)) : formatter.format(new Date(item.published_at))}
-                </time>
+              <div className={styles.storyBody}>{contents}
+                <div className={styles.storyActions}>
+                {readable ? <button className={styles.open} aria-label={`${item.title} · ${tr(language, "Lire l’analyse", "Read analysis")}`} onClick={(event) => { readerTrigger.current = event.currentTarget; setSelected(item); }} type="button">{tr(language, "Lire l’analyse", "Read analysis")}</button>
+                  : <a className={styles.open} aria-label={`${item.title} · ${tr(language, "Voir l’article original", "View original article")}`} href={item.url} target="_blank" rel="noopener noreferrer">{tr(language, "Voir l’article original", "View original article")}</a>}
+                {item.related_sources?.length ? <details className={styles.sources}>
+                  <summary>{tr(language, "Autres sources", "Other sources")} · {item.related_sources.length}</summary>
+                  <ul>{item.related_sources.map((source) => <li key={source.url}>
+                    <a href={source.url} target="_blank" rel="noopener noreferrer">{source.publisher} · {source.title}</a>
+                    {source.origin === "company_release" ? <span> · {tr(language, "Officiel", "Official")}</span> : null}
+                  </li>)}</ul>
+                </details> : null}
+                </div>
               </div>
-              <span className={styles.relevance}>{item.relevance === "sector" ? tr(language, "Secteur", "Sector") : item.origin === "company_release" ? tr(language, "Communiqué officiel", "Official release") : tr(language, "Entreprise", "Company")}</span>
-              <h3>{item.title}</h3>
-              {item.summary ? <p className={styles.summary}>{item.summary}</p> : null}
-              <span className={styles.open}>
-                {readable ? tr(language, "Lire le résumé", "Read summary") : tr(language, "Voir l'article", "View article")}
-              </span>
-            </>;
-            return readable ? <button className={styles.card} key={item.id} onClick={(event) => { readerTrigger.current = event.currentTarget; setSelected(item); }} type="button">{contents}</button>
-              : <a className={styles.card} key={item.id} href={item.url} target="_blank" rel="noopener noreferrer">{contents}</a>;
+            </article>;
           })}
         </div>
       ) : null}
-      {visibleCount < visibleItems.length ? <button className={styles.more} type="button" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>
-        {tr(language, "Charger plus", "Load more")}
+      {snapshot?.has_more ? <button className={styles.more} type="button" disabled={loadingMore} onClick={() => void loadMore()}>
+        {loadingMore ? tr(language, "Chargement…", "Loading…") : tr(language, "Charger plus", "Load more")}
       </button> : null}
       {selected && selectedArticle ? (
         <NewsIntelligenceReader
           key={selected.id}
           article={selectedArticle}
           language={language}
-          onClose={closeReader}
+          onClose={() => setSelected(null)}
           returnFocusRef={readerTrigger}
         />
       ) : null}

@@ -51,6 +51,7 @@ class DemoProvider:
             "2y": 520,
             "5y": 900,
             "10y": 1200,
+            "max": 1600,
         }.get(range_, 260)
         intraday_minutes = {
             "1m": 1,
@@ -62,6 +63,8 @@ class DemoProvider:
             "90m": 90,
         }
         intraday = interval in intraday_minutes
+        if interval == "1wk" and range_ in {"5y", "10y"}:
+            count = 260 if range_ == "5y" else 520
         step = (
             timedelta(minutes=intraday_minutes[interval])
             if intraday
@@ -90,6 +93,8 @@ class DemoProvider:
                 second=0,
                 microsecond=0,
             )
+            if interval == "1wk" and anchor.weekday() >= 5:
+                anchor -= timedelta(days=anchor.weekday() - 4)
         current = anchor - step * count
         price = 45 + self._seed(symbol) % 120
         output: list[Candle] = []
@@ -120,6 +125,14 @@ class DemoProvider:
                 )
             )
             price = close
+        # All demo ranges share one current price. Otherwise the quote (built
+        # from 1mo candles) and a selected chart range show different prices.
+        factor = (45 + self._seed(symbol) % 120) / output[-1].close
+        for candle in output:
+            candle.open = round(candle.open * factor, 4)
+            candle.high = round(candle.high * factor, 4)
+            candle.low = round(candle.low * factor, 4)
+            candle.close = round(candle.close * factor, 4)
         return output
 
     async def quote(
