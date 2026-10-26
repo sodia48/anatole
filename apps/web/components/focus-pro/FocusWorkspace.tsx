@@ -445,6 +445,13 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
             view={section === "overview" ? "valuation" : fundamentalView as FundamentalView}
           />}
           {section === "overview" ? (
+            <nav className="fp-inlineActions" aria-label={pick(language, "Approfondir le titre", "Explore the stock")}>
+              <button className="fp-button" type="button" onClick={() => { setFundamentalView("financials"); setSection("fundamentals"); }}>{pick(language, "Résultats financiers", "Financial results")}</button>
+              <button className="fp-button" type="button" onClick={() => { setFundamentalView("capital"); setSection("fundamentals"); }}>{pick(language, "Analystes et capital", "Analysts and capital")}</button>
+              <button className="fp-button" type="button" onClick={() => { setFundamentalView("peers"); setSection("fundamentals"); }}>{pick(language, "Comparer", "Compare")}</button>
+            </nav>
+          ) : null}
+          {section === "overview" ? (
             <FocusStockNews
               ticker={ticker}
               company={initialSnapshot.profile.name ?? ticker}

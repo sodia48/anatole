@@ -22,7 +22,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { buildCandleSessionFlow } from "@anatole/shared";
 
 import { pick } from "@/lib/i18n";
 
@@ -57,11 +56,13 @@ type PeriodKey =
   | "live"
   | "1w"
   | "ytd"
-  | "3mo"
+  | "1mo"
   | "6mo"
   | "1y"
+  | "3y"
   | "5y"
-  | "10y";
+  | "10y"
+  | "max";
 
 type PeriodDefinition = {
   key: PeriodKey;
@@ -69,67 +70,70 @@ type PeriodDefinition = {
   range: string;
   interval: string;
   refreshMs?: number;
-  movingAverageUnit: "bougies" | "semaines";
 };
 
 const PERIODS: PeriodDefinition[] = [
   {
     key: "live",
-    label: "LIVE",
+    label: "1J",
     range: "1d",
     interval: "1m",
     refreshMs: 15_000,
-    movingAverageUnit: "bougies",
   },
   {
     key: "1w",
-    label: "1S",
+    label: "5J",
     range: "5d",
     interval: "5m",
     refreshMs: 60_000,
-    movingAverageUnit: "bougies",
   },
   {
     key: "ytd",
     label: "YTD",
     range: "ytd",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
-    key: "3mo",
-    label: "3M",
-    range: "3mo",
+    key: "1mo",
+    label: "1M",
+    range: "1mo",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "6mo",
     label: "6M",
     range: "6mo",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "1y",
     label: "1A",
     range: "1y",
     interval: "1d",
-    movingAverageUnit: "bougies",
+  },
+  {
+    key: "3y",
+    label: "3A",
+    range: "5y",
+    interval: "1wk",
   },
   {
     key: "5y",
     label: "5A",
     range: "5y",
     interval: "1wk",
-    movingAverageUnit: "semaines",
   },
   {
     key: "10y",
     label: "10A",
     range: "10y",
     interval: "1wk",
-    movingAverageUnit: "semaines",
+  },
+  {
+    key: "max",
+    label: "MAX",
+    range: "max",
+    interval: "1wk",
   },
 ];
 
@@ -263,10 +267,6 @@ function formatVolume(value: number | null): string {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
-}
-
-function volumeShare(value: number | null, total: number | null): number {
-  return value !== null && total !== null && total > 0 ? (value / total) * 100 : 0;
 }
 
 function formatPercent(value: number | null): string {
@@ -447,24 +447,19 @@ export function FocusRangeChart({
     PERIODS.find((candidate) => candidate.key === periodKey) ??
     PERIODS[0];
 
-  const candles = useMemo(
-    () => normalizedCandles(snapshot?.history ?? []),
-    [snapshot],
-  );
+  const candles = useMemo(() => {
+    const rows = normalizedCandles(snapshot?.history ?? []);
+    if (periodKey !== "3y" || !rows.length) return rows;
+    const cutoff = new Date(Number(rows.at(-1)?.time) * 1000);
+    cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 3);
+    return rows.filter((row) => Number(row.time) * 1000 >= cutoff.getTime());
+  }, [snapshot, periodKey]);
 
   const performance = useMemo(
     () => periodPerformance(candles),
     [candles],
   );
-  const volume = useMemo(() => buildCandleSessionFlow({
-    ticker,
-    range: period.range,
-    interval: period.interval,
-    candles: snapshot?.history ?? [],
-    source: snapshot?.quote?.source ?? "unavailable",
-    delayed: Boolean(snapshot?.quote?.delayed),
-    generatedAt: snapshot?.generated_at,
-  }), [period.interval, period.range, snapshot, ticker]);
+  const totalVolume = useMemo(() => candles.reduce((sum, candle) => sum + candle.volume, 0), [candles]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -520,7 +515,7 @@ export function FocusRangeChart({
       secondsVisible: false,
       rightOffset: periodKey === "live" ? 6 : 2,
       barSpacing: periodKey === "live" ? 7 : 5,
-      minBarSpacing: periodKey === "10y" ? 0.04 : 0.08,
+      minBarSpacing: periodKey === "10y" || periodKey === "max" ? 0.04 : 0.08,
     });
 
     const candleData: CandlestickData<UTCTimestamp>[] = candles.map(
@@ -793,59 +788,22 @@ export function FocusRangeChart({
 
         <aside
           className="frc-volumePanel"
-          aria-label={`Volumes acheteur et vendeur estimés — ${period.label}`}
+          aria-label={`Volume échangé — ${period.label}`}
         >
           <div className="frc-volumeHeading">
             <span>Volume · {period.label}</span>
-            <strong>{formatVolume(volume.total_volume)}</strong>
+            <strong>{formatVolume(candles.length ? totalVolume : null)}</strong>
           </div>
-
-          <div className="frc-volumeBar" aria-hidden="true">
-            <span
-              className="frc-buyerBar"
-              style={{ width: `${volumeShare(volume.buy_volume, volume.total_volume)}%` }}
-            />
-            <span
-              className="frc-sellerBar"
-              style={{ width: `${volumeShare(volume.sell_volume, volume.total_volume)}%` }}
-            />
-            <span
-              className="frc-neutralBar"
-              style={{ width: `${volumeShare(volume.neutral_volume, volume.total_volume)}%` }}
-            />
-          </div>
-
-          <div className="frc-volumeMetric">
-            <span><i className="frc-buyerDot" />Acheteur estimé</span>
-            <strong>{formatVolume(volume.buy_volume)}</strong>
-            <small>{volume.buy_ratio === null ? "N/D" : `${(volume.buy_ratio * 100).toFixed(1)} %`}</small>
-          </div>
-
-          <div className="frc-volumeMetric">
-            <span><i className="frc-sellerDot" />Vendeur estimé</span>
-            <strong>{formatVolume(volume.sell_volume)}</strong>
-            <small>{volume.sell_ratio === null ? "N/D" : `${(volume.sell_ratio * 100).toFixed(1)} %`}</small>
-          </div>
-
-          {volume.neutral_volume !== null && volume.neutral_volume > 0 ? (
-            <div className={`frc-volumeMetric frc-neutralMetric`}>
-              <span><i className="frc-neutralDot" />Indéterminé</span>
-              <strong>{formatVolume(volume.neutral_volume)}</strong>
-              <small>{volumeShare(volume.neutral_volume, volume.total_volume).toFixed(1)} %</small>
-            </div>
-          ) : null}
-
           <p className="frc-volumeMethod">
-            Estimation OHLCV : volume des bougies haussières ou baissières,
-            et non transactions bid/ask exactes.
+            Somme des volumes des bougies disponibles sur la période.
           </p>
         </aside>
       </div>
 
       <p className="frc-note">
-        Pour 5A et 10A, les bougies et les SMA utilisent une
-        fréquence hebdomadaire. Le mode LIVE dépend du délai de la
-        source de marché.
+        3A, 5A, 10A et MAX : bougies hebdomadaires. Variation du cours seul,
+        sans dividendes. Indice : N/D sans séries ajustées et alignées.
+        Le mode LIVE dépend du délai de la source.
       </p>
     </section>
   );

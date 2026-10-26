@@ -228,7 +228,10 @@ def _covered_performance(
             portfolio=round(portfolio_level, 4),
             benchmark=round(benchmark_level, 4) if benchmark_value is not None else None,
         ))
-    coverage = sum(daily_coverages) / len(daily_coverages) * 100 if daily_coverages else 0.0
+    coverage = (
+        min(100.0, max(0.0, sum(daily_coverages) / len(daily_coverages) * 100))
+        if daily_coverages else 0.0
+    )
     return portfolio_returns, benchmark_returns, performance, coverage
 
 

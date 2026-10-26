@@ -387,23 +387,19 @@ function Valuation({
   const { preferences } = usePreferences();
   const language = preferences.language;
   const m = snapshot.metrics;
-  const [mode, chooseMode] = useFocusMode("anatole.focus.valuation.view.v3", ["table", "cards", "charts"]);
   const currency =
     snapshot.financial_currency ??
     snapshot.currency ??
     "CAD";
-  const values = [
-    m.market_cap,
-    m.enterprise_value,
-    m.trailing_pe,
-    m.forward_pe,
-    m.price_to_book,
-    m.price_to_sales,
-    m.enterprise_to_revenue,
-    m.enterprise_to_ebitda,
-    m.trailing_eps,
+  const essentials = [
+    { label: tr(language, "Capitalisation", "Market cap"), value: compact(m.market_cap, currency) },
+    { label: tr(language, "C/B historique", "Trailing P/E"), value: n(m.trailing_pe) },
+    { label: tr(language, "BPA historique", "Trailing EPS"), value: money(m.trailing_eps, currency) },
+    { label: tr(language, "Rendement du dividende", "Dividend yield"), value: pct(m.dividend_yield) },
   ];
-  const hasValuation = values.some(
+  const hasValuation = [m.market_cap, m.trailing_pe, m.trailing_eps, m.dividend_yield,
+    m.enterprise_value, m.forward_pe, m.price_to_book, m.price_to_sales,
+    m.enterprise_to_revenue, m.enterprise_to_ebitda].some(
     (value) => value !== null && Number.isFinite(value),
   );
 
@@ -424,32 +420,21 @@ function Valuation({
     );
   }
 
-  return <div className="ff-modeStack">
-    <FocusViewMode mode={mode} choose={chooseMode} modes={["table", "cards", "charts"]}
-      language={language} label={tr(language, "Mode de la valorisation", "Valuation display mode")} />
-    {mode === "charts" ? <FocusSeriesChart storageKey="valuation.ratios" title={tr(language,
-      "Multiples disponibles à la date du cliché", "Available multiples at snapshot date")}
-      periods={[snapshot.generated_at.slice(0, 10)]} source={snapshot.source} language={language} unit="number" kind="bar"
-      series={[
-        { id: "trailing_pe", label: tr(language, "C/B historique", "Trailing P/E"), values: [m.trailing_pe] },
-        { id: "forward_pe", label: tr(language, "C/B anticipé", "Forward P/E"), values: [m.forward_pe] },
-        { id: "price_to_book", label: tr(language, "Cours / valeur comptable", "Price / book"), values: [m.price_to_book] },
-        { id: "price_to_sales", label: tr(language, "Cours / ventes", "Price / sales"), values: [m.price_to_sales] },
-        { id: "enterprise_to_revenue", label: tr(language, "VE / Revenus", "EV / revenue"), values: [m.enterprise_to_revenue] },
-        { id: "enterprise_to_ebitda", label: tr(language, "VE / BAIIA", "EV / EBITDA"), values: [m.enterprise_to_ebitda] },
-      ]} /> : null}
-    <Group title={tr(language, "Valorisation", "Valuation")} items={[
-    { label: tr(language, "Capitalisation", "Market capitalization"), value: compact(m.market_cap, currency) },
-    { label: tr(language, "Valeur d’entreprise", "Enterprise value"), value: compact(m.enterprise_value, currency) },
-    { label: tr(language, "C/B historique", "Trailing P/E"), value: n(m.trailing_pe) },
-    { label: tr(language, "C/B anticipé", "Forward P/E"), value: n(m.forward_pe) },
-    { label: tr(language, "Cours / valeur comptable", "Price / book value"), value: n(m.price_to_book) },
-    { label: tr(language, "Cours / ventes", "Price / sales"), value: n(m.price_to_sales) },
-    { label: tr(language, "VE / Revenus", "EV / Revenue"), value: n(m.enterprise_to_revenue) },
-    { label: tr(language, "VE / BAIIA", "EV / EBITDA"), value: n(m.enterprise_to_ebitda) },
-    { label: tr(language, "BPA historique", "Trailing EPS"), value: money(m.trailing_eps, currency) },
-  ]} />
-  </div>;
+  return <section className="ff-valuationOverview" aria-label={tr(language, "Indicateurs essentiels", "Essential metrics")}>
+    <h2>{tr(language, "En bref", "At a glance")}</h2>
+    <div className="ff-valuationEssentials">{essentials.map(item => <Metric key={item.label} {...item} />)}</div>
+    <details className="ff-valuationMore">
+      <summary>{tr(language, "Autres ratios de valorisation", "More valuation ratios")}</summary>
+      <div className="ff-valuationMoreGrid">{[
+        { label: tr(language, "Valeur d’entreprise", "Enterprise value"), value: compact(m.enterprise_value, currency) },
+        { label: tr(language, "C/B anticipé", "Forward P/E"), value: n(m.forward_pe) },
+        { label: tr(language, "Cours / valeur comptable", "Price / book"), value: n(m.price_to_book) },
+        { label: tr(language, "Cours / ventes", "Price / sales"), value: n(m.price_to_sales) },
+        { label: tr(language, "VE / Revenus", "EV / revenue"), value: n(m.enterprise_to_revenue) },
+        { label: tr(language, "VE / BAIIA", "EV / EBITDA"), value: n(m.enterprise_to_ebitda) },
+      ].map(item => <Metric key={item.label} {...item} />)}</div>
+    </details>
+  </section>;
 }
 
 function Fundamentals({
