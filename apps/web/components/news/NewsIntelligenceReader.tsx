@@ -74,7 +74,11 @@ function NewsBriefFigures({ brief, language }: {
               <tr key={figure.period + figure.value + figureIndex}><th scope="row">{figure.period}</th><td>{figure.value}</td></tr>
             ))}</tbody>
           </table>
-          <details><summary>{pick(language, "Justification", "Source evidence")}</summary><p>{group.figures[0]?.context}</p></details>
+          <details><summary>{pick(language, "Justifications", "Evidence")}</summary>
+            <ul>{group.figures.map((figure) => <li key={figure.period + figure.value}>
+              <strong>{figure.period}</strong> — {figure.context}
+            </li>)}</ul>
+          </details>
         </div>
       ))}
       <div className={styles.figures}>
@@ -109,21 +113,21 @@ function NewsBriefAnalysis({ brief, language, context }: {
     <>
       {brief.changes.length ? (
         <section className={styles.section}>
-          <h3>{pick(language, "Ce qui change", "What changed")}</h3>
+          <h3>{pick(language, "Autres faits", "Other facts")}</h3>
           <ul>{brief.changes.map((item, index) => <li key={index}>{item}</li>)}</ul>
         </section>
       ) : null}
       {brief.why_it_matters ? (
         <section className={styles.analysis}>
-          <h3>{pick(language, "Ce que cela signifie", "What this means")}</h3>
+          <h3>{pick(language, "Pourquoi c’est important", "Why it matters")}</h3>
           <p>{brief.why_it_matters}</p>
-          <small>{pick(language, "Interprétation fondée sur le contenu disponible.", "Interpretation based on available content.")}</small>
+          <small>{pick(language, "Selon le contenu disponible.", "Based on available content.")}</small>
         </section>
       ) : context === "stock" && brief.relevance !== "direct" ? (
         <p className={styles.limit}>{pick(
           language,
-          "Le lien direct entre cette publication et l’entreprise n’est pas établi.",
-          "A direct link between this publication and the company has not been established.",
+          "Lien direct non établi.",
+          "Direct link not established.",
         )}</p>
       ) : null}
       {brief.watch.length ? (
@@ -154,9 +158,7 @@ function NewsBrief({ brief, language, context, view }: {
     <>
       <section className={styles.lead}>
           <span>{pick(language, "L’ESSENTIEL", "THE ESSENTIALS")}</span>
-          <h3>{untranslated
-            ? pick(language, "Résumé en langue originale", "Summary in original language")
-            : pick(language, "Résumé", "Summary")}</h3>
+          <h3>{pick(language, "Résumé", "Summary")}</h3>
           <p lang={untranslated ? brief.source_language : undefined}>{brief.summary}</p>
       </section>
       {view === "detail" ? (
