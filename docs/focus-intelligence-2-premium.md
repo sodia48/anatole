@@ -10,7 +10,27 @@ Les captures ci-dessous proviennent de la **même fixture Playwright ENB**. Elle
 | --- | --- |
 | ![Fil ENB avant](images/focus-news-coverage-before.png) | ![Fil ENB après](images/focus-news-coverage-after.png) |
 
-La nouvelle vue affiche la date, l’éditeur, le sujet et l’image fournie par l’éditeur lorsqu’elle est disponible. Les angles supplémentaires d’un événement sont repliables. Les filtres et « Charger plus » interrogent la pagination de l’API News Coverage de la PR #169. Cette PR Premium est empilée après Résumé+ (#170) et News × Fundamentals (#171).
+La capture « après » correspond à la pile complète des quatre PR : la synthèse du cours est compacte, le volume observé remplace l’estimation acheteur/vendeur et le fil donne la priorité à une annonce. La nouvelle vue affiche la date, l’éditeur, le sujet et l’image fournie par l’éditeur lorsqu’elle est disponible. Les angles supplémentaires d’un événement sont repliables. Les filtres et « Charger plus » interrogent la pagination de l’API News Coverage de la PR #169. Cette PR Premium est empilée après Résumé+ (#170) et News × Fundamentals (#171).
+
+## Captures de validation visuelle
+
+Les vues ENB et Résumé+ ci-dessous utilisent des fixtures Playwright ; TD provient du parcours local en mode démonstration et affiche explicitement les données partielles renvoyées par les fournisseurs. Ces images documentent l’interface, sans attester la couverture ou la disponibilité des sources en production.
+
+| Focus TD desktop | Focus TD Pixel 7 |
+| --- | --- |
+| ![Synthèse Focus TD desktop](images/focus-premium-td-desktop.png) | ![Synthèse Focus TD Pixel 7](images/focus-premium-td-mobile.png) |
+
+| Résultats financiers TD | Analystes et capital TD |
+| --- | --- |
+| ![Résultats financiers TD](images/focus-premium-td-results.png) | ![Analystes et capital TD](images/focus-premium-td-analysts.png) |
+
+| Fil ENB Pixel 7 | Lecteur ENB desktop | Lecteur ENB Pixel 7 |
+| --- | --- | --- |
+| ![Fil ENB Pixel 7](images/focus-premium-mobile.png) | ![Lecteur ENB desktop](images/focus-premium-reader-desktop.png) | ![Lecteur ENB Pixel 7](images/focus-premium-reader-mobile.png) |
+
+| Résumé rapide | Analyse détaillée |
+| --- | --- |
+| ![Résumé rapide](images/focus-resume-quick.png) | ![Analyse détaillée](images/focus-resume-detailed.png) |
 
 ## Données et limites
 
