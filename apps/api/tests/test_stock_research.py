@@ -243,6 +243,33 @@ def _mock_ry_services(monkeypatch, *, stale=False, fundamentals_available=True,
 
 
 @pytest.mark.asyncio
+async def test_selected_article_context_requires_exact_ticker_news_match(monkeypatch):
+    _mock_ry_services(monkeypatch)
+    _, _, news = fixtures()
+    news.items[0].title = "RBC reports quarterly results"
+    news.items[0].summary = "Published quarterly revenue rose in the reported period."
+
+    async def news_snapshot(*_args, **_kwargs):
+        return news
+
+    monkeypatch.setattr(stock_news_service, "get_snapshot", news_snapshot)
+    context = AssistantContext(surface="stock", route="/focus/RY", symbol="RY",
+        metadata={"news_url": "https://example.com/0", "news_title": news.items[0].title})
+    result = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
+        message="Cette annonce change-t-elle les revenus de RY ?", context=context))
+    assert "## Publication sélectionnée" in result.answer
+    assert news.items[0].summary in result.answer
+    assert any(source.url == news.items[0].url for source in result.evidence[0].sources)
+    assert any("document complet n'a pas été lu" in limit for limit in result.evidence[0].limitations)
+
+    context.metadata["news_url"] = "https://untrusted.example/article"
+    rejected = await AnatoleAssistantOrchestrator().answer(UnifiedAssistantRequest(
+        message="Cette annonce change-t-elle les revenus de RY ?", context=context))
+    assert "## Publication sélectionnée" not in rejected.answer
+    assert all(source.url != context.metadata["news_url"] for source in rejected.evidence[0].sources)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("surface,route", [("stock", "/focus/RY"), ("canada360", "/canada")])
 async def test_stale_ry_research_preserves_evidence_and_legacy_source_contract(monkeypatch, surface, route):
     _mock_ry_services(monkeypatch, stale=True)

@@ -22,7 +22,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { buildCandleSessionFlow } from "@anatole/shared";
 
 import { pick } from "@/lib/i18n";
 
@@ -69,7 +68,6 @@ type PeriodDefinition = {
   range: string;
   interval: string;
   refreshMs?: number;
-  movingAverageUnit: "bougies" | "semaines";
 };
 
 const PERIODS: PeriodDefinition[] = [
@@ -79,7 +77,6 @@ const PERIODS: PeriodDefinition[] = [
     range: "1d",
     interval: "1m",
     refreshMs: 15_000,
-    movingAverageUnit: "bougies",
   },
   {
     key: "1w",
@@ -87,49 +84,42 @@ const PERIODS: PeriodDefinition[] = [
     range: "5d",
     interval: "5m",
     refreshMs: 60_000,
-    movingAverageUnit: "bougies",
   },
   {
     key: "ytd",
     label: "YTD",
     range: "ytd",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "3mo",
     label: "3M",
     range: "3mo",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "6mo",
     label: "6M",
     range: "6mo",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "1y",
     label: "1A",
     range: "1y",
     interval: "1d",
-    movingAverageUnit: "bougies",
   },
   {
     key: "5y",
     label: "5A",
     range: "5y",
     interval: "1wk",
-    movingAverageUnit: "semaines",
   },
   {
     key: "10y",
     label: "10A",
     range: "10y",
     interval: "1wk",
-    movingAverageUnit: "semaines",
   },
 ];
 
@@ -146,14 +136,7 @@ function apiUrl(
   ticker: string,
   period: PeriodDefinition,
 ): string {
-  const params = new URLSearchParams({
-    range: period.range,
-    interval: period.interval,
-  });
-
-  return `/api/anatole/api/v1/stocks/${encodeURIComponent(
-    ticker,
-  )}/focus?${params.toString()}`;
+  return `/api/anatole/api/v1/stocks/${encodeURIComponent(ticker)}/focus?range=${period.range}&interval=${period.interval}`;
 }
 
 function toTimestamp(value: string | number): UTCTimestamp | null {
@@ -263,10 +246,6 @@ function formatVolume(value: number | null): string {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
-}
-
-function volumeShare(value: number | null, total: number | null): number {
-  return value !== null && total !== null && total > 0 ? (value / total) * 100 : 0;
 }
 
 function formatPercent(value: number | null): string {
@@ -456,15 +435,7 @@ export function FocusRangeChart({
     () => periodPerformance(candles),
     [candles],
   );
-  const volume = useMemo(() => buildCandleSessionFlow({
-    ticker,
-    range: period.range,
-    interval: period.interval,
-    candles: snapshot?.history ?? [],
-    source: snapshot?.quote?.source ?? "unavailable",
-    delayed: Boolean(snapshot?.quote?.delayed),
-    generatedAt: snapshot?.generated_at,
-  }), [period.interval, period.range, snapshot, ticker]);
+  const totalVolume = useMemo(() => candles.reduce((sum, candle) => sum + candle.volume, 0), [candles]);
 
   useEffect(() => {
     const container = chartContainerRef.current;
@@ -793,51 +764,14 @@ export function FocusRangeChart({
 
         <aside
           className="frc-volumePanel"
-          aria-label={`Volumes acheteur et vendeur estimés — ${period.label}`}
+          aria-label={`Volume échangé — ${period.label}`}
         >
           <div className="frc-volumeHeading">
             <span>Volume · {period.label}</span>
-            <strong>{formatVolume(volume.total_volume)}</strong>
+            <strong>{formatVolume(candles.length ? totalVolume : null)}</strong>
           </div>
-
-          <div className="frc-volumeBar" aria-hidden="true">
-            <span
-              className="frc-buyerBar"
-              style={{ width: `${volumeShare(volume.buy_volume, volume.total_volume)}%` }}
-            />
-            <span
-              className="frc-sellerBar"
-              style={{ width: `${volumeShare(volume.sell_volume, volume.total_volume)}%` }}
-            />
-            <span
-              className="frc-neutralBar"
-              style={{ width: `${volumeShare(volume.neutral_volume, volume.total_volume)}%` }}
-            />
-          </div>
-
-          <div className="frc-volumeMetric">
-            <span><i className="frc-buyerDot" />Acheteur estimé</span>
-            <strong>{formatVolume(volume.buy_volume)}</strong>
-            <small>{volume.buy_ratio === null ? "N/D" : `${(volume.buy_ratio * 100).toFixed(1)} %`}</small>
-          </div>
-
-          <div className="frc-volumeMetric">
-            <span><i className="frc-sellerDot" />Vendeur estimé</span>
-            <strong>{formatVolume(volume.sell_volume)}</strong>
-            <small>{volume.sell_ratio === null ? "N/D" : `${(volume.sell_ratio * 100).toFixed(1)} %`}</small>
-          </div>
-
-          {volume.neutral_volume !== null && volume.neutral_volume > 0 ? (
-            <div className={`frc-volumeMetric frc-neutralMetric`}>
-              <span><i className="frc-neutralDot" />Indéterminé</span>
-              <strong>{formatVolume(volume.neutral_volume)}</strong>
-              <small>{volumeShare(volume.neutral_volume, volume.total_volume).toFixed(1)} %</small>
-            </div>
-          ) : null}
-
           <p className="frc-volumeMethod">
-            Estimation OHLCV : volume des bougies haussières ou baissières,
-            et non transactions bid/ask exactes.
+            Somme des volumes des bougies disponibles sur la période.
           </p>
         </aside>
       </div>

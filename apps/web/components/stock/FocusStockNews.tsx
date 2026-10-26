@@ -56,6 +56,7 @@ export function FocusStockNews({
     ticker,
     company: snapshot?.company || company,
     relatedTickers: selected.related_tickers,
+    eventType: selected.event_type,
   } : null, [selected, ticker, company, snapshot?.company]);
 
   useEffect(() => {
