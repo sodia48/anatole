@@ -261,7 +261,9 @@ class AnatoleAssistantOrchestrator:
                                  confidence=confidence, disclaimer=DISCLAIMER,
                                  generated_at=datetime.now(UTC))
 
-    async def _stock(self, symbol: str, language: str, question: str = "") -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
+    async def _stock(self, symbol: str, language: str, question: str = "",
+                     selected_news_url: str | None = None,
+                     selected_news_title: str | None = None) -> tuple[AssistantResponse, AnatoleEvidenceBundle]:
         started = monotonic()
         logger.info("assistant_tool_started skill=stock_analysis tool=focus")
         tasks = await asyncio.gather(
@@ -290,6 +292,28 @@ class AnatoleAssistantOrchestrator:
             focus = None
         bundle = build_stock_research_bundle(symbol, focus, fundamental_snapshot, news_snapshot)
         answer = format_stock_research(bundle, question=question)
+        # The browser's metadata is only a selector. All article facts must be
+        # matched against this ticker's server-side news snapshot before use.
+        selected_news = next((item for item in news_snapshot.items
+                              if selected_news_url and item.url == selected_news_url
+                              and item.title == selected_news_title
+                              and item.relevance == "direct"), None) if news_snapshot else None
+        if selected_news is not None:
+            excerpt = selected_news.summary.strip()[:600]
+            freshness = "stale" if news_snapshot.stale else "delayed"
+            bundle.facts.append(EvidenceFact(label="Publication sélectionnée", value=selected_news.title,
+                source=selected_news.publisher, timestamp=selected_news.published_at,
+                freshness=freshness))
+            if excerpt:
+                bundle.facts.append(EvidenceFact(label="Extrait de la publication", value=excerpt,
+                    source=selected_news.publisher, timestamp=selected_news.published_at,
+                    freshness=freshness))
+            bundle.sources.append(EvidenceSource(label=selected_news.publisher, type="news",
+                freshness=freshness, timestamp=selected_news.published_at, url=selected_news.url))
+            bundle.limitations.append("Seul l'extrait indexé est confirmé; le document complet n'a pas été lu par l'Assistant.")
+            answer += ("\n\n## Publication sélectionnée\n- " + selected_news.title +
+                       ("\n- Extrait indexé : " + excerpt if excerpt else "\n- Aucun extrait exploitable disponible.") +
+                       "\nCe contexte ne confirme pas une conséquence financière causale.")
         if fundamental_snapshot is not None and fundamental_question_kind(question):
             try:
                 focused = await answer_fundamental_question(fundamental_snapshot, question)
@@ -661,7 +685,9 @@ class AnatoleAssistantOrchestrator:
         elif skill == "stock_analysis" and symbols:
             raw_scenario = context.metadata.get("scenario_request")
             base, bundle = await self._stock(symbols[0], context.language,
-                                             "" if raw_scenario else request.message)
+                                             "" if raw_scenario else request.message,
+                                             context.metadata.get("news_url") if context.surface == "stock" and context.symbol == symbols[0] else None,
+                                             context.metadata.get("news_title") if context.surface == "stock" and context.symbol == symbols[0] else None)
             if (raw_scenario and context.surface == "stock" and context.symbol == symbols[0]
                     and context.metadata.get("focus_module") == "scenarios"):
                 try:
@@ -748,7 +774,9 @@ class AnatoleAssistantOrchestrator:
             bundle = _bundle_from_response(skill, base, [])
         elif skill == "news_context":
             if symbols:
-                base, bundle = await self._stock(symbols[0], context.language, request.message)
+                base, bundle = await self._stock(symbols[0], context.language, request.message,
+                    context.metadata.get("news_url") if context.surface == "stock" and context.symbol == symbols[0] else None,
+                    context.metadata.get("news_title") if context.surface == "stock" and context.symbol == symbols[0] else None)
                 bundle.skill = "news_context"
             else:
                 base, bundle = await self._news(context.language)

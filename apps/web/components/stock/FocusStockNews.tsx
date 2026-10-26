@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { FocusGlyph } from "@/components/focus-pro/FocusGlyph";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getStockNewsSnapshot } from "@/lib/api";
 import type { ReaderArticle } from "@/components/news/NewsIntelligenceReader";
@@ -19,6 +19,13 @@ const NewsIntelligenceReader = dynamic(
 
 type NewsItem = StockNewsSnapshot["items"][number];
 const PAGE_SIZE = 6;
+const FILTERS = [
+  ["all", "Toutes", "All"],
+  ["direct", "Entreprise", "Company"],
+  ["sector", "Secteur", "Sector"],
+  ["market", "Marché", "Market"],
+  ["official", "Communiqués", "Official releases"],
+] as const;
 
 function canReadBrief(item: NewsItem): boolean {
   const excerpt = item.summary?.trim() ?? "";
@@ -40,11 +47,9 @@ export function FocusStockNews({
   const [selected, setSelected] = useState<NewsItem | null>(null);
   const readerTrigger = useRef<HTMLButtonElement | null>(null);
   const [filter, setFilter] = useState<"all" | "direct" | "sector" | "market" | "official">("all");
-  const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const activeQuery = useRef("");
   const queryKey = `${ticker}|${company}|${language}|${filter}`;
-  const closeReader = useCallback(() => setSelected(null), []);
   const selectedArticle = useMemo<ReaderArticle | null>(() => selected ? {
     title: selected.title,
     summary: selected.summary,
@@ -59,6 +64,7 @@ export function FocusStockNews({
     ticker,
     company: snapshot?.company || company,
     relatedTickers: selected.related_tickers,
+    eventType: selected.event_type,
   } : null, [selected, ticker, company, snapshot?.company]);
 
   useEffect(() => {
@@ -69,7 +75,6 @@ export function FocusStockNews({
       if (!active || activeQuery.current !== queryKey) return;
       setSnapshot(null);
       setSelected(null);
-      setPage(1);
       setLoadingMore(false);
       setLoading(true);
       setError(false);
@@ -120,16 +125,13 @@ export function FocusStockNews({
   );
 
   const items = snapshot?.items ?? [];
-  const visibleItems = items;
-  const shownItems = items;
   const loadMore = async () => {
     if (!snapshot?.has_more || loadingMore) return;
     setLoadingMore(true);
     try {
-      const next = await getStockNewsSnapshot(ticker, company, language, undefined, page + 1, PAGE_SIZE, filter);
+      const next = await getStockNewsSnapshot(ticker, company, language, undefined, (snapshot.page ?? 1) + 1, PAGE_SIZE, filter);
       if (activeQuery.current !== queryKey) return;
       setSnapshot((current) => current ? { ...next, items: [...current.items, ...next.items.filter((item) => !current.items.some((old) => old.id === item.id))] } : next);
-      setPage(page + 1);
     } catch {
       if (activeQuery.current === queryKey) setError(true);
     } finally {
@@ -166,9 +168,9 @@ export function FocusStockNews({
 
       {!loading && items.length ? (
         <div className={styles.filters} role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
-          {(["all", "direct", "sector", "market", "official"] as const).map((option) => (
+          {FILTERS.map(([option, fr, en]) => (
             <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
-              {option === "all" ? tr(language, "Toutes", "All") : option === "direct" ? tr(language, "Entreprise", "Company") : option === "sector" ? tr(language, "Secteur", "Sector") : option === "market" ? tr(language, "Marché", "Market") : tr(language, "Communiqués", "Official releases")}
+              {tr(language, fr, en)}
             </button>
           ))}
         </div>
@@ -182,16 +184,16 @@ export function FocusStockNews({
         </div>
       ) : null}
 
-      {!loading && (error || !visibleItems.length) ? (
+      {!loading && (error || !items.length) ? (
         <div className={styles.state}>
           {error ? tr(language, "Les sources d’actualités sont momentanément indisponibles.", "News sources are temporarily unavailable.")
             : tr(language, "Aucune nouvelle vérifiée dans cette catégorie.", "No verified news in this category.")}
         </div>
       ) : null}
 
-      {visibleItems.length ? (
+      {items.length ? (
         <div className={styles.grid}>
-          {shownItems.map((item, index) => {
+          {items.map((item, index) => {
             const readable = canReadBrief(item);
             const contents = <>
               <div className={styles.meta}>
@@ -235,7 +237,7 @@ export function FocusStockNews({
           key={selected.id}
           article={selectedArticle}
           language={language}
-          onClose={closeReader}
+          onClose={() => setSelected(null)}
           returnFocusRef={readerTrigger}
         />
       ) : null}

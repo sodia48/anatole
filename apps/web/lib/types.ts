@@ -240,12 +240,15 @@ export type StockHistoryResponse = {
 export type FocusFundamentalOverlaySnapshot = {
   refresh_in_progress?: boolean;
   stale?: boolean;
+  generated_at?: string;
+  financial_currency?: string | null;
   ticker: string;
   source: string;
   quarterly_financials: Array<{
     period_end: string;
     total_revenue: number | null;
     diluted_eps: number | null;
+    currency?: string | null;
     source: {
       source_name: string;
       source_url: string | null;
@@ -393,6 +396,7 @@ export type NewsBriefRequest = {
 
 export type NewsBriefFigure = {
   value: string;
+  unit?: string | null;
   context: string;
   kind?: "actual" | "forecast" | "opinion" | "date" | "other";
   label?: string;

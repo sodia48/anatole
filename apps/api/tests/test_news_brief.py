@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.discovery import NewsBriefRequest
-from app.services.news_brief import NewsBriefService
+from app.services.news_brief import ArticleParser, NewsBriefService
 from app.services import news_brief as brief_module
 
 
@@ -67,6 +67,66 @@ def test_official_allowlist_blocks_arbitrary_hosts() -> None:
     assert service._allowed("https://user@www150.statcan.gc.ca/private") is False
     assert service._allowed("https://newswire.ca/release", "stock") is True
     assert service._allowed("https://newswire.ca/release", "macro") is False
+    assert service._allowed("https://www.5nplus.com/en/news/5n-reports-results/", "stock") is True
+    assert service._allowed("https://www.5nplus.com/en/news/press-releases/", "stock") is False
+    assert service._allowed("https://www.5nplus.com/en/news/5n-reports-results/", "macro") is False
+
+
+def test_five_n_public_release_parser_excludes_navigation_and_preserves_evidence() -> None:
+    parser = ArticleParser(section_class="news-details")
+    parser.feed('''<nav><p>Revenue reached $999 billion.</p></nav>
+      <section class="news-details"><h1>5N Plus Inc. Reports Second Quarter Results</h1>
+      <p>5N Plus reported revenue of USD 122.4 million for Q2 2026.</p></section>
+      <footer><p>Revenue reached $888 billion.</p></footer>''')
+    assert len(parser.blocks) == 2
+    assert "USD 122.4 million" in parser.blocks[1]
+    assert all("999" not in block and "888" not in block for block in parser.blocks)
+
+
+def test_five_n_release_uses_article_evidence_when_public_page_is_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = NewsBriefService()
+    request = make_request(
+        title="5N Plus reports second quarter results", summary="",
+        url="https://www.5nplus.com/en/news/5n-reports-second-quarter-results/",
+        source="5N Plus", language="en", context="stock", ticker="VNP.TO", company="5N Plus Inc.",
+    )
+
+    async def public_page(url: str, context: str):
+        assert url == request.url and context == "stock"
+        return ("5N Plus reports second quarter results\n"
+                "5N Plus reported revenue of USD 122.4 million in Q2 2026. "
+                "Revenue increased 28% compared with Q2 2025. "
+                "Net income was USD 19.7 million in Q2 2026.")
+
+    monkeypatch.setattr(service, "_fetch_text", public_page)
+    brief = asyncio.run(service._load(request))
+    assert brief.source_mode == "article_page"
+    assert brief.availability == "article"
+    assert brief.summary.startswith("5N Plus reported revenue")
+    figures = [*brief.key_figures, *(figure for group in brief.figure_series for figure in group.figures)]
+    assert any(figure.value == "USD 122.4 million" and figure.period == "2026" for figure in figures)
+
+
+def test_resume_plus_preserves_distinct_facts_and_units_without_repeating_sections() -> None:
+    article = (
+        "5N Plus reported revenue of USD 122.4 million for Q2 2026. "
+        "Revenue increased 28% from USD 95.3 million in Q2 2025. "
+        "Adjusted gross margin was 30.3% in Q2 2026, down from 34.6% in Q2 2025. "
+        "Management will report third-quarter results in November 2026."
+    )
+    brief = NewsBriefService().build_from_text(make_request(
+        title="5N Plus reports second-quarter results", summary="", language="en",
+        context="stock", ticker="VNP.TO", company="5N Plus Inc.",
+    ), article, source_mode="article_page")
+    assert brief.summary.count("Revenue increased") <= 1
+    assert all(change not in brief.summary for change in brief.changes)
+    assert all(item not in brief.summary for item in brief.watch)
+    figures = [*brief.key_figures, *(figure for group in brief.figure_series for figure in group.figures)]
+    assert any(figure.unit == "USD million" and figure.kind == "actual" and figure.context in article
+               for figure in figures)
+    assert next(figure for figure in figures if figure.value == "USD 122.4 million").label == "Revenue"
+    assert next(figure for figure in figures if figure.value == "28%").period is None
+    assert brief.availability == "article"
 
 
 def test_stock_brief_separates_actual_forecast_and_other_companies() -> None:
@@ -178,6 +238,23 @@ def test_translation_preserves_numbers_and_rejects_invented_ones(monkeypatch: py
         }))
 
     monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", changed_scale)
+    assert asyncio.run(service._translate(brief, "fr")).translation_status == "unavailable"
+
+    async def untranslated(*, prompt: str, **kwargs):
+        return SimpleNamespace(success=True, answer=json.dumps({
+            "texts": json.loads(prompt.split("Input: ", 1)[1]),
+        }))
+
+    monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", untranslated)
+    assert asyncio.run(service._translate(brief, "fr")).translation_status == "unavailable"
+
+    async def invented_interpretation(*, prompt: str, **kwargs):
+        values = json.loads(prompt.split("Input: ", 1)[1])
+        values[0] = "La banque a déclaré des revenus de $18.4 milliards et ses actions ont augmenté de 4.2%."
+        values[next(index for index, value in enumerate(values) if not value)] = "La publication garantit une hausse."
+        return SimpleNamespace(success=True, answer=json.dumps({"texts": values}))
+
+    monkeypatch.setattr(brief_module.provider_router, "generate_internal_evidence", invented_interpretation)
     assert asyncio.run(service._translate(brief, "fr")).translation_status == "unavailable"
 
 
@@ -346,7 +423,7 @@ def test_antimony_forecast_is_grouped_by_year_without_repeated_paragraphs() -> N
     ), article, source_mode="feed_summary")
     market = next(group for group in brief.figure_series if "antimony" in group.label.lower())
     assert [(figure.period, figure.value) for figure in market.figures] == [
-        ("2025", "4.94 billion"), ("2026", "5.26 billion"), ("2030", "6.65 billion"),
+        ("2025", "USD 4.94 billion"), ("2026", "USD 5.26 billion"), ("2030", "USD 6.65 billion"),
     ]
     assert all(figure.kind == "forecast" for figure in market.figures)
     assert all("antimony" not in figure.context.lower() or figure.context == article.split(". A CAGR")[0] + "." for figure in market.figures)

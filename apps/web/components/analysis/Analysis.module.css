@@ -487,8 +487,7 @@
 
 .scorePill,
 .statePill,
-.typePill,
-.severityPill {
+.typePill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -689,19 +688,6 @@
 }
 
 /* Terminal Pro */
-.terminalHero {
-  align-items: stretch;
-}
-
-.regimeBlock {
-  min-width: 270px;
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 18px;
-}
 
 .scoreRing {
   width: 118px;
@@ -791,16 +777,14 @@
   font-size: 20px;
 }
 
-.componentTrack,
-.sectorTrack {
+.componentTrack {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
   background: var(--light-raised, rgba(58, 93, 115, 0.28));
 }
 
-.componentTrack span,
-.sectorTrack span {
+.componentTrack span {
   height: 100%;
   display: block;
   border-radius: inherit;
@@ -825,53 +809,9 @@
   gap: 16px;
 }
 
-.sectorList,
-.alertList,
-.opportunityGrid {
+.alertList {
   display: grid;
   gap: 8px;
-}
-
-.sectorRow {
-  display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) 90px 90px 70px minmax(130px, 1fr) 96px;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 5px;
-  border-top: 1px solid var(--light-border, rgba(28, 67, 91, 0.55));
-  font-size: 10px;
-}
-
-.sectorRow:first-child {
-  border-top: 0;
-}
-
-.sectorName {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.sectorName strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.sectorName small {
-  color: var(--muted);
-}
-
-.sectorMetric {
-  display: grid;
-  gap: 3px;
-  text-align: right;
-}
-
-.sectorMetric span {
-  color: var(--light-muted, #6d8da2);
-  font-size: 8px;
-  text-transform: uppercase;
 }
 
 .statePill {
@@ -953,103 +893,6 @@
   text-transform: uppercase;
 }
 
-.opportunityGrid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.opportunityCard {
-  min-width: 0;
-  padding: 15px;
-  display: grid;
-  gap: 12px;
-}
-
-.opportunityHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.opportunityHeader h3 {
-  margin: 0;
-  font-size: 19px;
-}
-
-.opportunityHeader p {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.opportunityScore {
-  min-width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border-radius: 12px;
-  background: var(--primary-surface);
-  color: var(--light-accent, #8eb9ff);
-  font-weight: 850;
-}
-
-.opportunityMetrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
-}
-
-.opportunityMetrics div {
-  min-width: 0;
-  padding: 8px;
-  border-radius: 9px;
-  background: var(--panel);
-  text-align: center;
-}
-
-.opportunityMetrics span {
-  display: block;
-  color: var(--muted);
-  font-size: 7px;
-  text-transform: uppercase;
-}
-
-.opportunityMetrics strong {
-  display: block;
-  margin-top: 4px;
-  font-size: 10px;
-}
-
-.reasonList {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-  list-style: none;
-}
-
-.reasonList li {
-  position: relative;
-  padding-left: 12px;
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1.4;
-}
-
-.reasonList li::before {
-  position: absolute;
-  top: 5px;
-  left: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--teal);
-  content: "";
-}
-
 .emptyInline {
   padding: 24px 10px;
   color: var(--muted);
@@ -1058,8 +901,7 @@
 }
 
 @media (max-width: 1250px) {
-  .profileGrid,
-  .opportunityGrid {
+  .profileGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1131,8 +973,7 @@
 
   .kpiGrid,
   .componentGrid,
-  .profileGrid,
-  .opportunityGrid {
+  .profileGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1146,12 +987,6 @@
     grid-template-columns: 1fr;
   }
 
-  .regimeBlock {
-    width: 100%;
-    min-width: 0;
-    justify-content: space-between;
-  }
-
   .scoreRing {
     width: 102px;
     height: 102px;
@@ -1159,16 +994,6 @@
 
   .regimeCopy {
     text-align: right;
-  }
-
-  .sectorRow {
-    grid-template-columns: minmax(120px, 1fr) 78px 84px;
-  }
-
-  .sectorMetric:nth-of-type(3),
-  .sectorMetric:nth-of-type(4),
-  .sectorRow > .sectorTrack {
-    display: none;
   }
 
   .statePill {
@@ -1195,10 +1020,6 @@
     width: 100%;
   }
 
-  .regimeBlock {
-    align-items: flex-end;
-  }
-
   .scoreRing {
     width: 88px;
     height: 88px;
@@ -1206,10 +1027,6 @@
 
   .scoreRing strong {
     font-size: 25px;
-  }
-
-  .opportunityMetrics {
-    gap: 5px;
   }
 }
 

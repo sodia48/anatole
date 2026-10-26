@@ -83,6 +83,7 @@ class NewsBriefRequest(BaseModel):
 
 class NewsBriefFigure(BaseModel):
     value: str
+    unit: str | None = None
     context: str
     kind: Literal["actual", "forecast", "opinion", "date", "other"] = "other"
     label: str = ""

@@ -10,7 +10,7 @@ Les captures ci-dessous proviennent de la **même fixture Playwright ENB**. Elle
 | --- | --- |
 | ![Fil ENB avant](images/focus-news-coverage-before.png) | ![Fil ENB après](images/focus-news-coverage-after.png) |
 
-La nouvelle vue affiche la date, l’éditeur, le sujet et l’image fournie par l’éditeur lorsqu’elle est disponible. Les angles supplémentaires d’un événement sont repliables. Les filtres et « Charger plus » interrogent la pagination de l’API News Coverage de la PR #169 ; cette PR Premium doit être intégrée après elle.
+La nouvelle vue affiche la date, l’éditeur, le sujet et l’image fournie par l’éditeur lorsqu’elle est disponible. Les angles supplémentaires d’un événement sont repliables. Les filtres et « Charger plus » interrogent la pagination de l’API News Coverage de la PR #169. Cette PR Premium est empilée après Résumé+ (#170) et News × Fundamentals (#171).
 
 ## Données et limites
 
@@ -20,5 +20,6 @@ La nouvelle vue affiche la date, l’éditeur, le sujet et l’image fournie par
 - La vue de valorisation privilégie capitalisation, C/B, BPA et rendement du dividende. Les autres ratios restent accessibles à la demande. L’absence de donnée reste `N/D`.
 - Les résultats financiers, le consensus, les analystes et les entreprises comparables réutilisent les modules Focus existants. Les liens de navigation internes préservent le titre courant.
 - Aucun rendement avec dividendes ni comparaison à un indice n’est calculé à partir de prix non ajustés ou de devises incompatibles. Ces comparaisons demandent des séries datées, ajustées et alignées qui ne sont pas fournies par ce parcours.
+- Les sélecteurs CSS Modules sans référence dans les composants actifs ont été supprimés du fil Focus, de l’espace de travail, du terminal d’analyse et du graphique provincial. Les classes construites dynamiquement pour l’observatoire de portefeuille sont conservées. Ce nettoyage permet de garder la pile des quatre PR sous le budget JavaScript existant.
 
 Le PDF Yahoo fourni dans la conversation sert de référence de hiérarchie de l’information. Aucun contenu ou visuel propriétaire n’est repris.

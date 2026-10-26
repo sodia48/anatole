@@ -46,7 +46,8 @@ test("antimony forecast has one compact series and distinct growth periods", asy
   await expect(reader.getByRole("row", { name: /2025.*4,94 milliards USD/ })).toBeVisible();
   await expect(reader.getByRole("row", { name: /2030.*6,65 milliards USD/ })).toBeVisible();
   await expect(reader.getByRole("row", { name: /2025–2026.*6,6 %/ })).toBeVisible();
-  await expect(reader.getByText(evidence)).toBeHidden();
+  await expect(reader.getByText(evidence)).toHaveCount(3);
+  await expect(reader.getByText(evidence).first()).toBeHidden();
   await page.screenshot({ path: testInfo.outputPath("antimony-after.png") });
 });
 
@@ -78,7 +79,7 @@ test("publisher excerpt is honest when the full article cannot be read", async (
   await page.goto("/actualites");
   await page.getByRole("button", { name: "Lire le résumé" }).click();
   const reader = page.getByRole("dialog", { name: item.title });
-  await expect(reader.getByRole("heading", { name: "Résumé en langue originale" })).toBeVisible();
+  await expect(reader.getByRole("heading", { name: "Résumé" })).toBeVisible();
   await expect(reader.getByText("Résumé de l’éditeur")).toBeVisible();
   await expect(reader.getByText(/traduction fiable indisponible/)).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("limited-after.png") });
