@@ -246,6 +246,14 @@
   font-size: 13px;
   font-weight: 800;
 }
+.impact { display: grid; gap: 10px; padding: 16px 0; border-top: 1px solid var(--reader-border); }
+.impactBody { display: grid; gap: 14px; }
+.impactBody > div { padding: 13px; border: 1px solid var(--reader-border); border-radius: 9px; background: var(--reader-surface); }
+.impactBody h3 { margin: 0 0 7px; font-size: 14px; }
+.impactBody p, .impactBody li { margin: 0; color: var(--reader-muted); font-size: 13px; line-height: 1.6; }
+.impactBody ul { margin: 0; padding-left: 20px; }
+.impactBody small { color: var(--reader-muted); font-size: 11px; }
+.impactBody a { color: var(--reader-accent); }
 @media (max-width: 560px) {
   .backdrop { padding: 0; }
   .reader { border: 0; border-radius: 0; }

@@ -4,6 +4,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { RefObject } from "react";
 
 import { getNewsBrief } from "@/lib/api";
+import { useAssistantContext } from "@/components/assistant/AssistantContextProvider";
+import { NewsImpactPanel } from "./NewsImpactPanel";
 import { localeFor, pick } from "@/lib/i18n";
 import type { NewsBriefRequest, NewsBriefResponse } from "@/lib/types";
 
@@ -23,6 +25,7 @@ export type ReaderArticle = {
   ticker?: string;
   company?: string;
   relatedTickers?: string[];
+  eventType?: "results" | "dividend" | "acquisition" | "financing" | "leadership" | "operations" | "other";
 };
 
 function safeLink(value: string): string | null {
@@ -182,6 +185,8 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const closeCallback = useRef(onClose);
+  const handoffFocus = useRef(false);
+  const { openAssistant } = useAssistantContext();
   const [brief, setBrief] = useState<NewsBriefResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -236,7 +241,7 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = oldOverflow;
       requestAnimationFrame(() => {
-        if (!panel?.isConnected && trigger?.isConnected) trigger.focus();
+        if (!handoffFocus.current && !panel?.isConnected && trigger?.isConnected) trigger.focus();
       });
     };
   }, [returnFocusRef]);
@@ -279,6 +284,13 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
     setView(next);
     try { sessionStorage.setItem("anatole.news.reader.view", next); } catch { /* Optional preference. */ }
   };
+  const askAboutArticle = () => {
+    if (!article.ticker) return;
+    handoffFocus.current = true;
+    onClose();
+    openAssistant({ surface: "stock", symbol: article.ticker, symbols: [article.ticker],
+      instrument_type: "stock", metadata: { news_url: article.url, news_title: article.title } });
+  };
 
   return (
     <div className={styles.backdrop} onMouseDown={(event) => {
@@ -320,6 +332,9 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
                   </div>
                 ) : null}
                 <NewsBrief brief={brief} language={language} context={article.context} view={view} />
+                {article.context === "stock" && article.ticker && brief.relevance === "direct"
+                  && brief.availability !== "limited" && (article.eventType === "results" || article.eventType === "dividend")
+                  ? <NewsImpactPanel article={article} language={language} onAsk={askAboutArticle} /> : null}
               </>
             ) : (
               <div className={styles.fallback} role={failed ? "alert" : undefined}>
