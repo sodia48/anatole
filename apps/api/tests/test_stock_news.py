@@ -2,6 +2,7 @@ import asyncio
 from collections import Counter
 from datetime import UTC, datetime
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -14,6 +15,7 @@ from app.services.stock_news import (
     _description_from_html,
     _thumbnail_url,
     _parse_enbridge_releases,
+    _parse_five_n_releases,
 )
 
 
@@ -101,9 +103,13 @@ def test_news_parser_keeps_only_company_related_articles() -> None:
         company="Canadian National Railway Company",
     )
 
-    assert [item.id for item in items] == ["right-company"]
+    assert [item.id for item in items] == ["right-company", "right-company-syndicated"]
     assert items[0].related_tickers == ["CNI"]
     assert items[0].image_url == "https://images.example.com/cn-rail.jpg"
+    grouped = service._rank_and_select(items, Counter())
+    assert len(grouped) == 1
+    assert {grouped[0].publisher, grouped[0].related_sources[0].publisher} == {"Wire", "Second Wire"}
+    assert grouped[0].event_published_at == items[1].published_at
 
 
 def test_yahoo_thumbnail_uses_a_suitable_https_resolution() -> None:
@@ -344,6 +350,81 @@ def test_same_announcement_from_two_publishers_is_grouped() -> None:
     selected = StockNewsService._rank_and_select(candidates, rejected)
     assert len(selected) == 1
     assert rejected["same_announcement"] == 1
+    assert {source.publisher for source in selected[0].related_sources} == {"First Wire", "Second Wire"} - {selected[0].publisher}
+    assert selected[0].event_published_at == max(item.published_at for item in candidates)
+
+
+def test_distinct_announcements_and_market_context_are_not_grouped() -> None:
+    payload = {"news": [
+        _news_row("TD Bank Group reports first quarter 2026 results", "Wire A", 1, ticker="TD.TO"),
+        _news_row("TD Bank Group reports second quarter 2026 results", "Wire B", 2, ticker="TD.TO"),
+        _news_row("Bank of Canada policy rate decision keeps interest rates stable", "Wire C", 3, ticker="TD.TO"),
+        _news_row("Five dividend stocks for your TFSA, including TD", "Listicle", 4, ticker="TD.TO"),
+    ]}
+    candidates = StockNewsService._parse_items(payload, aliases={"TD.TO"}, company="The Toronto-Dominion Bank", symbol="TD.TO")
+    selected = StockNewsService._rank_and_select(candidates, Counter())
+    assert {(item.relevance, item.publisher) for item in selected} == {
+        ("direct", "Wire A"), ("direct", "Wire B"), ("market", "Wire C")
+    }
+
+
+@pytest.mark.parametrize(("symbol", "company", "title"), [
+    ("TD.TO", "The Toronto-Dominion Bank", "TD Bank Group announces quarterly results"),
+    ("ENB.TO", "Enbridge Inc.", "Enbridge announces new pipeline project"),
+    ("CNQ.TO", "Canadian Natural Resources", "Canadian Natural reports production update"),
+    ("VNP.TO", "5N Plus Inc.", "5N+ announces gallium arsenide production expansion"),
+])
+def test_canadian_issuer_headlines_are_direct(symbol: str, company: str, title: str) -> None:
+    relevance, reason = _classification({"title": title}, aliases={symbol}, company=company, symbol=symbol)
+    assert (relevance, reason) == ("direct", "direct_title")
+
+
+def test_five_n_official_index_preserves_verified_links_and_short_excerpts() -> None:
+    page = '''<div class="news-list__list-el"><div class="news-list__title"><h2>
+      <a href='/en/news/5n-reports-results/'>5N Plus reports second quarter results</a></h2></div>
+      <div class="news-list__info"><p><strong>August 3, 2026 <span>|</span></strong> Montréal</p></div>
+      <div class="news-list__text"><p>5N Plus reported revenue of $122.4 million.</p></div></div>
+      <div class="news-list__list-el"><h2><a href="https://evil.example/news">5N Plus announces project</a></h2>
+      <strong>August 4, 2026</strong></div>'''
+    releases = _parse_five_n_releases(page, "VNP.TO")
+    assert len(releases) == 1
+    assert releases[0].origin == "company_release"
+    assert releases[0].published_at.date().isoformat() == "2026-08-03"
+    assert releases[0].url == "https://www.5nplus.com/en/news/5n-reports-results/"
+    assert releases[0].summary == "5N Plus reported revenue of $122.4 million."
+
+
+def test_news_endpoint_filters_and_paginates_cached_events(monkeypatch) -> None:
+    import httpx
+    from app.schemas.stocks import StockNewsSnapshot
+    from app.services.stock_news import stock_news_service
+
+    now = datetime.now(UTC)
+    items = [StockNewsItem(id=str(index), title=f"Event {index}", summary="",
+                           url=f"https://example.com/{index}", publisher="Wire", published_at=now,
+                           relevance="direct" if index < 3 else "sector") for index in range(5)]
+
+    async def snapshot(*args, **kwargs):
+        return StockNewsSnapshot(ticker="TD", symbol="TD.TO", company="TD", items=items, generated_at=now)
+
+    monkeypatch.setattr(stock_news_service, "get_snapshot", snapshot)
+    async def fetch_pages():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            first = await client.get("/api/v1/stocks/TD/news", params={"page": 1, "page_size": 2, "relevance": "direct"})
+            second = await client.get("/api/v1/stocks/TD/news", params={"page": 2, "page_size": 2, "relevance": "direct"})
+            legacy = await client.get("/api/v1/stocks/TD/news")
+            return first, second, legacy
+
+    first, second, legacy = asyncio.run(fetch_pages())
+    assert first.status_code == second.status_code == 200
+    assert [item["id"] for item in first.json()["items"]] == ["0", "1"]
+    assert [item["id"] for item in second.json()["items"]] == ["2"]
+    assert first.json()["has_more"] is True
+    assert second.json()["has_more"] is False
+    assert first.json()["total_items"] == 3
+    assert legacy.status_code == 200
+    assert legacy.json()["page_size"] == 72
+    assert len(legacy.json()["items"]) == 5
 
 
 def test_company_release_parser_uses_verified_public_pdf_dates(monkeypatch) -> None:
@@ -388,6 +469,23 @@ def test_no_direct_or_sector_news_is_honest(monkeypatch) -> None:
     snapshot = asyncio.run(service._load(symbol="CNQ.TO", company="Canadian Natural Resources", language="en"))
     assert snapshot.status == "partial"
     assert snapshot.items == []
+
+
+def test_every_source_failing_is_distinguished_from_no_recent_news(monkeypatch) -> None:
+    service = StockNewsService()
+
+    async def failed_search(*, query: str, language: str, region: str = "CA"):
+        raise RuntimeError("provider offline")
+
+    async def failed_releases(symbol: str):
+        raise RuntimeError("official index offline")
+
+    monkeypatch.setattr(service, "_search", failed_search)
+    monkeypatch.setattr(service, "_company_releases", failed_releases)
+    snapshot = asyncio.run(service._load(symbol="VNP.TO", company="5N Plus Inc.", language="en"))
+    assert snapshot.status == "unavailable"
+    assert snapshot.items == []
+    assert snapshot.detail == "All stock news sources are temporarily unavailable"
 
 
 def test_enbridge_index_uses_official_dates_links_and_excerpts() -> None:

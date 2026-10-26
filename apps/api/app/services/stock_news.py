@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 
 from app.core.config import settings
 from app.core.resilience import AsyncStaleCache, shared_http_client
-from app.schemas.stocks import StockNewsItem, StockNewsSnapshot
+from app.schemas.stocks import StockNewsItem, StockNewsSnapshot, StockNewsSource
 from app.services.session_quotes import session_quote_service
 
 
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 CNQ_RELEASES_URL = "https://www.cnrl.com/investors/news-releases/"
 ENB_RELEASES_URL = "https://www.enbridge.com/media-center/news"
+VNP_RELEASES_URL = "https://www.5nplus.com/en/news/press-releases/"
 _GENERIC = re.compile(r"\b(?:TFSA|RRSP|CELI|REER|best stocks?|top \d+|stocks? to buy|dividend stocks?|passive income|portfolio strateg|retirement|watchlist|millionaire|wealth building|buy and hold|where I.d put|I keep coming back|what you should know|fully priced|can the run continue|vs\.)\b", re.I)
 _EVENT = re.compile(r"\b(?:results?|earnings?|revenue|profit|dividend|production|guidance|forecast|budget|acquisition|merger|sale|transaction|contract|appoint|CEO|quarter|annual|financing|notes|debt|buyback|issuer bid|operat\w*|announce\w*|report\w*|update|upgrade|downgrade|price target|open\w*|launch\w*|expand\w*|résultats?|bénéfices?|revenus?|dividende|production|prévisions?|acquisition|direction|trimestre|annonce|rachat|objectif de cours|ouvre|lance)\b", re.I)
 _DIVIDEND_ACTION = re.compile(r"\b(?:announc\w*|declar\w*|rais\w*|increas\w*|cut\w*|boost\w*|hik\w*|pay\w*|record date|déclar\w*|annonce\w*|hausse|verse\w*)\b", re.I)
@@ -34,6 +35,13 @@ _SECTOR_TERMS = {
     "ENB": re.compile(r"\b(?:pipeline|natural gas|crude oil|energy infrastructure|pétrole|gaz naturel|oléoduc|gazoduc)\b", re.I),
     "AEM": re.compile(r"\b(?:gold|mining|minerals?|mines?|minier)\b", re.I),
     "RY": re.compile(r"\b(?:banks?|banking|financial sector|banques?|bancaire)\b", re.I),
+    "TD": re.compile(r"\b(?:banks?|banking|financial sector|banques?|bancaire)\b", re.I),
+    "VNP": re.compile(r"\b(?:specialty semiconductors?|critical minerals?|gallium arsenide|advanced materials?|semi-conducteurs?|minéraux critiques)\b", re.I),
+}
+_MARKET_TERMS = {
+    "TD": re.compile(r"\b(?:Bank of Canada|Banque du Canada)\b.{0,70}\b(?:interest rates?|policy rate|taux directeur|taux d.intérêt)\b", re.I),
+    "CNQ": re.compile(r"\b(?:WTI|Brent)\b.{0,50}\b(?:crude oil|oil prices?|pétrole|prix du brut)\b", re.I),
+    "ENB": re.compile(r"\b(?:natural gas prices?|prix du gaz naturel)\b.{0,50}\b(?:Canada|North America|Amérique du Nord)\b", re.I),
 }
 _RELEASE_YEAR = re.compile(r'<cnrl-tab\s+title="((?:19|20)\d{2})"[^>]*>(.*?)</cnrl-tab>', re.I | re.S)
 _RELEASE_CARD = re.compile(r'<cnrl-news-release-card\s+link="([^"]+)"\s+day="(\d{1,2})"\s+month="(\d{1,2})"[^>]*>\s*<h1[^>]*>(.*?)</h1>', re.I | re.S)
@@ -92,6 +100,57 @@ class _EnbridgeIndexParser(HTMLParser):
             self.parts = []
         if tag == "div":
             self.depth -= 1
+            if self.depth == 0:
+                self.cards.append(self.card)
+                self.card = None
+
+
+class _FiveNIndexParser(HTMLParser):
+    """Read the visible press-release list, never article bodies or other site news."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.cards: list[dict[str, str]] = []
+        self.card: dict[str, str] | None = None
+        self.depth = 0
+        self.field = ""
+        self.parts: list[str] = []
+        self.div_classes: list[set[str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        classes = (values.get("class") or "").split()
+        if tag == "div" and "news-list__list-el" in classes and self.card is None:
+            self.card, self.depth = {}, 1
+            self.div_classes = [set(classes)]
+            return
+        if self.card is None:
+            return
+        if tag == "div":
+            self.depth += 1
+            self.div_classes.append(set(classes))
+        if tag == "h2" and any("news-list__title" in group for group in self.div_classes):
+            self.field, self.parts = "title", []
+        elif tag == "strong" and any("news-list__info" in group for group in self.div_classes):
+            self.field, self.parts = "date", []
+        elif tag == "p" and any("news-list__text" in group for group in self.div_classes):
+            self.field, self.parts = "summary", []
+        elif tag == "a" and self.field == "title":
+            self.card["url"] = values.get("href") or ""
+
+    def handle_data(self, data: str) -> None:
+        if self.card is not None and self.field:
+            self.parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.card is None:
+            return
+        if (tag == "h2" and self.field == "title") or (tag == "strong" and self.field == "date") or (tag == "p" and self.field == "summary"):
+            self.card[self.field] = " ".join(self.parts).strip()
+            self.field, self.parts = "", []
+        if tag == "div":
+            self.depth -= 1
+            self.div_classes.pop()
             if self.depth == 0:
                 self.cards.append(self.card)
                 self.card = None
@@ -162,6 +221,10 @@ def _classification(row: dict[str, Any], *, aliases: set[str], company: str, sym
     title_tokens = _company_tokens(title)
     company_tokens = _company_tokens(company)
     direct_name = bool(company_tokens) and len(title_tokens & company_tokens) >= (1 if len(company_tokens) == 1 else 2)
+    if symbol.upper().removesuffix(".TO") == "TD":
+        direct_name = direct_name or bool(re.search(r"\bTD Bank(?: Group)?\b", title, re.I))
+    if symbol.upper().removesuffix(".TO") == "VNP":
+        direct_name = direct_name or bool(re.search(r"\b5N\+|\b5N\s+Plus\b", title, re.I))
     ticker_aliases = {alias.upper().removesuffix(".TO") for alias in aliases if len(alias.removesuffix(".TO")) >= 3}
     direct_ticker = any(re.search(rf"(?<![A-Z0-9]){re.escape(alias)}(?![A-Z0-9])", title.upper()) for alias in ticker_aliases)
     if (direct_name or direct_ticker) and _EVENT.search(title):
@@ -169,6 +232,9 @@ def _classification(row: dict[str, Any], *, aliases: set[str], company: str, sym
     sector = _SECTOR_TERMS.get(symbol.upper().removesuffix(".TO"))
     if sector and sector.search(title) and _EVENT.search(title):
         return "sector", "sector_title"
+    market = _MARKET_TERMS.get(symbol.upper().removesuffix(".TO"))
+    if market and market.search(title):
+        return "market", "market_title"
     # A Yahoo relatedTicker is a search hint, never proof of a company event.
     return None, "no_direct_evidence"
 
@@ -178,6 +244,9 @@ def _near_duplicate(left: StockNewsItem, right: StockNewsItem) -> bool:
         return False
     if re.findall(r"\d+(?:[.,]\d+)?", left.title) != re.findall(r"\d+(?:[.,]\d+)?", right.title):
         return False
+    period = re.compile(r"\b(?:first|second|third|fourth|1st|2nd|3rd|4th|Q[1-4]|T[1-4]|premier|deuxième|troisième|quatrième)\b", re.I)
+    if [value.casefold() for value in period.findall(left.title)] != [value.casefold() for value in period.findall(right.title)]:
+        return False
     a, b = _company_tokens(left.title), _company_tokens(right.title)
     return bool(a and b) and len(a & b) / len(a | b) >= 0.72
 
@@ -185,7 +254,7 @@ def _near_duplicate(left: StockNewsItem, right: StockNewsItem) -> bool:
 def _priority(item: StockNewsItem) -> float:
     age_days = max(0.0, (datetime.now(UTC) - item.published_at).total_seconds() / 86400)
     event = bool(_EVENT.search(item.title))
-    return ((100 if item.relevance == "direct" else 0) +
+    return ((100 if item.relevance == "direct" else 35 if item.relevance == "sector" else 0) +
             (20 if item.origin == "company_release" else 0) +
             (12 if event else 0) + max(0, 20 - age_days / 3))
 
@@ -357,16 +426,44 @@ def _parse_enbridge_releases(page: str, symbol: str) -> list[StockNewsItem]:
     return releases[:30]
 
 
+def _parse_five_n_releases(page: str, symbol: str) -> list[StockNewsItem]:
+    parser = _FiveNIndexParser()
+    parser.feed(page)
+    releases: list[StockNewsItem] = []
+    for card in parser.cards:
+        url = urljoin(VNP_RELEASES_URL, html.unescape(card.get("url", "")))
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or parsed.hostname != "www.5nplus.com" or not parsed.path.startswith("/en/news/"):
+            continue
+        try:
+            published = datetime.strptime(card.get("date", "").split("|")[0].strip(), "%B %d, %Y").replace(tzinfo=UTC)
+        except ValueError:
+            continue
+        title = re.sub(r"\s+", " ", card.get("title", "")).strip()
+        if not title:
+            continue
+        releases.append(StockNewsItem(
+            id=hashlib.sha1(url.encode()).hexdigest()[:16], title=title,
+            summary=_clean_summary(card.get("summary", "")), url=url,
+            publisher="5N Plus", published_at=published, related_tickers=[symbol],
+            relevance="direct", origin="company_release", event_type=_event_type(title),
+        ))
+    if not releases:
+        raise ValueError("official_release_structure_changed")
+    return releases[:30]
+
+
 OFFICIAL_RELEASE_SOURCES: dict[str, OfficialReleaseSource] = {
     "CNQ.TO": OfficialReleaseSource(CNQ_RELEASES_URL, "Canadian Natural Resources", _parse_cnq_releases),
     "ENB.TO": OfficialReleaseSource(ENB_RELEASES_URL, "Enbridge Inc.", _parse_enbridge_releases),
+    "VNP.TO": OfficialReleaseSource(VNP_RELEASES_URL, "5N Plus", _parse_five_n_releases),
 }
 
 
 class StockNewsService:
     refresh_after_seconds = 900
     stale_seconds = 86_400
-    max_items = 24
+    max_items = 72
 
     def __init__(self) -> None:
         self._cache: AsyncStaleCache[str, StockNewsSnapshot] = (
@@ -439,7 +536,8 @@ class StockNewsService:
                 if rejected is not None:
                     rejected["invalid_url_or_title"] += 1
                 continue
-            title_key = f"{_normalise_text(title)}|{published_at.date().isoformat()}"
+            publisher = str(row.get("publisher") or "Actualité").strip()
+            title_key = f"{_normalise_text(title)}|{published_at.date().isoformat()}|{_normalise_text(publisher)}"
             url_key = url.casefold().rstrip("/")
             if title_key in seen_titles or url_key in seen_urls:
                 if rejected is not None:
@@ -464,7 +562,7 @@ class StockNewsService:
                         str(row.get("summary") or row.get("description") or "")
                     ),
                     url=url,
-                    publisher=str(row.get("publisher") or "Actualité").strip(),
+                    publisher=publisher,
                     published_at=published_at,
                     related_tickers=sorted(
                         {
@@ -573,7 +671,7 @@ class StockNewsService:
         source = OFFICIAL_RELEASE_SOURCES.get(symbol.upper())
         if source is None:
             return []
-        response = await shared_http_client.request("GET", source.index_url, attempts=1)
+        response = await shared_http_client.request("GET", source.index_url, attempts=1, follow_redirects=False)
         response.raise_for_status()
         if "html" not in response.headers.get("content-type", "").casefold() or len(response.content) > 600_000:
             raise ValueError("invalid_official_release_index")
@@ -589,13 +687,26 @@ class StockNewsService:
         seen_urls: set[str] = set()
         for item in ranked:
             url = item.url.casefold().rstrip("/")
-            if url in seen_urls or any(_near_duplicate(item, existing) for existing in unique):
-                rejected["same_announcement"] += 1
+            if url in seen_urls:
+                rejected["duplicate_url"] += 1
                 continue
             seen_urls.add(url)
+            match_index = next((index for index, existing in enumerate(unique) if item.event_type == existing.event_type and _near_duplicate(item, existing)), None)
+            if match_index is not None:
+                primary = unique[match_index]
+                event_published_at = max(primary.event_published_at or primary.published_at, item.published_at)
+                if item.publisher.casefold() != primary.publisher.casefold() and all(item.publisher.casefold() != source.publisher.casefold() for source in primary.related_sources):
+                    source = StockNewsSource(title=item.title, url=item.url, publisher=item.publisher,
+                                             published_at=item.published_at, origin=item.origin)
+                    unique[match_index] = primary.model_copy(update={"related_sources": [*primary.related_sources, source],
+                                                              "event_published_at": event_published_at})
+                else:
+                    unique[match_index] = primary.model_copy(update={"event_published_at": event_published_at})
+                rejected["same_announcement"] += 1
+                continue
             unique.append(item)
         ordered: list[StockNewsItem] = []
-        for tier in ("direct", "sector"):
+        for tier in ("direct", "sector", "market"):
             pool = [item for item in unique if item.relevance == tier]
             selected_ids: set[str] = set()
             publisher_count: Counter[str] = Counter()
@@ -656,8 +767,10 @@ class StockNewsService:
         yahoo_accepted = len(items)
         try:
             official = await self._company_releases(symbol)
+            official_available = symbol.upper() in OFFICIAL_RELEASE_SOURCES
         except Exception as exc:  # noqa: BLE001
             official = []
+            official_available = False
             rejected["company_release_unavailable"] += 1
             logger.info("stock_news_provider_unavailable provider=company_release error=%s", type(exc).__name__)
         provider_counts["company_release"] = len(official)
@@ -681,7 +794,8 @@ class StockNewsService:
             symbol=symbol,
             company=company,
             items=items,
-            status="ok" if items else "partial",
+            status="ok" if items else "partial" if payloads or official_available else "unavailable",
+            detail=None if items or payloads or official_available else "All stock news sources are temporarily unavailable",
             coverage_note=coverage_note,
             generated_at=datetime.now(UTC),
             refresh_after_seconds=self.refresh_after_seconds,

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -111,6 +112,7 @@ export function NewsClient() {
     useState<RegionCode>("ALL");
   const [selectedItem, setSelectedItem] =
     useState<NewsDisplayItem | null>(null);
+  const readerTrigger = useRef<HTMLButtonElement | null>(null);
   const selectedArticle = useMemo<ReaderArticle | null>(() => selectedItem ? {
     title: selectedItem.title,
     summary: selectedItem.summary,
@@ -774,7 +776,7 @@ export function NewsClient() {
               <div className="news-card-actions">
                 <button
                   type="button"
-                  onClick={() => openReader(item)}
+                  onClick={(event) => { readerTrigger.current = event.currentTarget; openReader(item); }}
                 >
                   <BookOpen size={14} />
                   {pick(language, "Lire le résumé", "Read summary")}
@@ -818,6 +820,7 @@ export function NewsClient() {
           article={selectedArticle}
           language={language}
           onClose={closeReader}
+          returnFocusRef={readerTrigger}
         />
       ) : null}
     </div>

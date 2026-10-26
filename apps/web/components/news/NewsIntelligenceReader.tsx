@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import type { RefObject } from "react";
 
 import { getNewsBrief } from "@/lib/api";
 import { localeFor, pick } from "@/lib/i18n";
@@ -169,10 +170,11 @@ function NewsBrief({ brief, language, context, view }: {
   );
 }
 
-export function NewsIntelligenceReader({ article, language, onClose }: {
+export function NewsIntelligenceReader({ article, language, onClose, returnFocusRef }: {
   article: ReaderArticle;
   language: "fr" | "en";
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
@@ -204,6 +206,8 @@ export function NewsIntelligenceReader({ article, language, onClose }: {
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef.current;
+    const trigger = returnFocusRef?.current;
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
@@ -230,9 +234,14 @@ export function NewsIntelligenceReader({ article, language, onClose }: {
     return () => {
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = oldOverflow;
-      previous?.focus();
+      requestAnimationFrame(() => {
+        if (!panel?.isConnected) {
+          const target = trigger?.isConnected ? trigger : previous;
+          target?.focus();
+        }
+      });
     };
-  }, []);
+  }, [returnFocusRef]);
 
   useEffect(() => {
     const controller = new AbortController();
