@@ -136,14 +136,7 @@ function apiUrl(
   ticker: string,
   period: PeriodDefinition,
 ): string {
-  const params = new URLSearchParams({
-    range: period.range,
-    interval: period.interval,
-  });
-
-  return `/api/anatole/api/v1/stocks/${encodeURIComponent(
-    ticker,
-  )}/focus?${params.toString()}`;
+  return `/api/anatole/api/v1/stocks/${encodeURIComponent(ticker)}/focus?range=${period.range}&interval=${period.interval}`;
 }
 
 function toTimestamp(value: string | number): UTCTimestamp | null {

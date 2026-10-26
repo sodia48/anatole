@@ -179,7 +179,7 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
   article: ReaderArticle;
   language: "fr" | "en";
   onClose: () => void;
-  returnFocusRef: RefObject<HTMLElement | null>;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
@@ -212,8 +212,9 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
   useEffect(() => { closeCallback.current = onClose; }, [onClose]);
 
   useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const panel = panelRef.current;
-    const trigger = returnFocusRef.current;
+    const trigger = returnFocusRef?.current;
     const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
@@ -241,7 +242,10 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
       document.removeEventListener("keydown", handleKey);
       document.body.style.overflow = oldOverflow;
       requestAnimationFrame(() => {
-        if (!handoffFocus.current && !panel?.isConnected && trigger?.isConnected) trigger.focus();
+        if (!handoffFocus.current && !panel?.isConnected) {
+          const target = trigger?.isConnected ? trigger : previous;
+          target?.focus();
+        }
       });
     };
   }, [returnFocusRef]);

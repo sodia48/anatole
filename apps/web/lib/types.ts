@@ -70,9 +70,11 @@ export type StockNewsItem = {
   published_at: string;
   related_tickers: string[];
   image_url?: string | null;
-  relevance?: "direct" | "sector";
+  relevance?: "direct" | "sector" | "market";
   origin?: "publisher" | "company_release";
   event_type?: "results" | "dividend" | "acquisition" | "financing" | "leadership" | "operations" | "other";
+  event_published_at?: string | null;
+  related_sources?: Array<{ title: string; url: string; publisher: string; published_at: string; origin: "publisher" | "company_release" }>;
 };
 
 export type StockNewsSnapshot = {
@@ -86,6 +88,10 @@ export type StockNewsSnapshot = {
   stale?: boolean;
   generated_at: string;
   refresh_after_seconds: number;
+  total_items?: number | null;
+  page?: number | null;
+  page_size?: number | null;
+  has_more?: boolean;
 };
 
 export type CompanyNetworkNodeType =
