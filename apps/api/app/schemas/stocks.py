@@ -72,6 +72,14 @@ class FocusSnapshot(BaseModel):
     generated_at: datetime
 
 
+class StockNewsSource(BaseModel):
+    title: str
+    url: str
+    publisher: str
+    published_at: datetime
+    origin: Literal["publisher", "company_release"] = "publisher"
+
+
 class StockNewsItem(BaseModel):
     id: str
     title: str
@@ -81,9 +89,11 @@ class StockNewsItem(BaseModel):
     published_at: datetime
     related_tickers: list[str] = Field(default_factory=list)
     image_url: str | None = None
-    relevance: Literal["direct", "sector"] = "direct"
+    relevance: Literal["direct", "sector", "market"] = "direct"
     origin: Literal["publisher", "company_release"] = "publisher"
     event_type: Literal["results", "dividend", "acquisition", "financing", "leadership", "operations", "other"] = "other"
+    event_published_at: datetime | None = None
+    related_sources: list[StockNewsSource] = Field(default_factory=list)
 
 
 class StockNewsSnapshot(BaseModel):
@@ -97,3 +107,7 @@ class StockNewsSnapshot(BaseModel):
     stale: bool = False
     generated_at: datetime
     refresh_after_seconds: int = 900
+    total_items: int | None = None
+    page: int | None = None
+    page_size: int | None = None
+    has_more: bool = False
