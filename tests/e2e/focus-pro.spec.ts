@@ -98,12 +98,13 @@ test.describe("Focus Pro workstation", () => {
     await expect(reader).toBeVisible();
     await expect(reader.getByRole("heading", { name: "Résumé" })).toBeVisible();
     await expect(reader.getByText("The bank announced a new strategic investment for its Canadian operations.")).toBeVisible();
-    await expect(reader.locator("img")).toHaveCount(1);
+    // A publisher image URL alone is not a verified republication licence.
+    await expect(reader.locator("img")).toHaveCount(0);
     expect(await reader.evaluate((node) => {
       const style = getComputedStyle(node);
       return { background: style.backgroundColor, color: style.color, opacity: style.opacity };
     })).toEqual({ background: "rgb(7, 21, 33)", color: "rgb(244, 249, 253)", opacity: "1" });
-    await expect(reader.getByRole("complementary", { name: "Provenance et limites" }).getByText("Only the publisher's excerpt is available.")).toBeVisible();
+    await expect(reader.getByText("Only the publisher's excerpt is available.")).toBeVisible();
     await expect(reader.getByRole("link", { name: "Voir la source originale" })).toHaveAttribute("href", "https://example.com/royal-bank-news-0");
     await page.keyboard.press("Escape");
     await expect(reader).toHaveCount(0);
