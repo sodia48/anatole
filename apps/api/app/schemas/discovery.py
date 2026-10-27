@@ -79,6 +79,7 @@ class NewsBriefRequest(BaseModel):
     company: str | None = None
     published_at: datetime | None = None
     related_tickers: list[str] = Field(default_factory=list)
+    candidate_sources: list["NewsArticleSource"] = Field(default_factory=list)
 
 
 class NewsBriefFigure(BaseModel):
@@ -93,6 +94,41 @@ class NewsBriefFigure(BaseModel):
 class NewsBriefFigureSeries(BaseModel):
     label: str
     figures: list[NewsBriefFigure]
+
+
+class NewsArticleSource(BaseModel):
+    title: str
+    url: str
+    publisher: str = ""
+    published_at: datetime | None = None
+    origin: str = ""
+
+
+class NewsArticleEvent(BaseModel):
+    kind: Literal["results_scheduled", "results_published", "conference", "dividend", "acquisition", "other"]
+    label: str
+    starts_at: datetime | None = None
+    timing: str = ""
+    timezone: str | None = None
+    webcast_url: str | None = None
+    phone_numbers: list[str] = Field(default_factory=list)
+    access_code: str | None = None
+    replay_until: datetime | None = None
+
+
+class NewsArticle(BaseModel):
+    kind: Literal["results_schedule", "results_report", "dividend", "acquisition", "operations", "other"] = "other"
+    coverage: Literal["licensed_full", "structured", "excerpt", "title_only", "inaccessible"] = "title_only"
+    coverage_note: str = ""
+    title: str
+    published_at: datetime | None = None
+    facts: list[str] = Field(default_factory=list)
+    events: list[NewsArticleEvent] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    source_url: str
+    original_url: str
+    alternate_sources: list[NewsArticleSource] = Field(default_factory=list)
+    language: Literal["fr", "en", "unknown"] = "unknown"
 
 
 class NewsBriefResponse(BaseModel):
@@ -113,6 +149,7 @@ class NewsBriefResponse(BaseModel):
     translation_status: Literal["original", "automatic", "unavailable"] = "original"
     relevance: Literal["direct", "related", "unclear", "not_applicable"] = "not_applicable"
     detail_available: bool = False
+    article: NewsArticle | None = None
 
 
 class EconomicEvent(BaseModel):

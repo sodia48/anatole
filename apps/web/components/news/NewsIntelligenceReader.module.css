@@ -62,7 +62,7 @@
   font-size: 27px;
   line-height: 1;
 }
-.close:focus-visible, .original:focus-visible, .views button:focus-visible, .fallback button:focus-visible, .more:focus-visible, .section summary:focus-visible {
+.close:focus-visible, .original:focus-visible, .views button:focus-visible, .fallback button:focus-visible, .more:focus-visible, .section summary:focus-visible, .articleBody a:focus-visible, .articleBody button:focus-visible, .articleBody summary:focus-visible {
   outline: 2px solid var(--reader-accent);
   outline-offset: 2px;
 }
@@ -179,6 +179,23 @@
   font-size: 16px;
   line-height: 1.7;
 }
+.articleBody { display: grid; gap: 25px; max-width: 66ch; }
+.coverage { margin: 0; color: var(--reader-accent); font-size: 12px; font-weight: 750; }
+.readSection { display: grid; gap: 12px; }
+.readSection h3 { margin: 0; color: var(--reader-text); font-size: 18px; }
+.readSection p { margin: 0; color: var(--reader-text); font-size: 15px; line-height: 1.7; }
+.readSection a, .alternate { color: var(--reader-accent); text-decoration: underline; text-underline-offset: 3px; }
+.eventList { display: grid; gap: 10px; margin: 0; }
+.eventList > div { display: grid; gap: 5px; padding: 13px 15px; border: 1px solid var(--reader-border); border-radius: 10px; background: var(--reader-surface); }
+.eventList dt { color: var(--reader-muted); font-size: 12px; }
+.eventList dd { margin: 0; color: var(--reader-text); font-size: 15px; font-weight: 750; }
+.readSection details { padding: 9px 0; color: var(--reader-muted); font-size: 13px; }
+.readSection summary { min-height: 36px; color: var(--reader-accent); cursor: pointer; }
+.calendar { width: fit-content; min-height: 42px; display: inline-flex; align-items: center; padding: 8px 13px; border: 1px solid var(--reader-accent); border-radius: 8px; background: transparent; color: var(--reader-accent); cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; text-decoration: none !important; }
+.limitBox { padding: 15px 17px; border-left: 3px solid var(--reader-accent); background: var(--reader-surface); color: var(--reader-muted); }
+.limitBox strong { color: var(--reader-text); font-size: 14px; }
+.limitBox p { margin: 7px 0 0; font-size: 13px; line-height: 1.6; }
+.alternate { width: fit-content; font-size: 13px; }
 .section { display: grid; gap: 11px; }
 .series {
   display: grid;

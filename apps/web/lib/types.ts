@@ -392,6 +392,42 @@ export type NewsBriefRequest = {
   company?: string;
   published_at?: string | null;
   related_tickers?: string[];
+  candidate_sources?: NewsArticleSource[];
+};
+
+export type NewsArticleSource = {
+  title: string;
+  url: string;
+  publisher: string;
+  published_at?: string | null;
+  origin?: string;
+};
+
+export type NewsArticleEvent = {
+  kind: "results_scheduled" | "results_published" | "conference" | "dividend" | "acquisition" | "other";
+  label: string;
+  starts_at?: string | null;
+  timing: string;
+  timezone?: string | null;
+  webcast_url?: string | null;
+  phone_numbers: string[];
+  access_code?: string | null;
+  replay_until?: string | null;
+};
+
+export type NewsArticle = {
+  kind: "results_schedule" | "results_report" | "dividend" | "acquisition" | "operations" | "other";
+  coverage: "licensed_full" | "structured" | "excerpt" | "title_only" | "inaccessible";
+  coverage_note?: string;
+  title: string;
+  published_at?: string | null;
+  facts: string[];
+  events: NewsArticleEvent[];
+  limitations: string[];
+  source_url: string;
+  original_url: string;
+  alternate_sources: NewsArticleSource[];
+  language: "fr" | "en" | "unknown";
 };
 
 export type NewsBriefFigure = {
@@ -421,6 +457,7 @@ export type NewsBriefResponse = {
   translation_status?: "original" | "automatic" | "unavailable";
   relevance?: "direct" | "related" | "unclear" | "not_applicable";
   detail_available?: boolean;
+  article?: NewsArticle | null;
 };
 
 export type EconomicEvent = {

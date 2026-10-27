@@ -65,9 +65,9 @@ test("ENB shows official and Yahoo coverage, full brief, load more, and title-on
   await news.getByRole("button", { name: /Enbridge Reports Second Quarter/ }).click();
   const reader = page.getByRole("dialog", { name: title });
   await expect(reader.getByText("20 octobre 2026")).toBeVisible();
-  await expect(reader.getByText(/1,4 milliard/)).toBeVisible();
-  await expect(reader.getByText(/2,2 milliards/)).toBeVisible();
-  await reader.getByRole("button", { name: "Analyse détaillée" }).click();
+  await expect(reader.getByText("1,4 milliard $", { exact: true })).toBeVisible();
+  await expect(reader.getByText(/2,2 milliards/).first()).toBeVisible();
+  await reader.getByRole("button", { name: "Lire l’article" }).click();
   await expect(reader.getByText("Bénéfice GAAP", { exact: true })).toBeVisible();
   await expect(reader.getByRole("link", { name: "Voir la source originale" })).toHaveAttribute("href", sourceUrl);
   await page.screenshot({ path: testInfo.outputPath("enb-reader-after.png") });

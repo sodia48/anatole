@@ -40,7 +40,7 @@ test("antimony forecast has one compact series and distinct growth periods", asy
   await page.goto("/actualites");
   await page.getByRole("button", { name: "Lire le résumé" }).click();
   const reader = page.getByRole("dialog", { name: item.title });
-  await reader.getByRole("button", { name: "Analyse détaillée" }).click();
+  await reader.getByRole("button", { name: "Lire l’article" }).click();
   await expect(reader.getByRole("heading", { name: "Chiffres importants" })).toBeVisible();
   await expect(reader.getByRole("table")).toHaveCount(2);
   await expect(reader.getByRole("row", { name: /2025.*4,94 milliards USD/ })).toBeVisible();
@@ -62,7 +62,7 @@ test("macroeconomic release keeps figures concise and accessible", async ({ page
   await page.goto("/actualites");
   await page.getByRole("button", { name: "Lire le résumé" }).click();
   const reader = page.getByRole("dialog", { name: item.title });
-  await reader.getByRole("button", { name: "Analyse détaillée" }).click();
+  await reader.getByRole("button", { name: "Lire l’article" }).click();
   await expect(reader.getByText("Variation de l'emploi")).toBeVisible();
   await expect(reader.getByText("2,1 %", { exact: true })).toBeVisible();
   await expect(reader.getByText("L'emploi a progressé de 2,1 % en septembre.")).toBeHidden();

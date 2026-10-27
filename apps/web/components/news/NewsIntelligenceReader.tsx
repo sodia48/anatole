@@ -7,7 +7,7 @@ import { getNewsBrief } from "@/lib/api";
 import { useAssistantContext } from "@/components/assistant/AssistantContextProvider";
 import { NewsImpactPanel } from "./NewsImpactPanel";
 import { localeFor, pick } from "@/lib/i18n";
-import type { NewsBriefRequest, NewsBriefResponse } from "@/lib/types";
+import type { NewsArticleEvent, NewsBriefRequest, NewsBriefResponse } from "@/lib/types";
 
 import styles from "./NewsIntelligenceReader.module.css";
 
@@ -26,7 +26,63 @@ export type ReaderArticle = {
   company?: string;
   relatedTickers?: string[];
   eventType?: "results" | "dividend" | "acquisition" | "financing" | "leadership" | "operations" | "other";
+  candidateSources?: NewsBriefRequest["candidate_sources"];
 };
+
+type ReaderView = "read" | "summary" | "financial";
+
+function eventDate(value: string | null | undefined, language: "fr" | "en", time: boolean): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat(localeFor(language), {
+    dateStyle: "long", ...(time ? { timeStyle: "short" as const } : {}), timeZone: "America/Toronto",
+  }).format(parsed);
+}
+
+function calendarHref(event: NewsArticleEvent, title: string, source: string): string | null {
+  if (!event.starts_at || event.kind !== "conference" || event.timing !== "confirmed") return null;
+  return `/api/news-calendar?${new URLSearchParams({ start: event.starts_at, title, source })}`;
+}
+
+function NewsArticleRead({ brief, language, context }: { brief: NewsBriefResponse; language: "fr" | "en"; context: ReaderArticle["context"] }) {
+  const article = brief.article;
+  if (!article) return <NewsBrief brief={brief} language={language} context={context} view="detail" />;
+  const call = article.events.find((event) => event.kind === "conference");
+  const calendar = call ? calendarHref(call, brief.title, article.source_url) : null;
+  const webcastLink = safeLink(call?.webcast_url ?? "") ?? safeLink(article.source_url);
+  const alternate = article.alternate_sources.find((source) => source.url !== article.source_url);
+  return <div className={styles.articleBody}>
+    <p className={styles.coverage}>{article.coverage_note}</p>
+    {article.facts.length ? <section className={styles.readSection}>
+      <h3>{pick(language, "L’essentiel", "The essentials")}</h3>
+      {article.facts.map((fact, index) => <p key={`${index}-${fact.slice(0, 16)}`} lang={article.kind === "results_schedule" ? language : article.language}>{fact}</p>)}
+    </section> : null}
+    {article.events.length ? <section className={styles.readSection}>
+      <h3>{pick(language, "Événements importants", "Key events")}</h3>
+      <dl className={styles.eventList}>{article.events.map((event, index) => <div key={`${event.kind}-${index}`}>
+        <dt>{event.label}</dt>
+        <dd>{eventDate(event.starts_at, language, event.kind === "conference" && event.timing === "confirmed") ?? pick(language, "Date non précisée", "Date not specified")}
+          {event.timing === "after_close" ? ` · ${pick(language, "après la clôture", "after market close")}` : null}
+          {event.timezone && event.kind === "conference" ? ` · ${pick(language, "heure de l’Est", "Eastern time")}` : null}</dd>
+      </div>)}</dl>
+    </section> : null}
+    {call && (call.phone_numbers.length > 0 || call.access_code || call.replay_until || call.webcast_url) ? <section className={styles.readSection}>
+      <h3>{pick(language, "Participer à la conférence", "Join the conference")}</h3>
+      {webcastLink ? <p>{pick(language, "Webdiffusion et modalités :", "Webcast and details:")} <a href={webcastLink} target="_blank" rel="noopener noreferrer">{pick(language, "communiqué officiel", "official release")}</a></p> : null}
+      <details><summary>{pick(language, "Numéros et code d’accès", "Dial-in numbers and access code")}</summary>
+        {call.phone_numbers.length ? <p>{call.phone_numbers.join(" · ")}</p> : null}
+        {call.access_code ? <p>{pick(language, "Code d’accès", "Access code")} : {call.access_code}</p> : null}
+        {call.replay_until ? <p>{pick(language, "Enregistrement disponible jusqu’au", "Replay available until")} {eventDate(call.replay_until, language, false)}</p> : null}
+      </details>
+      {calendar ? <a className={styles.calendar} href={calendar}>{pick(language, "Ajouter au calendrier", "Add to calendar")}</a> : null}
+    </section> : null}
+    {article.limitations.length ? <div className={styles.limitBox}><strong>{pick(language, "À retenir", "Keep in mind")}</strong>
+      {article.limitations.map((limit) => <p key={limit}>{limit}</p>)}</div> : null}
+    {alternate && safeLink(alternate.url) ? <a href={alternate.url} target="_blank" rel="noopener noreferrer" className={styles.alternate}>{alternate.publisher} ↗</a> : null}
+    <NewsBriefProvenance brief={brief} language={language} />
+  </div>;
+}
 
 function safeLink(value: string): string | null {
   try {
@@ -50,10 +106,10 @@ function NewsBriefProvenance({ brief, language }: {
       ? pick(language, "Résumé de l’éditeur", "Publisher excerpt")
       : pick(language, "Informations limitées", "Limited information");
   return (
-    <aside className={styles.provenance} aria-label={pick(language, "Provenance et limites", "Provenance and limits")}>
+    <div className={styles.provenance}>
       <strong>{label}</strong>
       <span>{brief.source_note}</span>
-    </aside>
+    </div>
   );
 }
 
@@ -190,22 +246,17 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
   const [brief, setBrief] = useState<NewsBriefResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [view, setView] = useState<"quick" | "detail">(() => {
-    try {
-      return typeof window !== "undefined" &&
-        sessionStorage.getItem("anatole.news.reader.view") === "detail"
-        ? "detail" : "quick";
-    } catch { return "quick"; }
-  });
+  const [view, setView] = useState<ReaderView>("read");
   const original = safeLink(article.url);
-  const image = article.imageUrl ? safeLink(article.imageUrl) : null;
-  const published = article.publishedAt ? new Date(article.publishedAt) : null;
+  const primarySource = brief?.article ? safeLink(brief.article.source_url) : original;
+  const displayPublishedAt = brief?.article?.published_at ?? article.publishedAt;
+  const dateOnly = article.dateOnly || (Boolean(brief?.article) && brief?.article?.source_url !== article.url);
+  const published = displayPublishedAt ? new Date(displayPublishedAt) : null;
   const publishedLabel = published && !Number.isNaN(published.getTime())
     ? new Intl.DateTimeFormat(localeFor(language), {
-      dateStyle: "long", ...(!article.dateOnly ? { timeStyle: "short" as const } : {}),
-      timeZone: article.dateOnly ? "UTC" : "America/Toronto",
+      dateStyle: "long", ...(!dateOnly ? { timeStyle: "short" as const } : {}),
+      timeZone: dateOnly ? "UTC" : "America/Toronto",
     }).format(published)
     : null;
 
@@ -266,6 +317,7 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
       company: article.company,
       published_at: article.publishedAt,
       related_tickers: article.relatedTickers,
+      candidate_sources: article.candidateSources,
     };
     queueMicrotask(() => {
       if (!active) return;
@@ -284,10 +336,6 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
     return () => { active = false; controller.abort(); };
   }, [article, language, attempt]);
 
-  const changeView = (next: "quick" | "detail") => {
-    setView(next);
-    try { sessionStorage.setItem("anatole.news.reader.view", next); } catch { /* Optional preference. */ }
-  };
   const askAboutArticle = () => {
     if (!article.ticker) return;
     handoffFocus.current = true;
@@ -295,6 +343,10 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
     openAssistant({ surface: "stock", symbol: article.ticker, symbols: [article.ticker],
       instrument_type: "stock", metadata: { news_url: article.url, news_title: article.title } });
   };
+  const financialAvailable = article.context === "stock" && Boolean(article.ticker) &&
+    brief?.relevance === "direct" && brief?.availability !== "limited" &&
+    (article.eventType === "results" || article.eventType === "dividend");
+  const activeView: ReaderView = view === "financial" && !financialAvailable ? "read" : view;
 
   return (
     <div className={styles.backdrop} onMouseDown={(event) => {
@@ -306,19 +358,12 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
           <button ref={closeRef} type="button" onClick={onClose} aria-label={pick(language, "Fermer", "Close")} className={styles.close}>×</button>
         </header>
         <div className={styles.scroll}>
-          {image?.startsWith("https:") && !imageFailed ? (
-            <div className={styles.hero}>
-              {/* Publisher-hosted images are deliberately left unoptimized and are not fetched by our server. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImageFailed(true)} />
-            </div>
-          ) : null}
           <div className={styles.content}>
             <div className={styles.meta}>
-              <span>{article.source}</span>
-              {publishedLabel ? <time dateTime={article.publishedAt ?? undefined}>{publishedLabel}</time> : null}
+              <span>{brief?.source_name ?? article.source}</span>
+              {publishedLabel ? <time dateTime={displayPublishedAt ?? undefined}>{publishedLabel}</time> : null}
             </div>
-            <h2 id={titleId}>{article.title}</h2>
+            <h2 id={titleId}>{brief?.title ?? article.title}</h2>
             {article.context === "stock" && article.company ? (
               <p className={styles.subject}>{article.company}{article.ticker ? " · " + article.ticker : ""}</p>
             ) : article.region ? <p className={styles.subject}>{article.region}</p> : null}
@@ -329,16 +374,18 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
               </div>
             ) : brief ? (
               <>
-                {brief.detail_available ? (
-                  <div className={styles.views} role="group" aria-label={pick(language, "Mode de lecture", "Reading mode")}>
-                    <button type="button" aria-pressed={view === "quick"} onClick={() => changeView("quick")}>{pick(language, "Résumé rapide", "Quick summary")}</button>
-                    <button type="button" aria-pressed={view === "detail"} onClick={() => changeView("detail")}>{pick(language, "Analyse détaillée", "Detailed analysis")}</button>
-                  </div>
-                ) : null}
-                <NewsBrief brief={brief} language={language} context={article.context} view={view} />
-                {article.context === "stock" && article.ticker && brief.relevance === "direct"
-                  && brief.availability !== "limited" && (article.eventType === "results" || article.eventType === "dividend")
-                  ? <NewsImpactPanel article={article} language={language} onAsk={askAboutArticle} /> : null}
+                <div className={styles.views} role="group" aria-label={pick(language, "Mode de lecture", "Reading mode")}>
+                  <button type="button" aria-pressed={activeView === "read"} onClick={() => setView("read")}>{pick(language, "Lire l’article", "Read the article")}</button>
+                  <button type="button" aria-pressed={activeView === "summary"} onClick={() => setView("summary")}>{pick(language, "Résumé Anatole", "Anatole summary")}</button>
+                  {financialAvailable ? <button type="button" aria-pressed={activeView === "financial"} onClick={() => setView("financial")}>{pick(language, "Analyse financière", "Financial analysis")}</button> : null}
+                </div>
+                <div>
+                  {activeView === "read" ? <NewsArticleRead brief={brief} language={language} context={article.context} />
+                    : activeView === "summary" ? <NewsBrief brief={brief} language={language} context={article.context} view="quick" />
+                      : <><NewsBrief brief={brief} language={language} context={article.context} view="detail" />
+                        {financialAvailable ? <NewsImpactPanel article={article} language={language} onAsk={askAboutArticle}
+                          resultsScheduled={brief.article?.kind === "results_schedule"} /> : null}</>}
+                </div>
               </>
             ) : (
               <div className={styles.fallback} role={failed ? "alert" : undefined}>
@@ -347,9 +394,10 @@ export function NewsIntelligenceReader({ article, language, onClose, returnFocus
                 {failed ? <button type="button" onClick={() => setAttempt((value) => value + 1)}>{pick(language, "Réessayer", "Retry")}</button> : null}
               </div>
             )}
-            {original ? (
-              <a href={original} target="_blank" rel="noopener noreferrer" className={styles.original}>
-                {pick(language, "Voir la source originale", "View original source")} ↗
+            {primarySource ? (
+              <a href={primarySource} target="_blank" rel="noopener noreferrer" className={styles.original}>
+                {primarySource === original ? pick(language, "Voir la source originale", "View original source")
+                  : pick(language, "Voir le communiqué officiel", "View official release")} ↗
               </a>
             ) : null}
           </div>

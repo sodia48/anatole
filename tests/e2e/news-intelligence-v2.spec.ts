@@ -43,7 +43,7 @@ test("macro reader shows grounded quick and detailed briefs across viewports", a
   }
   await page.screenshot({ path: testInfo.outputPath("news-reader-quick.png") });
 
-  await reader.getByRole("button", { name: "Analyse détaillée" }).click();
+  await reader.getByRole("button", { name: "Lire l’article" }).click();
   await expect(reader.getByRole("heading", { name: "Chiffres importants" })).toBeVisible();
   await expect(reader.getByText("Donnée publiée")).toBeVisible();
   await expect(reader.getByRole("heading", { name: "À surveiller" })).toBeVisible();
@@ -108,7 +108,7 @@ test("Focus CNQ shares the reader and ignores an obsolete article response", asy
   await cards.first().click();
   const results = page.getByRole("dialog", { name: "Canadian Natural Resources reports quarterly results" });
   await expect(results.getByText("Résumé de l’éditeur")).toBeVisible();
-  await results.getByRole("button", { name: "Analyse détaillée" }).click();
+  await results.getByRole("button", { name: "Lire l’article" }).click();
   await expect(results.getByText("$10 billion").first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("focus-cnq-reader.png") });
 });
