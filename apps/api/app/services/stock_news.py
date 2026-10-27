@@ -27,6 +27,7 @@ YAHOO_SEARCH_URL = "https://query1.finance.yahoo.com/v1/finance/search"
 CNQ_RELEASES_URL = "https://www.cnrl.com/investors/news-releases/"
 ENB_RELEASES_URL = "https://www.enbridge.com/media-center/news"
 VNP_RELEASES_URL = "https://www.5nplus.com/en/news/press-releases/"
+VNP_RELEASES_URL_FR = "https://www.5nplus.com/fr/nouvelles/communiques-de-presse/"
 _GENERIC = re.compile(r"\b(?:TFSA|RRSP|CELI|REER|best stocks?|top \d+|stocks? to buy|dividend stocks?|passive income|portfolio strateg|retirement|watchlist|millionaire|wealth building|buy and hold|where I.d put|I keep coming back|what you should know|fully priced|can the run continue|vs\.)\b", re.I)
 _EVENT = re.compile(r"\b(?:results?|earnings?|revenue|profit|dividend|production|guidance|forecast|budget|acquisition|merger|sale|transaction|contract|appoint|CEO|quarter|annual|financing|notes|debt|buyback|issuer bid|operat\w*|announce\w*|report\w*|update|upgrade|downgrade|price target|open\w*|launch\w*|expand\w*|résultats?|bénéfices?|revenus?|dividende|production|prévisions?|acquisition|direction|trimestre|annonce|rachat|objectif de cours|ouvre|lance)\b", re.I)
 _DIVIDEND_ACTION = re.compile(r"\b(?:announc\w*|declar\w*|rais\w*|increas\w*|cut\w*|boost\w*|hik\w*|pay\w*|record date|déclar\w*|annonce\w*|hausse|verse\w*)\b", re.I)
@@ -244,6 +245,16 @@ def _near_duplicate(left: StockNewsItem, right: StockNewsItem) -> bool:
         return False
     if re.findall(r"\d+(?:[.,]\d+)?", left.title) != re.findall(r"\d+(?:[.,]\d+)?", right.title):
         return False
+    future_release = re.compile(r"\b(?:to release|will release|annoncera|publiera|prévoit publier)\b", re.I)
+    if (left.origin == "company_release" and right.origin == "company_release"
+            and urlparse(left.url).hostname == urlparse(right.url).hostname == "www.5nplus.com"
+            and left.event_type == right.event_type
+            and bool(future_release.search(left.title)) == bool(future_release.search(right.title))
+            and {"/fr/nouvelles/", "/en/news/"} == {
+                "/fr/nouvelles/" if "/fr/nouvelles/" in left.url else "/en/news/",
+                "/fr/nouvelles/" if "/fr/nouvelles/" in right.url else "/en/news/",
+            }):
+        return True
     period = re.compile(r"\b(?:first|second|third|fourth|1st|2nd|3rd|4th|Q[1-4]|T[1-4]|premier|deuxième|troisième|quatrième)\b", re.I)
     if [value.casefold() for value in period.findall(left.title)] != [value.casefold() for value in period.findall(right.title)]:
         return False
@@ -426,17 +437,27 @@ def _parse_enbridge_releases(page: str, symbol: str) -> list[StockNewsItem]:
     return releases[:30]
 
 
-def _parse_five_n_releases(page: str, symbol: str) -> list[StockNewsItem]:
+def _parse_five_n_releases(page: str, symbol: str, language: str = "en") -> list[StockNewsItem]:
     parser = _FiveNIndexParser()
     parser.feed(page)
     releases: list[StockNewsItem] = []
+    base_url = VNP_RELEASES_URL_FR if language == "fr" else VNP_RELEASES_URL
     for card in parser.cards:
-        url = urljoin(VNP_RELEASES_URL, html.unescape(card.get("url", "")))
+        url = urljoin(base_url, html.unescape(card.get("url", "")))
         parsed = urlparse(url)
-        if parsed.scheme != "https" or parsed.hostname != "www.5nplus.com" or not parsed.path.startswith("/en/news/"):
+        if parsed.scheme != "https" or parsed.hostname != "www.5nplus.com" or not parsed.path.startswith("/fr/nouvelles/" if language == "fr" else "/en/news/"):
             continue
         try:
-            published = datetime.strptime(card.get("date", "").split("|")[0].strip(), "%B %d, %Y").replace(tzinfo=UTC)
+            raw_date = card.get("date", "").split("|")[0].strip()
+            if language == "fr":
+                months = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6,
+                          "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12}
+                match = re.fullmatch(r"(\d{1,2})\s+([a-zéû]+)\s+(20\d{2})", raw_date, re.I)
+                if not match:
+                    continue
+                published = datetime(int(match.group(3)), months[match.group(2).casefold()], int(match.group(1)), tzinfo=UTC)
+            else:
+                published = datetime.strptime(raw_date, "%B %d, %Y").replace(tzinfo=UTC)
         except ValueError:
             continue
         title = re.sub(r"\s+", " ", card.get("title", "")).strip()
@@ -677,6 +698,16 @@ class StockNewsService:
             raise ValueError("invalid_official_release_index")
         return source.parse(response.text, symbol)
 
+    @staticmethod
+    async def _company_releases_fr(symbol: str) -> list[StockNewsItem]:
+        if symbol.upper() != "VNP.TO":
+            return []
+        response = await shared_http_client.request("GET", VNP_RELEASES_URL_FR, attempts=1, follow_redirects=False)
+        response.raise_for_status()
+        if "html" not in response.headers.get("content-type", "").casefold() or len(response.content) > 600_000:
+            raise ValueError("invalid_official_release_index")
+        return _parse_five_n_releases(response.text, symbol, "fr")
+
     @classmethod
     def _rank_and_select(cls, candidates: list[StockNewsItem], rejected: Counter[str]) -> list[StockNewsItem]:
         cutoff = datetime.now(UTC) - timedelta(days=120)
@@ -695,7 +726,9 @@ class StockNewsService:
             if match_index is not None:
                 primary = unique[match_index]
                 event_published_at = max(primary.event_published_at or primary.published_at, item.published_at)
-                if item.publisher.casefold() != primary.publisher.casefold() and all(item.publisher.casefold() != source.publisher.casefold() for source in primary.related_sources):
+                alternate_language = (item.publisher.casefold() == primary.publisher.casefold()
+                                      and urlparse(item.url).path.split("/")[1:3] != urlparse(primary.url).path.split("/")[1:3])
+                if (alternate_language or item.publisher.casefold() != primary.publisher.casefold()) and all(item.url != source.url for source in primary.related_sources):
                     source = StockNewsSource(title=item.title, url=item.url, publisher=item.publisher,
                                              published_at=item.published_at, origin=item.origin)
                     unique[match_index] = primary.model_copy(update={"related_sources": [*primary.related_sources, source],
@@ -773,6 +806,12 @@ class StockNewsService:
             official_available = False
             rejected["company_release_unavailable"] += 1
             logger.info("stock_news_provider_unavailable provider=company_release error=%s", type(exc).__name__)
+        if language == "fr" and symbol.upper() == "VNP.TO":
+            try:
+                official = [*await self._company_releases_fr(symbol), *official]
+            except Exception as exc:  # noqa: BLE001
+                rejected["company_release_fr_unavailable"] += 1
+                logger.info("stock_news_provider_unavailable provider=company_release_fr error=%s", type(exc).__name__)
         provider_counts["company_release"] = len(official)
         items = self._rank_and_select([*items, *official], rejected)
         items = await self._enrich_summaries(items, language=language)

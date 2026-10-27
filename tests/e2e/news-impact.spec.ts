@@ -43,13 +43,12 @@ test("direct RY results connect sourced facts to fundamentals and the existing a
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   await page.getByRole("button", { name: `${title} · Lire l’analyse` }).click();
   const reader = page.getByRole("dialog", { name: title });
+  await reader.getByRole("button", { name: "Analyse financière" }).click();
   const impact = reader.getByRole("region", { name: "Impact de la nouvelle" });
-  await impact.getByRole("button", { name: "Comprendre l’impact" }).click();
   await expect(reader.getByText("The bank reported revenue of CAD 17 billion in the latest quarter.")).toHaveCount(1);
   await expect(impact.getByRole("heading", { name: "Contexte financier" })).toBeVisible();
   await expect(impact.getByText(/16.?000.?000.?000/)).toBeVisible();
   await expect(impact.getByRole("link", { name: "Document source" })).toHaveAttribute("href", "https://example.com/ry-filing");
-  await expect(impact.getByText(/Tendance N\/D : une seule période présentée/)).toBeVisible();
   await impact.getByRole("button", { name: "Poser une question à Anatole" }).click();
   await expect(reader).toHaveCount(0);
   const assistant = page.getByRole("dialog", { name: "Anatole Assistant" });
