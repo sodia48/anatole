@@ -41,11 +41,12 @@ class OptionContract(BaseModel):
     contract: str | None = None
     side: OptionSide
     strike: float
-    expiration: str
+    expiration: str | None
     exchange: str
     bid: float | None = None
     ask: float | None = None
     last: float | None = None
+    settlement: float | None = None
     change: float | None = None
     percent_change: float | None = None
     volume: int | None = None

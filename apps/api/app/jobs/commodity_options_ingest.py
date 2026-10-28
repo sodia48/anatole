@@ -45,7 +45,7 @@ def normalize(root: str, payload: dict[str, Any]) -> OptionChainSnapshot:
             continue
         try:
             parsed = _barchart_contract(raw, market="commodities", fallback_underlying=root)
-            if parsed is None:
+            if parsed is None or parsed.expiration is None:
                 raise ValueError("incomplete contract")
             # The legacy converter guesses the unit for small IV values. Until the
             # licensed feed's unit is confirmed, do not publish a guessed Greek.

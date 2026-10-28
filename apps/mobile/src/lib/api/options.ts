@@ -34,7 +34,7 @@ export type OptionContract = {
   contract: string | null;
   side: OptionSide;
   strike: number;
-  expiration: string;
+  expiration: string | null;
   exchange: string;
   bid: number | null;
   ask: number | null;

@@ -93,7 +93,7 @@ function ContractRow({
 }) {
   return (
     <tr className={item.in_the_money ? styles.inMoney : undefined}>
-      <td>{item.expiration}</td>
+      <td>{item.expiration ?? "N/D"}</td>
       <td>
         <span className={item.side === "call" ? styles.callBadge : styles.putBadge}>
           {item.side === "call"
