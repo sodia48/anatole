@@ -13,7 +13,7 @@ jest.mock("@tanstack/react-query", () => ({
         symbol: market === "commodities" ? "GC" : "RY", name: "Fixture", generated_at: "2026-10-27T12:00:00Z",
         stale: market === "commodities", source_statuses: [], analytics: { contract_count: 1 },
         contracts: market === "commodities" ? [{ symbol: "fixture", side: "call", strike: 2.5,
-          expiration: "2027-11-25", bid: null, ask: null, last: 0, volume: null, open_interest: 0,
+          expiration: null, bid: null, ask: null, last: 0, volume: null, open_interest: 0,
           implied_volatility: null }] : [],
       },
     };
@@ -27,5 +27,6 @@ test("commodity snapshots identify stale and unknown data without hiding publish
   expect(view.getByText(/fraîcheur des cotations à confirmer/)).toBeTruthy();
   expect(view.getByText("Vol séance N/D")).toBeTruthy();
   expect(view.getByText("OI 0")).toBeTruthy();
+  expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
   await view.unmount();
 });

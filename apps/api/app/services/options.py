@@ -477,6 +477,8 @@ def _apply_black_scholes_metrics(
     enriched = 0
 
     for contract in contracts:
+        if contract.expiration is None:
+            continue
         try:
             expiry = datetime.strptime(contract.expiration, "%Y-%m-%d").date()
         except ValueError:
@@ -569,10 +571,12 @@ def _merge_provider_metrics(
             round(item.strike, 6),
             item.side,
         ): item
-        for item in provider
+        for item in provider if item.expiration is not None
     }
     enriched = 0
     for contract in official:
+        if contract.expiration is None:
+            continue
         match = lookup.get(
             (
                 contract.expiration,

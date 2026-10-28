@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import re
-from calendar import monthrange
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Iterable
@@ -95,14 +94,13 @@ _OI_RE = re.compile(r"\b(?P<oi>\d[\d,]*)\s+(?:UNCH|[+-]\s+\d[\d,]*)\b")
 _INTEGER_RE = re.compile(r"(?<![\d.])\d[\d,]*(?![\d.])")
 
 
-def _month_end(month_code: str) -> str:
+def _contract_month(month_code: str) -> str:
     match = _MONTH_RE.match(month_code.upper())
     if not match:
         raise ValueError(month_code)
     month = _MONTHS[match.group(1)]
     year = 2000 + int(match.group(2))
-    day = monthrange(year, month)[1]
-    return f"{year:04d}-{month:02d}-{day:02d}"
+    return f"{year:04d}-{month:02d}"
 
 
 def _source_side(line: str, config: CmePublicConfig) -> str | None:
@@ -137,7 +135,7 @@ def parse_cme_bulletin_text(
 ) -> list[OptionContract]:
     contracts: list[OptionContract] = []
     active_side: str | None = None
-    expiration: str | None = None
+    contract_month: str | None = None
 
     for raw_line in text.splitlines():
         line = " ".join(raw_line.split())
@@ -151,8 +149,8 @@ def parse_cme_bulletin_text(
             # heading (for example livestock). Preserve it instead of
             # discarding the contract month when switching sides.
             month_match = _MONTH_RE.search(line.upper())
-            expiration = (
-                _month_end(month_match.group(0))
+            contract_month = (
+                _contract_month(month_match.group(0))
                 if month_match
                 else None
             )
@@ -162,18 +160,18 @@ def parse_cme_bulletin_text(
         # "OG CALL COMEX GOLD OPTIONS" then "OCT26").
         month_match = _MONTH_RE.match(line.upper())
         if active_side and month_match:
-            expiration = _month_end(month_match.group(0))
+            contract_month = _contract_month(month_match.group(0))
             continue
 
         if active_side and _looks_like_other_option_header(line):
             active_side = None
-            expiration = None
+            contract_month = None
             continue
 
         if not active_side:
             continue
 
-        if expiration is None:
+        if contract_month is None:
             continue
 
         row = _ROW_RE.match(line)
@@ -187,8 +185,8 @@ def parse_cme_bulletin_text(
         rest = row.group("rest")
 
         oi_matches = list(_OI_RE.finditer(rest))
-        open_interest = 0
-        volume = 0
+        open_interest = None
+        volume = None
         if oi_matches:
             oi_match = oi_matches[-1]
             open_interest = int(oi_match.group("oi").replace(",", ""))
@@ -200,18 +198,19 @@ def parse_cme_bulletin_text(
             if integers:
                 volume = integers[-1]
 
-        symbol = f"{root}|{expiration}|{strike:g}{active_side[0].upper()}|CME-EOD"
+        # An internal row identifier, not an exchange option symbol.
+        symbol = f"CME-EOD-ROW|{root}|{contract_month}|{strike:g}{active_side[0].upper()}"
         contracts.append(
             OptionContract(
                 symbol=symbol,
                 underlying=root,
                 market="commodities",
-                contract=expiration[:7],
+                contract=contract_month,
                 side=active_side,  # type: ignore[arg-type]
                 strike=strike,
-                expiration=expiration,
+                expiration=None,
                 exchange=config.exchange,
-                last=settle,
+                settlement=settle,
                 volume=volume,
                 open_interest=open_interest,
                 delta=delta,
@@ -222,7 +221,7 @@ def parse_cme_bulletin_text(
 
     deduped: dict[tuple[str, str, float], OptionContract] = {}
     for item in contracts:
-        key = (item.expiration, item.side, round(item.strike, 8))
+        key = (item.contract or "", item.side, round(item.strike, 8))
         previous = deduped.get(key)
         if previous is None:
             deduped[key] = item
@@ -233,7 +232,7 @@ def parse_cme_bulletin_text(
             deduped[key] = item
     return sorted(
         deduped.values(),
-        key=lambda item: (item.expiration, item.strike, item.side),
+        key=lambda item: (item.contract or "", item.strike, item.side),
     )
 
 
@@ -312,7 +311,7 @@ class PublicCommodityOptionsService:
 
         deduped: dict[tuple[str, str, float], OptionContract] = {}
         for item in contracts:
-            key = (item.expiration, item.side, round(item.strike, 8))
+            key = (item.contract or "", item.side, round(item.strike, 8))
             previous = deduped.get(key)
             if previous is None or (
                 (item.volume or 0) + (item.open_interest or 0)
@@ -322,17 +321,17 @@ class PublicCommodityOptionsService:
 
         final = sorted(
             deduped.values(),
-            key=lambda item: (item.expiration, item.strike, item.side),
+            key=lambda item: (item.contract or "", item.strike, item.side),
         )
-        expirations = sorted({item.expiration for item in final})
+        expirations = sorted({item.expiration for item in final if item.expiration is not None})
         if final:
             return final, expirations, OptionSourceStatus(
                 source="CME Group public EOD",
-                status="available",
+                status="partial",
                 detail=(
                     f"{len(final)} contrats extraits du Daily Bulletin public "
                     f"({successes}/{len(config.urls)} rapport(s)). Données fin de séance; "
-                    "les échéances sont affichées par mois de contrat."
+                    "mois contractuel seulement : échéance et symbole officiel non vérifiés."
                 ),
             )
         return [], [], OptionSourceStatus(

@@ -197,7 +197,7 @@ export function OptionsScreen() {
                       {item.side.toUpperCase()}
                     </Text>
                     <Text style={styles.strike}>{number(item.strike)}</Text>
-                    <Text style={styles.expiry}>{item.expiration}</Text>
+                    <Text style={styles.expiry}>{item.expiration ?? "N/D"}</Text>
                   </View>
                   <View style={styles.contractMetrics}>
                     <Text style={styles.metric}>Bid {number(item.bid)}</Text>
