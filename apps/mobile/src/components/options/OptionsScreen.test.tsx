@@ -11,10 +11,14 @@ jest.mock("@tanstack/react-query", () => ({
       isLoading: false, isRefetching: false, error: null, refetch: jest.fn(),
       data: universe ? { items: [] } : {
         symbol: market === "commodities" ? "GC" : "RY", name: "Fixture", generated_at: "2026-10-27T12:00:00Z",
-        stale: market === "commodities", source_statuses: [], analytics: { contract_count: 1 },
-        contracts: market === "commodities" ? [{ symbol: "fixture", side: "call", strike: 2.5,
+        stale: market === "commodities", source_statuses: [], analytics: { contract_count: 3 }, expirations: ["2027-11-25"],
+        contracts: market === "commodities" ? [{ symbol: "fixture", underlying: "GC", market: "commodities", contract: "GCZ27", side: "call", strike: 2.5,
           expiration: null, bid: null, ask: null, last: 0, volume: null, open_interest: 0,
-          implied_volatility: null }] : [],
+          implied_volatility: null },
+        { symbol: "fixture-c", underlying: "GC", market: "commodities", contract: "GCZ27", side: "call", strike: 3,
+          expiration: "2027-11-25", bid: 1, ask: 2, last: 1.5, volume: 10, open_interest: 5, implied_volatility: null },
+        { symbol: "fixture-p", underlying: "GC", market: "commodities", contract: "GCZ27", side: "put", strike: 3,
+          expiration: "2027-11-25", bid: 1, ask: 2, last: 1.5, volume: 10, open_interest: 5, implied_volatility: null }] : [],
       },
     };
   },
@@ -25,8 +29,13 @@ test("commodity snapshots identify stale and unknown data without hiding publish
   await act(async () => { fireEvent.press(view.getByText("Matières")); });
   expect(view.getByText(/instantané périmé/)).toBeTruthy();
   expect(view.getByText(/fraîcheur des cotations à confirmer/)).toBeTruthy();
-  expect(view.getByText("Vol séance N/D")).toBeTruthy();
-  expect(view.getByText("OI 0")).toBeTruthy();
-  expect(view.getAllByText("N/D").length).toBeGreaterThan(0);
+  expect(view.getByText("Vol N/D · OI 0")).toBeTruthy();
+  expect(view.getByText("N/D · GCZ27")).toBeTruthy();
+  await act(async () => { fireEvent.press(view.getByLabelText("CALL 2.50 N/D fixture")); });
+  expect(view.getByText("fixture · CALL")).toBeTruthy();
+  await act(async () => { fireEvent.press(view.getByText("2027-11-25")); });
+  expect(view.queryByLabelText("CALL 2.50 N/D fixture")).toBeNull();
+  expect(view.getByLabelText("CALL 3.00 2027-11-25 fixture-c")).toBeTruthy();
+  expect(view.getByLabelText("PUT 3.00 2027-11-25 fixture-p")).toBeTruthy();
   await view.unmount();
 });

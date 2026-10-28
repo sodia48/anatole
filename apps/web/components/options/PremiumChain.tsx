@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { pairOptions } from "@/lib/options-chain";
+import { pairOptions } from "@anatole/shared/options-chain";
 import type { OptionContract } from "@/lib/options-api";
 import { pick } from "@/lib/i18n";
 

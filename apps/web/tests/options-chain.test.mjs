@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pairOptions } from "../lib/options-chain.ts";
+import { pairOptions } from "../../../packages/shared/src/options-chain.ts";
 
 const option = (symbol, side, overrides = {}) => ({
   symbol, side, market: "commodities", underlying: "RB", contract: "RBZ27",
