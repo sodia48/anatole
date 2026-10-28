@@ -22,12 +22,14 @@ async def option_strategy_payoff(request: PayoffRequest) -> PayoffResponse:
             raise ValueError("a requested price is outside the specified domain")
         return PayoffResponse(
             currency=legs[0].currency, expiry=legs[0].expiry,
+            domain_min=request.domain_min, domain_max=request.domain_max,
             points=[PayoffPoint(price=price, profit_loss=payoff(legs, price, underlying)) for price in request.prices],
             theoretical_debit=theoretical_debit(legs, underlying),
             minimum_profit_loss=bounds.minimum, maximum_profit_loss=bounds.maximum,
             loss_unbounded=bounds.lower_unbounded, gain_unbounded=bounds.upper_unbounded,
             break_evens=[BreakEvenResult(lower=root.lower, upper=root.upper) for root in roots],
             limitations=["Hypothetical expiration payoff; caller-supplied contracts and prices are not verified.",
+                         "Bounds, break-evens and unbounded flags apply only to the specified price domain.",
                          "Excludes fees, taxes, FX, financing, margin, early exercise, assignment and settlement effects.",
                          "Multiple expiries and futures-style margining are not supported; break-even values use decimal precision."],
         )

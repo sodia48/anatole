@@ -143,6 +143,7 @@ async def test_http_payoff_uses_explicit_legs_and_rejects_mixed_expiries():
         mixed = await client.post("/api/v1/options/strategy/payoff", json={**payload, "legs": [long_call, different_expiry]})
         futures_style = await client.post("/api/v1/options/strategy/payoff", json={**payload, "legs": [{**long_call, "premium_style": "futures_style"}]})
         outside_domain = await client.post("/api/v1/options/strategy/payoff", json={**payload, "prices": ["-1"]})
+        bounded = await client.post("/api/v1/options/strategy/payoff", json={**payload, "domain_max": "112"})
         bad_quantity = await client.post("/api/v1/options/strategy/payoff", json={**payload, "legs": [{**long_call, "quantity": True}]})
         future_put = {**long_call, "market": "futures", "side": "put", "strike": "10"}
         negative_future = await client.post("/api/v1/options/strategy/payoff", json={**payload, "legs": [future_put], "domain_min": None, "prices": ["-5"]})
@@ -151,6 +152,12 @@ async def test_http_payoff_uses_explicit_legs_and_rejects_mixed_expiries():
     assert [D(point["profit_loss"]) for point in body["points"]] == [D(-200), D(500)]
     assert D(body["theoretical_debit"]) == D(200)
     assert body["gain_unbounded"] and not body["loss_unbounded"]
+    assert D(body["domain_min"]) == 0 and body["domain_max"] is None
+    assert bounded.status_code == 200
+    assert D(bounded.json()["domain_max"]) == 112
+    assert D(bounded.json()["maximum_profit_loss"]) == 500
+    assert not bounded.json()["gain_unbounded"]
+    assert any("specified price domain" in item for item in bounded.json()["limitations"])
     assert D(body["break_evens"][0]["lower"]) == D(107)
     assert mixed.status_code == futures_style.status_code == outside_domain.status_code == 400
     assert bad_quantity.status_code == 422

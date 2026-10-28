@@ -58,6 +58,8 @@ class BreakEvenResult(BaseModel):
 class PayoffResponse(BaseModel):
     currency: str
     expiry: datetime
+    domain_min: Decimal | None
+    domain_max: Decimal | None
     points: list[PayoffPoint]
     theoretical_debit: Decimal | None
     minimum_profit_loss: Decimal | None
