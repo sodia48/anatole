@@ -151,25 +151,30 @@ export function OptionsScreen() {
               <Text style={styles.kpiLabel}>{pick("Contrats", "Contracts")}</Text>
               <Text style={styles.kpiValue}>{integer(analytics?.contract_count)}</Text>
             </Card>
-            <Card>
+            {analytics?.put_call_volume_ratio != null ? <Card>
               <Text style={styles.kpiLabel}>Put / Call · Vol.</Text>
               <Text style={styles.kpiValue}>{number(analytics?.put_call_volume_ratio)}</Text>
-            </Card>
-            <Card>
+            </Card> : null}
+            {analytics?.put_call_open_interest_ratio != null ? <Card>
               <Text style={styles.kpiLabel}>Put / Call · OI</Text>
               <Text style={styles.kpiValue}>{number(analytics?.put_call_open_interest_ratio)}</Text>
-            </Card>
-            <Card>
+            </Card> : null}
+            {analytics?.atm_implied_volatility != null ? <Card>
               <Text style={styles.kpiLabel}>IV ATM</Text>
               <Text style={styles.kpiValue}>
                 {analytics?.atm_implied_volatility == null
                   ? "N/D"
                   : `${number(analytics.atm_implied_volatility, 1)}%`}
               </Text>
-            </Card>
+            </Card> : null}
           </View>
 
           <Card title={`${chain.data.symbol} · ${chain.data.name}`}>
+            {market === "commodities" && chain.data.contracts.length ? <Text style={styles.sourceDetail}>
+              {pick("Instantané récupéré", "Snapshot retrieved")}: {new Date(chain.data.generated_at).toLocaleString()}
+              {chain.data.stale ? ` · ${pick("instantané périmé", "stale snapshot")}` : ""}
+              {` · ${pick("fraîcheur des cotations à confirmer", "quote freshness unconfirmed")}`}
+            </Text> : null}
             <View style={styles.sideRow}>
               {(["both", "call", "put"] as const).map((item) => (
                 <Pressable
@@ -197,7 +202,7 @@ export function OptionsScreen() {
                   <View style={styles.contractMetrics}>
                     <Text style={styles.metric}>Bid {number(item.bid)}</Text>
                     <Text style={styles.metric}>Ask {number(item.ask)}</Text>
-                    <Text style={styles.metric}>Last {number(item.last)}</Text>
+                    <Text style={styles.metric}>{market === "commodities" ? pick("Prix fourni", "Provider price") : "Last"} {number(item.last)}</Text>
                     <Text style={styles.metric}>{pick("Vol séance", "Session vol.")} {integer(item.volume)}</Text>
                     <Text style={styles.metric}>OI {integer(item.open_interest)}</Text>
                     <Text style={styles.metric}>
@@ -210,8 +215,8 @@ export function OptionsScreen() {
               <Text style={styles.empty}>
                 {market === "commodities"
                   ? pick(
-                      "Aucune chaîne publique exploitable pour cette racine. Les marchés CME utilisent automatiquement le Daily Bulletin public; certaines racines ICE peuvent encore nécessiter une source autorisée.",
-                      "No usable public chain for this root. CME markets automatically use the public Daily Bulletin; some ICE roots may still require an authorized source.",
+                      "Aucun instantané exploitable : une source autorisée et une collecte configurée sont nécessaires.",
+                      "No usable snapshot: an authorized source and configured ingestion are required.",
                     )
                   : pick(
                       "Aucune chaîne disponible pour ce symbole à cet instant.",
@@ -245,7 +250,10 @@ export function OptionsScreen() {
       ) : null}
 
       <Text style={styles.disclaimer}>
-        {pick(
+        {market === "commodities" ? pick(
+          "Données descriptives différées lorsqu'elles sont disponibles. Les champs absents restent N/D.",
+          "Descriptive delayed data when available. Missing fields remain N/A.",
+        ) : pick(
           "IV et Greeks proviennent du fournisseur lorsqu'ils existent; sinon Anatole peut les estimer par Black-Scholes à partir des prix observés. Données descriptives et parfois différées.",
           "IV and Greeks come from the provider when available; otherwise Anatole may estimate them with Black-Scholes from observed prices. Descriptive and sometimes delayed data.",
         )}

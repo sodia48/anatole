@@ -68,10 +68,10 @@ export type OptionChainSnapshot = {
     contract_count: number;
     call_count: number;
     put_count: number;
-    call_volume: number;
-    put_volume: number;
-    call_open_interest: number;
-    put_open_interest: number;
+    call_volume: number | null;
+    put_volume: number | null;
+    call_open_interest: number | null;
+    put_open_interest: number | null;
     put_call_volume_ratio: number | null;
     put_call_open_interest_ratio: number | null;
     atm_implied_volatility: number | null;

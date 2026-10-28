@@ -231,13 +231,17 @@ export function OptionsClient() {
       setError(pick(language, "Symbole invalide.", "Invalid symbol."));
       return;
     }
+    if (next === symbol && !expiration) return;
     setLoadingChain(true);
+    if (next !== symbol) setChain(null);
     setExpiration("");
     setSymbol(next);
   }
 
   function chooseSymbol(next: string) {
+    if (next === symbol && !expiration) return;
     setLoadingChain(true);
+    if (next !== symbol) setChain(null);
     setDraftSymbol(next);
     setSymbol(next);
     setExpiration("");
@@ -381,38 +385,26 @@ export function OptionsClient() {
           <strong>{analytics ? integer(analytics.contract_count) : "—"}</strong>
           <small>{chain ? `${chain.name} · ${chain.exchange}` : symbol}</small>
         </article>
-        <article className="panel">
+        {analytics?.put_call_volume_ratio != null ? <article className="panel">
           <span>Put / Call · {pick(language, "volume séance", "session volume")}</span>
-          <strong>{ratio(analytics?.put_call_volume_ratio)}</strong>
-          <small>
-            {analytics
-              ? `${integer(analytics.put_volume)} P / ${integer(analytics.call_volume)} C`
-              : "—"}
-          </small>
-        </article>
-        <article className="panel">
+          <strong>{ratio(analytics.put_call_volume_ratio)}</strong>
+          <small>{`${integer(analytics.put_volume)} P / ${integer(analytics.call_volume)} C`}</small>
+        </article> : null}
+        {analytics?.put_call_open_interest_ratio != null ? <article className="panel">
           <span>Put / Call · OI</span>
-          <strong>{ratio(analytics?.put_call_open_interest_ratio)}</strong>
-          <small>
-            {analytics
-              ? `${integer(analytics.put_open_interest)} P / ${integer(analytics.call_open_interest)} C`
-              : "—"}
-          </small>
-        </article>
-        <article className="panel">
+          <strong>{ratio(analytics.put_call_open_interest_ratio)}</strong>
+          <small>{`${integer(analytics.put_open_interest)} P / ${integer(analytics.call_open_interest)} C`}</small>
+        </article> : null}
+        {analytics?.atm_implied_volatility != null ? <article className="panel">
           <span>{pick(language, "Volatilité implicite ATM", "ATM implied volatility")}</span>
-          <strong>
-            {analytics?.atm_implied_volatility == null
-              ? "N/D"
-              : `${value(analytics.atm_implied_volatility, 1)} %`}
-          </strong>
+          <strong>{`${value(analytics.atm_implied_volatility, 1)} %`}</strong>
           <small>{pick(language, "Fournisseur si disponible, sinon estimation Anatole", "Provider when available, otherwise Anatole estimate")}</small>
-        </article>
-        <article className="panel">
+        </article> : null}
+        {analytics?.max_pain_estimate != null ? <article className="panel">
           <span>{pick(language, "Max pain estimé", "Estimated max pain")}</span>
-          <strong>{value(analytics?.max_pain_estimate)}</strong>
+          <strong>{value(analytics.max_pain_estimate)}</strong>
           <small>{pick(language, "Calcul descriptif à partir de l'OI", "Descriptive calculation from OI")}</small>
-        </article>
+        </article> : null}
       </section>
 
       <section className={`panel ${styles.sourcePanel}`}>
@@ -427,8 +419,8 @@ export function OptionsClient() {
                 )
               : pick(
                   language,
-                  "Anatole utilise d'abord Barchart s'il est configuré, sinon les Daily Bulletins publics CME/CBOT/NYMEX/COMEX sans clé API. Pour ICE, les échéances publiques sont récupérées lorsque disponibles; une chaîne strike/prix complète peut encore nécessiter une source autorisée.",
-                  "Anatole uses Barchart first when configured, otherwise public CME/CBOT/NYMEX/COMEX Daily Bulletins with no API key. For ICE, public expiries are retrieved when available; a full strike/price chain may still require an authorized source.",
+                  "Instantanés issus d'une source autorisée ; couverture variable et cotations parfois différées.",
+                  "Snapshots from an authorized source; coverage varies and quotes may be delayed.",
                 )}
           </p>
         </div>
@@ -449,6 +441,11 @@ export function OptionsClient() {
                 ? `${pick(language, "Sous-jacent", "Underlying")}: ${value(chain.underlying_price)}`
                 : pick(language, "Prix du sous-jacent non fourni par cette source.", "Underlying price not supplied by this source.")}
             </p>
+            {market === "commodities" && chain?.contracts.length ? <p>
+              {pick(language, "Instantané récupéré", "Snapshot retrieved")}: {new Date(chain.generated_at).toLocaleString(language === "fr" ? "fr-CA" : "en-CA")}
+              {chain.stale ? ` · ${pick(language, "instantané périmé", "stale snapshot")}` : ""}
+              {` · ${pick(language, "fraîcheur des cotations à confirmer", "quote freshness unconfirmed")}`}
+            </p> : null}
           </div>
           <div className={styles.chainMeta}>
             <strong>{contracts.length.toLocaleString("fr-CA")}</strong>
@@ -461,8 +458,8 @@ export function OptionsClient() {
             {pick(language, "Chargement de la chaîne…", "Loading option chain…")}
           </div>
         ) : contracts.length ? (
-          <div className={styles.tableWrap}>
-            <table>
+          <div className={styles.tableWrap} role="region" tabIndex={0} aria-label={pick(language, "Chaîne d'options", "Option chain")}>
+            <table data-mobile-scroll>
               <thead>
                 <tr>
                   <th>{pick(language, "Échéance", "Expiry")}</th>
@@ -470,7 +467,7 @@ export function OptionsClient() {
                   <th>Strike</th>
                   <th>Bid</th>
                   <th>Ask</th>
-                  <th>Last</th>
+                  <th>{market === "commodities" ? pick(language, "Prix fourni*", "Provider price*") : "Last"}</th>
                   <th>Δ prix</th>
                   <th title={pick(language, "Contrats négociés pendant la séance. Un volume de 0 avec un OI positif est normal.", "Contracts traded during the session. Zero volume with positive OI is normal.")}>
                     {pick(language, "Vol. séance", "Session vol.")}
@@ -497,8 +494,8 @@ export function OptionsClient() {
               {market === "commodities"
                 ? pick(
                     language,
-                    "Aucune chaîne strike/prix publique exploitable n'a été trouvée pour cette racine. Les racines CME utilisent automatiquement le Daily Bulletin public; certaines racines ICE peuvent encore nécessiter une source autorisée.",
-                    "No usable public strike/price chain was found for this root. CME roots automatically use the public Daily Bulletin; some ICE roots may still require an authorized source.",
+                    "Aucun instantané exploitable n'est disponible. Une source autorisée et une collecte configurée sont nécessaires.",
+                    "No usable snapshot is available. An authorized source and configured ingestion are required.",
                   )
                 : pick(
                     language,
@@ -513,8 +510,8 @@ export function OptionsClient() {
       <p className={styles.disclaimer}>
         {pick(
           language,
-          "* Volume séance = contrats négociés pendant la séance; OI = contrats encore ouverts. Un volume nul avec OI positif est normal. IV/Greeks : données fournisseur lorsqu’elles existent; sinon estimations Anatole. Les fallbacks CME publics sont EOD et donc différés.",
-          "* Session volume = contracts traded during the session; OI = contracts still open. Zero volume with positive OI is normal. IV/Greeks: provider data when available; otherwise Anatole estimates. Public CME fallbacks are EOD and therefore delayed.",
+          "* Volume séance = contrats négociés pendant la séance; OI = contrats encore ouverts. Une valeur manquante reste N/D. Prix fourni : nature à confirmer. Les cotations peuvent être différées.",
+          "* Session volume = contracts traded during the session; OI = contracts still open. Missing values remain N/A. Provider price type is unconfirmed. Quotes may be delayed.",
         )}
       </p>
     </main>

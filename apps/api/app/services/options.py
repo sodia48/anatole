@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import re
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from html import unescape
 from html.parser import HTMLParser
 from statistics import median
@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.data_hub import shared_data_hub
 from app.core.resilience import shared_http_client
 from app.services.bank_of_canada import bank_of_canada_valet_service
-from app.services.public_commodity_options import public_commodity_options_service
+from app.services.commodity_option_snapshots import commodity_option_snapshots, snapshot_age_seconds
 from app.schemas.options import (
     OptionAnalytics,
     OptionChainSnapshot,
@@ -308,8 +308,8 @@ def _barchart_contract(
         exchange=str(item.get("exchange") or "Barchart").strip(),
         bid=_number(item.get("bid")),
         ask=_number(item.get("ask")),
-        last=_number(item.get("last") or item.get("lastPrice") or item.get("close")),
-        change=_number(item.get("change") or item.get("netChange")),
+        last=_number(next((item[key] for key in ("last", "lastPrice", "close") if item.get(key) is not None), None)),
+        change=_number(next((item[key] for key in ("change", "netChange") if item.get(key) is not None), None)),
         percent_change=_number(item.get("percentChange")),
         volume=_integer(item.get("volume")),
         open_interest=_integer(item.get("openInterest")),
@@ -700,6 +700,26 @@ def _analytics(
     )
 
 
+def _commodity_analytics(contracts: list[OptionContract]) -> OptionAnalytics:
+    """Do not turn missing fields or an unknown underlying into market facts."""
+    calls = [item for item in contracts if item.side == "call"]
+    puts = [item for item in contracts if item.side == "put"]
+
+    def total(items: list[OptionContract], field: str) -> int | None:
+        values = [getattr(item, field) for item in items]
+        return sum(values) if values and all(value is not None for value in values) else None
+
+    call_volume, put_volume = total(calls, "volume"), total(puts, "volume")
+    call_oi, put_oi = total(calls, "open_interest"), total(puts, "open_interest")
+    return OptionAnalytics(
+        contract_count=len(contracts), call_count=len(calls), put_count=len(puts),
+        call_volume=call_volume, put_volume=put_volume,
+        call_open_interest=call_oi, put_open_interest=put_oi,
+        put_call_volume_ratio=_ratio(put_volume, call_volume) if put_volume is not None and call_volume is not None else None,
+        put_call_open_interest_ratio=_ratio(put_oi, call_oi) if put_oi is not None and call_oi is not None else None,
+    )
+
+
 class OptionsService:
     def __init__(self) -> None:
         # v3 invalide les snapshots antérieurs qui contenaient encore du
@@ -773,17 +793,16 @@ class OptionsService:
             )
             for root, name, category, exchange in _COMMODITIES
         ]
-        if settings.barchart_api_key:
+        if settings.barchart_api_key and settings.commodity_options_barchart_authorized:
             detail = (
-                f"{len(items)} racines majeures préchargées; toute autre racine de futures "
-                "supportée par Barchart peut être saisie manuellement."
+                f"{len(items)} raccourcis de navigation ; la disponibilité réelle "
+                "dépend du dernier instantané collecté pour chaque racine."
             )
-            status = "available"
+            status = "partial"
         else:
             detail = (
-                f"{len(items)} racines majeures disponibles. Barchart est optionnel : "
-                "Anatole utilise aussi les Daily Bulletins publics CME/CBOT/NYMEX/COMEX "
-                "sans clé API, et les métadonnées publiques ICE lorsqu'elles existent."
+                f"{len(items)} raccourcis de navigation. La disponibilité des chaînes "
+                "nécessite un fournisseur autorisé et une collecte configurée."
             )
             status = "partial"
         return items, OptionSourceStatus(
@@ -1042,85 +1061,48 @@ class OptionsService:
         root: str,
         expiration: str | None,
         contract: str | None,
-    ) -> tuple[list[OptionContract], list[str], list[OptionSourceStatus]]:
-        statuses: list[OptionSourceStatus] = []
-
-        # Barchart reste un enrichissement facultatif. S'il est configuré et
-        # renvoie une chaîne, on la privilégie pour l'intraday et les champs
-        # additionnels. Son absence ne vide plus la section matières premières.
-        if settings.barchart_api_key:
-            params: dict[str, str] = {
-                "apikey": settings.barchart_api_key,
-                "root": root,
-                "fields": "bid,bidSize,ask,askSize,premium,openInterest",
-            }
-            if contract:
-                params["contract"] = contract
-            try:
-                payload = await shared_http_client.get_json(
-                    f"{_BARCHART_BASE}/getFuturesOptions.json",
-                    attempts=1,
-                    params=params,
-                )
-                results = payload.get("results") or []
-                provider_contracts = [
-                    parsed
-                    for raw in results
-                    if isinstance(raw, dict)
-                    for parsed in [
-                        _barchart_contract(
-                            raw,
-                            market="commodities",
-                            fallback_underlying=root,
-                        )
-                    ]
-                    if parsed is not None
-                ]
-                provider_expirations = sorted(
-                    {item.expiration for item in provider_contracts}
-                )
-                if expiration:
-                    provider_contracts = [
-                        item for item in provider_contracts
-                        if item.expiration == expiration
-                    ]
-                if provider_contracts:
-                    return provider_contracts, provider_expirations, [
-                        OptionSourceStatus(
-                            source="Barchart OnDemand",
-                            status="available",
-                            detail=f"{len(provider_contracts)} contrats fournisseur.",
-                        )
-                    ]
-                statuses.append(
-                    OptionSourceStatus(
-                        source="Barchart OnDemand",
-                        status="partial",
-                        detail="Aucun contrat fournisseur pour cette racine/échéance; fallback public tenté.",
-                    )
-                )
-            except Exception as error:  # noqa: BLE001
-                statuses.append(
-                    OptionSourceStatus(
-                        source="Barchart OnDemand",
-                        status="unavailable",
-                        detail=f"Fournisseur indisponible ({type(error).__name__}); fallback public tenté.",
-                    )
-                )
-        else:
-            statuses.append(
-                OptionSourceStatus(
-                    source="Barchart OnDemand",
-                    status="partial",
-                    detail="Clé non configurée; fournisseur facultatif. Le fallback public des bourses est utilisé.",
-                )
+    ) -> OptionChainSnapshot:
+        catalog = {key: (name, category, exchange) for key, name, category, exchange in _COMMODITIES}
+        name, category, exchange = catalog.get(root, (root, "Custom futures root", "Provider"))
+        snapshot = None
+        state = "not_authorized"
+        if settings.commodity_options_barchart_authorized:
+            snapshot, state = await commodity_option_snapshots.read(root)
+        if snapshot is None:
+            detail = (
+                "Aucune source avec droits de collecte et d'affichage confirmés n'est configurée."
+                if state == "not_authorized" else
+                "Aucun instantané disponible : vérifiez le stockage et la collecte autorisée."
+            )
+            return OptionChainSnapshot(
+                market="commodities", symbol=root, provider_symbol=root, name=name,
+                category=category, exchange=exchange, requested_expiration=expiration,
+                source_statuses=[OptionSourceStatus(source="Commodity snapshots", status="unavailable", detail=detail)],
+                generated_at=datetime.now(UTC),
             )
 
-        public_contracts, public_expirations, public_status = (
-            await public_commodity_options_service.chain(root, expiration)
-        )
-        statuses.append(public_status)
-        return public_contracts, public_expirations, statuses
+        contracts = [item for item in snapshot.contracts
+                     if (not expiration or item.expiration == expiration)
+                     and (not contract or (item.contract or "").upper() == contract)]
+        age = snapshot_age_seconds(snapshot)
+        source_old = False
+        if snapshot.source_observation_date:
+            try:
+                source_old = date.fromisoformat(snapshot.source_observation_date) < datetime.now(UTC).date()
+            except ValueError:
+                source_old = True
+        stale = state != "hit" or age > settings.commodity_options_refresh_seconds or source_old
+        statuses = list(snapshot.source_statuses)
+        if stale:
+            statuses.append(OptionSourceStatus(
+                source="Commodity snapshots", status="partial",
+                detail=f"Instantané récupéré il y a {int(age // 60)} min ; ancienneté des données ou état du stockage à vérifier.",
+            ))
+        return snapshot.model_copy(update={
+            "requested_expiration": expiration, "contracts": contracts,
+            "analytics": _commodity_analytics(contracts), "source_statuses": statuses,
+            "stale": stale, "refresh_after_seconds": settings.commodity_options_refresh_seconds,
+        })
 
     async def chain(
         self,
@@ -1138,8 +1120,16 @@ class OptionsService:
             raise ValueError("Symbole d'option invalide.")
         if expiration and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", expiration):
             raise ValueError("expiration doit être au format YYYY-MM-DD.")
+        if expiration:
+            try:
+                date.fromisoformat(expiration)
+            except ValueError as error:
+                raise ValueError("expiration doit être une date valide.") from error
         if contract and not re.fullmatch(r"[A-Z0-9.^|-]{1,32}", contract.upper()):
             raise ValueError("Contrat de futures invalide.")
+
+        if normalized_market == "commodities":
+            return await self._commodity_chain(normalized_symbol, expiration, contract.upper() if contract else None)
 
         key = (
             normalized_market,
@@ -1170,30 +1160,7 @@ class OptionsService:
                     generated_at=datetime.now(UTC),
                 )
 
-            catalog = {root: (name, category, exchange) for root, name, category, exchange in _COMMODITIES}
-            name, category, exchange = catalog.get(
-                normalized_symbol,
-                (normalized_symbol, "Custom futures root", "Provider"),
-            )
-            contracts, expirations, statuses = await self._commodity_chain(
-                normalized_symbol,
-                expiration,
-                contract.upper() if contract else None,
-            )
-            return OptionChainSnapshot(
-                market="commodities",
-                symbol=normalized_symbol,
-                provider_symbol=normalized_symbol,
-                name=name,
-                category=category,
-                exchange=exchange,
-                requested_expiration=expiration,
-                expirations=expirations,
-                contracts=contracts[:5000],
-                analytics=_analytics(contracts, None),
-                source_statuses=statuses,
-                generated_at=datetime.now(UTC),
-            )
+            raise AssertionError("commodity requests are served from snapshots")
 
         return await self._chain_cache.get_or_load(
             key,
