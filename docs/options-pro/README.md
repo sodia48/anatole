@@ -6,7 +6,7 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 | --- | --- | --- |
 | 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | En cours |
 | 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | PR 1 ; validation réelle conditionnée aux droits |
-| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | PR 1–2 |
+| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | Prototype en cours sur PR 1–2 ; mesures et validation en attente |
 | 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Contrats et spécifications vérifiés |
 | 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | Données de qualité et modèles validés |
 | 6 — Screener & Heatmap | Filtres et visualisations | PR 3 et données suffisantes |
@@ -40,3 +40,9 @@ Le parseur expérimental du bulletin distingue maintenant le mois contractuel de
 Des PDF **entièrement synthétiques**, générés dans les tests, couvrent énergie, métaux, agriculture, élevage et bois, avec changements de page et sections call/put. Ces tests ne valident ni le format d'un bulletin réel ni le nombre de contrats GC ou RB. Les multiplicateurs, unités, style d'exercice, bourse, sous-jacents et dates réelles de l'ensemble des racines restent à vérifier auprès de sources autorisées ; le parseur historique n'est pas raccordé aux requêtes. La couverture réelle, les droits et la comparaison aux originaux restent donc ouvertes et ce lot demeure en brouillon.
 
 Racines à auditer : énergie CL, BZ, NG, RB, HO ; métaux GC, SI, HG, PL, PA ; agriculture ZC, ZW, KE, ZO, ZR, ZS, ZM, ZL ; élevage LE, GF, HE ; bois LBR. Leur présence dans la configuration historique est un point de départ, pas une preuve de disponibilité ni de conformité des spécifications. À titre d'exemple, CME distingue le code d'option sur l'or OG du sous-jacent GC dans sa [fiche contractuelle](https://www.cmegroup.com/trading/metals/files/fact-card-gold-futures-options.pdf) : la racine du futur ne suffit pas pour identifier l'option.
+
+## PR 3 — chaîne web en cours
+
+La vue web rapproche un call et un put uniquement lorsque le marché, le sous-jacent, le contrat à terme lorsqu'il est nécessaire, l'échéance réelle et le strike concordent sans ambiguïté. Une série ambiguë ou à échéance inconnue reste distincte. Les filtres ne considèrent pas une valeur manquante comme zéro ; le filtre de spread utilise l'écart absolu ask moins bid. L'indicateur ATM n'est produit que si le sous-jacent est disponible. La limite d'affichage de 1 200 lignes est signalée. Les tests Playwright et les captures utilisent des contrats synthétiques.
+
+Les filtres et la vue jumelée sont pour l'instant limités au web ; l'écran mobile natif conserve ses cartes et devra être enrichi avant de considérer la PR complète. Les préférences de cette vue ne sont pas encore persistées. Les composants de stratégie, screener et heatmap relèvent des lots suivants. Les tests sur une chaîne réelle restent dépendants d'une source autorisée. Le budget JavaScript actuel est respecté avec une marge très faible, à surveiller à chaque changement.
