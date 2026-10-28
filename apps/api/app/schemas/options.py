@@ -64,10 +64,10 @@ class OptionAnalytics(BaseModel):
     contract_count: int = 0
     call_count: int = 0
     put_count: int = 0
-    call_volume: int = 0
-    put_volume: int = 0
-    call_open_interest: int = 0
-    put_open_interest: int = 0
+    call_volume: int | None = None
+    put_volume: int | None = None
+    call_open_interest: int | None = None
+    put_open_interest: int | None = None
     put_call_volume_ratio: float | None = None
     put_call_open_interest_ratio: float | None = None
     atm_implied_volatility: float | None = None
@@ -90,3 +90,5 @@ class OptionChainSnapshot(BaseModel):
     generated_at: datetime
     refresh_after_seconds: int = 30
     stale: bool = False
+    # Earliest source date found, not the time at which a quote was observed.
+    source_observation_date: str | None = None

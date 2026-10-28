@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     redis_singleflight_poll_seconds: float = Field(default=0.05, ge=0.01, le=1.0)
     finnhub_api_key: str = ""
     barchart_api_key: str = ""
+    # An API key alone does not establish storage and display rights.
+    commodity_options_barchart_authorized: bool = False
+    commodity_options_refresh_seconds: int = Field(default=21_600, ge=300, le=604_800)
     openai_api_key: str = Field(
         default="",
         validation_alias="OPENAI_API_KEY",
