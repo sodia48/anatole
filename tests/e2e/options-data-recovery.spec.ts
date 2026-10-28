@@ -40,6 +40,7 @@ test("commodity selection stays responsive and ignores an obsolete chain", async
     await route.fulfill({ json: body }).catch(() => undefined);
   });
   await page.goto("/options", { waitUntil: "domcontentloaded" });
+  await expect(page.getByRole("heading", { name: "RY · RY" })).toBeVisible();
   await page.getByRole("button", { name: "Matières premières", exact: true }).click();
   await goldRequested;
   const rb = page.getByRole("button", { name: "RB RBOB Gasoline" });
