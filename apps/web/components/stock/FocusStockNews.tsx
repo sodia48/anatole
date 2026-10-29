@@ -142,7 +142,7 @@ export function FocusStockNews({
 
   return (
     <section
-      className="focus-news-root"
+      className="fsn_root__"
       aria-label={pick(
         language,
         `Dernières nouvelles pour ${ticker}`,
@@ -150,9 +150,9 @@ export function FocusStockNews({
       )}
       data-testid="focus-stock-news"
     >
-      <header className="focus-news-header">
+      <header className="fsn_header__">
         <div>
-          <span className="focus-news-eyebrow">
+          <span className="fsn_eyebrow__">
             <FocusGlyph name="Newspaper" size={14} />
             {tr(language, "ACTUALITÉS DU TITRE", "STOCK NEWS")}
           </span>
@@ -161,14 +161,14 @@ export function FocusStockNews({
           </h2>
         </div>
         {!loading && items.length ? (
-          <span className="focus-news-count">
+          <span className="fsn_count__">
             {snapshot?.total_items ?? items.length} {tr(language, "événements", "events")}
           </span>
         ) : null}
       </header>
 
       {!loading && items.length ? (
-        <div className="focus-news-filters" role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
+        <div className="fsn_filters__" role="group" aria-label={tr(language, "Filtrer les actualités", "Filter news")}>
           {FILTERS.map(([option, fr, en]) => (
             <button key={option} type="button" aria-pressed={filter === option} onClick={() => setFilter(option)}>
               {tr(language, fr, en)}
@@ -176,48 +176,48 @@ export function FocusStockNews({
           ))}
         </div>
       ) : null}
-      {snapshot?.coverage_note ? <p className="focus-news-coverage">{snapshot.coverage_note}</p> : null}
-      {snapshot?.stale ? <p className="focus-news-coverage" role="status">{tr(language, "Instantané périmé : actualisation en cours.", "Stale snapshot: refresh in progress.")}</p> : null}
+      {snapshot?.coverage_note ? <p className="fsn_coverage__">{snapshot.coverage_note}</p> : null}
+      {snapshot?.stale ? <p className="fsn_coverage__" role="status">{tr(language, "Instantané périmé : actualisation en cours.", "Stale snapshot: refresh in progress.")}</p> : null}
 
       {loading ? (
-        <div className="focus-news-state">
+        <div className="fsn_state__">
           {tr(language, "Recherche des nouvelles récentes…", "Loading recent news…")}
         </div>
       ) : null}
 
       {!loading && (error || !items.length) ? (
-        <div className="focus-news-state">
+        <div className="fsn_state__">
           {error ? tr(language, "Les sources d’actualités sont momentanément indisponibles.", "News sources are temporarily unavailable.")
             : tr(language, "Aucune nouvelle vérifiée dans cette catégorie.", "No verified news in this category.")}
         </div>
       ) : null}
 
       {items.length ? (
-        <div className="focus-news-grid">
+        <div className="fsn_grid__">
           {items.map((item, index) => {
             const readable = canReadBrief(item);
             const contents = <>
-              <div className="focus-news-meta">
+              <div className="fsn_meta__">
                 <span>{item.publisher}</span>
                 <time dateTime={item.event_published_at ?? item.published_at}>
                   {item.origin === "company_release" && !item.event_published_at ? new Intl.DateTimeFormat(localeFor(language), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(item.published_at)) : formatter.format(new Date(item.event_published_at ?? item.published_at))}
                 </time>
               </div>
-              <span className="focus-news-relevance">{item.origin === "company_release" ? tr(language, "Communiqué officiel", "Official release") : item.relevance === "sector" ? tr(language, "Secteur", "Sector") : item.relevance === "market" ? tr(language, "Marché", "Market") : tr(language, "Entreprise", "Company")}</span>
+              <span className="fsn_relevance__">{item.origin === "company_release" ? tr(language, "Communiqué officiel", "Official release") : item.relevance === "sector" ? tr(language, "Secteur", "Sector") : item.relevance === "market" ? tr(language, "Marché", "Market") : tr(language, "Entreprise", "Company")}</span>
               <h3>{item.title}</h3>
-              {item.summary ? <p className="focus-news-summary">{item.summary}</p> : null}
+              {item.summary ? <p className="fsn_summary__">{item.summary}</p> : null}
             </>;
-            return <article className={`focus-news-card ${index === 0 ? "focus-news-featured" : ""}`} key={item.id}>
+            return <article className={`fsn_card__ ${index === 0 ? "fsn_featured__" : ""}`} key={item.id}>
               {item.image_url?.startsWith("https://") ? (
                 // The image is supplied by the publisher and is not fetched by our server.
                 // eslint-disable-next-line @next/next/no-img-element
-                <img className="focus-news-thumbnail" src={item.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+                <img className="fsn_thumbnail__" src={item.image_url} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.style.display = "none"; }} />
               ) : null}
-              <div className="focus-news-storyBody">{contents}
-                <div className="focus-news-storyActions">
-                {readable ? <button className="focus-news-open" aria-label={`${item.title} · ${tr(language, "Lire l’analyse", "Read analysis")}`} onClick={(event) => { readerTrigger.current = event.currentTarget; setSelected(item); }} type="button">{tr(language, "Lire l’analyse", "Read analysis")}</button>
-                  : <a className="focus-news-open" aria-label={`${item.title} · ${tr(language, "Voir l’article original", "View original article")}`} href={item.url} target="_blank" rel="noopener noreferrer">{tr(language, "Voir l’article original", "View original article")}</a>}
-                {item.related_sources?.length ? <details className="focus-news-sources">
+              <div className="fsn_storyBody__">{contents}
+                <div className="fsn_storyActions__">
+                {readable ? <button className="fsn_open__" aria-label={`${item.title} · ${tr(language, "Lire l’analyse", "Read analysis")}`} onClick={(event) => { readerTrigger.current = event.currentTarget; setSelected(item); }} type="button">{tr(language, "Lire l’analyse", "Read analysis")}</button>
+                  : <a className="fsn_open__" aria-label={`${item.title} · ${tr(language, "Voir l’article original", "View original article")}`} href={item.url} target="_blank" rel="noopener noreferrer">{tr(language, "Voir l’article original", "View original article")}</a>}
+                {item.related_sources?.length ? <details className="fsn_sources__">
                   <summary>{tr(language, "Autres sources", "Other sources")} · {item.related_sources.length}</summary>
                   <ul>{item.related_sources.map((source) => <li key={source.url}>
                     <a href={source.url} target="_blank" rel="noopener noreferrer">{source.publisher} · {source.title}</a>
@@ -230,7 +230,7 @@ export function FocusStockNews({
           })}
         </div>
       ) : null}
-      {snapshot?.has_more ? <button className="focus-news-more" type="button" disabled={loadingMore} onClick={() => void loadMore()}>
+      {snapshot?.has_more ? <button className="fsn_more__" type="button" disabled={loadingMore} onClick={() => void loadMore()}>
         {loadingMore ? tr(language, "Chargement…", "Loading…") : tr(language, "Charger plus", "Load more")}
       </button> : null}
       {selected && selectedArticle ? (
