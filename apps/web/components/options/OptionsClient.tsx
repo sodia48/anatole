@@ -1,7 +1,8 @@
 "use client";
 
 import { RefreshCw, Search } from "@/components/layout/AppIcons";
-import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
@@ -9,6 +10,7 @@ import {
   getOptionChain,
   getOptionsUniverse,
   type OptionChainSnapshot,
+  type OptionContract,
   type OptionMarket,
   type OptionSourceStatus,
   type OptionUniverseSnapshot,
@@ -16,6 +18,9 @@ import {
 
 import "./options.css";
 import { PremiumChain } from "./PremiumChain";
+import type { StrategyLeg } from "./StrategyBuilder";
+
+const StrategyBuilder = dynamic(() => import("./StrategyBuilder").then((module) => module.StrategyBuilder), { ssr: false });
 
 type SideFilter = "both" | "call" | "put";
 
@@ -86,6 +91,20 @@ export function OptionsClient() {
   const [universeError, setUniverseError] = useState<string | null>(null);
   const [chainError, setChainError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [legs, setLegs] = useState<StrategyLeg[]>([]);
+  const [showStrategy, setShowStrategy] = useState(false);
+  const nextLegId = useRef(0);
+
+  function addStrategyLeg(contract: OptionContract) {
+    if (legs.length >= 20) {
+      setChainError(pick(language, "La stratégie est limitée à 20 jambes.", "A strategy is limited to 20 legs."));
+      return;
+    }
+    setChainError(null);
+    const id = nextLegId.current++;
+    setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: "long", quantity: "1", premium: "", multiplier: "", snapshotStale: chain?.stale ?? false, snapshotAt: chain?.generated_at ?? "", upfront: false }]);
+    setShowStrategy(true);
+  }
 
   useEffect(() => {
     const controller = new AbortController();
@@ -347,7 +366,7 @@ export function OptionsClient() {
           </div>
         ) : contracts.length ? (
           <PremiumChain contracts={contracts} underlying={chain?.underlying_price ?? null}
-            stale={chain?.stale ?? false} language={language} display={value} />
+            stale={chain?.stale ?? false} language={language} display={value} onAddStrategy={addStrategyLeg} />
         ) : (
           <div className={"op-empty"}>
             <strong>{pick(language, "Aucune chaîne exploitable pour l'instant.", "No usable chain yet.")}</strong>
@@ -367,6 +386,8 @@ export function OptionsClient() {
           </div>
         )}
       </section>
+
+      {showStrategy ? <StrategyBuilder legs={legs} setLegs={setLegs} language={language} /> : null}
 
       <p className={"op-disclaimer"}>
         {pick(
