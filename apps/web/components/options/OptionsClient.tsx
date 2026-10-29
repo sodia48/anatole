@@ -21,6 +21,7 @@ import { PremiumChain } from "./PremiumChain";
 import type { StrategyLeg } from "./StrategyBuilder";
 
 const StrategyBuilder = dynamic(() => import("./StrategyBuilder").then((module) => module.StrategyBuilder), { ssr: false });
+const VolatilityIntelligence = dynamic(() => import("./VolatilityIntelligence").then((module) => module.VolatilityIntelligence), { ssr: false });
 
 type SideFilter = "both" | "call" | "put";
 
@@ -93,6 +94,7 @@ export function OptionsClient() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [legs, setLegs] = useState<StrategyLeg[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
+  const [showVolatility, setShowVolatility] = useState(false);
   const nextLegId = useRef(0);
 
   function addStrategyLeg(contract: OptionContract) {
@@ -205,6 +207,9 @@ export function OptionsClient() {
             )}
           </p>
         </div>
+        <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showVolatility} onClick={() => setShowVolatility(!showVolatility)}>
+          {pick(language, "Intelligence de volatilité", "Volatility intelligence")}
+        </button>
       </header>
 
       <section className="panel op-controls">
@@ -388,6 +393,7 @@ export function OptionsClient() {
       </section>
 
       {showStrategy ? <StrategyBuilder legs={legs} setLegs={setLegs} language={language} /> : null}
+      {showVolatility && chain ? <VolatilityIntelligence chain={chain} language={language} /> : null}
 
       <p className={"op-disclaimer"}>
         {pick(

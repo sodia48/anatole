@@ -25,6 +25,22 @@
   color: var(--muted);
 }
 
+.op-vol-toggle {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--blue);
+  border-radius: 12px;
+  background: var(--primary-surface);
+  color: var(--accent-text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.op-vol-toggle:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .op-controls {
   display: grid;
   gap: 16px;
