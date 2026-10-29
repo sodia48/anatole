@@ -46,7 +46,7 @@ import {
 import { PortfolioIntelligence } from "./PortfolioIntelligence";
 import { PortfolioPerformancePanel } from "./PortfolioPerformancePanel";
 
-import styles from "./Workspace.module.css";
+import "./Workspace.css";
 
 const STORAGE_KEY = "anatole:portfolio:v1";
 const SNAPSHOT_CACHE_KEY = "anatole:portfolio:snapshot:v2";
@@ -88,7 +88,7 @@ function percent(value: number | null, digits = 1): string {
 }
 
 function tone(value: number): string {
-  return value > 0.001 ? styles.positive : value < -0.001 ? styles.negative : "";
+  return value > 0.001 ? "anatole-ws-positive" : value < -0.001 ? "anatole-ws-negative" : "";
 }
 
 function riskLabel(value: NonNullable<PortfolioSnapshot["risk"]>["risk_level"], language: AnatoleLanguage): string {
@@ -290,19 +290,19 @@ function AllocationCard({ title, items, totalLabel, language }: { title: string;
     return `${COLORS[index % COLORS.length]} ${start}% ${cursor}%`;
   });
   return (
-    <section className={`panel ${styles.panel}`}>
-      <div className={styles.cardHeader}>
+    <section className={`panel ${"anatole-ws-panel"}`}>
+      <div className={"anatole-ws-cardHeader"}>
         <div><span className="eyebrow">{pick(language, "RÉPARTITION", "ALLOCATION")}</span><h3>{title}</h3></div>
       </div>
-      <div className={styles.allocationLayout}>
-        <div className={styles.donut} style={{ background: items.length ? `conic-gradient(${stops.join(",")})` : "var(--surface-raised)" }}>
+      <div className={"anatole-ws-allocationLayout"}>
+        <div className={"anatole-ws-donut"} style={{ background: items.length ? `conic-gradient(${stops.join(",")})` : "var(--surface-raised)" }}>
           <strong>{items.length}</strong><small>{totalLabel}</small>
         </div>
-        <div className={styles.allocationList}>
+        <div className={"anatole-ws-allocationList"}>
           {items.slice(0, 8).map((item, index) => (
-            <div className={styles.allocationRow} key={item.key}>
+            <div className={"anatole-ws-allocationRow"} key={item.key}>
               <span><i style={{ display: "inline-block", width: 7, height: 7, marginRight: 7, borderRadius: 99, background: COLORS[index % COLORS.length] }} />{item.label}</span>
-              <span className={styles.progress}><i style={{ width: `${Math.min(item.weight_percent, 100)}%` }} /></span>
+              <span className={"anatole-ws-progress"}><i style={{ width: `${Math.min(item.weight_percent, 100)}%` }} /></span>
               <strong>{item.weight_percent.toFixed(1)} %</strong>
             </div>
           ))}
@@ -774,14 +774,14 @@ export function PortfolioClient({
   const observationGrade = observation ? portfolioSpeedGrade(observation) : "pending";
 
   return (
-    <main className={styles.page}>
-      <section className={`panel ${styles.hero}`}>
-        <div className={styles.heroCopy}>
+    <main className={"anatole-ws-page"}>
+      <section className={`panel ${"anatole-ws-hero"}`}>
+        <div className={"anatole-ws-heroCopy"}>
           <span className="eyebrow">{pick(language, "MON ESPACE", "MY WORKSPACE")} · V0.7</span>
           <h1>{pick(language, "Portefeuille", "Portfolio")}</h1>
           <p>{pick(language, "Positions locales, performance, P&L, allocation sectorielle, concentration et risque. Aucun ordre n’est exécuté et les positions restent dans ce navigateur.", "Local positions, performance, P&L, sector allocation, concentration, and risk. No order is executed and positions remain in this browser.")}</p>
         </div>
-        <div className={styles.heroMetric}>
+        <div className={"anatole-ws-heroMetric"}>
           <strong>{snapshot?.portfolio_score?.toFixed(1) ?? (analyticsPending ? "…" : pick(language, "N/D", "N/A"))}</strong>
           <span>{pick(language, "score portefeuille", "portfolio score")}</span>
           <small>{positions.length} {pick(language, `position${positions.length > 1 ? "s" : ""}`, `position${positions.length === 1 ? "" : "s"}`)} · {liveCount} {pick(language, `cotation${liveCount > 1 ? "s" : ""} publique${liveCount > 1 ? "s" : ""}`, `public quote${liveCount === 1 ? "" : "s"}`)}</small>
@@ -790,8 +790,8 @@ export function PortfolioClient({
 
       {positions.length ? (
         <>
-          <div className={styles.portfolioStatus} role="status">
-            <span className={loading ? styles.statusDotBusy : styles.statusDot} />
+          <div className={"anatole-ws-portfolioStatus"} role="status">
+            <span className={loading ? "anatole-ws-statusDotBusy" : "anatole-ws-statusDot"} />
             <strong>
               {snapshotFromCache
                 ? pick(language, "Affichage instantané du dernier calcul", "Showing the latest cached calculation")
@@ -802,7 +802,7 @@ export function PortfolioClient({
             {analyticsPending ? <small>{pick(language, "Valorisation disponible · intelligence historique en cours", "Valuation available · historical intelligence loading")}</small> : null}
           </div>
           {observation ? (
-            <div className={`${styles.portfolioObservatory} ${styles[`portfolioObservatory_${observationGrade}`]}`} data-testid="portfolio-observatory">
+            <div className={`${"anatole-ws-portfolioObservatory"} ${`anatole-ws-portfolioObservatory_${observationGrade}`}`} data-testid="portfolio-observatory">
               <strong>{pick(language, "Vitesse", "Speed")}</strong>
               <span>{observation.cache_hit ? `${pick(language, "Affichage", "Display")} ${formatPortfolioMs(observation.display_ms)}` : pick(language, "Sans cache", "No cache")}</span>
               <span>{pick(language, "Prix", "Prices")} {formatPortfolioMs(observation.price_ms)}</span>
@@ -813,19 +813,19 @@ export function PortfolioClient({
         </>
       ) : null}
 
-      <section className={`panel ${styles.toolbar}`}>
-        <div className={styles.toolbarTop}>
+      <section className={`panel ${"anatole-ws-toolbar"}`}>
+        <div className={"anatole-ws-toolbarTop"}>
           <div><span className="eyebrow">{pick(language, "CONSTRUCTION", "BUILD")}</span><h2>{pick(language, "Ajouter ou importer des positions", "Add or import positions")}</h2><p>{pick(language, "Le coût moyen est saisi dans la devise de cotation du titre.", "Average cost is entered in the security’s quote currency.")}</p></div>
-          <div className={styles.actionRow}>
-            <button className={styles.primaryButton} type="button" onClick={() => setBuilderOpen((current) => !current)}><Plus size={15} /> {builderOpen ? pick(language, "Fermer", "Close") : pick(language, "Ajouter", "Add")}</button>
-            {!positions.length ? <button className={styles.secondaryButton} type="button" onClick={loadExample}>{pick(language, "Charger un exemple", "Load example")}</button> : null}
-            <button className={styles.secondaryButton} type="button" onClick={() => importedRef.current?.click()}><Upload size={15} /> {pick(language, "Importer CSV", "Import CSV")}</button>
-            <button className={styles.secondaryButton} type="button" disabled={!positions.length} onClick={exportCsv}><Download size={15} /> {pick(language, "Exporter", "Export")}</button>
+          <div className={"anatole-ws-actionRow"}>
+            <button className={"anatole-ws-primaryButton"} type="button" onClick={() => setBuilderOpen((current) => !current)}><Plus size={15} /> {builderOpen ? pick(language, "Fermer", "Close") : pick(language, "Ajouter", "Add")}</button>
+            {!positions.length ? <button className={"anatole-ws-secondaryButton"} type="button" onClick={loadExample}>{pick(language, "Charger un exemple", "Load example")}</button> : null}
+            <button className={"anatole-ws-secondaryButton"} type="button" onClick={() => importedRef.current?.click()}><Upload size={15} /> {pick(language, "Importer CSV", "Import CSV")}</button>
+            <button className={"anatole-ws-secondaryButton"} type="button" disabled={!positions.length} onClick={exportCsv}><Download size={15} /> {pick(language, "Exporter", "Export")}</button>
             <input ref={importedRef} aria-label={pick(language, "Importer un portefeuille CSV", "Import a CSV portfolio")} hidden type="file" accept=".csv,text/csv" onChange={(event) => importCsv(event.target.files?.[0])} />
           </div>
         </div>
-        {builderOpen ? <div className={`${styles.formGrid} ${styles.portfolioGlobalForm}`}>
-          <div className={styles.field}>
+        {builderOpen ? <div className={`${"anatole-ws-formGrid"} ${"anatole-ws-portfolioGlobalForm"}`}>
+          <div className={"anatole-ws-field"}>
             <label htmlFor="portfolio-market">{pick(language, "Marché", "Market")}</label>
             <select id="portfolio-market" value={market} onChange={(event) => { setMarket(event.target.value as PortfolioMarket); setSymbol(""); setSuggestions([]); }}>
               <option value="CA">{pick(language, "Canada (TSX/TSXV)", "Canada (TSX/TSXV)")}</option>
@@ -833,47 +833,47 @@ export function PortfolioClient({
               <option value="INTL">{pick(language, "International", "International")}</option>
             </select>
           </div>
-          <div className={styles.searchField}>
+          <div className={"anatole-ws-searchField"}>
             <label htmlFor="portfolio-symbol">{pick(language, "Symbole ou entreprise", "Symbol or company")}</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="portfolio-symbol" className={styles.searchInput} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
-            {suggestions.length ? <div className={styles.suggestions}>{suggestions.map((item) => <button className={styles.suggestion} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
-            {market !== "CA" ? <small className={styles.marketHint}>{market === "US" ? pick(language, "Entre le ticker américain exact, par ex. AAPL ou BRK-B.", "Enter the exact U.S. ticker, e.g. AAPL or BRK-B.") : pick(language, "Entre le ticker Yahoo avec suffixe de place, par ex. BMW.DE, 7203.T, AIR.PA ou NESN.SW.", "Enter the Yahoo ticker with exchange suffix, e.g. BMW.DE, 7203.T, AIR.PA or NESN.SW.")}</small> : null}
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="portfolio-symbol" className={"anatole-ws-searchInput"} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="RY, SHOP, XIC…" /></div>
+            {suggestions.length ? <div className={"anatole-ws-suggestions"}>{suggestions.map((item) => <button className={"anatole-ws-suggestion"} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
+            {market !== "CA" ? <small className={"anatole-ws-marketHint"}>{market === "US" ? pick(language, "Entre le ticker américain exact, par ex. AAPL ou BRK-B.", "Enter the exact U.S. ticker, e.g. AAPL or BRK-B.") : pick(language, "Entre le ticker Yahoo avec suffixe de place, par ex. BMW.DE, 7203.T, AIR.PA ou NESN.SW.", "Enter the Yahoo ticker with exchange suffix, e.g. BMW.DE, 7203.T, AIR.PA or NESN.SW.")}</small> : null}
           </div>
-          <div className={styles.field}><label htmlFor="portfolio-quantity">{pick(language, "Quantité", "Quantity")}</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
-          <div className={styles.field}><label htmlFor="portfolio-average-cost">{pick(language, "Coût moyen", "Average cost")}</label><input id="portfolio-average-cost" inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0.00" /></div>
-          <button className={styles.primaryButton} type="button" onClick={addPosition}><Plus size={16} /> {pick(language, "Ajouter", "Add")}</button>
+          <div className={"anatole-ws-field"}><label htmlFor="portfolio-quantity">{pick(language, "Quantité", "Quantity")}</label><input id="portfolio-quantity" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></div>
+          <div className={"anatole-ws-field"}><label htmlFor="portfolio-average-cost">{pick(language, "Coût moyen", "Average cost")}</label><input id="portfolio-average-cost" inputMode="decimal" value={averageCost} onChange={(event) => setAverageCost(event.target.value)} placeholder="0.00" /></div>
+          <button className={"anatole-ws-primaryButton"} type="button" onClick={addPosition}><Plus size={16} /> {pick(language, "Ajouter", "Add")}</button>
         </div> : null}
       </section>
 
-      {error ? <div className={styles.errorNotice} role="alert"><span>{error}</span><button className={styles.secondaryButton} disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
+      {error ? <div className={"anatole-ws-errorNotice"} role="alert"><span>{error}</span><button className={"anatole-ws-secondaryButton"} disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })} type="button"><RefreshCw aria-hidden="true" size={15} /> {pick(language, "Réessayer", "Retry")}</button></div> : null}
 
       {!positions.length ? (
-        <section className={`panel ${styles.emptyState}`}>
+        <section className={`panel ${"anatole-ws-emptyState"}`}>
           <BarChart3 size={30} />
           <strong>{pick(language, "Ton portefeuille est vide", "Your portfolio is empty")}</strong>
           <span>{pick(language, "Ajoute une position ou charge l’exemple pour voir le diagnostic complet.", "Add a position or load the example to view the full analysis.")}</span>
-          <button className={styles.primaryButton} type="button" onClick={loadExample}>{pick(language, "Charger l’exemple", "Load example")}</button>
+          <button className={"anatole-ws-primaryButton"} type="button" onClick={loadExample}>{pick(language, "Charger l’exemple", "Load example")}</button>
         </section>
       ) : (
         <>
-          <section className={styles.kpiGrid}>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Valeur actuelle", "Current value")}</span><strong>{snapshot ? money(snapshot.total_market_value, snapshot.base_currency, language) : pendingValue}</strong><small>CAD</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pendingValue}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pendingValue}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? (performanceReturn === null ? analyticsValue : percent(performanceReturn)) : pendingValue}</strong><small>{analyticsPending ? pick(language, "Historique en cours de calcul", "Historical analysis in progress") : pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
-            <article className={`panel ${styles.kpiCard}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? (snapshot.risk?.risk_level ? riskLabel(snapshot.risk.risk_level, language) : analyticsValue) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(1)}/100`}` : pendingValue}</small></article>
+          <section className={"anatole-ws-kpiGrid"}>
+            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Valeur actuelle", "Current value")}</span><strong>{snapshot ? money(snapshot.total_market_value, snapshot.base_currency, language) : pendingValue}</strong><small>CAD</small></article>
+            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "P&L latent", "Unrealized P&L")}</span><strong className={snapshot ? tone(snapshot.total_unrealized_pnl) : ""}>{snapshot ? money(snapshot.total_unrealized_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_unrealized_pnl_percent) : pendingValue}</small></article>
+            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Séance", "Session")}</span><strong className={snapshot ? tone(snapshot.total_day_pnl) : ""}>{snapshot ? money(snapshot.total_day_pnl, snapshot.base_currency, language) : pendingValue}</strong><small>{snapshot ? percent(snapshot.total_day_change_percent) : pendingValue}</small></article>
+            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Performance 1 an", "1-year performance")}</span><strong className={performanceReturn === null ? "" : tone(performanceReturn)}>{snapshot ? (performanceReturn === null ? analyticsValue : percent(performanceReturn)) : pendingValue}</strong><small>{analyticsPending ? pick(language, "Historique en cours de calcul", "Historical analysis in progress") : pick(language, "Portefeuille reconstitué aux poids actuels", "Portfolio reconstructed using current weights")}</small></article>
+            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Risque", "Risk")}</span><strong>{snapshot ? (snapshot.risk?.risk_level ? riskLabel(snapshot.risk.risk_level, language) : analyticsValue) : pendingValue}</strong><small>{snapshot ? `${pick(language, "Diversification", "Diversification")} ${snapshot.risk?.diversification_score == null ? pick(language, "N/D", "N/A") : `${snapshot.risk.diversification_score.toFixed(1)}/100`}` : pendingValue}</small></article>
           </section>
 
-          <section className={`panel ${styles.panel}`}>
-            <div className={styles.sectionHeading}><div><span className="eyebrow">POSITIONS</span><h2>{pick(language, "Détail du portefeuille", "Portfolio details")}</h2><p>{pick(language, "Modifie les quantités ou coûts moyens directement dans le tableau.", "Edit quantities or average costs directly in the table.")}</p></div><button className={styles.secondaryButton} type="button" disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button></div>
-            <div className={styles.tableWrap}>
-              <table className={styles.table} data-mobile-cards="portfolio">
+          <section className={`panel ${"anatole-ws-panel"}`}>
+            <div className={"anatole-ws-sectionHeading"}><div><span className="eyebrow">POSITIONS</span><h2>{pick(language, "Détail du portefeuille", "Portfolio details")}</h2><p>{pick(language, "Modifie les quantités ou coûts moyens directement dans le tableau.", "Edit quantities or average costs directly in the table.")}</p></div><button className={"anatole-ws-secondaryButton"} type="button" disabled={loading} onClick={() => void refresh(positions, { fullOnly: true })}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button></div>
+            <div className={"anatole-ws-tableWrap"}>
+              <table className={"anatole-ws-table"} data-mobile-cards="portfolio">
                 <thead><tr><th>{pick(language, "Titre", "Security")}</th><th>{pick(language, "Quantité", "Quantity")}</th><th>{pick(language, "Coût moyen", "Average cost")}</th><th>{pick(language, "Prix", "Price")}</th><th>{pick(language, "Valeur", "Value")}</th><th>{pick(language, "Poids", "Weight")}</th><th>P&amp;L</th><th>{pick(language, "Jour", "Day")}</th><th>Score</th><th /></tr></thead>
                 <tbody>
                   {positions.map((position, index) => {
                     const result = snapshotBySymbol.get(position.symbol);
                     return <tr key={position.symbol}>
-                      <td data-label={pick(language, "Titre", "Security")}><div className={styles.instrument}><span className={styles.symbolBadge}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{portfolioMarketLabel(position.market ?? "CA", language)} · {result?.native_currency ?? result?.currency ?? "—"} · {result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
+                      <td data-label={pick(language, "Titre", "Security")}><div className={"anatole-ws-instrument"}><span className={"anatole-ws-symbolBadge"}>{position.symbol}</span><span><b>{result?.name ?? position.symbol}</b><small>{portfolioMarketLabel(position.market ?? "CA", language)} · {result?.native_currency ?? result?.currency ?? "—"} · {result?.sector ?? (loading && !snapshot ? pick(language, "Chargement", "Loading") : pick(language, "Données temporairement indisponibles", "Data temporarily unavailable"))}</small></span></div></td>
                       <td data-label={pick(language, "Quantité", "Quantity")}><input aria-label={pick(language, `Quantité de ${position.symbol}`, `${position.symbol} quantity`)} style={{ width: 82, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.quantity} onChange={(event) => updatePosition(index, { quantity: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></td>
                       <td data-label={pick(language, "Coût moyen", "Average cost")}><input aria-label={pick(language, `Coût moyen de ${position.symbol}`, `${position.symbol} average cost`)} style={{ width: 96, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "inherit", padding: "7px 8px", textAlign: "right" }} value={position.average_cost} onChange={(event) => updatePosition(index, { average_cost: Math.max(0, Number(event.target.value) || 0) })} /></td>
                       <td data-label={pick(language, "Prix", "Price")}>{result ? money(result.native_price ?? result.price, result.native_currency ?? result.currency, language) : pendingValue}</td>
@@ -881,8 +881,8 @@ export function PortfolioClient({
                       <td data-label={pick(language, "Poids", "Weight")}>{result ? `${result.weight_percent.toFixed(1)} %` : pendingValue}</td>
                       <td data-label={pick(language, "P&L latent", "Unrealized P&L")} className={result ? tone(result.unrealized_pnl) : ""}>{result ? `${money(result.unrealized_pnl, snapshot?.base_currency, language)} · ${percent(result.unrealized_pnl_percent)}` : pendingValue}</td>
                       <td data-label={pick(language, "Séance", "Session")} className={result ? tone(result.day_pnl) : ""}>{result ? `${money(result.day_pnl, snapshot?.base_currency, language)} · ${percent(result.day_change_percent)}` : pendingValue}</td>
-                      <td data-label="Score">{result?.score !== null && result?.score !== undefined ? <span className={styles.scorePill}>{result.score.toFixed(0)}</span> : analyticsPending ? analyticsValue : pendingValue}</td>
-                      <td data-label="Action"><button className={styles.iconButton} type="button" aria-label={pick(language, `Supprimer ${position.symbol}`, `Delete ${position.symbol}`)} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
+                      <td data-label="Score">{result?.score !== null && result?.score !== undefined ? <span className={"anatole-ws-scorePill"}>{result.score.toFixed(0)}</span> : analyticsPending ? analyticsValue : pendingValue}</td>
+                      <td data-label="Action"><button className={"anatole-ws-iconButton"} type="button" aria-label={pick(language, `Supprimer ${position.symbol}`, `Delete ${position.symbol}`)} onClick={() => setPositions((current) => current.filter((_, itemIndex) => itemIndex !== index))}><Trash2 size={14} /></button></td>
                     </tr>;
                   })}
                 </tbody>
@@ -892,19 +892,19 @@ export function PortfolioClient({
 
           {snapshot ? (
             <>
-              <div className={styles.gridTwo}>
+              <div className={"anatole-ws-gridTwo"}>
                 <PortfolioPerformancePanel language={language} snapshot={snapshot} />
-                <section className={`panel ${styles.panel}`}>
-                  <div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${styles.statusPill} ${snapshot.risk?.risk_level === "Faible" ? styles.statusHealthy : snapshot.risk?.risk_level === "Modéré" ? styles.statusMonitoring : snapshot.risk?.risk_level ? styles.statusDegraded : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
-                  {snapshot.risk ? <div className={styles.riskGrid}>
-                    <div className={styles.riskMetric}><span>{pick(language, "Volatilité", "Volatility")}</span><strong>{optionalFixed(snapshot.risk.volatility_percent, 1, language, " %")}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Bêta TSX", "TSX beta")}</span><strong>{optionalFixed(snapshot.risk.beta, 2, language)}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Drawdown max", "Max drawdown")}</span><strong className={snapshot.risk.max_drawdown_percent === null ? "" : styles.negative}>{optionalFixed(snapshot.risk.max_drawdown_percent, 1, language, " %")}</strong></div>
-                    <div className={styles.riskMetric}><span>Sharpe</span><strong>{optionalFixed(snapshot.risk.sharpe_ratio, 2, language)}</strong></div>
-                    <div className={styles.riskMetric}><span>{pick(language, "Plus grande position", "Largest position")}</span><strong>{optionalFixed(snapshot.risk.top_position_percent, 1, language, " %")}</strong></div>
-                    <div className={styles.riskMetric}><span>Top 3</span><strong>{optionalFixed(snapshot.risk.top_three_percent, 1, language, " %")}</strong></div>
-                  </div> : <div className={styles.notice}>{pick(language, "Diagnostic de risque indisponible pour les données actuelles.", "Risk assessment is unavailable for the current data.")}</div>}
-                  {visiblePortfolioNotes(snapshot).map((note, index) => <div className={styles.notice} style={{ marginTop: 10 }} key={note}>{language === "fr" ? note : pick(language, "", [
+                <section className={`panel ${"anatole-ws-panel"}`}>
+                  <div className={"anatole-ws-cardHeader"}><div><span className="eyebrow">{pick(language, "RISQUE", "RISK")}</span><h3>{pick(language, "Diagnostic", "Assessment")}</h3><p>{pick(language, "Concentration, volatilité et sensibilité au marché.", "Concentration, volatility, and market sensitivity.")}</p></div><span className={`${"anatole-ws-statusPill"} ${snapshot.risk?.risk_level === "Faible" ? "anatole-ws-statusHealthy" : snapshot.risk?.risk_level === "Modéré" ? "anatole-ws-statusMonitoring" : snapshot.risk?.risk_level ? "anatole-ws-statusDegraded" : ""}`}>{riskLabel(snapshot.risk?.risk_level ?? null, language)}</span></div>
+                  {snapshot.risk ? <div className={"anatole-ws-riskGrid"}>
+                    <div className={"anatole-ws-riskMetric"}><span>{pick(language, "Volatilité", "Volatility")}</span><strong>{optionalFixed(snapshot.risk.volatility_percent, 1, language, " %")}</strong></div>
+                    <div className={"anatole-ws-riskMetric"}><span>{pick(language, "Bêta TSX", "TSX beta")}</span><strong>{optionalFixed(snapshot.risk.beta, 2, language)}</strong></div>
+                    <div className={"anatole-ws-riskMetric"}><span>{pick(language, "Drawdown max", "Max drawdown")}</span><strong className={snapshot.risk.max_drawdown_percent === null ? "" : "anatole-ws-negative"}>{optionalFixed(snapshot.risk.max_drawdown_percent, 1, language, " %")}</strong></div>
+                    <div className={"anatole-ws-riskMetric"}><span>Sharpe</span><strong>{optionalFixed(snapshot.risk.sharpe_ratio, 2, language)}</strong></div>
+                    <div className={"anatole-ws-riskMetric"}><span>{pick(language, "Plus grande position", "Largest position")}</span><strong>{optionalFixed(snapshot.risk.top_position_percent, 1, language, " %")}</strong></div>
+                    <div className={"anatole-ws-riskMetric"}><span>Top 3</span><strong>{optionalFixed(snapshot.risk.top_three_percent, 1, language, " %")}</strong></div>
+                  </div> : <div className={"anatole-ws-notice"}>{pick(language, "Diagnostic de risque indisponible pour les données actuelles.", "Risk assessment is unavailable for the current data.")}</div>}
+                  {visiblePortfolioNotes(snapshot).map((note, index) => <div className={"anatole-ws-notice"} style={{ marginTop: 10 }} key={note}>{language === "fr" ? note : pick(language, "", [
                     "This portfolio risk note is based on the current positions and available market history.",
                     "Concentration and volatility should be reviewed alongside the underlying data coverage.",
                     "Risk indicators are informational and do not constitute financial advice.",
@@ -918,21 +918,21 @@ export function PortfolioClient({
                 snapshot={snapshot}
               />
 
-              <div className={styles.gridEqual}>
+              <div className={"anatole-ws-gridEqual"}>
                 <AllocationCard language={language} title={pick(language, "Répartition sectorielle", "Sector allocation")} items={snapshot.sector_allocation} totalLabel={pick(language, "secteurs", "sectors")} />
                 <AllocationCard language={language} title={pick(language, "Exposition par devise", "Currency exposure")} items={snapshot.currency_allocation} totalLabel={pick(language, "devises", "currencies")} />
               </div>
 
-              <div className={styles.gridEqual}>
-                <section className={`panel ${styles.panel}`}><div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "CONTRIBUTEURS", "CONTRIBUTORS")}</span><h3>{pick(language, "Moteurs de la séance", "Session drivers")}</h3></div></div><div className={styles.compactList} style={{ marginTop: 14 }}>{snapshot.contributors.length ? snapshot.contributors.map((item) => <div className={styles.contributorRow} key={item.symbol}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><strong className={styles.positive}>{money(item.value, snapshot.base_currency, language)} · {percent(item.value_percent)}</strong></div>) : <div className={styles.notice}>{pick(language, "Aucun contributeur positif aujourd’hui.", "No positive contributor today.")}</div>}</div></section>
-                <section className={`panel ${styles.panel}`}><div className={styles.cardHeader}><div><span className="eyebrow">{pick(language, "DÉTRACTEURS", "DETRACTORS")}</span><h3>{pick(language, "Pressions de la séance", "Session pressures")}</h3></div></div><div className={styles.compactList} style={{ marginTop: 14 }}>{snapshot.detractors.length ? snapshot.detractors.map((item) => <div className={styles.contributorRow} key={item.symbol}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><strong className={styles.negative}>{money(item.value, snapshot.base_currency, language)} · {percent(item.value_percent)}</strong></div>) : <div className={styles.notice}>{pick(language, "Aucun détracteur négatif aujourd’hui.", "No negative detractor today.")}</div>}</div></section>
+              <div className={"anatole-ws-gridEqual"}>
+                <section className={`panel ${"anatole-ws-panel"}`}><div className={"anatole-ws-cardHeader"}><div><span className="eyebrow">{pick(language, "CONTRIBUTEURS", "CONTRIBUTORS")}</span><h3>{pick(language, "Moteurs de la séance", "Session drivers")}</h3></div></div><div className={"anatole-ws-compactList"} style={{ marginTop: 14 }}>{snapshot.contributors.length ? snapshot.contributors.map((item) => <div className={"anatole-ws-contributorRow"} key={item.symbol}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><strong className={"anatole-ws-positive"}>{money(item.value, snapshot.base_currency, language)} · {percent(item.value_percent)}</strong></div>) : <div className={"anatole-ws-notice"}>{pick(language, "Aucun contributeur positif aujourd’hui.", "No positive contributor today.")}</div>}</div></section>
+                <section className={`panel ${"anatole-ws-panel"}`}><div className={"anatole-ws-cardHeader"}><div><span className="eyebrow">{pick(language, "DÉTRACTEURS", "DETRACTORS")}</span><h3>{pick(language, "Pressions de la séance", "Session pressures")}</h3></div></div><div className={"anatole-ws-compactList"} style={{ marginTop: 14 }}>{snapshot.detractors.length ? snapshot.detractors.map((item) => <div className={"anatole-ws-contributorRow"} key={item.symbol}><span><strong>{item.symbol}</strong><small>{item.name}</small></span><strong className={"anatole-ws-negative"}>{money(item.value, snapshot.base_currency, language)} · {percent(item.value_percent)}</strong></div>) : <div className={"anatole-ws-notice"}>{pick(language, "Aucun détracteur négatif aujourd’hui.", "No negative detractor today.")}</div>}</div></section>
               </div>
             </>
-          ) : loading ? <div className={styles.skeleton} /> : null}
+          ) : loading ? <div className={"anatole-ws-skeleton"} /> : null}
         </>
       )}
 
-      <div className={styles.notice}>{pick(language, "Portefeuille de suivi uniquement. Les quantités et coûts moyens restent sur cet appareil en mode anonyme et sont synchronisés uniquement lorsqu’un compte Anatole est connecté.", "Tracking portfolio only. Quantities and average costs remain on this device while anonymous and synchronize only when an Anatole account is connected.")}</div>
+      <div className={"anatole-ws-notice"}>{pick(language, "Portefeuille de suivi uniquement. Les quantités et coûts moyens restent sur cet appareil en mode anonyme et sont synchronisés uniquement lorsqu’un compte Anatole est connecté.", "Tracking portfolio only. Quantities and average costs remain on this device while anonymous and synchronize only when an Anatole account is connected.")}</div>
       <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}>{snapshot ? <>{pick(language, "Dernière analyse", "Last analysis")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · <Link href="/parametres?section=quality">{pick(language, "Vérifier les sources", "Check sources")}</Link></> : null}</div>
     </main>
   );

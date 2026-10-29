@@ -12,7 +12,7 @@ import type {
   PortfolioSnapshot,
 } from "@/lib/types";
 
-import styles from "./Workspace.module.css";
+import "./Workspace.css";
 
 const RANGE_OPTIONS: Array<{
   value: PortfolioPerformanceRange;
@@ -234,9 +234,9 @@ function PerformanceChart({
           "Chargement de l’historique",
           "Loading history",
         )}
-        className={`${styles.chartWrap} ${styles.chartState}`}
+        className={`${"anatole-ws-chartWrap"} ${"anatole-ws-chartState"}`}
       >
-        <div className={styles.skeleton} />
+        <div className={"anatole-ws-skeleton"} />
       </div>
     );
   }
@@ -244,7 +244,7 @@ function PerformanceChart({
   if (!points.length) {
     return (
       <div
-        className={`${styles.chartWrap} ${styles.chartState}`}
+        className={`${"anatole-ws-chartWrap"} ${"anatole-ws-chartState"}`}
         role={error ? "alert" : "status"}
       >
         <strong>
@@ -255,7 +255,7 @@ function PerformanceChart({
           )}
         </strong>
         <button
-          className={styles.secondaryButton}
+          className={"anatole-ws-secondaryButton"}
           onClick={onRetry}
           type="button"
         >
@@ -268,9 +268,9 @@ function PerformanceChart({
 
   return (
     <div>
-      <div className={styles.chartWrap}>
+      <div className={"anatole-ws-chartWrap"}>
         <svg
-          className={styles.chart}
+          className={"anatole-ws-chart"}
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={
@@ -299,7 +299,7 @@ function PerformanceChart({
                   stroke="rgba(75,111,135,.22)"
                 />
                 <text
-                  className={styles.chartAxis}
+                  className={"anatole-ws-chartAxis"}
                   x="8"
                   y={y + 4}
                 >
@@ -314,7 +314,7 @@ function PerformanceChart({
             return (
               <text
                 key={`x-${point.time}-${index}`}
-                className={styles.chartAxis}
+                className={"anatole-ws-chartAxis"}
                 x={x}
                 y={height - 8}
                 textAnchor={
@@ -349,9 +349,9 @@ function PerformanceChart({
         </svg>
       </div>
       {error ? (
-        <div className={styles.chartNotice}>{error}</div>
+        <div className={"anatole-ws-chartNotice"}>{error}</div>
       ) : benchmark.length === 0 ? (
-        <div className={styles.chartNotice}>
+        <div className={"anatole-ws-chartNotice"}>
           {benchmarkName === "S&P/TSX Composite"
             ? pick(
                 language,
@@ -537,8 +537,8 @@ export function PortfolioPerformancePanel({
   }
 
   return (
-    <section className={`panel ${styles.panel}`}>
-      <div className={styles.performancePanelHeader}>
+    <section className={`panel ${"anatole-ws-panel"}`}>
+      <div className={"anatole-ws-performancePanelHeader"}>
         <div>
           <span className="eyebrow">PERFORMANCE</span>
           <h2>
@@ -557,7 +557,7 @@ export function PortfolioPerformancePanel({
           </p>
         </div>
 
-        <div className={styles.performanceBenchmarkControls}>
+        <div className={"anatole-ws-performanceBenchmarkControls"}>
           <label>
             <span>{pick(language, "Benchmark", "Benchmark")}</span>
             <select
@@ -578,7 +578,7 @@ export function PortfolioPerformancePanel({
           </label>
 
           {benchmarkChoice === "custom" ? (
-            <div className={styles.performanceCustomBenchmark}>
+            <div className={"anatole-ws-performanceCustomBenchmark"}>
               <input
                 aria-label={pick(
                   language,
@@ -590,7 +590,7 @@ export function PortfolioPerformancePanel({
                 onChange={(event) => setCustomBenchmark(event.target.value)}
               />
               <button
-                className={styles.secondaryButton}
+                className={"anatole-ws-secondaryButton"}
                 type="button"
                 disabled={!customBenchmark.trim() || loading}
                 onClick={applyCustom}
@@ -603,7 +603,7 @@ export function PortfolioPerformancePanel({
       </div>
 
       <div
-        className={styles.performanceRanges}
+        className={"anatole-ws-performanceRanges"}
         role="group"
         aria-label={pick(
           language,
@@ -617,7 +617,7 @@ export function PortfolioPerformancePanel({
             type="button"
             className={
               range === item.value
-                ? styles.performanceRangeActive
+                ? "anatole-ws-performanceRangeActive"
                 : ""
             }
             aria-pressed={range === item.value}
@@ -627,7 +627,7 @@ export function PortfolioPerformancePanel({
           </button>
         ))}
         {["5y", "10y", "max"].includes(range) ? (
-          <span className={styles.performanceRangeMeta}>
+          <span className={"anatole-ws-performanceRangeMeta"}>
             {historyStartYear && activeRemote
               ? pick(
                   language,
@@ -648,7 +648,7 @@ export function PortfolioPerformancePanel({
           </span>
         ) : null}
         {activeRemote?.history_status === "partial" && !proxyActive ? (
-          <span className={styles.performanceRangeMeta}>Historique partiel · {activeRemote.effective_years?.toFixed(1) ?? "N/D"} an exploitable</span>
+          <span className={"anatole-ws-performanceRangeMeta"}>Historique partiel · {activeRemote.effective_years?.toFixed(1) ?? "N/D"} an exploitable</span>
         ) : null}
         {activeRemote?.proxy_points?.length ? (
           <button type="button" aria-pressed={proxyActive} onClick={() => setShowProxy((value) => !value)}>
@@ -657,7 +657,7 @@ export function PortfolioPerformancePanel({
         ) : null}
       </div>
 
-      <div className={styles.performanceSummary}>
+      <div className={"anatole-ws-performanceSummary"}>
         <div>
           <span>{pick(language, "Portefeuille", "Portfolio")}</span>
           <strong>{percent(portfolioReturn)}</strong>
@@ -679,11 +679,11 @@ export function PortfolioPerformancePanel({
       </div>
 
       {activeRemote?.requested_window_coverage_percent != null && !proxyActive ? (
-        <div className={styles.chartNotice}>Couverture de la fenêtre demandée : {activeRemote.requested_window_coverage_percent.toFixed(0)} %.</div>
+        <div className={"anatole-ws-chartNotice"}>Couverture de la fenêtre demandée : {activeRemote.requested_window_coverage_percent.toFixed(0)} %.</div>
       ) : null}
-      {proxyActive ? <div className={styles.chartNotice}>Proxy historique des positions disponibles · poids renormalisés chaque jour; ce n’est pas la performance réelle du portefeuille complet.</div> : null}
+      {proxyActive ? <div className={"anatole-ws-chartNotice"}>Proxy historique des positions disponibles · poids renormalisés chaque jour; ce n’est pas la performance réelle du portefeuille complet.</div> : null}
 
-      <div className={styles.legend}>
+      <div className={"anatole-ws-legend"}>
         <span style={{ color: "var(--accent-text)" }}>
           <i /> {pick(language, "Portefeuille", "Portfolio")}
         </span>
@@ -703,7 +703,7 @@ export function PortfolioPerformancePanel({
         points={points}
       />
 
-      <div className={styles.performanceMethodology}>
+      <div className={"anatole-ws-performanceMethodology"}>
         {activeRemote?.methodology
           ?? pick(
             language,
