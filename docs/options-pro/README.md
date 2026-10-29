@@ -4,10 +4,10 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 
 | PR | Périmètre | Dépendance / état |
 | --- | --- | --- |
-| 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | En cours |
-| 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | PR 1 ; validation réelle conditionnée aux droits |
-| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | Prototype en cours sur PR 1–2 ; mesures et validation en attente |
-| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Contrats et spécifications vérifiés |
+| 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | [#174](https://github.com/sodia48/anatole/pull/174), brouillon ; source et stockage non configurés |
+| 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | [#175](https://github.com/sodia48/anatole/pull/175), brouillon ; dépend de #174, validation réelle conditionnée aux droits |
+| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | [#176](https://github.com/sodia48/anatole/pull/176), brouillon ; dépend de #175 ; intégration Strategy Builder à construire |
+| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Fondation API [#177](https://github.com/sodia48/anatole/pull/177) fusionnée dans la branche de #176 ; interface et modèles restent à construire |
 | 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | Données de qualité et modèles validés |
 | 6 — Screener & Heatmap | Filtres et visualisations | PR 3 et données suffisantes |
 | 7 — Options Portfolio & Alerts | Positions, valorisation et alertes | Contrats, devises et fraîcheur vérifiés |
@@ -18,6 +18,8 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 Le 27 octobre 2026, le propriétaire indique qu'aucune licence n'est connue. Les [conditions de CME Group](https://www.cmegroup.com/trading/market-data-explanation-disclaimer.html) restreignent notamment l'extraction systématique, le stockage et la redistribution des données de son site sans autorisation écrite. Un accès public ou une clé ne démontre pas de droits de diffusion. Le chemin utilisateur ne télécharge plus les bulletins ni les pages ICE ; sans source autorisée et instantané, il affiche une indisponibilité. Le parseur legacy demeure présent uniquement pour les tests existants et n'est pas une source active de l'API.
 
 L'adaptateur Barchart utilise un endpoint documenté, mais il ne s'active que si un opérateur a vérifié les droits de collecte, conservation et affichage applicables. La couverture, la fréquence et les droits dépendent du contrat conclu avec le fournisseur. La réponse indique une couverture partielle et des cotations différées : la date de récupération n'est pas une heure de cotation garantie. Aucune donnée de marché n'est créée pour remplir une chaîne.
+
+La [comparaison technique et commerciale des fournisseurs](commodity-data-providers.md) rassemble les informations publiées et les droits à confirmer par devis ; elle n'active aucune source.
 
 ## Exploitation de PR 1
 
@@ -45,7 +47,7 @@ Racines à auditer : énergie CL, BZ, NG, RB, HO ; métaux GC, SI, HG, PL, PA ; 
 
 La vue web rapproche un call et un put uniquement lorsque le marché, le sous-jacent, le contrat à terme lorsqu'il est nécessaire, l'échéance réelle et le strike concordent sans ambiguïté. Une série ambiguë ou à échéance inconnue reste distincte. Les filtres ne considèrent pas une valeur manquante comme zéro ; le filtre de spread utilise l'écart absolu ask moins bid. L'indicateur ATM n'est produit que si le sous-jacent est disponible. La limite d'affichage de 1 200 lignes est signalée. Les tests Playwright et les captures utilisent des contrats synthétiques.
 
-La vue jumelée et la sélection d'échéance sont également disponibles dans l'écran mobile natif, avec la même règle de rapprochement ; les filtres avancés y restent à compléter. Les préférences de cette vue ne sont pas encore persistées. Les composants de stratégie, screener et heatmap relèvent des lots suivants. Les tests sur une chaîne réelle restent dépendants d'une source autorisée. Le budget JavaScript actuel est respecté avec une marge très faible, à surveiller à chaque changement.
+La vue jumelée et la sélection d'échéance sont également disponibles dans l'écran mobile natif, avec la même règle de rapprochement. Les filtres avancés mobiles peuvent être enregistrés sur l'appareil ; les préférences web, l'intégration des stratégies, le screener et la heatmap restent à compléter. Les tests sur une chaîne réelle restent dépendants d'une source autorisée. Le budget JavaScript actuel est respecté avec une marge très faible, à surveiller à chaque changement.
 
 ## PR 4 — calcul à échéance en préparation
 
