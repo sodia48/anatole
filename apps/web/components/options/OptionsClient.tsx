@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw, Search } from "@/components/layout/AppIcons";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
@@ -18,6 +18,21 @@ import "./options.css";
 import { PremiumChain } from "./PremiumChain";
 
 type SideFilter = "both" | "call" | "put";
+
+function SelectControl({ label, value, onChange, disabled, children }: {
+  label: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode;
+}) {
+  return <label className="op-selectControl"><span>{label}</span>
+    <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</select>
+  </label>;
+}
+
+function settleRequest<T>(request: Promise<T>, controller: AbortController, setData: (data: T) => void,
+  setError: (error: string | null) => void, setLoading: (loading: boolean) => void, fallback: string) {
+  void request.then((data) => { if (!controller.signal.aborted) { setData(data); setError(null); } }).catch((reason: unknown) => {
+    if (!controller.signal.aborted && (reason as Error)?.name !== "AbortError") setError(reason instanceof Error ? reason.message : fallback);
+  }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+}
 
 function value(
   number: number | null | undefined,
@@ -68,55 +83,21 @@ export function OptionsClient() {
   const [category, setCategory] = useState("all");
   const [loadingUniverse, setLoadingUniverse] = useState(true);
   const [loadingChain, setLoadingChain] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [universeError, setUniverseError] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    void getOptionsUniverse(market, controller.signal)
-      .then((snapshot) => {
-        setUniverse(snapshot);
-        setError(null);
-      })
-      .catch((reason: unknown) => {
-        if ((reason as Error).name !== "AbortError") {
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : pick(language, "Univers d'options indisponible.", "Options universe unavailable."),
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingUniverse(false);
-      });
+    settleRequest(getOptionsUniverse(market, controller.signal), controller, setUniverse, setUniverseError, setLoadingUniverse,
+      pick(language, "Univers d'options indisponible.", "Options universe unavailable."));
     return () => controller.abort();
   }, [language, market, refreshKey]);
 
   useEffect(() => {
     const controller = new AbortController();
-    void getOptionChain(
-      market,
-      symbol,
-      expiration || undefined,
-      controller.signal,
-    )
-      .then((snapshot) => {
-        setChain(snapshot);
-        setError(null);
-      })
-      .catch((reason: unknown) => {
-        if ((reason as Error).name !== "AbortError") {
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."),
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingChain(false);
-      });
+    settleRequest(getOptionChain(market, symbol, expiration || undefined, controller.signal), controller,
+      setChain, setChainError, setLoadingChain, pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."));
     return () => controller.abort();
   }, [expiration, language, market, refreshKey, symbol]);
 
@@ -164,17 +145,14 @@ export function OptionsClient() {
     event.preventDefault();
     const next = draftSymbol.trim().toUpperCase();
     if (!/^[A-Z0-9.^-]{1,16}$/.test(next)) {
-      setError(pick(language, "Symbole invalide.", "Invalid symbol."));
+      setChainError(pick(language, "Symbole invalide.", "Invalid symbol."));
       return;
     }
-    if (next === symbol && !expiration) return;
-    setLoadingChain(true);
-    if (next !== symbol) setChain(null);
-    setExpiration("");
-    setSymbol(next);
+    chooseSymbol(next);
   }
 
   function chooseSymbol(next: string) {
+    setChainError(null);
     if (next === symbol && !expiration) return;
     setLoadingChain(true);
     if (next !== symbol) setChain(null);
@@ -244,24 +222,19 @@ export function OptionsClient() {
             </label>
           </form>
 
-          <label className={"op-selectControl"}>
-            <span>{pick(language, "Catégorie", "Category")}</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <SelectControl label={pick(language, "Catégorie", "Category")} value={category} onChange={setCategory}>
               {categories.map((item) => (
                 <option key={item} value={item}>
                   {item === "all" ? pick(language, "Toutes", "All") : item}
                 </option>
               ))}
-            </select>
-          </label>
+          </SelectControl>
 
-          <label className={"op-selectControl"}>
-            <span>{pick(language, "Échéance", "Expiry")}</span>
-            <select
+          <SelectControl label={pick(language, "Échéance", "Expiry")}
               value={expiration}
-              onChange={(event) => {
+              onChange={(next) => {
                 setLoadingChain(true);
-                setExpiration(event.target.value);
+                setExpiration(next);
               }}
               disabled={!chain?.expirations.length}
             >
@@ -269,17 +242,13 @@ export function OptionsClient() {
               {chain?.expirations.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
-            </select>
-          </label>
+          </SelectControl>
 
-          <label className={"op-selectControl"}>
-            <span>{pick(language, "Type", "Type")}</span>
-            <select value={side} onChange={(event) => setSide(event.target.value as SideFilter)}>
+          <SelectControl label="Type" value={side} onChange={(next) => setSide(next as SideFilter)}>
               <option value="both">Call + Put</option>
               <option value="call">Calls</option>
               <option value="put">Puts</option>
-            </select>
-          </label>
+          </SelectControl>
 
           <button
             type="button"
@@ -316,7 +285,7 @@ export function OptionsClient() {
         </div>
       </section>
 
-      {error ? <div className={"op-error"}>{error}</div> : null}
+      {[universeError, chainError].map((error, index) => error ? <div className={"op-error"} role="alert" key={index}>{error}</div> : null)}
 
       <section className={"op-metrics"}>
         {metrics.map(([label, result, detail]) => result == null ? null : <article className="panel" key={label}>

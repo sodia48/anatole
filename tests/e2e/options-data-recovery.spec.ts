@@ -68,5 +68,31 @@ test("commodity selection stays responsive and ignores an obsolete chain", async
   await page.getByLabel("Échéance").selectOption("2027-11-25");
   await expect(page.getByRole("heading", { name: "RB · RBOB Gasoline" })).toBeVisible();
   await expect(page.getByText("2027-11-25 · RBZ27", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Vue avancée" }).click();
+  const hydrated = page.waitForResponse((response) => response.url().includes("/options/chain?") &&
+    new URL(response.url()).searchParams.get("market") === "tsx");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await hydrated;
+  await page.getByRole("button", { name: "Matières premières", exact: true }).click();
+  await page.getByRole("button", { name: "RB RBOB Gasoline" }).click();
+  await expect(page.getByRole("heading", { name: "RB · RBOB Gasoline" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Vue compacte" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByText("Filtres de chaîne").click();
+  await expect(page.getByLabel("Volume minimum")).toHaveValue("1");
+  await expect(page.getByRole("button", { name: /CALL 2,5/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /PUT 2,5/ })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("options-rb-synthetic.png"), fullPage: true });
+});
+
+test("an options universe error remains visible when the chain succeeds", async ({ page }) => {
+  await page.route("**/api/anatole/api/v1/options/universe?**", (route) =>
+    route.fulfill({ status: 503, json: { detail: "Univers temporairement indisponible" } }));
+  await page.route("**/api/anatole/api/v1/options/chain?**", (route) => route.fulfill({ json: {
+    market: "tsx", symbol: "RY", provider_symbol: "RY", name: "Royal Bank", category: "Banks", exchange: "TEST",
+    underlying_price: null, requested_expiration: null, expirations: [], contracts: [], analytics: null,
+    source_statuses: [], generated_at: "2026-10-27T12:00:00Z", refresh_after_seconds: 21600, stale: false,
+  } }));
+  await page.goto("/options");
+  await expect(page.getByRole("heading", { name: "RY · Royal Bank" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("alert")).toHaveText("Univers temporairement indisponible");
 });

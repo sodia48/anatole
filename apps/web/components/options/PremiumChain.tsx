@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { pairOptions } from "@anatole/shared/options-chain";
 import type { OptionContract } from "@/lib/options-api";
 import { pick } from "@/lib/i18n";
@@ -14,10 +14,45 @@ type Props = {
   display: (value: number | null | undefined, digits?: number) => string;
 };
 
+const CHAIN_PREFERENCES_KEY = "anatole.options.chain.v1";
+const FILTER_KEYS = ["volume", "oi", "spread", "deltaMin", "deltaMax", "ivMin", "ivMax", "moneyness", "availability", "freshness"];
+
+function saveChainPreferences(advanced: boolean, filters: Record<string, string>) {
+  try { window.localStorage.setItem(CHAIN_PREFERENCES_KEY, JSON.stringify({ advanced, filters })); } catch { /* Storage can be unavailable. */ }
+}
+
 export function PremiumChain({ contracts, underlying, stale, language, display }: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [selected, setSelected] = useState<OptionContract | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const preferencesChanged = useRef(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+    if (preferencesChanged.current) return;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(CHAIN_PREFERENCES_KEY) ?? "null") as { advanced?: unknown; filters?: unknown } | null;
+      if (!saved || typeof saved !== "object") return;
+      if (typeof saved.advanced === "boolean") setAdvanced(saved.advanced);
+      if (saved.filters && typeof saved.filters === "object" && !Array.isArray(saved.filters)) {
+        const restored: Record<string, string> = {};
+        for (const [key, value] of Object.entries(saved.filters)) {
+          if (FILTER_KEYS.includes(key) && typeof value === "string" && value.length <= 32) restored[key] = value;
+        }
+        if (!["all", "atm", "itm", "otm"].includes(restored.moneyness ?? "all")) delete restored.moneyness;
+        if (!["all", "quoted", "missing"].includes(restored.availability ?? "all")) delete restored.availability;
+        if (!["all", "fresh", "delayed"].includes(restored.freshness ?? "all")) delete restored.freshness;
+        setFilters(restored);
+      }
+    } catch { /* Invalid or unavailable storage leaves defaults. */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const changeFilter = (key: string, value: string) => {
+    preferencesChanged.current = true;
+    const next = { ...filters, [key]: value };
+    setFilters(next);
+    saveChainPreferences(advanced, next);
+  };
   const { moneyness = "all", freshness = "all", availability = "all" } = filters;
   const nearest = underlying != null && underlying > 0 && contracts.length
     ? Math.min(...contracts.map((item) => Math.abs(item.strike - underlying))) : null;
@@ -72,16 +107,16 @@ export function PremiumChain({ contracts, underlying, stale, language, display }
 
   return <div className={"op-chain"} role="region" aria-label={pick(language, "Chaîne d'options", "Option chain")}>
     <div className={"op-toolbar"}>
-      <button type="button" onClick={() => setAdvanced(!advanced)} aria-pressed={advanced}>
+      <button type="button" onClick={() => { preferencesChanged.current = true; setAdvanced(!advanced); saveChainPreferences(!advanced, filters); }} aria-pressed={advanced}>
         {advanced ? pick(language, "Vue compacte", "Compact view") : pick(language, "Vue avancée", "Advanced view")}
       </button>
       <details><summary>{pick(language, "Filtres de chaîne", "Chain filters")}</summary>
         <div className={"op-filters"}>
           {fields.map(([label, key]) => <label key={key}>{label}
-            <input type="number" step="any" value={filters[key] ?? ""} onChange={(event) => setFilters({ ...filters, [key]: event.target.value })} />
+            <input type="number" step="any" value={filters[key] ?? ""} onChange={(event) => changeFilter(key, event.target.value)} />
           </label>)}
           {selectFields.map(([label, key, options]) => <label key={key}>{label}
-            <select value={filters[key] ?? "all"} onChange={(event) => setFilters({ ...filters, [key]: event.target.value })}>
+            <select value={filters[key] ?? "all"} onChange={(event) => changeFilter(key, event.target.value)}>
               <option value="all">{pick(language, "Toutes", "All")}</option>
               {options.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
             </select>
