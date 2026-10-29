@@ -36,7 +36,7 @@ import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
-import styles from "./Analysis.module.css";
+import "./analysis.css";
 
 const RANGE_OPTIONS: Array<{
   value: ComparisonRange;
@@ -206,7 +206,7 @@ function PerformanceChart({
 
   if (!chart) {
     return (
-      <div className={styles.emptyInline}>
+      <div className={"anatole-analysis_emptyInline__"}>
         {pick(language, "Historique insuffisant pour tracer la comparaison.", "Insufficient history to chart the comparison.")}
       </div>
     );
@@ -229,21 +229,21 @@ function PerformanceChart({
 
   return (
     <>
-      <div className={styles.chartLegend}>
+      <div className={"anatole-analysis_chartLegend__"}>
         {series.map((item, index) => (
           <span
-            className={styles.legendItem}
+            className={"anatole-analysis_legendItem__"}
             style={{ color: `var(--light-text, ${CHART_COLORS[index % CHART_COLORS.length]})` }}
             key={item.symbol}
           >
-            <span className={styles.legendDot} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />
+            <span className={"anatole-analysis_legendDot__"} style={{ color: CHART_COLORS[index % CHART_COLORS.length] }} />
             {item.symbol}
           </span>
         ))}
       </div>
-      <div className={styles.chartWrap}>
+      <div className={"anatole-analysis_chartWrap__"}>
         <svg
-          className={styles.chart}
+          className={"anatole-analysis_chart__"}
           viewBox={`0 0 ${chart.width} ${chart.height}`}
           role="img"
           aria-label={pick(language, "Performance normalisée des titres comparés", "Normalized performance of compared securities")}
@@ -265,7 +265,7 @@ function PerformanceChart({
                   x={chart.left - 10}
                   y={y + 4}
                   textAnchor="end"
-                  className={styles.chartAxis}
+                  className={"anatole-analysis_chartAxis__"}
                 >
                   {tick.toFixed(0)}
                 </text>
@@ -287,7 +287,7 @@ function PerformanceChart({
               x={chart.toX(tick)}
               y={chart.height - 11}
               textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"}
-              className={styles.chartAxis}
+              className={"anatole-analysis_chartAxis__"}
               key={tick}
             >
               {dateFormatter.format(new Date(tick * 1000))}
@@ -332,20 +332,20 @@ function CorrelationGrid({
   const columns = `repeat(${symbols.length + 1}, minmax(0, 1fr))`;
 
   return (
-    <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Correlations">
+    <div className={"anatole-analysis_tableWrap__"} tabIndex={0} role="region" aria-label="Correlations">
       <div
-        className={styles.correlationGrid}
+        className={"anatole-analysis_correlationGrid__"}
         style={{ gridTemplateColumns: columns }}
       >
-        <span className={styles.correlationHeader}>Corr.</span>
+        <span className={"anatole-analysis_correlationHeader__"}>Corr.</span>
         {symbols.map((symbol) => (
-          <span className={styles.correlationHeader} key={`head:${symbol}`}>
+          <span className={"anatole-analysis_correlationHeader__"} key={`head:${symbol}`}>
             {symbol}
           </span>
         ))}
         {symbols.map((symbol, rowIndex) => (
           <div style={{ display: "contents" }} key={`row:${symbol}`}>
-            <span className={styles.correlationHeader}>{symbol}</span>
+            <span className={"anatole-analysis_correlationHeader__"}>{symbol}</span>
             {snapshot.correlation.values[rowIndex].map((value, columnIndex) => {
               const intensity = Math.min(Math.abs(value ?? 0), 1);
               const background = value === null
@@ -356,7 +356,7 @@ function CorrelationGrid({
 
               return (
                 <span
-                  className={styles.correlationCell}
+                  className={"anatole-analysis_correlationCell__"}
                   style={{ background }}
                   title={`${symbol} / ${symbols[columnIndex]}`}
                   key={`${symbol}:${symbols[columnIndex]}`}
@@ -402,16 +402,16 @@ function InstrumentProfile({
     } as Record<string, string>)[value] ?? value;
   };
   return (
-    <article className={`panel ${styles.profileCard}`}>
-      <div className={styles.profileHeader}>
+    <article className={`panel ${"anatole-analysis_profileCard__"}`}>
+      <div className={"anatole-analysis_profileHeader__"}>
         <div>
           <h3>{instrument.symbol}</h3>
           <p>{instrument.name}</p>
         </div>
-        <span className={styles.profileScore}>{instrument.score ?? "—"}</span>
+        <span className={"anatole-analysis_profileScore__"}>{instrument.score ?? "—"}</span>
       </div>
-      <div className={styles.prosCons}>
-        <div className={styles.pros}>
+      <div className={"anatole-analysis_prosCons__"}>
+        <div className={"anatole-analysis_pros__"}>
           <h4>{pick(language, "Forces", "Strengths")}</h4>
           <ul>
             {instrument.strengths.map((item) => (
@@ -419,7 +419,7 @@ function InstrumentProfile({
             ))}
           </ul>
         </div>
-        <div className={styles.cons}>
+        <div className={"anatole-analysis_cons__"}>
           <h4>{pick(language, "Points de vigilance", "Watch points")}</h4>
           <ul>
             {instrument.weaknesses.map((item) => (
@@ -428,11 +428,11 @@ function InstrumentProfile({
           </ul>
         </div>
       </div>
-      <div className={styles.profileActions}>
-        <Link className={styles.secondaryLink} href={`/focus/${instrument.symbol}`}>
+      <div className={"anatole-analysis_profileActions__"}>
+        <Link className={"anatole-analysis_secondaryLink__"} href={`/focus/${instrument.symbol}`}>
           <BarChart3 size={14} /> Focus
         </Link>
-        <Link className={styles.secondaryLink} href={`/watchlist?add=${instrument.symbol}`}>
+        <Link className={"anatole-analysis_secondaryLink__"} href={`/watchlist?add=${instrument.symbol}`}>
           {pick(language, "Ajouter à la Watchlist", "Add to Watchlist")} <ArrowRight size={13} />
         </Link>
       </div>
@@ -622,16 +622,16 @@ export function ComparatorClient() {
     .sort((left, right) => (left.volatility_percent ?? 999) - (right.volatility_percent ?? 999))[0];
 
   return (
-    <div className={styles.page}>
-      <header className={`panel ${styles.hero}`}>
-        <div className={styles.heroCopy}>
+    <div className={"anatole-analysis_page__"}>
+      <header className={`panel ${"anatole-analysis_hero__"}`}>
+        <div className={"anatole-analysis_heroCopy__"}>
           <span className="eyebrow">{pick(language, "ANALYSE PROFESSIONNELLE", "PROFESSIONAL ANALYSIS")} · V0.6</span>
           <h1>{pick(language, "Comparateur", "Comparator")}</h1>
           <p>
             {pick(language, "Mets jusqu’à cinq actions ou ETF sur la même base et compare rendement, risque, momentum, valorisation et corrélations sans multiplier les écrans.", "Place up to five stocks or ETFs on the same basis and compare return, risk, momentum, valuation, and correlations in one screen.")}
           </p>
         </div>
-        <div className={styles.heroScore}>
+        <div className={"anatole-analysis_heroScore__"}>
           <GitCompareArrows size={24} color="#27d5ae" />
           <strong>{snapshot?.instruments.length ?? symbols.length}</strong>
           <span>{pick(language, "titres analysés", "securities analyzed")}</span>
@@ -639,19 +639,19 @@ export function ComparatorClient() {
         </div>
       </header>
 
-      <section className={`panel ${styles.controlPanel}`}>
-        <div className={styles.controlTop}>
-          <div className={styles.controlTitle}>
+      <section className={`panel ${"anatole-analysis_controlPanel__"}`}>
+        <div className={"anatole-analysis_controlTop__"}>
+          <div className={"anatole-analysis_controlTitle__"}>
             <span className="eyebrow">{pick(language, "UNIVERS DE COMPARAISON", "COMPARISON UNIVERSE")}</span>
             <h2>{pick(language, "Construis ton groupe", "Build your group")}</h2>
             <p>{pick(language, "Deux titres minimum, cinq maximum. Actions et ETF canadiens acceptés.", "Minimum two, maximum five securities. Canadian stocks and ETFs are supported.")}</p>
           </div>
-          <div className={styles.rangeRow} aria-label={pick(language, "Période de comparaison", "Comparison period")}>
+          <div className={"anatole-analysis_rangeRow__"} aria-label={pick(language, "Période de comparaison", "Comparison period")}>
             {RANGE_OPTIONS.map((option) => (
               <button
                 type="button"
-                className={`${styles.rangeButton} ${
-                  range === option.value ? styles.rangeButtonActive : ""
+                className={`${"anatole-analysis_rangeButton__"} ${
+                  range === option.value ? "anatole-analysis_rangeButtonActive__" : ""
                 }`}
                 aria-pressed={range === option.value}
                 onClick={() => setRange(option.value)}
@@ -663,9 +663,9 @@ export function ComparatorClient() {
           </div>
         </div>
 
-        <div className={styles.symbolComposer}>
-          <div className={styles.symbolSearchWrap}>
-            <label className={styles.symbolSearch}>
+        <div className={"anatole-analysis_symbolComposer__"}>
+          <div className={"anatole-analysis_symbolSearchWrap__"}>
+            <label className={"anatole-analysis_symbolSearch__"}>
               <Search size={18} />
               <input
                 value={query}
@@ -685,11 +685,11 @@ export function ComparatorClient() {
               <small>{symbols.length}/5</small>
             </label>
             {query && suggestions.length ? (
-              <div className={styles.suggestions}>
+              <div className={"anatole-analysis_suggestions__"}>
                 {suggestions.map((item) => (
                   <button
                     type="button"
-                    className={styles.suggestion}
+                    className={"anatole-analysis_suggestion__"}
                     onClick={() => addSymbol(item.symbol)}
                     key={item.symbol}
                   >
@@ -705,18 +705,18 @@ export function ComparatorClient() {
           </div>
           <button
             type="button"
-            className={styles.compareButton}
+            className={"anatole-analysis_compareButton__"}
             disabled={loading || symbols.length < 2}
             onClick={() => void loadComparison()}
           >
-            {loading ? <RefreshCw size={17} className={styles.spinIcon} /> : <Sparkles size={17} />}
+            {loading ? <RefreshCw size={17} className={"anatole-analysis_spinIcon__"} /> : <Sparkles size={17} />}
             {loading ? pick(language, "Analyse…", "Analyzing…") : pick(language, "Actualiser", "Refresh")}
           </button>
         </div>
 
-        <div className={styles.selectionRow}>
+        <div className={"anatole-analysis_selectionRow__"}>
           {symbols.map((symbol) => (
-            <span className={styles.symbolChip} key={symbol}>
+            <span className={"anatole-analysis_symbolChip__"} key={symbol}>
               {symbol}
               <button
                 type="button"
@@ -733,13 +733,13 @@ export function ComparatorClient() {
             </span>
           ) : null}
         </div>
-        {error ? <div className={styles.errorNotice}>{language === "fr" ? error : "The comparison could not be updated."}</div> : null}
+        {error ? <div className={"anatole-analysis_errorNotice__"}>{language === "fr" ? error : "The comparison could not be updated."}</div> : null}
       </section>
 
       {loading && !snapshot ? (
-        <section className={`panel ${styles.loadingPanel}`}>
-          <div className={styles.loadingCopy}>
-            <span className={styles.spinner} />
+        <section className={`panel ${"anatole-analysis_loadingPanel__"}`}>
+          <div className={"anatole-analysis_loadingCopy__"}>
+            <span className={"anatole-analysis_spinner__"} />
             <strong>{pick(language, "Construction de la comparaison", "Building comparison")}</strong>
             <span>{pick(language, "Historique, risque, momentum et valorisation sont calculés ensemble.", "History, risk, momentum, and valuation are calculated together.")}</span>
           </div>
@@ -748,37 +748,37 @@ export function ComparatorClient() {
 
       {snapshot ? (
         <>
-          <section className={styles.kpiGrid}>
-            <article className={`panel ${styles.kpiCard}`}>
+          <section className={"anatole-analysis_kpiGrid__"}>
+            <article className={`panel ${"anatole-analysis_kpiCard__"}`}>
               <span>{pick(language, "Meilleure performance", "Best performance")}</span>
               <strong>{bestPerformance?.symbol ?? "—"}</strong>
               <small>{formatPercent(bestPerformance?.total_return_percent ?? null, 2, language)}</small>
             </article>
-            <article className={`panel ${styles.kpiCard}`}>
+            <article className={`panel ${"anatole-analysis_kpiCard__"}`}>
               <span>{pick(language, "Meilleur Sharpe", "Best Sharpe")}</span>
               <strong>{bestSharpe?.symbol ?? "—"}</strong>
               <small>{formatNumber(bestSharpe?.sharpe_ratio ?? null, 2, language)}</small>
             </article>
-            <article className={`panel ${styles.kpiCard}`}>
+            <article className={`panel ${"anatole-analysis_kpiCard__"}`}>
               <span>{pick(language, "Volatilité la plus basse", "Lowest volatility")}</span>
               <strong>{lowestRisk?.symbol ?? "—"}</strong>
               <small>{formatPercent(lowestRisk?.volatility_percent ?? null, 2, language)}</small>
             </article>
-            <article className={`panel ${styles.kpiCard}`}>
+            <article className={`panel ${"anatole-analysis_kpiCard__"}`}>
               <span>{pick(language, "Référence bêta", "Beta benchmark")}</span>
               <strong>TSX</strong>
               <small>{snapshot.benchmark_name}</small>
             </article>
           </section>
 
-          <section className={`panel ${styles.sectionPanel}`}>
-            <div className={styles.sectionHeading}>
+          <section className={`panel ${"anatole-analysis_sectionPanel__"}`}>
+            <div className={"anatole-analysis_sectionHeading__"}>
               <div>
                 <span className="eyebrow">BASE 100</span>
                 <h2>{pick(language, "Performance normalisée", "Normalized performance")}</h2>
                 <p>{pick(language, "Chaque série débute à 100 pour rendre les trajectoires comparables.", "Each series begins at 100 to make paths comparable.")}</p>
               </div>
-              <span className={styles.sectionHeadingMeta}>
+              <span className={"anatole-analysis_sectionHeadingMeta__"}>
                 {pick(language, "Période", "Period")}: {snapshot.range_label}<br />
                 {pick(language, "Données différées selon la source", "Data delayed depending on source")}
               </span>
@@ -786,8 +786,8 @@ export function ComparatorClient() {
             <PerformanceChart series={snapshot.series} language={language} />
           </section>
 
-          <section className={`panel ${styles.sectionPanel}`}>
-            <div className={styles.sectionHeading}>
+          <section className={`panel ${"anatole-analysis_sectionPanel__"}`}>
+            <div className={"anatole-analysis_sectionHeading__"}>
               <div>
                 <span className="eyebrow">{pick(language, "CLASSEMENT ANATOLE", "ANATOLE RANKING")}</span>
                 <h2>{pick(language, "Rendement, risque et valorisation", "Return, risk, and valuation")}</h2>
@@ -795,8 +795,8 @@ export function ComparatorClient() {
               </div>
               <Trophy size={21} color="#f2b84b" />
             </div>
-            <div className={styles.tableWrap} tabIndex={0} role="region" aria-label={pick(language, "Rendement, risque et valorisation", "Return, risk, and valuation")}>
-              <table className={styles.compareTable} data-mobile-cards="compare">
+            <div className={"anatole-analysis_tableWrap__"} tabIndex={0} role="region" aria-label={pick(language, "Rendement, risque et valorisation", "Return, risk, and valuation")}>
+              <table className={"anatole-analysis_compareTable__"} data-mobile-cards="compare">
                 <thead>
                   <tr>
                     <th>{pick(language, "Titre", "Security")}</th>
@@ -819,15 +819,15 @@ export function ComparatorClient() {
                   {snapshot.instruments.map((instrument) => (
                     <tr key={instrument.symbol}>
                       <td data-label={pick(language, "Titre", "Security")}>
-                        <div className={styles.instrumentCell}>
-                          <span className={styles.rankBadge}>{instrument.rank}</span>
+                        <div className={"anatole-analysis_instrumentCell__"}>
+                          <span className={"anatole-analysis_rankBadge__"}>{instrument.rank}</span>
                           <span>
                             <strong>{instrument.symbol}</strong>
                             <small>{instrument.name}</small>
                           </span>
                         </div>
                       </td>
-                      <td data-label={pick(language, "Type", "Type")}><span className={styles.typePill}>{language === "en" ? ({ Action: "Stock", ETF: "ETF", Indice: "Index" } as Record<string, string>)[instrument.instrument_type] ?? instrument.instrument_type : instrument.instrument_type}</span></td>
+                      <td data-label={pick(language, "Type", "Type")}><span className={"anatole-analysis_typePill__"}>{language === "en" ? ({ Action: "Stock", ETF: "ETF", Indice: "Index" } as Record<string, string>)[instrument.instrument_type] ?? instrument.instrument_type : instrument.instrument_type}</span></td>
                       <td data-label={pick(language, "Prix", "Price")}>{formatCurrency(instrument.price, instrument.currency, language)}</td>
                       <td data-label={pick(language, "Période", "Period")} className={valueClass(instrument.total_return_percent)}>{formatPercent(instrument.total_return_percent, 2, language)}</td>
                       <td data-label={pick(language, "Annualisé", "Annualized")} className={valueClass(instrument.annualized_return_percent)}>{formatPercent(instrument.annualized_return_percent, 2, language)}</td>
@@ -839,7 +839,7 @@ export function ComparatorClient() {
                       <td data-label="RSI">{formatNumber(instrument.rsi_14, 1, language)}</td>
                       <td data-label={pick(language, "P/E prévu", "Forward P/E")}>{instrument.forward_pe === null ? "—" : `${formatNumber(instrument.forward_pe, 1, language)}×`}</td>
                       <td data-label={pick(language, "Dividende", "Dividend")}>{formatPercent(instrument.dividend_yield_percent, 2, language)}</td>
-                      <td data-label="Score"><span className={styles.scorePill}>{instrument.score ?? "—"}</span></td>
+                      <td data-label="Score"><span className={"anatole-analysis_scorePill__"}>{instrument.score ?? "—"}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -847,9 +847,9 @@ export function ComparatorClient() {
             </div>
           </section>
 
-          <section className={styles.terminalColumns}>
-            <article className={`panel ${styles.sectionPanel}`}>
-              <div className={styles.sectionHeading}>
+          <section className={"anatole-analysis_terminalColumns__"}>
+            <article className={`panel ${"anatole-analysis_sectionPanel__"}`}>
+              <div className={"anatole-analysis_sectionHeading__"}>
                 <div>
                   <span className="eyebrow">DIVERSIFICATION</span>
                   <h2>{pick(language, "Matrice de corrélation", "Correlation matrix")}</h2>
@@ -859,34 +859,34 @@ export function ComparatorClient() {
               </div>
               <CorrelationGrid snapshot={snapshot} />
             </article>
-            <article className={`panel ${styles.sectionPanel}`}>
-              <div className={styles.sectionHeading}>
+            <article className={`panel ${"anatole-analysis_sectionPanel__"}`}>
+              <div className={"anatole-analysis_sectionHeading__"}>
                 <div>
                   <span className="eyebrow">{pick(language, "REPÈRES", "GUIDANCE")}</span>
                   <h2>{pick(language, "Lecture du risque", "Risk interpretation")}</h2>
                 </div>
               </div>
-              <div className={styles.notice}>
+              <div className={"anatole-analysis_notice__"}>
                 {pick(language, `Le ratio de Sharpe utilise un taux sans risque technique de ${snapshot.risk_free_rate_percent.toFixed(1)} %. Le bêta est estimé contre le S&P/TSX Composite. Les données manquantes restent marquées « — » plutôt que remplacées par des estimations.`, `The Sharpe ratio uses a technical risk-free rate of ${snapshot.risk_free_rate_percent.toFixed(1)}%. Beta is estimated against the S&P/TSX Composite. Missing data remains marked “—” instead of being replaced with estimates.`)}
               </div>
             </article>
           </section>
 
           <section>
-            <div className={styles.sectionHeading}>
+            <div className={"anatole-analysis_sectionHeading__"}>
               <div>
                 <span className="eyebrow">{pick(language, "LECTURE TITRE PAR TITRE", "SECURITY-BY-SECURITY REVIEW")}</span>
                 <h2>{pick(language, "Forces et points de vigilance", "Strengths and watch points")}</h2>
               </div>
             </div>
-            <div className={styles.profileGrid}>
+            <div className={"anatole-analysis_profileGrid__"}>
               {snapshot.instruments.map((instrument) => (
                 <InstrumentProfile instrument={instrument} language={language} key={instrument.symbol} />
               ))}
             </div>
           </section>
 
-          <footer className={`panel ${styles.methodology}`}>
+          <footer className={`panel ${"anatole-analysis_methodology__"}`}>
             {language === "fr" ? snapshot.methodology : "The composite score uses performance, risk-adjusted return, volatility, momentum, RSI, trend, and available valuation data. It is an analysis tool, not a recommendation."} {pick(language, "Capitalisations", "Market capitalizations")}: {snapshot.instruments.map((item) => `${item.symbol} ${formatCompactCurrency(item.market_cap, item.currency, language)}`).join(" · ")}.
           </footer>
         </>
