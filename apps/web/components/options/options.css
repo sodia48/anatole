@@ -1,9 +1,9 @@
-.page {
+.op-page {
   display: grid;
   gap: 16px;
 }
 
-.hero {
+.op-hero {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -11,88 +11,76 @@
   padding: 24px;
 }
 
-.hero h1,
-.chainHeader h2,
-.sourcePanel h2 {
+.op-hero h1,
+.op-chainHeader h2,
+.op-sourcePanel h2 {
   margin: 6px 0;
 }
 
-.hero p,
-.chainHeader p,
-.sourcePanel p {
+.op-hero p,
+.op-chainHeader p,
+.op-sourcePanel p {
   max-width: 850px;
   margin: 0;
   color: var(--muted);
 }
 
-.heroBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  color: var(--accent-text);
-  background: var(--primary-surface);
-  white-space: nowrap;
-}
-
-.controls {
+.op-controls {
   display: grid;
   gap: 16px;
   padding: 18px;
 }
 
-.marketTabs {
+.op-marketTabs {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-.marketTabs button,
-.shortcuts button,
-.refreshButton,
-.symbolForm button {
+.op-marketTabs button,
+.op-shortcuts button,
+.op-refreshButton,
+.op-symbolForm button {
   border: 1px solid var(--border);
   color: var(--text);
   background: var(--surface-raised);
   cursor: pointer;
 }
 
-.marketTabs button {
+.op-marketTabs button {
   min-height: 42px;
   padding: 0 16px;
   border-radius: 12px;
   font-weight: 800;
 }
 
-.marketTabs .activeTab {
+.op-marketTabs .op-activeTab {
   border-color: var(--blue);
   color: var(--accent-text);
   background: var(--primary-surface);
 }
 
-.controlGrid {
+.op-controlGrid {
   display: grid;
   grid-template-columns: minmax(240px, 1.8fr) repeat(3, minmax(145px, .8fr)) auto;
   gap: 10px;
   align-items: end;
 }
 
-.symbolForm label,
-.selectControl {
+.op-symbolForm label,
+.op-selectControl {
   display: grid;
   gap: 6px;
 }
 
-.symbolForm label > span,
-.selectControl > span {
+.op-symbolForm label > span,
+.op-selectControl > span {
   color: var(--muted);
   font-size: .78rem;
   font-weight: 800;
 }
 
-.symbolForm label > div {
+.op-symbolForm label > div {
   min-height: 44px;
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -104,8 +92,8 @@
   background: var(--input-bg);
 }
 
-.symbolForm input,
-.selectControl select {
+.op-symbolForm input,
+.op-selectControl select {
   min-height: 44px;
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -113,14 +101,14 @@
   background: var(--input-bg);
 }
 
-.symbolForm input {
+.op-symbolForm input {
   min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
 }
 
-.symbolForm button {
+.op-symbolForm button {
   height: 42px;
   padding: 0 14px;
   border-width: 0 0 0 1px;
@@ -128,11 +116,11 @@
   font-weight: 800;
 }
 
-.selectControl select {
+.op-selectControl select {
   padding: 0 10px;
 }
 
-.refreshButton {
+.op-refreshButton {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
@@ -143,23 +131,23 @@
   font-weight: 800;
 }
 
-.refreshButton:disabled {
+.op-refreshButton:disabled {
   opacity: .55;
   cursor: wait;
 }
 
-.shortcuts {
+.op-shortcuts {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 4px;
 }
 
-.shortcuts > span {
+.op-shortcuts > span {
   color: var(--muted);
 }
 
-.shortcuts button {
+.op-shortcuts button {
   min-width: 116px;
   max-width: 180px;
   display: grid;
@@ -169,29 +157,29 @@
   text-align: left;
 }
 
-.shortcuts button strong {
+.op-shortcuts button strong {
   color: var(--text);
 }
 
-.shortcuts button small {
+.op-shortcuts button small {
   overflow: hidden;
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.shortcuts .selectedShortcut {
+.op-shortcuts .op-selectedShortcut {
   border-color: var(--blue);
   background: var(--primary-surface);
 }
 
-.metrics {
+.op-metrics {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
-.metrics article {
+.op-metrics article {
   min-height: 112px;
   display: grid;
   align-content: center;
@@ -199,69 +187,71 @@
   padding: 16px;
 }
 
-.metrics span,
-.metrics small {
+.op-metrics span,
+.op-metrics small {
   color: var(--muted);
 }
 
-.metrics strong {
+.op-metrics strong {
   font-size: 1.5rem;
 }
 
-.sourcePanel {
+.op-sourcePanel {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
   gap: 20px;
   padding: 18px;
 }
 
-.statuses {
+.op-dataState summary { padding: 16px 18px; cursor: pointer; font-weight: 800; }
+
+.op-statuses {
   display: grid;
   gap: 8px;
 }
 
-.status {
+.op-status {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: start;
   gap: 9px;
 }
 
-.status div {
+.op-status div {
   display: grid;
   gap: 2px;
 }
 
-.status small {
+.op-status small {
   color: var(--muted);
 }
 
-.dot {
+.op-dot {
   width: 9px;
   height: 9px;
   margin-top: 5px;
   border-radius: 50%;
 }
 
-.available {
+.op-available {
   background: var(--teal);
 }
 
-.partial {
+.op-partial {
   background: var(--warning);
 }
 
-.unavailable {
+.op-unavailable {
   background: var(--red);
 }
 
-.chainPanel {
+.op-chainPanel {
   min-width: 0;
   padding: 0;
   overflow: hidden;
 }
 
-.chainHeader {
+.op-chainHeader {
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -269,92 +259,53 @@
   border-bottom: 1px solid var(--border);
 }
 
-.chainMeta {
+.op-chainMeta {
   display: grid;
   align-content: center;
   justify-items: end;
   color: var(--muted);
 }
 
-.chainMeta strong {
+.op-chainMeta strong {
   color: var(--text);
   font-size: 1.4rem;
 }
 
-.tableWrap {
-  max-width: 100%;
-  overflow: auto;
+.op-chain { padding: 16px; min-width: 0; }
+.op-toolbar { display: flex; flex-wrap: wrap; align-items: start; gap: 12px; margin-bottom: 14px; }
+.op-toolbar button, .op-toolbar summary, .op-detail button {
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); background: var(--surface-raised); cursor: pointer;
 }
-
-.tableWrap table {
-  width: 100%;
-  min-width: 1260px;
-  border-collapse: collapse;
+.op-filters { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px 0; }
+.op-filters label { display: grid; gap: 4px; color: var(--muted); font-size: .8rem; }
+.op-filters input, .op-filters select {
+  width: 115px; min-height: 38px; padding: 6px; border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); background: var(--input-bg);
+}
+.op-head, .op-row { display: grid; grid-template-columns: 1fr minmax(100px, .45fr) 1fr; gap: 8px; }
+.op-head { padding: 8px; text-align: center; font-size: .78rem; color: var(--muted); font-weight: 800; }
+.op-row { align-items: stretch; padding: 10px 0; border-top: 1px solid var(--border); }
+.op-side { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.op-side > strong { font-size: .75rem; color: var(--muted); }
+.op-quote {
+  display: grid; gap: 4px; width: 100%; padding: 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+.op-quote:hover, .op-quote:focus-visible { border-color: var(--blue); }
+.op-strike { display: grid; align-content: center; justify-items: center; gap: 5px; text-align: center; }
+.op-strike span { color: var(--accent-text); font-weight: 800; }
+.op-strike small { color: var(--muted); overflow-wrap: anywhere; }
+.op-detail { display: grid; gap: 8px; margin-top: 16px; padding: 14px; border: 1px solid var(--border); border-radius: 10px; }
+.op-detail button { justify-self: end; }
+.op-detail p { margin: 0; color: var(--muted); }
 
-.tableWrap th,
-.tableWrap td {
-  padding: 10px 9px;
-  border-bottom: 1px solid var(--border);
-  text-align: right;
-  white-space: nowrap;
-}
-
-.tableWrap th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  color: var(--muted);
-  background: var(--panel);
-  font-size: .75rem;
-}
-
-.tableWrap th:first-child,
-.tableWrap td:first-child,
-.tableWrap th:nth-child(2),
-.tableWrap td:nth-child(2) {
-  text-align: left;
-}
-
-.tableWrap tbody tr:hover {
-  background: var(--hover-bg);
-}
-
-.callBadge,
-.putBadge {
-  display: inline-flex;
-  min-width: 44px;
-  justify-content: center;
-  padding: 4px 6px;
-  border-radius: 7px;
-  font-size: .72rem;
-  font-weight: 900;
-}
-
-.callBadge {
-  color: var(--positive-text);
-  background: var(--positive-surface);
-}
-
-.putBadge {
-  color: var(--negative-text);
-  background: var(--negative-surface);
-}
-
-.inMoney {
+.op-inMoney {
   background: var(--primary-surface);
 }
 
-.positive {
-  color: var(--positive-text);
-}
-
-.negative {
-  color: var(--negative-text);
-}
-
-.empty {
+.op-empty {
   min-height: 180px;
   display: grid;
   place-items: center;
@@ -365,11 +316,11 @@
   text-align: center;
 }
 
-.empty strong {
+.op-empty strong {
   color: var(--text);
 }
 
-.error {
+.op-error {
   padding: 12px 14px;
   border: 1px solid var(--red);
   border-radius: 11px;
@@ -377,59 +328,60 @@
   background: var(--negative-surface);
 }
 
-.disclaimer {
+.op-disclaimer {
   margin: 0;
   padding: 0 4px 18px;
   color: var(--muted);
   font-size: .8rem;
 }
 
-.spin {
-  animation: spin 1s linear infinite;
+.op-spin {
+  animation: op-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes op-spin {
   to { transform: rotate(360deg); }
 }
 
 @media (max-width: 1100px) {
-  .controlGrid {
+  .op-controlGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .symbolForm {
+  .op-symbolForm {
     grid-column: 1 / -1;
   }
 
-  .metrics {
+  .op-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .sourcePanel {
+  .op-sourcePanel {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 720px) {
-  .hero,
-  .chainHeader {
+  .op-head { display: none; }
+  .op-row { grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .op-strike { grid-row: 1; grid-column: 1 / -1; }
+  .op-side { grid-row: 2; }
+  .op-quote { font-size: .78rem; overflow-wrap: anywhere; }
+  .op-hero,
+  .op-chainHeader {
     flex-direction: column;
   }
 
-  .heroBadge {
-    align-self: flex-start;
-  }
-
-  .controlGrid,
-  .metrics {
+  .op-controlGrid,
+  .op-metrics {
     grid-template-columns: 1fr;
   }
 
-  .symbolForm {
+  .op-symbolForm {
     grid-column: auto;
   }
 
-  .chainMeta {
+  .op-chainMeta {
     justify-items: start;
   }
 }

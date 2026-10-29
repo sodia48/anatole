@@ -1,7 +1,7 @@
 "use client";
 
-import { Activity, RefreshCw, Search } from "@/components/layout/AppIcons";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { RefreshCw, Search } from "@/components/layout/AppIcons";
+import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { pick } from "@/lib/i18n";
@@ -9,15 +9,30 @@ import {
   getOptionChain,
   getOptionsUniverse,
   type OptionChainSnapshot,
-  type OptionContract,
   type OptionMarket,
   type OptionSourceStatus,
   type OptionUniverseSnapshot,
 } from "@/lib/options-api";
 
-import styles from "./options.module.css";
+import "./options.css";
+import { PremiumChain } from "./PremiumChain";
 
 type SideFilter = "both" | "call" | "put";
+
+function SelectControl({ label, value, onChange, disabled, children }: {
+  label: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode;
+}) {
+  return <label className="op-selectControl"><span>{label}</span>
+    <select value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled}>{children}</select>
+  </label>;
+}
+
+function settleRequest<T>(request: Promise<T>, controller: AbortController, setData: (data: T) => void,
+  setError: (error: string | null) => void, setLoading: (loading: boolean) => void, fallback: string) {
+  void request.then((data) => { if (!controller.signal.aborted) { setData(data); setError(null); } }).catch((reason: unknown) => {
+    if (!controller.signal.aborted && (reason as Error)?.name !== "AbortError") setError(reason instanceof Error ? reason.message : fallback);
+  }).finally(() => { if (!controller.signal.aborted) setLoading(false); });
+}
 
 function value(
   number: number | null | undefined,
@@ -43,79 +58,15 @@ function ratio(number: number | null | undefined): string {
     : number.toFixed(2);
 }
 
-const STATUS_WEIGHT: Record<OptionSourceStatus["status"], number> = {
-  available: 0,
-  partial: 1,
-  unavailable: 2,
-};
-
-function mergeSourceStatuses(items: OptionSourceStatus[]): OptionSourceStatus[] {
-  const merged = new Map<string, OptionSourceStatus>();
-  for (const item of items) {
-    const previous = merged.get(item.source);
-    if (!previous) {
-      merged.set(item.source, { ...item });
-      continue;
-    }
-    const details = [previous.detail, item.detail]
-      .filter((value): value is string => Boolean(value?.trim()))
-      .filter((value, index, values) => values.indexOf(value) === index);
-    merged.set(item.source, {
-      source: item.source,
-      status:
-        STATUS_WEIGHT[item.status] > STATUS_WEIGHT[previous.status]
-          ? item.status
-          : previous.status,
-      detail: details.join(" · ") || null,
-    });
-  }
-  return [...merged.values()];
-}
-
 function Status({ item }: { item: OptionSourceStatus }) {
   return (
-    <div className={styles.status}>
-      <span className={`${styles.dot} ${styles[item.status]}`} />
+    <div className={"op-status"}>
+      <span className={`op-dot op-${item.status}`} />
       <div>
         <strong>{item.source}</strong>
         <small>{item.detail ?? item.status}</small>
       </div>
     </div>
-  );
-}
-
-function ContractRow({
-  item,
-  language,
-}: {
-  item: OptionContract;
-  language: "fr" | "en";
-}) {
-  return (
-    <tr className={item.in_the_money ? styles.inMoney : undefined}>
-      <td>{item.expiration ?? "N/D"}</td>
-      <td>
-        <span className={item.side === "call" ? styles.callBadge : styles.putBadge}>
-          {item.side === "call"
-            ? pick(language, "CALL", "CALL")
-            : pick(language, "PUT", "PUT")}
-        </span>
-      </td>
-      <td>{value(item.strike)}</td>
-      <td>{value(item.bid)}</td>
-      <td>{value(item.ask)}</td>
-      <td>{value(item.last)}</td>
-      <td className={(item.change ?? 0) >= 0 ? styles.positive : styles.negative}>
-        {value(item.change)}
-      </td>
-      <td>{integer(item.volume)}</td>
-      <td>{integer(item.open_interest)}</td>
-      <td>{item.implied_volatility == null ? "N/D" : `${value(item.implied_volatility, 1)} %`}</td>
-      <td>{value(item.delta, 3)}</td>
-      <td>{value(item.gamma, 4)}</td>
-      <td>{value(item.theta, 3)}</td>
-      <td>{value(item.vega, 3)}</td>
-    </tr>
   );
 }
 
@@ -132,55 +83,21 @@ export function OptionsClient() {
   const [category, setCategory] = useState("all");
   const [loadingUniverse, setLoadingUniverse] = useState(true);
   const [loadingChain, setLoadingChain] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [universeError, setUniverseError] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
-    void getOptionsUniverse(market, controller.signal)
-      .then((snapshot) => {
-        setUniverse(snapshot);
-        setError(null);
-      })
-      .catch((reason: unknown) => {
-        if ((reason as Error).name !== "AbortError") {
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : pick(language, "Univers d'options indisponible.", "Options universe unavailable."),
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingUniverse(false);
-      });
+    settleRequest(getOptionsUniverse(market, controller.signal), controller, setUniverse, setUniverseError, setLoadingUniverse,
+      pick(language, "Univers d'options indisponible.", "Options universe unavailable."));
     return () => controller.abort();
   }, [language, market, refreshKey]);
 
   useEffect(() => {
     const controller = new AbortController();
-    void getOptionChain(
-      market,
-      symbol,
-      expiration || undefined,
-      controller.signal,
-    )
-      .then((snapshot) => {
-        setChain(snapshot);
-        setError(null);
-      })
-      .catch((reason: unknown) => {
-        if ((reason as Error).name !== "AbortError") {
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."),
-          );
-        }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoadingChain(false);
-      });
+    settleRequest(getOptionChain(market, symbol, expiration || undefined, controller.signal), controller,
+      setChain, setChainError, setLoadingChain, pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."));
     return () => controller.abort();
   }, [expiration, language, market, refreshKey, symbol]);
 
@@ -203,10 +120,10 @@ export function OptionsClient() {
 
   const statuses = useMemo(
     () =>
-      mergeSourceStatuses([
+      [
         ...(universe?.source_statuses ?? []),
         ...(chain?.source_statuses ?? []),
-      ]),
+      ],
     [chain, universe],
   );
 
@@ -228,17 +145,14 @@ export function OptionsClient() {
     event.preventDefault();
     const next = draftSymbol.trim().toUpperCase();
     if (!/^[A-Z0-9.^-]{1,16}$/.test(next)) {
-      setError(pick(language, "Symbole invalide.", "Invalid symbol."));
+      setChainError(pick(language, "Symbole invalide.", "Invalid symbol."));
       return;
     }
-    if (next === symbol && !expiration) return;
-    setLoadingChain(true);
-    if (next !== symbol) setChain(null);
-    setExpiration("");
-    setSymbol(next);
+    chooseSymbol(next);
   }
 
   function chooseSymbol(next: string) {
+    setChainError(null);
     if (next === symbol && !expiration) return;
     setLoadingChain(true);
     if (next !== symbol) setChain(null);
@@ -248,10 +162,17 @@ export function OptionsClient() {
   }
 
   const analytics = chain?.analytics;
+  const metrics = [
+    [pick(language, "Contrats", "Contracts"), analytics ? integer(analytics.contract_count) : "—", chain ? `${chain.name} · ${chain.exchange}` : symbol],
+    ["Put / Call · Vol.", analytics?.put_call_volume_ratio == null ? null : ratio(analytics.put_call_volume_ratio), `${integer(analytics?.put_volume)} P / ${integer(analytics?.call_volume)} C`],
+    ["Put / Call · OI", analytics?.put_call_open_interest_ratio == null ? null : ratio(analytics.put_call_open_interest_ratio), `${integer(analytics?.put_open_interest)} P / ${integer(analytics?.call_open_interest)} C`],
+    ["IV ATM", analytics?.atm_implied_volatility == null ? null : `${value(analytics.atm_implied_volatility, 1)} %`, pick(language, "Fournisseur ou estimation Anatole", "Provider or Anatole estimate")],
+    [pick(language, "Max pain estimé", "Estimated max pain"), analytics?.max_pain_estimate == null ? null : value(analytics.max_pain_estimate), pick(language, "Calcul descriptif à partir de l'OI", "Descriptive calculation from OI")],
+  ];
 
   return (
-    <main className={styles.page}>
-      <header className={`panel ${styles.hero}`}>
+    <main className={"op-page"}>
+      <header className="panel op-hero">
         <div>
           <span className="eyebrow">
             {pick(language, "DÉRIVÉS · OPTIONS", "DERIVATIVES · OPTIONS")}
@@ -260,37 +181,33 @@ export function OptionsClient() {
           <p>
             {pick(
               language,
-              "Calls, puts, échéances, volumes, intérêt ouvert et métriques de chaîne pour les classes canadiennes et les options sur contrats à terme de matières premières.",
-              "Calls, puts, expiries, volume, open interest and chain metrics for Canadian listed classes and commodity futures options.",
+              "Options canadiennes et sur contrats à terme.",
+              "Canadian and futures options.",
             )}
           </p>
         </div>
-        <div className={styles.heroBadge}>
-          <Activity size={18} />
-          <span>{market === "tsx" ? "MX / TSX" : "Futures options"}</span>
-        </div>
       </header>
 
-      <section className={`panel ${styles.controls}`}>
-        <div className={styles.marketTabs}>
+      <section className="panel op-controls">
+        <div className={"op-marketTabs"}>
           <button
             type="button"
-            className={market === "tsx" ? styles.activeTab : undefined}
+            className={market === "tsx" ? "op-activeTab" : undefined}
             onClick={() => changeMarket("tsx")}
           >
             {pick(language, "Canada · Montréal", "Canada · Montréal")}
           </button>
           <button
             type="button"
-            className={market === "commodities" ? styles.activeTab : undefined}
+            className={market === "commodities" ? "op-activeTab" : undefined}
             onClick={() => changeMarket("commodities")}
           >
             {pick(language, "Matières premières", "Commodities")}
           </button>
         </div>
 
-        <div className={styles.controlGrid}>
-          <form className={styles.symbolForm} onSubmit={submitSymbol}>
+        <div className={"op-controlGrid"}>
+          <form className={"op-symbolForm"} onSubmit={submitSymbol}>
             <label>
               <span>{pick(language, "Sous-jacent / racine", "Underlying / root")}</span>
               <div>
@@ -305,24 +222,19 @@ export function OptionsClient() {
             </label>
           </form>
 
-          <label className={styles.selectControl}>
-            <span>{pick(language, "Catégorie", "Category")}</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <SelectControl label={pick(language, "Catégorie", "Category")} value={category} onChange={setCategory}>
               {categories.map((item) => (
                 <option key={item} value={item}>
                   {item === "all" ? pick(language, "Toutes", "All") : item}
                 </option>
               ))}
-            </select>
-          </label>
+          </SelectControl>
 
-          <label className={styles.selectControl}>
-            <span>{pick(language, "Échéance", "Expiry")}</span>
-            <select
+          <SelectControl label={pick(language, "Échéance", "Expiry")}
               value={expiration}
-              onChange={(event) => {
+              onChange={(next) => {
                 setLoadingChain(true);
-                setExpiration(event.target.value);
+                setExpiration(next);
               }}
               disabled={!chain?.expirations.length}
             >
@@ -330,21 +242,17 @@ export function OptionsClient() {
               {chain?.expirations.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
-            </select>
-          </label>
+          </SelectControl>
 
-          <label className={styles.selectControl}>
-            <span>{pick(language, "Type", "Type")}</span>
-            <select value={side} onChange={(event) => setSide(event.target.value as SideFilter)}>
+          <SelectControl label="Type" value={side} onChange={(next) => setSide(next as SideFilter)}>
               <option value="both">Call + Put</option>
               <option value="call">Calls</option>
               <option value="put">Puts</option>
-            </select>
-          </label>
+          </SelectControl>
 
           <button
             type="button"
-            className={styles.refreshButton}
+            className={"op-refreshButton"}
             onClick={() => {
               setLoadingUniverse(true);
               setLoadingChain(true);
@@ -352,12 +260,12 @@ export function OptionsClient() {
             }}
             disabled={loadingUniverse || loadingChain}
           >
-            <RefreshCw className={loadingUniverse || loadingChain ? styles.spin : undefined} size={17} />
+            <RefreshCw className={loadingUniverse || loadingChain ? "op-spin" : undefined} size={17} />
             {pick(language, "Actualiser", "Refresh")}
           </button>
         </div>
 
-        <div className={styles.shortcuts}>
+        <div className={"op-shortcuts"}>
           {loadingUniverse ? (
             <span>{pick(language, "Chargement de l'univers…", "Loading universe…")}</span>
           ) : (
@@ -365,7 +273,7 @@ export function OptionsClient() {
               <button
                 type="button"
                 key={`${item.provider_symbol}-${item.symbol}`}
-                className={symbol === item.symbol ? styles.selectedShortcut : undefined}
+                className={symbol === item.symbol ? "op-selectedShortcut" : undefined}
                 onClick={() => chooseSymbol(item.symbol)}
                 title={item.name}
               >
@@ -377,45 +285,24 @@ export function OptionsClient() {
         </div>
       </section>
 
-      {error ? <div className={styles.error}>{error}</div> : null}
+      {[universeError, chainError].map((error, index) => error ? <div className={"op-error"} role="alert" key={index}>{error}</div> : null)}
 
-      <section className={styles.metrics}>
-        <article className="panel">
-          <span>{pick(language, "Contrats", "Contracts")}</span>
-          <strong>{analytics ? integer(analytics.contract_count) : "—"}</strong>
-          <small>{chain ? `${chain.name} · ${chain.exchange}` : symbol}</small>
-        </article>
-        {analytics?.put_call_volume_ratio != null ? <article className="panel">
-          <span>Put / Call · {pick(language, "volume séance", "session volume")}</span>
-          <strong>{ratio(analytics.put_call_volume_ratio)}</strong>
-          <small>{`${integer(analytics.put_volume)} P / ${integer(analytics.call_volume)} C`}</small>
-        </article> : null}
-        {analytics?.put_call_open_interest_ratio != null ? <article className="panel">
-          <span>Put / Call · OI</span>
-          <strong>{ratio(analytics.put_call_open_interest_ratio)}</strong>
-          <small>{`${integer(analytics.put_open_interest)} P / ${integer(analytics.call_open_interest)} C`}</small>
-        </article> : null}
-        {analytics?.atm_implied_volatility != null ? <article className="panel">
-          <span>{pick(language, "Volatilité implicite ATM", "ATM implied volatility")}</span>
-          <strong>{`${value(analytics.atm_implied_volatility, 1)} %`}</strong>
-          <small>{pick(language, "Fournisseur si disponible, sinon estimation Anatole", "Provider when available, otherwise Anatole estimate")}</small>
-        </article> : null}
-        {analytics?.max_pain_estimate != null ? <article className="panel">
-          <span>{pick(language, "Max pain estimé", "Estimated max pain")}</span>
-          <strong>{value(analytics.max_pain_estimate)}</strong>
-          <small>{pick(language, "Calcul descriptif à partir de l'OI", "Descriptive calculation from OI")}</small>
-        </article> : null}
+      <section className={"op-metrics"}>
+        {metrics.map(([label, result, detail]) => result == null ? null : <article className="panel" key={label}>
+          <span>{label}</span><strong>{result}</strong><small>{detail}</small>
+        </article>)}
       </section>
 
-      <section className={`panel ${styles.sourcePanel}`}>
+      <details className="panel op-dataState">
+        <summary>{pick(language, "État des données", "Data status")}</summary>
+        <div className={"op-sourcePanel"}>
         <div>
-          <h2>{pick(language, "Couverture et sources", "Coverage and sources")}</h2>
           <p>
             {market === "tsx"
               ? pick(
                   language,
-                  "La Bourse de Montréal reste la source officielle pour les prix, volumes et intérêts ouverts. Anatole utilise Barchart lorsqu’il est disponible puis calcule les IV/Greeks manquants avec une estimation Black-Scholes clairement signalée.",
-                  "Montréal Exchange remains the official source for prices, volume and open interest. Anatole uses Barchart when available, then fills missing IV/Greeks with a clearly disclosed Black-Scholes estimate.",
+                  "Bourse de Montréal et fournisseurs ; IV et Greeks parfois estimés par Black-Scholes.",
+                  "Montréal Exchange and providers; IV and Greeks may be Black-Scholes estimates.",
                 )
               : pick(
                   language,
@@ -424,15 +311,16 @@ export function OptionsClient() {
                 )}
           </p>
         </div>
-        <div className={styles.statuses}>
+        <div className={"op-statuses"}>
           {statuses.map((item, index) => (
             <Status item={item} key={`${item.source}-${item.status}-${index}`} />
           ))}
         </div>
-      </section>
+        </div>
+      </details>
 
-      <section className={`panel ${styles.chainPanel}`}>
-        <div className={styles.chainHeader}>
+      <section className="panel op-chainPanel">
+        <div className={"op-chainHeader"}>
           <div>
             <span className="eyebrow">{market === "tsx" ? "MX" : "COMMODITIES"}</span>
             <h2>{chain ? `${chain.symbol} · ${chain.name}` : symbol}</h2>
@@ -447,71 +335,44 @@ export function OptionsClient() {
               {` · ${pick(language, "fraîcheur des cotations à confirmer", "quote freshness unconfirmed")}`}
             </p> : null}
           </div>
-          <div className={styles.chainMeta}>
+          <div className={"op-chainMeta"}>
             <strong>{contracts.length.toLocaleString("fr-CA")}</strong>
-            <span>{pick(language, "lignes affichées", "rows shown")}</span>
+            <span>{pick(language, "contrats chargés", "contracts loaded")}</span>
           </div>
         </div>
 
         {loadingChain && !chain ? (
-          <div className={styles.empty}>
+          <div className={"op-empty"}>
             {pick(language, "Chargement de la chaîne…", "Loading option chain…")}
           </div>
         ) : contracts.length ? (
-          <div className={styles.tableWrap} role="region" tabIndex={0} aria-label={pick(language, "Chaîne d'options", "Option chain")}>
-            <table data-mobile-scroll>
-              <thead>
-                <tr>
-                  <th>{pick(language, "Échéance", "Expiry")}</th>
-                  <th>Type</th>
-                  <th>Strike</th>
-                  <th>Bid</th>
-                  <th>Ask</th>
-                  <th>{market === "commodities" ? pick(language, "Prix fourni*", "Provider price*") : "Last"}</th>
-                  <th>Δ prix</th>
-                  <th title={pick(language, "Contrats négociés pendant la séance. Un volume de 0 avec un OI positif est normal.", "Contracts traded during the session. Zero volume with positive OI is normal.")}>
-                    {pick(language, "Vol. séance", "Session vol.")}
-                  </th>
-                  <th title={pick(language, "Intérêt ouvert : contrats toujours ouverts.", "Open interest: contracts still open.")}>OI</th>
-                  <th>IV*</th>
-                  <th>Delta*</th>
-                  <th>Gamma*</th>
-                  <th>Theta*</th>
-                  <th>Vega*</th>
-                </tr>
-              </thead>
-              <tbody>
-                {contracts.slice(0, 1200).map((item) => (
-                  <ContractRow item={item} key={`${item.symbol}-${item.side}-${item.strike}-${item.expiration}`} language={language} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PremiumChain contracts={contracts} underlying={chain?.underlying_price ?? null}
+            stale={chain?.stale ?? false} language={language} display={value} />
         ) : (
-          <div className={styles.empty}>
+          <div className={"op-empty"}>
             <strong>{pick(language, "Aucune chaîne exploitable pour l'instant.", "No usable chain yet.")}</strong>
             <span>
               {market === "commodities"
                 ? pick(
                     language,
-                    "Aucun instantané exploitable n'est disponible. Une source autorisée et une collecte configurée sont nécessaires.",
-                    "No usable snapshot is available. An authorized source and configured ingestion are required.",
+                    "Source autorisée et collecte configurée nécessaires.",
+                    "Authorized source and configured ingestion required.",
                   )
                 : pick(
                     language,
-                    "La classe peut être admissible sur MX sans que le fournisseur de repli dispose de la chaîne à cet instant.",
-                    "A class may be listed on MX even when a fallback provider has no chain at that moment.",
+                    "La chaîne peut être absente chez le fournisseur.",
+                    "The provider may not have this chain.",
                   )}
             </span>
           </div>
         )}
       </section>
 
-      <p className={styles.disclaimer}>
+      <p className={"op-disclaimer"}>
         {pick(
           language,
-          "* Volume séance = contrats négociés pendant la séance; OI = contrats encore ouverts. Une valeur manquante reste N/D. Prix fourni : nature à confirmer. Les cotations peuvent être différées.",
-          "* Session volume = contracts traded during the session; OI = contracts still open. Missing values remain N/A. Provider price type is unconfirmed. Quotes may be delayed.",
+          "* Vol. : séance ; OI : intérêt ouvert ; N/D : donnée absente. Nature du prix fourni à confirmer. Cotations parfois différées.",
+          "* Vol.: session; OI: open interest; N/D: missing. Provider price type unconfirmed. Quotes may be delayed.",
         )}
       </p>
     </main>

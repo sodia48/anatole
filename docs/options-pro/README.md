@@ -4,10 +4,10 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 
 | PR | Périmètre | Dépendance / état |
 | --- | --- | --- |
-| 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | En cours |
-| 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | PR 1 ; validation réelle conditionnée aux droits |
-| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | PR 1–2 |
-| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Contrats et spécifications vérifiés |
+| 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | [#174](https://github.com/sodia48/anatole/pull/174), brouillon ; source et stockage non configurés |
+| 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | [#175](https://github.com/sodia48/anatole/pull/175), brouillon ; dépend de #174, validation réelle conditionnée aux droits |
+| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | [#176](https://github.com/sodia48/anatole/pull/176), brouillon ; dépend de #175 ; intégration Strategy Builder à construire |
+| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Fondation API [#177](https://github.com/sodia48/anatole/pull/177) fusionnée dans la branche de #176 ; interface et modèles restent à construire |
 | 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | Données de qualité et modèles validés |
 | 6 — Screener & Heatmap | Filtres et visualisations | PR 3 et données suffisantes |
 | 7 — Options Portfolio & Alerts | Positions, valorisation et alertes | Contrats, devises et fraîcheur vérifiés |
@@ -18,6 +18,8 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 Le 27 octobre 2026, le propriétaire indique qu'aucune licence n'est connue. Les [conditions de CME Group](https://www.cmegroup.com/trading/market-data-explanation-disclaimer.html) restreignent notamment l'extraction systématique, le stockage et la redistribution des données de son site sans autorisation écrite. Un accès public ou une clé ne démontre pas de droits de diffusion. Le chemin utilisateur ne télécharge plus les bulletins ni les pages ICE ; sans source autorisée et instantané, il affiche une indisponibilité. Le parseur legacy demeure présent uniquement pour les tests existants et n'est pas une source active de l'API.
 
 L'adaptateur Barchart utilise un endpoint documenté, mais il ne s'active que si un opérateur a vérifié les droits de collecte, conservation et affichage applicables. La couverture, la fréquence et les droits dépendent du contrat conclu avec le fournisseur. La réponse indique une couverture partielle et des cotations différées : la date de récupération n'est pas une heure de cotation garantie. Aucune donnée de marché n'est créée pour remplir une chaîne.
+
+La [comparaison technique et commerciale des fournisseurs](commodity-data-providers.md) rassemble les informations publiées et les droits à confirmer par devis ; elle n'active aucune source.
 
 ## Exploitation de PR 1
 
@@ -40,3 +42,15 @@ Le parseur expérimental du bulletin distingue maintenant le mois contractuel de
 Des PDF **entièrement synthétiques**, générés dans les tests, couvrent énergie, métaux, agriculture, élevage et bois, avec changements de page et sections call/put. Ces tests ne valident ni le format d'un bulletin réel ni le nombre de contrats GC ou RB. Les multiplicateurs, unités, style d'exercice, bourse, sous-jacents et dates réelles de l'ensemble des racines restent à vérifier auprès de sources autorisées ; le parseur historique n'est pas raccordé aux requêtes. La couverture réelle, les droits et la comparaison aux originaux restent donc ouvertes et ce lot demeure en brouillon.
 
 Racines à auditer : énergie CL, BZ, NG, RB, HO ; métaux GC, SI, HG, PL, PA ; agriculture ZC, ZW, KE, ZO, ZR, ZS, ZM, ZL ; élevage LE, GF, HE ; bois LBR. Leur présence dans la configuration historique est un point de départ, pas une preuve de disponibilité ni de conformité des spécifications. À titre d'exemple, CME distingue le code d'option sur l'or OG du sous-jacent GC dans sa [fiche contractuelle](https://www.cmegroup.com/trading/metals/files/fact-card-gold-futures-options.pdf) : la racine du futur ne suffit pas pour identifier l'option.
+
+## PR 3 — chaîne web en cours
+
+La vue web rapproche un call et un put uniquement lorsque le marché, le sous-jacent, le contrat à terme lorsqu'il est nécessaire, l'échéance réelle et le strike concordent sans ambiguïté. Une série ambiguë ou à échéance inconnue reste distincte. Les filtres ne considèrent pas une valeur manquante comme zéro ; le filtre de spread utilise l'écart absolu ask moins bid. L'indicateur ATM n'est produit que si le sous-jacent est disponible. La limite d'affichage de 1 200 lignes est signalée. Les tests Playwright et les captures utilisent des contrats synthétiques.
+
+La vue jumelée et la sélection d'échéance sont également disponibles dans l'écran mobile natif, avec la même règle de rapprochement. Les filtres avancés mobiles et les préférences de chaîne web peuvent être enregistrés sur l'appareil. Sur le web, les erreurs de l'univers et de la chaîne restent distinctes et une réponse devenue obsolète est ignorée. L'intégration des stratégies, le screener et la heatmap restent à compléter. Les tests sur une chaîne réelle restent dépendants d'une source autorisée. Le budget JavaScript actuel est respecté avec une marge très faible, à surveiller à chaque changement.
+
+## PR 4 — calcul à échéance en préparation
+
+Le moteur expérimental calcule le résultat de jambes vanille et d'une position linéaire sur le sous-jacent à une échéance commune, avec prix, multiplicateurs, devises et sources fournis explicitement. L'heure d'échéance et son fuseau doivent être fournis ; deux contrats expirant le même jour à des heures différentes ne sont pas assimilés. Les bornes du domaine de prix sont explicites et peuvent être non bornées ; les seuils incluent les intervalles de résultat nul. Les échéances ou devises différentes et le régime de prime de type futures sont refusés. Tests numériques sur des exemples synthétiques et une grille de prix indépendante.
+
+Le calcul est disponible sur un endpoint expérimental avec entrées explicites ; aucune interface ne l'utilise encore. L'éditeur, les modèles avant échéance, les stratégies prédéfinies, les conventions de règlement et les risques d'exercice/assignation restent à réaliser. Frais, impôts, change et marge ne sont pas inclus. La prime des options à marge de type futures ne peut pas être supposée payée initialement : voir le [document CME sur les styles de marge](https://www.cmegroup.com/education/articles-and-reports/a-primer-on-margining-styles-for-options).

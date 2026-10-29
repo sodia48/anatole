@@ -56,6 +56,9 @@ test("ENB shows official and Yahoo coverage, full brief, load more, and title-on
   await expect(page.locator('[data-focus-ready="true"]')).toBeVisible();
   const news = page.getByRole("region", { name: /Dernières nouvelles pour ENB/ });
   await expect(news.getByText("8 événements")).toBeVisible();
+  if (testInfo.project.name.startsWith("mobile")) {
+    await expect(news.getByRole("group", { name: "Filtrer les actualités" })).toHaveCSS("display", "grid");
+  }
   await expect(news.getByRole("button", { name: /Lire l’analyse/ })).toHaveCount(5);
   await expect(news.getByRole("link", { name: /Voir l’article original/ })).toHaveCount(1);
   await news.getByText("Autres sources · 1").click();
