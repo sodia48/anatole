@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { pairOptions } from "@anatole/shared/options-chain";
 
@@ -14,6 +14,7 @@ import { useLocale } from "@/src/lib/i18n";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
+import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilters, type NumericFilter, type OptionFilters } from "./optionFilters";
 
 type SideFilter = "both" | OptionSide;
 
@@ -40,6 +41,20 @@ export function OptionsScreen() {
   const [side, setSide] = useState<SideFilter>("both");
   const [expiry, setExpiry] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [filters, setFilters] = useState<OptionFilters>({ ...defaultOptionFilters });
+  const [filtersReady, setFiltersReady] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void loadOptionFilters().then((saved) => {
+      if (active) setFilters(saved);
+    }).catch(() => undefined).finally(() => { if (active) setFiltersReady(true); });
+    return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!filtersReady) return;
+    void saveOptionFilters(filters);
+  }, [filters, filtersReady]);
 
   const universe = useQuery({
     queryKey: ["options-universe", market],
@@ -55,8 +70,9 @@ export function OptionsScreen() {
 
   const contracts = useMemo(() => {
     const items = chain.data?.contracts ?? [];
-    return items.filter((item) => (side === "both" || item.side === side) && (!expiry || item.expiration === expiry));
-  }, [chain.data, side, expiry]);
+    const eligible = items.filter((item) => (side === "both" || item.side === side) && (!expiry || item.expiration === expiry));
+    return filterOptions(eligible, filters, chain.data?.underlying_price ?? null, Boolean(chain.data?.stale || chain.error));
+  }, [chain.data, chain.error, side, expiry, filters]);
   const pairs = useMemo(() => pairOptions(contracts), [contracts]);
   const detail = contracts.find((item) => contractKey(item) === selected) ?? null;
 
@@ -78,6 +94,11 @@ export function OptionsScreen() {
   }
 
   const analytics = chain.data?.analytics;
+  const numericFields: [NumericFilter, string][] = [
+    ["volume", pick("Volume minimum", "Minimum volume")], ["oi", "OI minimum"],
+    ["spread", pick("Spread maximum", "Maximum spread")], ["deltaMin", "Delta min"],
+    ["deltaMax", "Delta max"], ["ivMin", "IV min (%)"], ["ivMax", "IV max (%)"],
+  ];
 
   return (
     <Screen
@@ -183,6 +204,9 @@ export function OptionsScreen() {
           </View>
 
           <Card title={`${chain.data.symbol} · ${chain.data.name}`}>
+            {chain.error ? <Text accessibilityRole="alert" style={styles.sourceDetail}>
+              {pick("Actualisation impossible : les données affichées peuvent être périmées.", "Refresh failed: displayed data may be stale.")}
+            </Text> : null}
             {market === "commodities" && chain.data.contracts.length ? <Text style={styles.sourceDetail}>
               {pick("Instantané récupéré", "Snapshot retrieved")}: {new Date(chain.data.generated_at).toLocaleString()}
               {chain.data.stale ? ` · ${pick("instantané périmé", "stale snapshot")}` : ""}
@@ -210,6 +234,30 @@ export function OptionsScreen() {
               </Pressable>)}
             </ScrollView> : null}
 
+            <Button label={pick("Filtres avancés", "Advanced filters")} variant="secondary"
+              disabled={!filtersReady} onPress={() => setFiltersOpen((open) => !open)} />
+            {filtersOpen && filtersReady ? <View style={styles.contractRow}>
+              {numericFields.map(([key, label]) => <Field key={key} label={label} accessibilityLabel={label}
+                value={filters[key]} onChangeText={(value) => setFilters((current) => ({ ...current, [key]: value }))} />)}
+              {([
+                ["moneyness", "Moneyness", [["all", pick("Toutes", "All")], ["atm", "ATM"], ["itm", "ITM"], ["otm", "OTM"]]],
+                ["availability", pick("Cotations", "Quotes"), [["all", pick("Toutes", "All")], ["quoted", "Bid / Ask"], ["missing", pick("Incomplètes", "Incomplete")]]],
+                ["freshness", pick("Fraîcheur", "Freshness"), [["all", pick("Toutes", "All")], ["fresh", pick("Non différé", "Not delayed")], ["delayed", pick("Différé ou périmé", "Delayed or stale")]]],
+              ] as const).map(([key, label, options]) => <View key={key}>
+                <Text style={styles.shortcutSymbol}>{label}</Text>
+                <ScrollView horizontal contentContainerStyle={styles.shortcuts}>
+                  {options.map(([value, name]) => <Pressable key={value} accessibilityRole="button"
+                    accessibilityLabel={`${label}: ${name}`} accessibilityState={{ selected: filters[key] === value }}
+                    onPress={() => setFilters((current) => ({ ...current, [key]: value }))}
+                    style={[styles.shortcut, filters[key] === value && styles.shortcutActive]}>
+                    <Text style={styles.shortcutSymbol}>{name}</Text>
+                  </Pressable>)}
+                </ScrollView>
+              </View>)}
+              <Button label={pick("Effacer les filtres", "Clear filters")} variant="secondary"
+                onPress={() => setFilters({ ...defaultOptionFilters })} />
+            </View> : null}
+
             {pairs.length ? (
               pairs.slice(0, 80).map((pair) => (
                 <View key={pair.key} style={styles.contractRow}>
@@ -233,7 +281,7 @@ export function OptionsScreen() {
               ))
             ) : (
               <Text style={styles.empty}>
-                {market === "commodities"
+                {chain.data.contracts.length ? pick("Aucun contrat ne correspond aux filtres.", "No contracts match the filters.") : market === "commodities"
                   ? pick(
                       "Aucun instantané exploitable : une source autorisée et une collecte configurée sont nécessaires.",
                       "No usable snapshot: an authorized source and configured ingestion are required.",
