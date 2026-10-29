@@ -153,9 +153,9 @@ export function PerformanceOperationsClient() {
   const perfViolations = performance?.budget_violations.length ?? 0;
 
   return (
-    <main className={"anatole-ws-page"}>
-      <section className={`panel ${"anatole-ws-hero"}`}>
-        <div className={"anatole-ws-heroCopy"}>
+    <main className={"anatole-ws_page__"}>
+      <section className={`panel ${"anatole-ws_hero__"}`}>
+        <div className={"anatole-ws_heroCopy__"}>
           <span className="eyebrow">PERFORMANCE · PHASE 3G</span>
           <h1>{pick(language, "Centre d’opérations performance", "Performance operations center")}</h1>
           <p>
@@ -166,59 +166,59 @@ export function PerformanceOperationsClient() {
             )}
           </p>
         </div>
-        <div className={"anatole-ws-actionRow"}>
-          <button className={"anatole-ws-secondaryButton"} type="button" disabled={loading} onClick={() => void refresh()}>
+        <div className={"anatole-ws_actionRow__"}>
+          <button className={"anatole-ws_secondaryButton__"} type="button" disabled={loading} onClick={() => void refresh()}>
             <RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}
           </button>
         </div>
       </section>
 
-      {error ? <div className={"anatole-ws-errorNotice"}>{error}</div> : null}
+      {error ? <div className={"anatole-ws_errorNotice__"}>{error}</div> : null}
 
-      <section className={"anatole-ws-qualityMetricGrid"}>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+      <section className={"anatole-ws_qualityMetricGrid__"}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><Gauge size={14} /> {pick(language, "p95 API global", "Global API p95")}</span>
           <strong>{snapshot ? formatMs(snapshot.p95_duration_ms) : "—"}</strong>
           <small>{snapshot?.total_requests ?? 0} {pick(language, "requêtes observées", "observed requests")}</small>
         </article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><Database size={14} /> {pick(language, "Hit-rate mémoire", "Memory hit rate")}</span>
           <strong>{formatRate(performance?.cache.memory_hit_rate_percent)}</strong>
           <small>{performance?.cache.memory_hits ?? 0} hits · {performance?.cache.memory_misses ?? 0} misses</small>
         </article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><Server size={14} /> Redis</span>
           <strong>{formatRate(performance?.cache.redis_hit_rate_percent)}</strong>
           <small>{performance?.cache.redis_hits ?? 0} hits · {performance?.cache.redis_errors ?? 0} {pick(language, "erreurs", "errors")}</small>
         </article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><Zap size={14} /> Single-flight</span>
           <strong>{avoidedLoads}</strong>
           <small>{pick(language, "chargements dupliqués évités/réutilisés", "duplicate loads avoided/reused")}</small>
         </article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><TriangleAlert size={14} /> {pick(language, "Budgets dépassés", "Budget violations")}</span>
-          <strong className={routeViolations + perfViolations ? "anatole-ws-negative" : "anatole-ws-positive"}>{routeViolations + perfViolations}</strong>
+          <strong className={routeViolations + perfViolations ? "anatole-ws_negative__" : "anatole-ws_positive__"}>{routeViolations + perfViolations}</strong>
           <small>{pick(language, "routes + dépendances", "routes + dependencies")}</small>
         </article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}>
           <span><Activity size={14} /> {pick(language, "Fenêtre télémétrie", "Telemetry window")}</span>
           <strong>{performance?.sample_window ?? 0}</strong>
           <small>{pick(language, "échantillons bornés en mémoire", "bounded in-memory samples")}</small>
         </article>
       </section>
 
-      <section className={`panel ${"anatole-ws-panel"}`}>
-        <div className={"anatole-ws-sectionHeading"}>
+      <section className={`panel ${"anatole-ws_panel__"}`}>
+        <div className={"anatole-ws_sectionHeading__"}>
           <div>
             <span className="eyebrow">ROUTES</span>
             <h2>{pick(language, "p50 / p95 par route", "p50 / p95 by route")}</h2>
             <p>{pick(language, "Les dépassements de budget remontent en premier.", "Budget violations are surfaced first.")}</p>
           </div>
         </div>
-        <div className={"anatole-ws-compactList"}>
+        <div className={"anatole-ws_compactList__"}>
           {routes.length ? routes.map((route) => (
-            <div className={"anatole-ws-endpointRow"} key={route.path}>
+            <div className={"anatole-ws_endpointRow__"} key={route.path}>
               <div>
                 <strong>{route.path}</strong>
                 <small style={{ display: "block", marginTop: 4 }}>
@@ -226,53 +226,53 @@ export function PerformanceOperationsClient() {
                 </small>
               </div>
               <code>p95 {formatMs(route.p95_duration_ms)} / {formatMs(route.budget_ms)}</code>
-              <span className={`${"anatole-ws-statusPill"} ${route.within_budget ? "anatole-ws-statusHealthy" : "anatole-ws-statusDegraded"}`}>
+              <span className={`${"anatole-ws_statusPill__"} ${route.within_budget ? "anatole-ws_statusHealthy__" : "anatole-ws_statusDegraded__"}`}>
                 {route.within_budget ? pick(language, "Budget OK", "Budget OK") : pick(language, "À optimiser", "Optimize")}
               </span>
             </div>
-          )) : <div className={"anatole-ws-notice"}>{pick(language, "Pas encore assez de trafic observé.", "Not enough observed traffic yet.")}</div>}
+          )) : <div className={"anatole-ws_notice__"}>{pick(language, "Pas encore assez de trafic observé.", "Not enough observed traffic yet.")}</div>}
         </div>
       </section>
 
-      <div className={"anatole-ws-gridTwo"}>
-        <section className={`panel ${"anatole-ws-panel"}`}>
-          <div className={"anatole-ws-sectionHeading"}>
+      <div className={"anatole-ws_gridTwo__"}>
+        <section className={`panel ${"anatole-ws_panel__"}`}>
+          <div className={"anatole-ws_sectionHeading__"}>
             <div><span className="eyebrow">UPSTREAM</span><h2>{pick(language, "Fournisseurs les plus lents", "Slowest providers")}</h2></div>
           </div>
-          <div className={"anatole-ws-compactList"}>
+          <div className={"anatole-ws_compactList__"}>
             {providers.length ? providers.map((item) => (
-              <div className={"anatole-ws-endpointRow"} key={`${item.kind}-${item.name}`}>
+              <div className={"anatole-ws_endpointRow__"} key={`${item.kind}-${item.name}`}>
                 <div>
                   <strong>{shortName(item.name)}</strong>
                   <small style={{ display: "block", marginTop: 4 }}>{item.samples} samples · p50 {formatMs(item.p50_ms)} · max {formatMs(item.max_ms)}</small>
                 </div>
                 <code>p95 {formatMs(item.p95_ms)}</code>
-                <span className={`${"anatole-ws-statusPill"} ${item.within_budget ? "anatole-ws-statusHealthy" : "anatole-ws-statusDegraded"}`}>{item.within_budget ? "OK" : pick(language, "Lent", "Slow")}</span>
+                <span className={`${"anatole-ws_statusPill__"} ${item.within_budget ? "anatole-ws_statusHealthy__" : "anatole-ws_statusDegraded__"}`}>{item.within_budget ? "OK" : pick(language, "Lent", "Slow")}</span>
               </div>
-            )) : <div className={"anatole-ws-notice"}>{pick(language, "Aucun fournisseur mesuré pour l’instant.", "No provider measurements yet.")}</div>}
+            )) : <div className={"anatole-ws_notice__"}>{pick(language, "Aucun fournisseur mesuré pour l’instant.", "No provider measurements yet.")}</div>}
           </div>
         </section>
 
-        <section className={`panel ${"anatole-ws-panel"}`}>
-          <div className={"anatole-ws-sectionHeading"}>
+        <section className={`panel ${"anatole-ws_panel__"}`}>
+          <div className={"anatole-ws_sectionHeading__"}>
             <div><span className="eyebrow">CACHE & SINGLE-FLIGHT</span><h2>{pick(language, "Coûts internes", "Internal costs")}</h2></div>
           </div>
-          <div className={"anatole-ws-compactList"}>
+          <div className={"anatole-ws_compactList__"}>
             {internal.length ? internal.map((item) => (
-              <div className={"anatole-ws-endpointRow"} key={`${item.kind}-${item.name}`}>
+              <div className={"anatole-ws_endpointRow__"} key={`${item.kind}-${item.name}`}>
                 <div>
                   <strong>{item.kind} · {item.name}</strong>
                   <small style={{ display: "block", marginTop: 4 }}>{item.samples} samples · p50 {formatMs(item.p50_ms)} · max {formatMs(item.max_ms)}</small>
                 </div>
                 <code>p95 {formatMs(item.p95_ms)}</code>
-                <span className={`${"anatole-ws-statusPill"} ${item.within_budget ? "anatole-ws-statusHealthy" : "anatole-ws-statusDegraded"}`}>{item.within_budget ? "OK" : pick(language, "À optimiser", "Optimize")}</span>
+                <span className={`${"anatole-ws_statusPill__"} ${item.within_budget ? "anatole-ws_statusHealthy__" : "anatole-ws_statusDegraded__"}`}>{item.within_budget ? "OK" : pick(language, "À optimiser", "Optimize")}</span>
               </div>
-            )) : <div className={"anatole-ws-notice"}>{pick(language, "Aucune mesure interne disponible.", "No internal measurements available.")}</div>}
+            )) : <div className={"anatole-ws_notice__"}>{pick(language, "Aucune mesure interne disponible.", "No internal measurements available.")}</div>}
           </div>
         </section>
       </div>
 
-      <div className={"anatole-ws-notice"}>
+      <div className={"anatole-ws_notice__"}>
         <CheckCircle2 size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />
         {pick(
           language,

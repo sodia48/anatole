@@ -29,11 +29,11 @@ import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import "./Workspace.css";
 
 function sourceStatusClass(status: DataQualitySource["status"]): string {
-  if (status === "healthy") return "anatole-ws-statusHealthy";
-  if (status === "degraded") return "anatole-ws-statusDegraded";
-  if (status === "stale") return "anatole-ws-statusStale";
-  if (status === "unavailable") return "anatole-ws-statusUnavailable";
-  return "anatole-ws-statusIdle";
+  if (status === "healthy") return "anatole-ws_statusHealthy__";
+  if (status === "degraded") return "anatole-ws_statusDegraded__";
+  if (status === "stale") return "anatole-ws_statusStale__";
+  if (status === "unavailable") return "anatole-ws_statusUnavailable__";
+  return "anatole-ws_statusIdle__";
 }
 
 function sourceStatusLabel(status: DataQualitySource["status"], language: AnatoleLanguage): string {
@@ -156,45 +156,45 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
   const degradedCount = snapshot?.sources.filter((item) => ["degraded", "stale", "unavailable"].includes(item.status)).length ?? 0;
 
   return (
-    <main className={`${"anatole-ws-page"} ${embedded ? "anatole-ws-embedded" : ""}`}>
-      <section className={`panel ${"anatole-ws-hero"}`}>
-        <div className={"anatole-ws-heroCopy"}>
+    <main className={`${"anatole-ws_page__"} ${embedded ? "anatole-ws_embedded__" : ""}`}>
+      <section className={`panel ${"anatole-ws_hero__"}`}>
+        <div className={"anatole-ws_heroCopy__"}>
           <span className="eyebrow">{pick(language, "INTELLIGENCE", "INTELLIGENCE")} · V0.8</span>
           <h1>{pick(language, "Qualité des données", "Data quality")}</h1>
           <p>{pick(language, "Couverture, fraîcheur, mode fournisseur, retries, erreurs upstream et état des principales routes. Cette vue distingue clairement les données publiques, les caches et les données de secours.", "Coverage, freshness, provider mode, retries, upstream errors, and key route status. This view clearly distinguishes public data, caches, and fallback data.")}</p>
         </div>
-        <div className={"anatole-ws-heroMetric"}>
+        <div className={"anatole-ws_heroMetric__"}>
           <strong>{snapshot ? snapshot.overall_score.toFixed(0) : "—"}</strong>
           <span>{snapshot ? (language === "en" ? ({ Excellent: "Excellent", Bon: "Good", "Dégradé": "Degraded", Critique: "Critical" } as Record<string, string>)[snapshot.overall_status] ?? snapshot.overall_status : snapshot.overall_status) : pick(language, "analyse", "analysis")}</span>
           <small>{healthyCount} {pick(language, `source${healthyCount > 1 ? "s" : ""} saine${healthyCount > 1 ? "s" : ""}`, `healthy source${healthyCount === 1 ? "" : "s"}`)} · {degradedCount} {pick(language, "à surveiller", "to monitor")}</small>
         </div>
       </section>
 
-      <section className={`panel ${"anatole-ws-toolbar"}`}>
-        <div className={"anatole-ws-toolbarTop"}>
+      <section className={`panel ${"anatole-ws_toolbar__"}`}>
+        <div className={"anatole-ws_toolbarTop__"}>
           <div><span className="eyebrow">{pick(language, "OBSERVABILITÉ", "OBSERVABILITY")}</span><h2>{pick(language, "État du pipeline Anatole", "Anatole pipeline status")}</h2><p>{pick(language, "Une source « à réchauffer » n’est pas en panne : elle n’a simplement pas encore été sollicitée depuis le démarrage.", "A source marked not warmed is not down; it has simply not been requested since startup.")}</p></div>
-          <div className={"anatole-ws-actionRow"}>
-            <button className={"anatole-ws-secondaryButton"} type="button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button>
+          <div className={"anatole-ws_actionRow__"}>
+            <button className={"anatole-ws_secondaryButton__"} type="button" disabled={loading} onClick={() => void refresh()}><RefreshCw size={15} /> {loading ? pick(language, "Actualisation…", "Refreshing…") : pick(language, "Actualiser", "Refresh")}</button>
           </div>
         </div>
-        <div className={"anatole-ws-filterRow"} style={{ marginTop: 14 }}>
-          {categories.map((item) => <button className={item === category ? "anatole-ws-primaryButton" : "anatole-ws-secondaryButton"} type="button" key={item} onClick={() => setCategory(item)}>{item === "Toutes" ? pick(language, "Toutes", "All") : language === "en" ? ({ "Marché": "Market", Analyse: "Analysis", "Découverte": "Discovery", "Sociétés": "Companies" } as Record<string, string>)[item] ?? item : item}</button>)}
+        <div className={"anatole-ws_filterRow__"} style={{ marginTop: 14 }}>
+          {categories.map((item) => <button className={item === category ? "anatole-ws_primaryButton__" : "anatole-ws_secondaryButton__"} type="button" key={item} onClick={() => setCategory(item)}>{item === "Toutes" ? pick(language, "Toutes", "All") : language === "en" ? ({ "Marché": "Market", Analyse: "Analysis", "Découverte": "Discovery", "Sociétés": "Companies" } as Record<string, string>)[item] ?? item : item}</button>)}
         </div>
       </section>
 
-      {error ? <div className={"anatole-ws-errorNotice"}>{error}</div> : null}
+      {error ? <div className={"anatole-ws_errorNotice__"}>{error}</div> : null}
 
-      {!snapshot && loading ? <div className={"anatole-ws-skeleton"} /> : null}
+      {!snapshot && loading ? <div className={"anatole-ws_skeleton__"} /> : null}
 
       {snapshot ? (
         <>
-          <section className={"anatole-ws-qualityMetricGrid"}>
+          <section className={"anatole-ws_qualityMetricGrid__"}>
             {snapshot.metrics.map((metric) => {
               const copy = language === "en" ? QUALITY_METRIC_EN[metric.key] : undefined;
               return (
-              <article className={`panel ${"anatole-ws-kpiCard"}`} key={metric.key}>
+              <article className={`panel ${"anatole-ws_kpiCard__"}`} key={metric.key}>
                 <span>{copy?.label ?? metric.label}</span>
-                <strong className={metric.status === "healthy" ? "anatole-ws-positive" : metric.status === "critical" ? "anatole-ws-negative" : metric.status === "degraded" ? "anatole-ws-info" : ""}>{metric.value}</strong>
+                <strong className={metric.status === "healthy" ? "anatole-ws_positive__" : metric.status === "critical" ? "anatole-ws_negative__" : metric.status === "degraded" ? "anatole-ws_info__" : ""}>{metric.value}</strong>
                 <small>{copy?.detail(metric.detail) ?? metric.detail}</small>
               </article>
               );
@@ -202,88 +202,88 @@ export function DataQualityClient({ embedded = false }: { embedded?: boolean }) 
           </section>
 
 
-          <section className={`panel ${"anatole-ws-panel"}`}>
-            <div className={"anatole-ws-sectionHeading"}>
+          <section className={`panel ${"anatole-ws_panel__"}`}>
+            <div className={"anatole-ws_sectionHeading__"}>
               <div>
                 <span className="eyebrow">{pick(language, "FIABILITÉ PRODUCTION", "PRODUCTION RELIABILITY")}</span>
                 <h2>{pick(language, "Erreurs et latence du processus", "Process errors and latency")}</h2>
                 <p>{pick(language, "Mesures réelles depuis le dernier démarrage Render, avec X-Request-ID pour retrouver chaque incident.", "Real measurements since the latest Render startup, with X-Request-ID to trace each incident.")}</p>
               </div>
-              <span className={`${"anatole-ws-statusPill"} ${reliability?.status === "healthy" ? "anatole-ws-statusHealthy" : reliability?.status === "critical" ? "anatole-ws-statusUnavailable" : "anatole-ws-statusDegraded"}`}>
+              <span className={`${"anatole-ws_statusPill__"} ${reliability?.status === "healthy" ? "anatole-ws_statusHealthy__" : reliability?.status === "critical" ? "anatole-ws_statusUnavailable__" : "anatole-ws_statusDegraded__"}`}>
                 {reliability?.status === "healthy" ? pick(language, "Stable", "Stable") : reliability?.status === "critical" ? pick(language, "Critique", "Critical") : pick(language, "À surveiller", "Monitor")}
               </span>
             </div>
-            <div className={"anatole-ws-qualityMetricGrid"}>
-              <article className={"anatole-ws-kpiCard"}><span>{pick(language, "Requêtes reçues", "Requests received")}</span><strong>{reliability?.total_requests ?? "—"}</strong><small>{pick(language, "Depuis le démarrage courant", "Since current startup")}</small></article>
-              <article className={"anatole-ws-kpiCard"}><span>HTTP 5xx</span><strong className={(reliability?.error_rate_5xx ?? 0) >= 1 ? "anatole-ws-negative" : "anatole-ws-positive"}>{reliability ? `${reliability.error_rate_5xx.toFixed(2)} %` : "—"}</strong><small>{reliability?.total_5xx ?? 0} {pick(language, "erreur(s) serveur", "server error(s)")}</small></article>
-              <article className={"anatole-ws-kpiCard"}><span>{pick(language, "Latence p95", "p95 latency")}</span><strong>{reliability ? `${reliability.p95_duration_ms.toFixed(0)} ms` : "—"}</strong><small>{reliability?.slow_requests ?? 0} {pick(language, "requête(s) au-delà de 2,5 s", "request(s) over 2.5 s")}</small></article>
-              <article className={"anatole-ws-kpiCard"}><span>{pick(language, "Signalements bêta", "Beta reports")}</span><strong>{reliability?.reports_received ?? 0}</strong><small>{pick(language, "Enregistrés dans les logs opérationnels", "Recorded in operational logs")}</small></article>
+            <div className={"anatole-ws_qualityMetricGrid__"}>
+              <article className={"anatole-ws_kpiCard__"}><span>{pick(language, "Requêtes reçues", "Requests received")}</span><strong>{reliability?.total_requests ?? "—"}</strong><small>{pick(language, "Depuis le démarrage courant", "Since current startup")}</small></article>
+              <article className={"anatole-ws_kpiCard__"}><span>HTTP 5xx</span><strong className={(reliability?.error_rate_5xx ?? 0) >= 1 ? "anatole-ws_negative__" : "anatole-ws_positive__"}>{reliability ? `${reliability.error_rate_5xx.toFixed(2)} %` : "—"}</strong><small>{reliability?.total_5xx ?? 0} {pick(language, "erreur(s) serveur", "server error(s)")}</small></article>
+              <article className={"anatole-ws_kpiCard__"}><span>{pick(language, "Latence p95", "p95 latency")}</span><strong>{reliability ? `${reliability.p95_duration_ms.toFixed(0)} ms` : "—"}</strong><small>{reliability?.slow_requests ?? 0} {pick(language, "requête(s) au-delà de 2,5 s", "request(s) over 2.5 s")}</small></article>
+              <article className={"anatole-ws_kpiCard__"}><span>{pick(language, "Signalements bêta", "Beta reports")}</span><strong>{reliability?.reports_received ?? 0}</strong><small>{pick(language, "Enregistrés dans les logs opérationnels", "Recorded in operational logs")}</small></article>
             </div>
-            <div className={"anatole-ws-compactList"} style={{ marginTop: 14 }}>
+            <div className={"anatole-ws_compactList__"} style={{ marginTop: 14 }}>
               {reliability?.recent_errors.length ? reliability.recent_errors.slice(0, 6).map((incident) => (
-                <div className={"anatole-ws-endpointRow"} key={`${incident.request_id}-${incident.occurred_at}`}>
+                <div className={"anatole-ws_endpointRow__"} key={`${incident.request_id}-${incident.occurred_at}`}>
                   <div><strong>{incident.method} {incident.path}</strong><small style={{ display: "block", marginTop: 4 }}>{new Date(incident.occurred_at).toLocaleString("fr-CA")} · {incident.duration_ms.toFixed(0)} ms</small></div>
                   <code>{incident.request_id}</code>
-                  <span className={`${"anatole-ws-statusPill"} ${"anatole-ws-statusUnavailable"}`}>HTTP {incident.status_code}</span>
+                  <span className={`${"anatole-ws_statusPill__"} ${"anatole-ws_statusUnavailable__"}`}>HTTP {incident.status_code}</span>
                 </div>
-              )) : <div className={"anatole-ws-notice"}><CheckCircle2 size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />{pick(language, "Aucune erreur 5xx observée dans le processus courant.", "No 5xx errors observed in the current process.")}</div>}
+              )) : <div className={"anatole-ws_notice__"}><CheckCircle2 size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />{pick(language, "Aucune erreur 5xx observée dans le processus courant.", "No 5xx errors observed in the current process.")}</div>}
             </div>
           </section>
 
-          <section className={`panel ${"anatole-ws-panel"}`}>
-            <div className={"anatole-ws-sectionHeading"}>
+          <section className={`panel ${"anatole-ws_panel__"}`}>
+            <div className={"anatole-ws_sectionHeading__"}>
               <div><span className="eyebrow">SOURCES</span><h2>{pick(language, "Couverture et fraîcheur", "Coverage and freshness")}</h2><p>{sources.length} {pick(language, `source${sources.length > 1 ? "s" : ""} affichée${sources.length > 1 ? "s" : ""}`, `source${sources.length === 1 ? "" : "s"} shown`)}</p></div>
-              <span className={`${"anatole-ws-statusPill"} ${snapshot.overall_score >= 80 ? "anatole-ws-statusHealthy" : snapshot.overall_score >= 55 ? "anatole-ws-statusDegraded" : "anatole-ws-statusUnavailable"}`}>{snapshot.overall_status}</span>
+              <span className={`${"anatole-ws_statusPill__"} ${snapshot.overall_score >= 80 ? "anatole-ws_statusHealthy__" : snapshot.overall_score >= 55 ? "anatole-ws_statusDegraded__" : "anatole-ws_statusUnavailable__"}`}>{snapshot.overall_status}</span>
             </div>
-            <div className={"anatole-ws-sourceGrid"}>
+            <div className={"anatole-ws_sourceGrid__"}>
               {sources.map((source) => (
-                <article className={"anatole-ws-sourceCard"} key={source.key}>
-                  <div className={"anatole-ws-sourceHeader"}>
+                <article className={"anatole-ws_sourceCard__"} key={source.key}>
+                  <div className={"anatole-ws_sourceHeader__"}>
                   <div><small>{language === "en" ? SOURCE_EN[source.key]?.category ?? source.category : source.category}</small><h3>{language === "en" ? SOURCE_EN[source.key]?.label ?? source.label : source.label}</h3></div>
-                    <span className={`${"anatole-ws-statusPill"} ${sourceStatusClass(source.status)}`}>{sourceStatusLabel(source.status, language)}</span>
+                    <span className={`${"anatole-ws_statusPill__"} ${sourceStatusClass(source.status)}`}>{sourceStatusLabel(source.status, language)}</span>
                   </div>
                   <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 10, lineHeight: 1.55 }}>{language === "en" ? SOURCE_EN[source.key]?.detail ?? source.detail : source.detail}</p>
                   <div>
-                    <div className={"anatole-ws-sourceMeta"}><span>{pick(language, "Couverture", "Coverage")}</span><strong>{source.coverage_percent.toFixed(0)} %</strong></div>
-                    <div className={"anatole-ws-coverageBar"} style={{ marginTop: 7 }}><i style={{ width: `${source.coverage_percent}%` }} /></div>
+                    <div className={"anatole-ws_sourceMeta__"}><span>{pick(language, "Couverture", "Coverage")}</span><strong>{source.coverage_percent.toFixed(0)} %</strong></div>
+                    <div className={"anatole-ws_coverageBar__"} style={{ marginTop: 7 }}><i style={{ width: `${source.coverage_percent}%` }} /></div>
                   </div>
-                  <div className={"anatole-ws-sourceMeta"}><span><Database size={11} /> {source.source}</span><span><Clock3 size={11} /> {ageLabel(source.freshness_seconds, language)}</span>{source.item_count !== null ? <span>{source.item_count} {pick(language, `élément${source.item_count > 1 ? "s" : ""}`, `item${source.item_count === 1 ? "" : "s"}`)}</span> : null}</div>
+                  <div className={"anatole-ws_sourceMeta__"}><span><Database size={11} /> {source.source}</span><span><Clock3 size={11} /> {ageLabel(source.freshness_seconds, language)}</span>{source.item_count !== null ? <span>{source.item_count} {pick(language, `élément${source.item_count > 1 ? "s" : ""}`, `item${source.item_count === 1 ? "" : "s"}`)}</span> : null}</div>
                 </article>
               ))}
             </div>
           </section>
 
-          <div className={"anatole-ws-gridTwo"}>
-            <section className={`panel ${"anatole-ws-panel"}`}>
-              <div className={"anatole-ws-sectionHeading"}><div><span className="eyebrow">ROUTES</span><h2>{pick(language, "Disponibilité fonctionnelle", "Functional availability")}</h2><p>{pick(language, "État du dernier processus FastAPI courant.", "Status of the current FastAPI process.")}</p></div></div>
-              <div className={"anatole-ws-compactList"}>
+          <div className={"anatole-ws_gridTwo__"}>
+            <section className={`panel ${"anatole-ws_panel__"}`}>
+              <div className={"anatole-ws_sectionHeading__"}><div><span className="eyebrow">ROUTES</span><h2>{pick(language, "Disponibilité fonctionnelle", "Functional availability")}</h2><p>{pick(language, "État du dernier processus FastAPI courant.", "Status of the current FastAPI process.")}</p></div></div>
+              <div className={"anatole-ws_compactList__"}>
                 {snapshot.endpoints.map((endpoint) => (
-                  <div className={"anatole-ws-endpointRow"} key={endpoint.path}>
+                  <div className={"anatole-ws_endpointRow__"} key={endpoint.path}>
                     <div><strong>{language === "en" ? ENDPOINT_EN[endpoint.path]?.label ?? endpoint.label : endpoint.label}</strong><small style={{ display: "block", marginTop: 4 }}>{language === "en" ? ENDPOINT_EN[endpoint.path]?.detail ?? endpoint.detail : endpoint.detail}</small></div>
                     <code>{endpoint.path}</code>
-                    <span className={`${"anatole-ws-statusPill"} ${endpoint.status === "available" ? "anatole-ws-statusHealthy" : endpoint.status === "degraded" ? "anatole-ws-statusDegraded" : "anatole-ws-statusIdle"}`}>{endpoint.status === "available" ? pick(language, "Disponible", "Available") : endpoint.status === "degraded" ? pick(language, "Dégradée", "Degraded") : pick(language, "À réchauffer", "Not warmed")}</span>
+                    <span className={`${"anatole-ws_statusPill__"} ${endpoint.status === "available" ? "anatole-ws_statusHealthy__" : endpoint.status === "degraded" ? "anatole-ws_statusDegraded__" : "anatole-ws_statusIdle__"}`}>{endpoint.status === "available" ? pick(language, "Disponible", "Available") : endpoint.status === "degraded" ? pick(language, "Dégradée", "Degraded") : pick(language, "À réchauffer", "Not warmed")}</span>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section className={`panel ${"anatole-ws-panel"}`}>
-              <div className={"anatole-ws-sectionHeading"}><div><span className="eyebrow">ACTIONS</span><h2>{pick(language, "Recommandations", "Recommendations")}</h2><p>{pick(language, "Priorités dérivées des métriques observées.", "Priorities derived from observed metrics.")}</p></div></div>
-              <div className={"anatole-ws-compactList"}>
+            <section className={`panel ${"anatole-ws_panel__"}`}>
+              <div className={"anatole-ws_sectionHeading__"}><div><span className="eyebrow">ACTIONS</span><h2>{pick(language, "Recommandations", "Recommendations")}</h2><p>{pick(language, "Priorités dérivées des métriques observées.", "Priorities derived from observed metrics.")}</p></div></div>
+              <div className={"anatole-ws_compactList__"}>
                 {snapshot.recommendations.map((item, index) => (
-                  <div className={"anatole-ws-recommendation"} key={item}>
-                    <div className={"anatole-ws-instrument"}><span className={"anatole-ws-symbolBadge"}>{index + 1}</span><span><b>{recommendationLabel(item, language)}</b></span></div>
+                  <div className={"anatole-ws_recommendation__"} key={item}>
+                    <div className={"anatole-ws_instrument__"}><span className={"anatole-ws_symbolBadge__"}>{index + 1}</span><span><b>{recommendationLabel(item, language)}</b></span></div>
                   </div>
                 ))}
               </div>
-              <div className={"anatole-ws-notice"} style={{ marginTop: 12 }}><ShieldCheck size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />{pick(language, "Le score mesure l’état du processus et des caches visibles. Il ne certifie pas l’exactitude économique d’une donnée externe.", "The score measures process and visible cache status. It does not certify the economic accuracy of external data.")}</div>
+              <div className={"anatole-ws_notice__"} style={{ marginTop: 12 }}><ShieldCheck size={14} style={{ verticalAlign: "middle", marginRight: 7 }} />{pick(language, "Le score mesure l’état du processus et des caches visibles. Il ne certifie pas l’exactitude économique d’une donnée externe.", "The score measures process and visible cache status. It does not certify the economic accuracy of external data.")}</div>
             </section>
           </div>
 
-          <section className={"anatole-ws-gridThree"}>
-            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Processus API", "API process")}</span><strong className={"anatole-ws-positive"}><Server size={20} /> {pick(language, "En ligne", "Online")}</strong><small>Uptime {(snapshot.uptime_seconds / 3600).toFixed(1)} h</small></article>
-            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Mode fournisseur", "Provider mode")}</span><strong>{snapshot.provider_mode === "public" ? "Public" : pick(language, "Démonstration", "Demo")}</strong><small>{pick(language, "Cotations et historiques", "Quotes and history")}</small></article>
-            <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{pick(language, "Lecture", "Assessment")}</span><strong>{degradedCount ? <><AlertTriangle size={20} /> {pick(language, "À surveiller", "Monitor")}</> : <><CheckCircle2 size={20} /> Stable</>}</strong><small>{degradedCount} {pick(language, `source${degradedCount > 1 ? "s" : ""} dégradée${degradedCount > 1 ? "s" : ""}`, `degraded source${degradedCount === 1 ? "" : "s"}`)}</small></article>
+          <section className={"anatole-ws_gridThree__"}>
+            <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{pick(language, "Processus API", "API process")}</span><strong className={"anatole-ws_positive__"}><Server size={20} /> {pick(language, "En ligne", "Online")}</strong><small>Uptime {(snapshot.uptime_seconds / 3600).toFixed(1)} h</small></article>
+            <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{pick(language, "Mode fournisseur", "Provider mode")}</span><strong>{snapshot.provider_mode === "public" ? "Public" : pick(language, "Démonstration", "Demo")}</strong><small>{pick(language, "Cotations et historiques", "Quotes and history")}</small></article>
+            <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{pick(language, "Lecture", "Assessment")}</span><strong>{degradedCount ? <><AlertTriangle size={20} /> {pick(language, "À surveiller", "Monitor")}</> : <><CheckCircle2 size={20} /> Stable</>}</strong><small>{degradedCount} {pick(language, `source${degradedCount > 1 ? "s" : ""} dégradée${degradedCount > 1 ? "s" : ""}`, `degraded source${degradedCount === 1 ? "" : "s"}`)}</small></article>
           </section>
 
           <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}><Activity size={12} style={{ verticalAlign: "middle", marginRight: 5 }} />{pick(language, "Généré", "Generated")} {new Date(snapshot.generated_at).toLocaleString(localeFor(language))} · {pick(language, "actualisation 60 s", "refresh 60 s")}</div>

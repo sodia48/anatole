@@ -110,10 +110,10 @@ function formatValue(item: AlertEvaluation): string {
 }
 
 function statusClass(status: AlertEvaluation["status"]): string {
-  if (status === "triggered") return "anatole-ws-statusTriggered";
-  if (status === "monitoring") return "anatole-ws-statusMonitoring";
-  if (status === "unavailable") return "anatole-ws-statusUnavailable";
-  return "anatole-ws-statusIdle";
+  if (status === "triggered") return "anatole-ws_statusTriggered__";
+  if (status === "monitoring") return "anatole-ws_statusMonitoring__";
+  if (status === "unavailable") return "anatole-ws_statusUnavailable__";
+  return "anatole-ws_statusIdle__";
 }
 
 export function AlertsClient({ copy }: { copy: AlertsCopy }) {
@@ -296,81 +296,81 @@ export function AlertsClient({ copy }: { copy: AlertsCopy }) {
   );
 
   return (
-    <main className={"anatole-ws-page"}>
-      <section className={`panel ${"anatole-ws-hero"}`}>
-        <div className={"anatole-ws-heroCopy"}>
+    <main className={"anatole-ws_page__"}>
+      <section className={`panel ${"anatole-ws_hero__"}`}>
+        <div className={"anatole-ws_heroCopy__"}>
           <span className="eyebrow">{pick(language, "MON ESPACE", "MY WORKSPACE")} · V0.7</span>
           <h1>{pick(language, "Alertes", "Alerts")}</h1>
           <p>{strings.intro}</p>
         </div>
-        <div className={"anatole-ws-heroMetric"}>
+        <div className={"anatole-ws_heroMetric__"}>
           <strong>{triggered.length}</strong>
           <span>{pick(language, "alertes déclenchées", "triggered alerts")}</span>
           <small>{activeCount} {pick(language, `règle${activeCount > 1 ? "s" : ""} active${activeCount > 1 ? "s" : ""}`, `active rule${activeCount === 1 ? "" : "s"}`)} · {pick(language, "contrôle local", "local monitoring")}</small>
         </div>
       </section>
 
-      <section className={`panel ${"anatole-ws-toolbar"}`}>
-        <div className={"anatole-ws-toolbarTop"}>
+      <section className={`panel ${"anatole-ws_toolbar__"}`}>
+        <div className={"anatole-ws_toolbarTop__"}>
           <div><span className="eyebrow">{pick(language, "CRÉATION", "CREATE")}</span><h2>{pick(language, "Nouvelle règle", "New rule")}</h2><p>{strings.createHint}</p></div>
-          <div className={"anatole-ws-actionRow"}>
-            <button className={"anatole-ws-secondaryButton"} type="button" onClick={requestNotifications} disabled={permission === "granted" || permission === "unsupported"}>
+          <div className={"anatole-ws_actionRow__"}>
+            <button className={"anatole-ws_secondaryButton__"} type="button" onClick={requestNotifications} disabled={permission === "granted" || permission === "unsupported"}>
               <BellRing size={15} /> {permission === "granted" ? strings.permissionLabels[0] : permission === "denied" ? strings.permissionLabels[1] : permission === "unsupported" ? strings.permissionLabels[2] : strings.permissionLabels[3]}
             </button>
-            <button className={"anatole-ws-secondaryButton"} type="button" disabled={loading || !rules.length} onClick={() => void runEvaluation()}><RefreshCw size={15} /> {loading ? strings.actionLabels[0] : strings.actionLabels[1]}</button>
+            <button className={"anatole-ws_secondaryButton__"} type="button" disabled={loading || !rules.length} onClick={() => void runEvaluation()}><RefreshCw size={15} /> {loading ? strings.actionLabels[0] : strings.actionLabels[1]}</button>
           </div>
         </div>
 
-        <div className={"anatole-ws-alertFormGrid"}>
-          <div className={"anatole-ws-searchField"}>
+        <div className={"anatole-ws_alertFormGrid__"}>
+          <div className={"anatole-ws_searchField__"}>
             <label htmlFor="alert-symbol">{pick(language, "Symbole", "Symbol")}</label>
-            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="alert-symbol" className={"anatole-ws-searchInput"} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
-            {suggestions.length ? <div className={"anatole-ws-suggestions"}>{suggestions.map((item) => <button className={"anatole-ws-suggestion"} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
+            <div style={{ position: "relative" }}><Search size={15} style={{ position: "absolute", left: 12, top: 14, color: "var(--text-secondary)" }} /><input id="alert-symbol" className={"anatole-ws_searchInput__"} style={{ paddingLeft: 36 }} value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="MDA, RY, XIC…" /></div>
+            {suggestions.length ? <div className={"anatole-ws_suggestions__"}>{suggestions.map((item) => <button className={"anatole-ws_suggestion__"} key={item.symbol} type="button" onClick={() => { setSymbol(item.symbol); setSuggestions([]); }}><strong>{item.symbol}</strong><span><b>{item.name}</b><small>{item.sector} · {item.exchange}</small></span></button>)}</div> : null}
           </div>
-          <div className={"anatole-ws-field"}><label htmlFor="alert-kind">{pick(language, "Type de règle", "Rule type")}</label><select id="alert-kind" value={ruleKind} onChange={(event) => { const kind = event.target.value as "threshold" | "event"; setRuleKind(kind); if (kind === "event") setThreshold("3"); }}><option value="threshold">{pick(language, "Seuil de marché", "Market threshold")}</option><option value="event">{pick(language, "Événement fondamental", "Fundamental event")}</option></select></div>
-          {ruleKind === "threshold" ? <div className={"anatole-ws-field"}><label htmlFor="alert-metric">{pick(language, "Indicateur", "Metric")}</label><select id="alert-metric" value={metric} onChange={(event) => setMetric(event.target.value as AlertMetric)}>{METRICS.map((item, index) => <option value={item.key} key={item.key}>{strings.metricLabels[index]}</option>)}</select></div> : <div className={"anatole-ws-field"}><label htmlFor="fundamental-event">{pick(language, "Événement fondamental", "Fundamental event")}</label><select id="fundamental-event" value={fundamentalEvent} onChange={(event) => { const selected = FUNDAMENTAL_EVENTS.find((item) => item.key === event.target.value); if (selected) { setFundamentalEvent(selected.key); setThreshold(String(selected.threshold ?? "")); } }}>{FUNDAMENTAL_EVENTS.map((item, index) => <option key={item.key} value={item.key}>{strings.eventLabels[index]}</option>)}</select></div>}
-          {ruleKind === "threshold" ? <div className={"anatole-ws-field"}><label htmlFor="alert-operator">{pick(language, "Condition", "Condition")}</label><select id="alert-operator" value={operator} onChange={(event) => setOperator(event.target.value as "above" | "below")}><option value="above">{pick(language, "Au-dessus de", "Above")}</option><option value="below">{pick(language, "Sous", "Below")}</option></select></div> : <div className={"anatole-ws-field"}><label htmlFor="fundamental-frequency">{pick(language, "Rappel minimal", "Minimum reminder")}</label><select id="fundamental-frequency" value={fundamentalFrequency} onChange={(event) => setFundamentalFrequency(Number(event.target.value))}><option value={1440}>{pick(language, "1 jour", "1 day")}</option><option value={10080}>{pick(language, "1 semaine", "1 week")}</option><option value={43200}>{pick(language, "30 jours", "30 days")}</option></select></div>}
-          {(ruleKind === "threshold" || fundamentalEvent !== "fundamental_results") ? <div className={"anatole-ws-field"}><label htmlFor="alert-threshold">{ruleKind === "event" ? pick(language, "Changement minimal", "Minimum change") : pick(language, "Seuil", "Threshold")}</label><input id="alert-threshold" inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></div> : null}
-          <button className={"anatole-ws-primaryButton"} type="button" onClick={addRule}><Plus size={16} /> {pick(language, "Créer", "Create")}</button>
+          <div className={"anatole-ws_field__"}><label htmlFor="alert-kind">{pick(language, "Type de règle", "Rule type")}</label><select id="alert-kind" value={ruleKind} onChange={(event) => { const kind = event.target.value as "threshold" | "event"; setRuleKind(kind); if (kind === "event") setThreshold("3"); }}><option value="threshold">{pick(language, "Seuil de marché", "Market threshold")}</option><option value="event">{pick(language, "Événement fondamental", "Fundamental event")}</option></select></div>
+          {ruleKind === "threshold" ? <div className={"anatole-ws_field__"}><label htmlFor="alert-metric">{pick(language, "Indicateur", "Metric")}</label><select id="alert-metric" value={metric} onChange={(event) => setMetric(event.target.value as AlertMetric)}>{METRICS.map((item, index) => <option value={item.key} key={item.key}>{strings.metricLabels[index]}</option>)}</select></div> : <div className={"anatole-ws_field__"}><label htmlFor="fundamental-event">{pick(language, "Événement fondamental", "Fundamental event")}</label><select id="fundamental-event" value={fundamentalEvent} onChange={(event) => { const selected = FUNDAMENTAL_EVENTS.find((item) => item.key === event.target.value); if (selected) { setFundamentalEvent(selected.key); setThreshold(String(selected.threshold ?? "")); } }}>{FUNDAMENTAL_EVENTS.map((item, index) => <option key={item.key} value={item.key}>{strings.eventLabels[index]}</option>)}</select></div>}
+          {ruleKind === "threshold" ? <div className={"anatole-ws_field__"}><label htmlFor="alert-operator">{pick(language, "Condition", "Condition")}</label><select id="alert-operator" value={operator} onChange={(event) => setOperator(event.target.value as "above" | "below")}><option value="above">{pick(language, "Au-dessus de", "Above")}</option><option value="below">{pick(language, "Sous", "Below")}</option></select></div> : <div className={"anatole-ws_field__"}><label htmlFor="fundamental-frequency">{pick(language, "Rappel minimal", "Minimum reminder")}</label><select id="fundamental-frequency" value={fundamentalFrequency} onChange={(event) => setFundamentalFrequency(Number(event.target.value))}><option value={1440}>{pick(language, "1 jour", "1 day")}</option><option value={10080}>{pick(language, "1 semaine", "1 week")}</option><option value={43200}>{pick(language, "30 jours", "30 days")}</option></select></div>}
+          {(ruleKind === "threshold" || fundamentalEvent !== "fundamental_results") ? <div className={"anatole-ws_field__"}><label htmlFor="alert-threshold">{ruleKind === "event" ? pick(language, "Changement minimal", "Minimum change") : pick(language, "Seuil", "Threshold")}</label><input id="alert-threshold" inputMode="decimal" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></div> : null}
+          <button className={"anatole-ws_primaryButton__"} type="button" onClick={addRule}><Plus size={16} /> {pick(language, "Créer", "Create")}</button>
         </div>
       </section>
 
-      {error ? <div className={"anatole-ws-errorNotice"}>{error}</div> : null}
+      {error ? <div className={"anatole-ws_errorNotice__"}>{error}</div> : null}
 
-      <section className={"anatole-ws-kpiGrid"}>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{strings.kpiLabels[0]}</span><strong>{rules.length}</strong><small>{strings.kpiLabels[1]}</small></article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{strings.kpiLabels[2]}</span><strong>{activeCount}</strong><small>{strings.kpiLabels[3]}</small></article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{strings.kpiLabels[4]}</span><strong className={triggered.length ? "anatole-ws-positive" : ""}>{triggered.length}</strong><small>{strings.kpiLabels[5]}</small></article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}><span>{strings.kpiLabels[6]}</span><strong className={snapshot?.unavailable_count ? "anatole-ws-negative" : ""}>{snapshot?.unavailable_count ?? 0}</strong><small>{strings.kpiLabels[7]}</small></article>
-        <article className={`panel ${"anatole-ws-kpiCard"}`}><span>Notifications</span><strong>{permission === "granted" ? strings.kpiLabels[8] : strings.kpiLabels[9]}</strong><small>{permission === "granted" ? strings.kpiLabels[10] : strings.kpiLabels[11]}</small></article>
+      <section className={"anatole-ws_kpiGrid__"}>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{strings.kpiLabels[0]}</span><strong>{rules.length}</strong><small>{strings.kpiLabels[1]}</small></article>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{strings.kpiLabels[2]}</span><strong>{activeCount}</strong><small>{strings.kpiLabels[3]}</small></article>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{strings.kpiLabels[4]}</span><strong className={triggered.length ? "anatole-ws_positive__" : ""}>{triggered.length}</strong><small>{strings.kpiLabels[5]}</small></article>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>{strings.kpiLabels[6]}</span><strong className={snapshot?.unavailable_count ? "anatole-ws_negative__" : ""}>{snapshot?.unavailable_count ?? 0}</strong><small>{strings.kpiLabels[7]}</small></article>
+        <article className={`panel ${"anatole-ws_kpiCard__"}`}><span>Notifications</span><strong>{permission === "granted" ? strings.kpiLabels[8] : strings.kpiLabels[9]}</strong><small>{permission === "granted" ? strings.kpiLabels[10] : strings.kpiLabels[11]}</small></article>
       </section>
 
-      <section className={`panel ${"anatole-ws-panel"}`}>
-        <div className={"anatole-ws-sectionHeading"}><div><span className="eyebrow">{pick(language, "SURVEILLANCE", "MONITORING")}</span><h2>{pick(language, "Règles configurées", "Configured rules")}</h2><p>{strings.sectionHint}</p></div></div>
+      <section className={`panel ${"anatole-ws_panel__"}`}>
+        <div className={"anatole-ws_sectionHeading__"}><div><span className="eyebrow">{pick(language, "SURVEILLANCE", "MONITORING")}</span><h2>{pick(language, "Règles configurées", "Configured rules")}</h2><p>{strings.sectionHint}</p></div></div>
         {!rules.length ? (
-          <div className={"anatole-ws-emptyState"}><Bell size={30} /><strong>{pick(language, "Aucune alerte", "No alerts")}</strong><span>{strings.emptyHint}</span></div>
+          <div className={"anatole-ws_emptyState__"}><Bell size={30} /><strong>{pick(language, "Aucune alerte", "No alerts")}</strong><span>{strings.emptyHint}</span></div>
         ) : (
-          <div className={"anatole-ws-alertList"}>
+          <div className={"anatole-ws_alertList__"}>
             {rules.map((rule) => {
               const result = resultsById.get(rule.id);
               return (
-                <article className={`${"anatole-ws-alertCard"} ${result?.triggered ? "anatole-ws-alertCardTriggered" : ""}`} key={rule.id}>
-                  <div className={"anatole-ws-alertMain"}>
-                    <div className={"anatole-ws-alertIdentity"}>
-                      <span className={"anatole-ws-symbolBadge"}>{rule.symbol}</span>
+                <article className={`${"anatole-ws_alertCard__"} ${result?.triggered ? "anatole-ws_alertCardTriggered__" : ""}`} key={rule.id}>
+                  <div className={"anatole-ws_alertMain__"}>
+                    <div className={"anatole-ws_alertIdentity__"}>
+                      <span className={"anatole-ws_symbolBadge__"}>{rule.symbol}</span>
                       <span><b>{result?.name ?? rule.symbol}</b><small>{alertRuleLabel(rule, strings)}{rule.kind === "event" ? ` · ${rule.cooldown_minutes ?? 1440} min` : ` · ${rule.operator === "above" ? pick(language, "au-dessus de", "above") : pick(language, "sous", "below")} ${rule.threshold}`}</small></span>
                     </div>
-                    <div className={"anatole-ws-actionRow"}>
-                      <span className={`${"anatole-ws-statusPill"} ${result ? statusClass(result.status) : "anatole-ws-statusIdle"}`}>{result?.status === "triggered" ? strings.statusLabels[0] : result?.status === "monitoring" ? strings.statusLabels[1] : result?.status === "unavailable" ? strings.statusLabels[2] : rule.enabled ? strings.statusLabels[3] : strings.statusLabels[4]}</span>
-                      <button className={`${"anatole-ws-toggle"} ${rule.enabled ? "anatole-ws-toggleOn" : ""}`} type="button" aria-label={rule.enabled ? strings.actionLabels[2] : strings.actionLabels[3]} onClick={() => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, enabled: !item.enabled } : item))}><i /></button>
-                      <button className={"anatole-ws-iconButton"} type="button" aria-label={strings.actionLabels[4]} onClick={() => setRules((current) => current.filter((item) => item.id !== rule.id))}><Trash2 size={14} /></button>
+                    <div className={"anatole-ws_actionRow__"}>
+                      <span className={`${"anatole-ws_statusPill__"} ${result ? statusClass(result.status) : "anatole-ws_statusIdle__"}`}>{result?.status === "triggered" ? strings.statusLabels[0] : result?.status === "monitoring" ? strings.statusLabels[1] : result?.status === "unavailable" ? strings.statusLabels[2] : rule.enabled ? strings.statusLabels[3] : strings.statusLabels[4]}</span>
+                      <button className={`${"anatole-ws_toggle__"} ${rule.enabled ? "anatole-ws_toggleOn__" : ""}`} type="button" aria-label={rule.enabled ? strings.actionLabels[2] : strings.actionLabels[3]} onClick={() => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, enabled: !item.enabled } : item))}><i /></button>
+                      <button className={"anatole-ws_iconButton__"} type="button" aria-label={strings.actionLabels[4]} onClick={() => setRules((current) => current.filter((item) => item.id !== rule.id))}><Trash2 size={14} /></button>
                     </div>
                   </div>
-                  <div className={"anatole-ws-inlineBetween"}>
-                    <span className={"anatole-ws-alertMeta"}>{result ? (rule.kind === "event" || language === "fr" ? result.message : `${metricLabel(rule.metric, strings)} ${rule.operator === "above" ? "above" : "below"} ${rule.threshold}`) : pick(language, "Première évaluation en cours…", "Initial evaluation in progress…")}</span>
-                    <strong className={result?.triggered ? "anatole-ws-positive" : ""}>{result ? formatValue(result) : "…"}</strong>
+                  <div className={"anatole-ws_inlineBetween__"}>
+                    <span className={"anatole-ws_alertMeta__"}>{result ? (rule.kind === "event" || language === "fr" ? result.message : `${metricLabel(rule.metric, strings)} ${rule.operator === "above" ? "above" : "below"} ${rule.threshold}`) : pick(language, "Première évaluation en cours…", "Initial evaluation in progress…")}</span>
+                    <strong className={result?.triggered ? "anatole-ws_positive__" : ""}>{result ? formatValue(result) : "…"}</strong>
                   </div>
-                  <div className={"anatole-ws-actionRow"}><Link className={"anatole-ws-secondaryButton"} href={`/focus/${rule.symbol}`}>{strings.actionLabels[5]}</Link><Link className={"anatole-ws-secondaryButton"} href={`/assistant?symbol=${rule.symbol}`}>{strings.actionLabels[6]}</Link>{result?.source?.startsWith("https://") ? <a className={"anatole-ws-secondaryButton"} href={result.source} rel="noopener noreferrer" target="_blank">{strings.actionLabels[7]}</a> : null}</div>
+                  <div className={"anatole-ws_actionRow__"}><Link className={"anatole-ws_secondaryButton__"} href={`/focus/${rule.symbol}`}>{strings.actionLabels[5]}</Link><Link className={"anatole-ws_secondaryButton__"} href={`/assistant?symbol=${rule.symbol}`}>{strings.actionLabels[6]}</Link>{result?.source?.startsWith("https://") ? <a className={"anatole-ws_secondaryButton__"} href={result.source} rel="noopener noreferrer" target="_blank">{strings.actionLabels[7]}</a> : null}</div>
                 </article>
               );
             })}
@@ -378,7 +378,7 @@ export function AlertsClient({ copy }: { copy: AlertsCopy }) {
         )}
       </section>
 
-      <div className={"anatole-ws-notice"}><strong>{pick(language, "Portée actuelle :", "Current scope:")}</strong> {strings.scope}</div>
+      <div className={"anatole-ws_notice__"}><strong>{pick(language, "Portée actuelle :", "Current scope:")}</strong> {strings.scope}</div>
       <div style={{ textAlign: "right", color: "var(--text-secondary)", fontSize: 10 }}>{snapshot ? `${pick(language, "Dernière vérification", "Last checked")} ${new Date(snapshot.generated_at).toLocaleString(localeFor(language))}` : null}</div>
     </main>
   );
