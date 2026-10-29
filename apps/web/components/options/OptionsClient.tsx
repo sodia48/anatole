@@ -22,6 +22,7 @@ import type { StrategyLeg } from "./StrategyBuilder";
 
 const StrategyBuilder = dynamic(() => import("./StrategyBuilder").then((module) => module.StrategyBuilder), { ssr: false });
 const VolatilityIntelligence = dynamic(() => import("./VolatilityIntelligence").then((module) => module.VolatilityIntelligence), { ssr: false });
+const OptionsScreener = dynamic(() => import("./OptionsScreener").then((module) => module.OptionsScreener), { ssr: false });
 
 type SideFilter = "both" | "call" | "put";
 
@@ -95,17 +96,19 @@ export function OptionsClient() {
   const [legs, setLegs] = useState<StrategyLeg[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
   const [showVolatility, setShowVolatility] = useState(false);
+  const [showScreener, setShowScreener] = useState(false);
   const nextLegId = useRef(0);
 
   function addStrategyLeg(contract: OptionContract) {
     if (legs.length >= 20) {
       setChainError(pick(language, "La stratégie est limitée à 20 jambes.", "A strategy is limited to 20 legs."));
-      return;
+      return false;
     }
     setChainError(null);
     const id = nextLegId.current++;
     setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: "long", quantity: "1", premium: "", multiplier: "", snapshotStale: chain?.stale ?? false, snapshotAt: chain?.generated_at ?? "", upfront: false }]);
     setShowStrategy(true);
+    return true;
   }
 
   useEffect(() => {
@@ -209,6 +212,9 @@ export function OptionsClient() {
         </div>
         <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showVolatility} onClick={() => setShowVolatility(!showVolatility)}>
           {pick(language, "Intelligence de volatilité", "Volatility intelligence")}
+        </button>
+        <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showScreener} onClick={() => setShowScreener(!showScreener)}>
+          {pick(language, "Screener de contrats", "Contract screener")}
         </button>
       </header>
 
@@ -394,6 +400,7 @@ export function OptionsClient() {
 
       {showStrategy ? <StrategyBuilder legs={legs} setLegs={setLegs} language={language} /> : null}
       {showVolatility && chain ? <VolatilityIntelligence chain={chain} language={language} /> : null}
+      {showScreener && chain ? <OptionsScreener chain={chain} language={language} onAddStrategy={addStrategyLeg} /> : null}
 
       <p className={"op-disclaimer"}>
         {pick(
