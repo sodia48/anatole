@@ -5,9 +5,15 @@ import { OptionsScreen } from "./OptionsScreen";
 import { OPTION_FILTERS_STORAGE_KEY } from "./optionFilters";
 import { optionsApi } from "@/src/lib/api/options";
 import { workspaceApi } from "@/src/lib/api/workspace";
+import { router } from "expo-router";
 
 let mockChainError: Error | null = null;
+let mockAccountId: string | null = null;
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ pick: (fr: string) => fr }) }));
+jest.mock("expo-router", () => ({ router: { push: jest.fn() } }));
+jest.mock("@/src/providers/MobileAccountProvider", () => ({ useMobileAccount: () => ({
+  state: mockAccountId ? "authenticated" : "anonymous", user: mockAccountId ? { id: mockAccountId } : null,
+}) }));
 jest.mock("@tanstack/react-query", () => ({
   useQuery: ({ queryKey }: { queryKey: string[] }) => {
     const market = queryKey[1];
@@ -33,7 +39,7 @@ jest.mock("@tanstack/react-query", () => ({
   },
 }));
 
-beforeEach(async () => { mockChainError = null; await AsyncStorage.clear(); });
+beforeEach(async () => { mockChainError = null; mockAccountId = null; await AsyncStorage.clear(); });
 
 test("commodity snapshots identify stale and unknown data without hiding published zero", async () => {
   const view = await render(<OptionsScreen />);
@@ -182,5 +188,52 @@ test("native assistant stays in Options, sends no positions and adds chain conte
   expect(view.queryByText("Analyse non sourcée.")).toBeNull();
   expect(view.getByText(/ne satisfait pas les garde-fous/)).toBeTruthy();
   ask.mockRestore();
+  await view.unmount();
+});
+
+test("native account reminders use verified expiry without sending position or premium", async () => {
+  mockAccountId = "00000000-0000-0000-0000-000000000001";
+  const reminder = { position_id: "00000000-0000-0000-0000-000000000002", underlying: "RY",
+    expires_at: "2027-11-25T21:00:00+00:00", reminder_days: 7, triggered_at: null };
+  const create = jest.spyOn(optionsApi, "createReminder").mockResolvedValue({ position_id: reminder.position_id });
+  const list = jest.spyOn(optionsApi, "reminders").mockResolvedValue([reminder]);
+  const remove = jest.spyOn(optionsApi, "deleteReminder").mockResolvedValue();
+  const view = await render(<OptionsScreen />);
+  await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
+  await fireEvent.press(view.getByLabelText("Enregistrer le rappel du compte"));
+  expect(create).not.toHaveBeenCalled();
+  expect(view.getByText(/vérifiez l'échéance future/)).toBeTruthy();
+  await fireEvent.changeText(view.getByLabelText("Échéance du rappel avec fuseau"), "2027-11-25T16:00:00-05:00");
+  await fireEvent.press(view.getByLabelText("PUT 100.00 2027-11-25 RY-P"));
+  expect(view.getByLabelText("Échéance du rappel avec fuseau").props.value).toBe("");
+  await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
+  await fireEvent.press(view.getByLabelText("Enregistrer le rappel du compte"));
+  await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+  expect(create.mock.calls[0]?.[0]).toEqual({ expected_account_id: mockAccountId, underlying: "RY",
+    expires_at: "2027-11-25T16:00:00-05:00", reminder_days: 7 });
+  expect(list).toHaveBeenCalledWith(mockAccountId);
+  expect(view.getByText("Rappel enregistré sur le compte.")).toBeTruthy();
+  await fireEvent.press(view.getByLabelText("Ouvrir Notifications"));
+  expect(router.push).toHaveBeenCalledWith("/notifications");
+  await fireEvent.press(view.getByLabelText("Supprimer rappel RY 2027-11-25T21:00:00+00:00"));
+  await waitFor(() => expect(remove).toHaveBeenCalledWith(reminder.position_id, mockAccountId));
+  expect(view.getByText("Aucun rappel enregistré.")).toBeTruthy();
+  create.mockRestore(); list.mockRestore(); remove.mockRestore();
+  await view.unmount();
+});
+
+test("a late reminder response is not shown after switching accounts", async () => {
+  mockAccountId = "00000000-0000-0000-0000-000000000001";
+  let resolveList!: (value: Awaited<ReturnType<typeof optionsApi.reminders>>) => void;
+  const list = jest.spyOn(optionsApi, "reminders").mockImplementation(() => new Promise((resolve) => { resolveList = resolve; }));
+  const view = await render(<OptionsScreen />);
+  await fireEvent.press(view.getByLabelText("Actualiser les rappels"));
+  expect(list).toHaveBeenCalledWith(mockAccountId);
+  mockAccountId = "00000000-0000-0000-0000-000000000002";
+  await view.rerender(<OptionsScreen />);
+  await act(async () => { resolveList([{ position_id: "old-account", underlying: "PRIVATE",
+    expires_at: "2027-11-25T21:00:00+00:00", reminder_days: 7, triggered_at: null }]); });
+  expect(view.queryByText(/PRIVATE/)).toBeNull();
+  list.mockRestore();
   await view.unmount();
 });

@@ -103,7 +103,18 @@ export type OptionPayoffResponse = {
   break_evens: { lower: string | null; upper: string | null }[];
 };
 
+export type OptionAccountReminder = { position_id: string; underlying: string; expires_at: string;
+  reminder_days: number; triggered_at: string | null };
+
 export const optionsApi = {
+  reminders: (accountId: string) => apiRequest<OptionAccountReminder[]>("/api/v1/notifications/option-reminders/account", {
+    auth: true, headers: { "X-Anatole-Account": accountId },
+  }),
+  createReminder: (payload: { expected_account_id: string; underlying: string; expires_at: string; reminder_days: number }) =>
+    apiRequest<{ position_id: string }>("/api/v1/notifications/option-reminders/create", { method: "POST", auth: true, body: JSON.stringify(payload) }),
+  deleteReminder: (id: string, accountId: string) => apiRequest<void>(`/api/v1/notifications/option-reminders/${encodeURIComponent(id)}`, {
+    method: "DELETE", auth: true, headers: { "X-Anatole-Account": accountId },
+  }),
   payoff: (payload: OptionPayoffRequest) => apiRequest<OptionPayoffResponse>("/api/v1/options/strategy/payoff", {
     method: "POST", body: JSON.stringify(payload), timeoutMs: 15_000,
   }),
