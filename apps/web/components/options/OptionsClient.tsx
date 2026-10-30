@@ -246,6 +246,12 @@ export function OptionsClient() {
         </button>
       </header>
 
+      <section className="panel op-integrations" aria-label={pick(language, "Assistant et autres espaces", "Assistant and other spaces")}>
+        {chain?.market === "tsx" && /^[A-Z^][A-Z0-9.^-]{0,14}$/.test(chain.symbol) ? <a href={`/focus/${chain.symbol}`}>{pick(language, `Voir ${chain.symbol} dans Focus`, `View ${chain.symbol} in Focus`)}</a> : null}
+        <a href="/portefeuille">{pick(language, "Ouvrir Portefeuille", "Open Portfolio")}</a>
+        <p>{pick(language, "Anatole Assistant explique les options sans lire positions ni chaîne. Le suivi local n'est pas synchronisé avec Portefeuille.", "Anatole Assistant explains options without reading positions or the chain. Local tracking is not synced with Portfolio.")}</p>
+      </section>
+
       <section className="panel op-controls">
         <div className={"op-marketTabs"}>
           <button

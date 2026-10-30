@@ -156,6 +156,9 @@ def _select_skill(message: str, context: AssistantContext, symbols: list[str], p
     explicit_market = any(cue in text for cue in _MARKET_CUES)
     explicit_news = any(cue in text for cue in _NEWS_CUES)
     explicit_instrument = bool(symbols) and (bool(_explicit_symbols(message)) or bool(re.search(r"\b(?:analyse|cours|prix|etf|ticker|action|titre|holdings)\b", text)))
+    option_cue = bool(re.search(r"\b(?:options?|call|put|strike|delta|gamma|theta|vega|greeks?|prime|échéance|expiration|volatilité implicite|implied volatility)\b", text))
+    if context.surface == "options" and (option_cue or portfolio or not (explicit_government or explicit_market or explicit_news or explicit_instrument)):
+        return "options_education", False
     government = explicit_government or (context.surface == "canada360" or previous == "canada360") and not (portfolio or explicit_instrument or explicit_market or explicit_news)
     mixed_macro = (government and bool(symbols) and any(cue in text for cue in _MACRO_CUES)
                    or (portfolio or previous == "portfolio_analysis")
@@ -682,6 +685,29 @@ class AnatoleAssistantOrchestrator:
             base = await assistant_service._guardrail(AssistantRequest(message=request.message,
                                                                       context_symbol=symbols[0] if symbols else None))
             bundle = _bundle_from_response(skill, base, symbols)
+        elif skill == "options_education":
+            context.portfolio_scope.authorized = False
+            context.portfolio_scope.position_count = 0
+            text = request.message.casefold()
+            if re.search(r"\b(delta|gamma|theta|vega|greeks?)\b", text):
+                fr = "Le delta mesure approximativement la variation du prix d'une option pour une variation d'une unité du sous-jacent. Le gamma décrit la variation du delta ; le theta et le vega décrivent des sensibilités au temps et à la volatilité. Ces sensibilités évoluent et ne garantissent aucun résultat."
+                en = "Delta approximates the change in an option's price for a one-unit underlying move. Gamma describes changes in delta; theta and vega describe sensitivities to time and volatility. These sensitivities change and do not guarantee a result."
+            elif "volatilité implicite" in text or "implied volatility" in text:
+                fr = "La volatilité implicite est un paramètre de modèle déduit d'un prix d'option et d'hypothèses. Elle diffère de la volatilité historique et ne prédit pas à elle seule le mouvement futur."
+                en = "Implied volatility is a model parameter inferred from an option price and assumptions. It differs from historical volatility and does not by itself predict a future move."
+            elif re.search(r"\b(call|put|option|options|prime|strike|échéance|expiration)\b", text):
+                fr = "Un call donne un droit d'achat et un put un droit de vente selon les conditions du contrat. La prime, le strike, l'échéance, le multiplicateur, le règlement et le style d'exercice doivent être vérifiés ; la vente d'options peut exposer à des pertes importantes."
+                en = "A call gives a right to buy and a put a right to sell under the contract's terms. Verify the premium, strike, expiry, multiplier, settlement and exercise style; writing options can expose the seller to substantial losses."
+            else:
+                fr = "Je peux expliquer les caractéristiques et risques généraux des options. Le constructeur permet de comparer des scénarios théoriques à l'échéance."
+                en = "I can explain general option characteristics and risks. The builder can compare theoretical expiry scenarios."
+            limitation = ("Je ne lis pas vos positions ni la chaîne ou les scénarios dans cette conversation ; aucune cotation ou recommandation n'est déduite."
+                          if context.language == "fr" else
+                          "I do not read your positions, chain or scenarios in this conversation; no quote or recommendation is inferred.")
+            base = self._simple(skill, "Options : explication générale" if context.language == "fr" else "Options: general explanation",
+                                (fr if context.language == "fr" else en) + "\n\n" + limitation)
+            bundle = _bundle_from_response(skill, base, [])
+            bundle.limitations.append(limitation)
         elif skill == "stock_analysis" and symbols:
             raw_scenario = context.metadata.get("scenario_request")
             base, bundle = await self._stock(symbols[0], context.language,
@@ -838,7 +864,7 @@ class AnatoleAssistantOrchestrator:
         bundle.navigation_actions.extend(actions)
         base.intent = skill
         synthesis = None
-        if skill not in {"canada360", "guardrail"} and not scenario_context_applied and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
+        if skill not in {"canada360", "guardrail", "options_education"} and not scenario_context_applied and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
             macro_suffix = ("\n\n## Contexte macro Canada 360" +
                             base.answer.split("\n\n## Contexte macro Canada 360", 1)[1]
                             if mixed_macro and skill == "portfolio_analysis"

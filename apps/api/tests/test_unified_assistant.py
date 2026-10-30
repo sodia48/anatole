@@ -47,6 +47,56 @@ def request(message: str, *, surface: str = "other", symbol: str | None = None,
                                    portfolio_positions=positions or [])
 
 
+@pytest.mark.asyncio
+async def test_options_questions_are_local_education_without_portfolio_or_provider(unit, monkeypatch):
+    async def forbidden(*_args, **_kwargs):
+        raise AssertionError("options education must not access portfolio, market data or a provider")
+
+    monkeypatch.setattr(unit, "_portfolio", forbidden)
+    monkeypatch.setattr(unit, "_stock", forbidden)
+    monkeypatch.setattr(provider_router, "generate_internal_evidence", forbidden)
+    context = AssistantContext(surface="options", route="/options")
+    context.portfolio_scope.authorized = True
+    context.portfolio_scope.position_count = 1
+    response = await unit.answer(UnifiedAssistantRequest(
+        message="Explique le delta d'une option", context=context,
+        portfolio_consent=True, portfolio_positions=POSITIONS,
+    ))
+    assert response.intent == "options_education"
+    assert "delta" in response.answer.lower()
+    assert "ne lis pas vos positions" in response.answer
+    assert not response.permission_required
+    assert response.synthesis_provider is None
+    assert not response.context.portfolio_scope.authorized
+    assert response.context.portfolio_scope.position_count == 0
+
+    follow_up = await unit.answer(UnifiedAssistantRequest(
+        message="Analyse mes positions d'options", context=context,
+        conversation_id=response.conversation_id,
+    ))
+    assert follow_up.intent == "options_education"
+    assert not follow_up.permission_required
+    assert "ne lis pas vos positions" in follow_up.answer
+
+    volatility = await unit.answer(UnifiedAssistantRequest(
+        message="Qu'est-ce que la volatilité implicite ?", context=context,
+        conversation_id=response.conversation_id,
+    ))
+    assert volatility.intent == "options_education"
+    assert "diffère de la volatilité historique" in volatility.answer
+
+
+def test_options_assistant_http_returns_educational_answer():
+    with TestClient(app) as client:
+        response = client.post("/api/v1/assistant/chat", json={
+            "message": "Que signifie un call ?",
+            "context": {"surface": "options", "route": "/options", "language": "fr"},
+        })
+    assert response.status_code == 200
+    assert response.json()["intent"] == "options_education"
+    assert "droit d'achat" in response.json()["answer"]
+
+
 @pytest.fixture
 def stock_tools(monkeypatch: pytest.MonkeyPatch, unit: AnatoleAssistantOrchestrator):
     seen: list[str] = []

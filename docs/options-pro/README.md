@@ -11,7 +11,7 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 | 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | [#179](https://github.com/sodia48/anatole/pull/179), brouillon ; données chargées uniquement, provenance détaillée à vérifier |
 | 6 — Screener & Heatmap | Filtres et visualisations | [#180](https://github.com/sodia48/anatole/pull/180), brouillon ; chaîne chargée uniquement |
 | 7 — Options Portfolio & Alerts | Positions, valorisation et alertes | Suivi local et rappels en page ; valorisation et alertes persistantes à construire |
-| 8 — Assistant & Full Integration | Contexte exact, intégration web/mobile et portefeuille | PR 3–7 |
+| 8 — Assistant & Full Integration | Contexte, intégration web/mobile et portefeuille | Explications générales et liens web ; analyse de chaîne, données de positions et mobile natif restent à construire |
 
 ## Droits et données
 
@@ -72,3 +72,9 @@ Ce screener ne recherche pas encore dans l'ensemble des sous-jacents : il travai
 Le suivi web permet de sélectionner un contrat chargé, saisir une position, vérifier la date et le fuseau d'échéance, la devise, le multiplicateur et le paiement initial de la prime, puis enregistrer ou retirer la position. Les données restent dans le stockage de ce navigateur. Un rappel d'échéance s'affiche pendant que la page est ouverte ; ce n'est ni une notification en arrière-plan ni une synchronisation avec un compte ou un courtier. Un contenu local non reconnu n'est pas écrasé. Le flux initial affiché est une estimation, hors frais, financement, change et fiscalité. Les cotations ne sont montrées que si la chaîne chargée contient une correspondance unique de l'identité complète ; leur état différé et celui de l'instantané sont indiqués.
 
 Une position peut être ajoutée au constructeur existant pour simuler son résultat théorique à l'échéance ; la devise et l'instant d'échéance doivent correspondre aux données enregistrées. Le lancement du calcul transmet les jambes et les hypothèses à l'API Anatole. La valeur actuelle, le risque global, la marge, le règlement, l'exercice et l'assignation ne sont pas calculés. Le stockage local n'offre pas de synchronisation multi-appareils ni de résolution transactionnelle entre onglets. Une intégration sécurisée au portefeuille de compte, des alertes persistantes en arrière-plan, la valorisation et les risques complets restent à construire ; ce lot doit rester en brouillon. Les parcours automatisés utilisent des contrats synthétiques.
+
+## PR 8 — premier lien vers l'assistant et les autres espaces
+
+Le tiroir Anatole Assistant est accessible depuis Options et reconnaît cet espace. Il répond de manière déterministe à des questions générales sur les options, les sensibilités et la volatilité implicite, sans consulter les positions, la chaîne ou les scénarios et sans appeler de fournisseur de génération pour ces réponses. Depuis `/options`, les positions locales ne sont pas jointes aux requêtes de l'assistant, même si le contexte est retiré. L'interface précise cette limite et propose des liens vers le sous-jacent dans Focus lorsque son symbole est valide, ainsi que vers Portefeuille. Le suivi local d'options n'est pas synchronisé avec Portefeuille.
+
+Les réponses ne constituent pas une analyse du contrat ou des positions. Une analyse contextualisée à partir de données de marché autorisées, l'intégration aux positions du compte avec consentement adapté, le retour depuis Focus et l'application mobile native restent à développer et à vérifier. Les tests web utilisent une chaîne synthétique et le véritable endpoint de l'assistant ; un test API vérifie également la réponse déterministe.

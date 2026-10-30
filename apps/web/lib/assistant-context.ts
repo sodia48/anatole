@@ -1,6 +1,6 @@
 import type { AssistantResponse, PortfolioPositionInput } from "./types";
 
-export type AssistantSurface = "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "fixed_income" | "compare" | "other";
+export type AssistantSurface = "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "fixed_income" | "compare" | "options" | "other";
 export type AssistantContext = {
   surface: AssistantSurface;
   route: string;
@@ -87,7 +87,7 @@ export function deriveAssistantContext(pathname: string, search: URLSearchParams
     : symbol && SYMBOL.test(symbol) ? [symbol] : [];
   const surface: AssistantSurface = focus || (institutionalSymbol && symbols.length) ? "stock" : etf ? "etf" : route === "/portefeuille" ? "portfolio"
     : route === "/comparateur" ? "compare" : route === "/actualites" ? "news" : route === "/canada" ? "canada360" : route === "/taux-obligations" ? "fixed_income"
-    : route === "/terminal" || route === "/screener" ? "market" : "other";
+    : route === "/terminal" || route === "/screener" ? "market" : route === "/options" ? "options" : "other";
   return { surface, route, symbol: symbols[0], symbols,
     instrument_type: focus || (institutionalSymbol && symbols.length) ? "stock" : etf ? "etf" : "unknown",
     portfolio_scope: { authorized: false, position_count: 0 }, language, metadata: {} };
@@ -102,6 +102,7 @@ export function assistantContextLabel(context: AssistantContext): string {
   if (context.surface === "fixed_income") return "Taux & Obligations";
   if (context.surface === "market") return "Marché";
   if (context.surface === "news") return "Actualités";
+  if (context.surface === "options") return "Options";
   return "Anatole";
 }
 
