@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { pairOptions } from "@anatole/shared/options-chain";
 
@@ -15,6 +15,7 @@ import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilters, type NumericFilter, type OptionFilters } from "./optionFilters";
+import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
 
 type SideFilter = "both" | OptionSide;
 
@@ -41,6 +42,8 @@ export function OptionsScreen() {
   const [side, setSide] = useState<SideFilter>("both");
   const [expiry, setExpiry] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [legs, setLegs] = useState<NativeStrategyLeg[]>([]);
+  const nextLegId = useRef(0);
   const [filters, setFilters] = useState<OptionFilters>({ ...defaultOptionFilters });
   const [filtersReady, setFiltersReady] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -297,6 +300,9 @@ export function OptionsScreen() {
               <Text style={styles.shortcutSymbol}>{detail.symbol} · {detail.side.toUpperCase()}</Text>
               <Text style={styles.metric}>{detail.source} · {detail.expiration ?? "N/D"}</Text>
               <Text style={styles.metric}>Γ {number(detail.gamma, 4)} · Θ {number(detail.theta, 3)} · Vega {number(detail.vega, 3)}</Text>
+              <Button label={pick("Ajouter au constructeur", "Add to builder")} disabled={legs.length >= 20}
+                onPress={() => { const id = ++nextLegId.current; setLegs((current) => current.length >= 20 ? current : [...current, { id, contract: detail,
+                  direction: "long", quantity: "1", premium: "", multiplier: "", upfront: false }]); }} />
               <Button label={pick("Fermer", "Close")} onPress={() => setSelected(null)} />
             </View> : null}
           </Card>
@@ -323,6 +329,8 @@ export function OptionsScreen() {
           </Card>
         </>
       ) : null}
+
+      <NativeStrategyBuilder legs={legs} setLegs={setLegs} />
 
       <Text style={styles.disclaimer}>
         {market === "commodities" ? pick(
