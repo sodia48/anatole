@@ -82,11 +82,7 @@ function Status({ item }: { item: OptionSourceStatus }) {
 }
 
 export function OptionsClient() {
-  const symbol = useSearchParams().get("symbol");
-  return <OptionsContent key={symbol === null ? "default" : `symbol:${symbol}`} requestedSymbol={symbol} />;
-}
-
-function OptionsContent({ requestedSymbol: rawSymbol }: { requestedSymbol: string | null }) {
+  const rawSymbol = useSearchParams().get("symbol");
   const { preferences } = usePreferences();
   const { openAssistant } = useAssistantContext();
   const language = preferences.language;
@@ -111,7 +107,20 @@ function OptionsContent({ requestedSymbol: rawSymbol }: { requestedSymbol: strin
   const [showScreener, setShowScreener] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [trackedContract, setTrackedContract] = useState<OptionContract | null>(null);
+  const [appliedQuery, setAppliedQuery] = useState(rawSymbol);
   const nextLegId = useRef(0);
+
+  if (appliedQuery !== rawSymbol) {
+    setAppliedQuery(rawSymbol);
+    setSymbol(initialSymbol);
+    setDraftSymbol(initialSymbol);
+    if (market !== "tsx") { setMarket("tsx"); setLoadingUniverse(true); setCategory("all"); }
+    setExpiration("");
+    setChain(null);
+    setTrackedContract(null);
+    setLoadingChain(Boolean(initialSymbol));
+    setChainError(initialSymbol ? null : pick(language, "Symbole invalide.", "Invalid symbol."));
+  }
 
   function addStrategyLeg(contract: OptionContract) {
     if (legs.length >= 20) {
