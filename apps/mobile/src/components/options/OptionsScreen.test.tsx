@@ -80,7 +80,8 @@ test("a failed refresh warns when cached chain data remains available", async ()
 test("native strategy builder validates specifications and compares two hypothetical scenarios", async () => {
   const payoff = jest.spyOn(optionsApi, "payoff").mockResolvedValue({ currency: "CAD", theoretical_debit: "500",
     minimum_profit_loss: "-500", maximum_profit_loss: null, loss_unbounded: false, gain_unbounded: true,
-    break_evens: [{ lower: "95", upper: "95" }, { lower: "105", upper: "105" }], points: [{ price: "100", profit_loss: "-500" }] });
+    break_evens: [{ lower: "95", upper: "95" }, { lower: "105", upper: "105" }], points: [
+      { price: "80", profit_loss: "1500" }, { price: "100", profit_loss: "-500" }, { price: "120", profit_loss: "1500" }] });
   const view = await render(<OptionsScreen />);
   await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
   await fireEvent.press(view.getByLabelText("Ajouter au constructeur"));
@@ -108,9 +109,11 @@ test("native strategy builder validates specifications and compares two hypothet
   ]));
   expect(view.getByText("Scénario théorique 1")).toBeTruthy();
   expect(view.getByText(/Seuils de rentabilité: 95, 105/)).toBeTruthy();
+  expect(view.getByLabelText(/Résultats théoriques dans la plage de 80 à 120/)).toBeTruthy();
   payoff.mockResolvedValueOnce({ currency: "CAD", theoretical_debit: "-100", minimum_profit_loss: "-19900",
     maximum_profit_loss: null, loss_unbounded: false, gain_unbounded: true,
-    break_evens: [{ lower: "99.5", upper: "99.5" }], points: [{ price: "100", profit_loss: "100" }] });
+    break_evens: [{ lower: "99.5", upper: "99.5" }], points: [
+      { price: "80", profit_loss: "-3900" }, { price: "100", profit_loss: "100" }, { price: "130", profit_loss: "3100" }] });
   await fireEvent.press(view.getByLabelText("Jambe 2 : achat, modifier"));
   expect(view.getByLabelText("Jambe 2 : vente, modifier")).toBeTruthy();
   await fireEvent.changeText(view.getByLabelText("Quantité jambe 2"), "2");
@@ -118,6 +121,7 @@ test("native strategy builder validates specifications and compares two hypothet
   await fireEvent.press(view.getByLabelText("Simuler à l'échéance"));
   await waitFor(() => expect(payoff).toHaveBeenCalledTimes(2));
   expect(view.getByText("Scénario théorique 2")).toBeTruthy();
+  expect(view.getByLabelText(/Résultats théoriques dans la plage de 80 à 130/)).toBeTruthy();
   expect(payoff.mock.calls[1]?.[0].prices.at(-1)).toBe("130.000000");
   expect(payoff.mock.calls[1]?.[0].legs[1]).toEqual(expect.objectContaining({ direction: "short", quantity: 2 }));
   expect(view.getByText(/Seuils de rentabilité: 99.5/)).toBeTruthy();

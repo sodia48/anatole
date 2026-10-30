@@ -1,5 +1,6 @@
 import { useRef, useState, type ComponentProps, type Dispatch, type SetStateAction } from "react";
 import { Text, View } from "react-native";
+import Svg, { Line, Polyline } from "react-native-svg";
 
 import { Button, Card, Field } from "@/src/components/ui";
 import { optionsApi, type OptionContract, type OptionPayoffResponse } from "@/src/lib/api/options";
@@ -22,6 +23,34 @@ type Scenario = { id: number; label: string; result: OptionPayoffResponse };
 
 function StrategyField(props: ComponentProps<typeof Field>) {
   return <Field {...props} accessibilityLabel={props.label} />;
+}
+
+function PayoffChart({ points, currency }: { points: OptionPayoffResponse["points"]; currency: string }) {
+  const { colors } = useMobileTheme();
+  const { pick } = useLocale();
+  const values = points.map((point) => ({ x: Number(point.price), y: Number(point.profit_loss) }));
+  if (values.length < 2 || values.some((point) => !Number.isFinite(point.x) || !Number.isFinite(point.y)) ||
+      values.some((point, index) => index > 0 && point.x <= values[index - 1]!.x)) {
+    return <Text style={styles.copy}>{pick("Graphique indisponible pour ces points.", "Chart unavailable for these points.")}</Text>;
+  }
+  const first = values[0]!;
+  const last = values[values.length - 1]!;
+  const observedMin = Math.min(...values.map((point) => point.y));
+  const observedMax = Math.max(...values.map((point) => point.y));
+  const yMin = Math.min(0, observedMin);
+  const yMax = Math.max(0, observedMax);
+  const y = (value: number) => yMax === yMin ? 75 : 12 + (yMax - value) * 126 / (yMax - yMin);
+  const plotted = values.map((point) => `${12 + (point.x - first.x) * 296 / (last.x - first.x)},${y(point.y)}`).join(" ");
+  return <View accessible accessibilityRole="image" accessibilityLabel={pick(
+    `Résultats théoriques dans la plage de ${first.x} à ${last.x}. Points calculés de ${observedMin} à ${observedMax} ${currency}.`,
+    `Theoretical results over the ${first.x} to ${last.x} range. Sampled points from ${observedMin} to ${observedMax} ${currency}.`)}>
+    <Text style={styles.copy}>{pick("Profit / perte dans la plage simulée", "Profit / loss in the simulated range")}</Text>
+    <Svg width="100%" height={150} viewBox="0 0 320 150">
+      <Line x1="12" y1={y(0)} x2="308" y2={y(0)} stroke={colors.textMuted} strokeDasharray="4 4" />
+      <Polyline points={plotted} fill="none" stroke={colors.primary} strokeWidth={3} />
+    </Svg>
+    <Text style={styles.copy}>{pick("Sous-jacent", "Underlying")}: {first.x} – {last.x} · {pick("résultat des points", "sampled results")}: {observedMin} – {observedMax} {currency} · {pick("pointillé : zéro", "dashed line: zero")}</Text>
+  </View>;
 }
 
 export function NativeStrategyBuilder({ legs, setLegs }: {
@@ -163,6 +192,7 @@ export function NativeStrategyBuilder({ legs, setLegs }: {
       <Text style={styles.copy}>{pick("Seuils de rentabilité", "Break-even points")}: {scenario.result.break_evens.length
         ? scenario.result.break_evens.map((point) => point.lower === point.upper ? point.lower : `${point.lower ?? "−∞"} – ${point.upper ?? "+∞"}`).join(", ")
         : pick("aucun calculé", "none calculated")}</Text>
+      <PayoffChart points={scenario.result.points} currency={scenario.result.currency} />
       {scenario.result.points.map((point, pointIndex) => <Text key={pointIndex} style={styles.copy}>{point.price} → {point.profit_loss} {scenario.result.currency}</Text>)}
     </View>)}
   </Card>;
