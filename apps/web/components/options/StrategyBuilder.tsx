@@ -117,7 +117,7 @@ export function StrategyBuilder({ legs, setLegs, language }: {
     }
   }
 
-  return <section className="op-strategy panel" aria-label={tr("Constructeur de stratégie", "Strategy builder")}>
+  return <section id="options-strategy-builder" className="op-strategy panel" aria-label={tr("Constructeur de stratégie", "Strategy builder")}>
     <h2>{tr("Constructeur de stratégie", "Strategy builder")}</h2>
     <p>{tr("Simulation théorique à une échéance, à partir d'hypothèses saisies. Les primes saisies ne sont pas des cotations vérifiées.", "Theoretical single-expiry simulation using entered assumptions. Entered premiums are not verified quotes.")}</p>
     <p>{tr("Les options à prime de type futures, les échéances mixtes et les devises différentes ne sont pas prises en charge.", "Futures-style premium margining, mixed expiries and currencies are not supported.")}</p>
