@@ -12,11 +12,13 @@ import {
 } from "@/src/lib/api/options";
 import { useLocale } from "@/src/lib/i18n";
 import { useMobileTheme } from "@/src/providers/MobileThemeProvider";
+import { useMobileAccount } from "@/src/providers/MobileAccountProvider";
 import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilters, type NumericFilter, type OptionFilters } from "./optionFilters";
 import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
 import { NativeOptionsAssistant } from "./NativeOptionsAssistant";
+import { NativeOptionReminders } from "./NativeOptionReminders";
 
 type SideFilter = "both" | OptionSide;
 
@@ -37,6 +39,7 @@ function integer(value: number | null | undefined): string {
 export function OptionsScreen() {
   useMobileTheme();
   const { pick } = useLocale();
+  const { state: accountState, user } = useMobileAccount();
   const [market, setMarket] = useState<OptionMarket>("tsx");
   const [symbol, setSymbol] = useState("RY");
   const [draft, setDraft] = useState("RY");
@@ -338,6 +341,7 @@ export function OptionsScreen() {
         </>
       ) : null}
 
+      <NativeOptionReminders key={user?.id ?? "anonymous"} accountId={accountState === "authenticated" ? user?.id ?? null : null} selected={detail} />
       <NativeStrategyBuilder legs={legs} setLegs={setLegs} />
 
       <Text style={styles.disclaimer}>

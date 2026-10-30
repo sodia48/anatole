@@ -19,10 +19,9 @@ NotificationKind = Literal[
 ]
 
 
-class OptionExpiryReminderInput(BaseModel):
+class OptionExpiryReminderDetails(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_account_id: UUID
-    position_id: UUID
     underlying: str = Field(min_length=1, max_length=16, pattern=r"^[A-Z0-9.^-]+$")
     expires_at: datetime
     reminder_days: int = Field(ge=0, le=30)
@@ -33,6 +32,18 @@ class OptionExpiryReminderInput(BaseModel):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("L'échéance doit inclure un fuseau horaire.")
         return value.astimezone(UTC)
+
+
+class OptionExpiryReminderInput(OptionExpiryReminderDetails):
+    position_id: UUID
+
+
+class OptionExpiryReminderCreate(OptionExpiryReminderDetails):
+    pass
+
+
+class OptionExpiryReminderCreated(BaseModel):
+    position_id: UUID
 
 
 class OptionExpiryReminder(BaseModel):

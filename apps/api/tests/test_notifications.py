@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 import asyncio
 from uuid import uuid4
+from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import event, update
 
@@ -48,6 +49,43 @@ def register(client: TestClient) -> dict:
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_mobile_reminder_creation_is_account_scoped_and_retry_safe(notification_client):
+    client, _ = notification_client
+    session = register(client)
+    other = client.post("/api/v1/account/register", json={"email": "other-notify@example.com", "password": "Anatole2026!",
+        "display_name": "Other", "accepted_terms": True, "accepted_privacy": True}).json()
+    body = {"expected_account_id": session["user"]["id"], "underlying": "RY",
+            "expires_at": (datetime.now(UTC) + timedelta(days=10)).isoformat(), "reminder_days": 3}
+    headers = auth(session["token"])
+    created = client.post("/api/v1/notifications/option-reminders/create", json=body, headers=headers)
+    assert created.status_code == 201
+    repeated = client.post("/api/v1/notifications/option-reminders/create", json=body, headers=headers)
+    assert repeated.status_code == 201 and repeated.json() == created.json()
+    reminders = client.get("/api/v1/notifications/option-reminders", headers=headers).json()
+    assert len(reminders) == 1 and reminders[0]["position_id"] == created.json()["position_id"]
+    assert client.get("/api/v1/notifications/option-reminders", headers=auth(other["token"])).json() == []
+    assert client.get("/api/v1/notifications/option-reminders/account", headers={**auth(other["token"]),
+        "X-Anatole-Account": session["user"]["id"]}).status_code == 409
+    assert client.get("/api/v1/notifications/option-reminders/account", headers={**headers,
+        "X-Anatole-Account": session["user"]["id"]}).json() == reminders
+    assert client.post("/api/v1/notifications/option-reminders/create", json=body, headers=auth(other["token"])).status_code == 409
+    assert client.post("/api/v1/notifications/option-reminders/create", json={**body, "quantity": 100}, headers=headers).status_code == 422
+    assert client.post("/api/v1/notifications/option-reminders/create", json={**body, "expires_at": "2027-01-01T12:00:00"}, headers=headers).status_code == 422
+
+
+def test_mobile_reminder_simultaneous_retries_produce_one_record(notification_client):
+    client, _ = notification_client
+    session = register(client)
+    body = {"expected_account_id": session["user"]["id"], "underlying": "RY",
+            "expires_at": (datetime.now(UTC) + timedelta(days=9)).isoformat(), "reminder_days": 3}
+    headers = auth(session["token"])
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda _: client.post("/api/v1/notifications/option-reminders/create", json=body, headers=headers), range(4)))
+    assert all(result.status_code == 201 for result in results)
+    assert len({result.json()["position_id"] for result in results}) == 1
+    assert len(client.get("/api/v1/notifications/option-reminders", headers=headers).json()) == 1
 
 
 def test_option_reminders_are_account_scoped_durable_and_idempotent(notification_client):

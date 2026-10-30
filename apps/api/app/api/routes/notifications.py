@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
-from uuid import UUID
+from uuid import UUID, NAMESPACE_URL, uuid5
+from sqlalchemy.exc import IntegrityError
 
 from app.api.routes.accounts import current_user
 from app.schemas.accounts import AccountUser
@@ -12,6 +13,8 @@ from app.schemas.notifications import (
     NotificationPreferencesEnvelope,
     OptionExpiryReminder,
     OptionExpiryReminderInput,
+    OptionExpiryReminderCreate,
+    OptionExpiryReminderCreated,
 )
 from app.services.notifications import notification_service
 
@@ -23,6 +26,13 @@ async def option_reminders(user: AccountUser = Depends(current_user)) -> list[Op
     return await notification_service.list_option_reminders(user.id)
 
 
+@router.get("/option-reminders/account", response_model=list[OptionExpiryReminder])
+async def account_option_reminders(account_id: UUID = Header(alias="X-Anatole-Account"), user: AccountUser = Depends(current_user)) -> list[OptionExpiryReminder]:
+    if str(account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    return await notification_service.list_option_reminders(user.id)
+
+
 @router.post("/option-reminders", status_code=status.HTTP_204_NO_CONTENT)
 async def save_option_reminder(payload: OptionExpiryReminderInput, user: AccountUser = Depends(current_user)) -> None:
     if str(payload.expected_account_id) != user.id:
@@ -31,6 +41,25 @@ async def save_option_reminder(payload: OptionExpiryReminderInput, user: Account
         await notification_service.save_option_reminder(user.id, payload)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/option-reminders/create", status_code=status.HTTP_201_CREATED, response_model=OptionExpiryReminderCreated)
+async def create_option_reminder(payload: OptionExpiryReminderCreate, user: AccountUser = Depends(current_user)) -> OptionExpiryReminderCreated:
+    if str(payload.expected_account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    # Same account, underlying and instant map to one reminder; retries are safe.
+    position_id = uuid5(NAMESPACE_URL, f"anatole-option-reminder:{user.id}:{payload.underlying}:{payload.expires_at.isoformat()}")
+    reminder = OptionExpiryReminderInput(**payload.model_dump(), position_id=position_id)
+    try:
+        try:
+            await notification_service.save_option_reminder(user.id, reminder)
+        except IntegrityError:
+            # Another identical request may have inserted this key after the
+            # initial read. Retry once in a fresh transaction.
+            await notification_service.save_option_reminder(user.id, reminder)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return OptionExpiryReminderCreated(position_id=position_id)
 
 
 @router.delete("/option-reminders/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
