@@ -32,7 +32,7 @@ import type {
   AdvisorProfile,
 } from "@/lib/types";
 
-import styles from "./AdvisorCommandCenter.module.css";
+import "./AdvisorCommandCenter.css";
 
 const HISTORY_KEY = "anatole:advisor-progress:v3";
 const SCENARIO_KEY = "anatole:advisor-scenarios:v3";
@@ -686,11 +686,11 @@ function TrajectoryChart({
 
   return (
     <div
-      className={`${styles.chartShell} ${styles.trajectoryLab}`}
+      className={`${"acc-chartShell"} ${"acc-trajectoryLab"}`}
       data-testid="advisor-trajectory-chart"
     >
-      <div className={styles.trajectoryTopbar}>
-        <div className={styles.trajectoryIntro}>
+      <div className={"acc-trajectoryTopbar"}>
+        <div className={"acc-trajectoryIntro"}>
           <span>
             {pick(language, "TRAJECTOIRE LAB", "TRAJECTORY LAB")}
           </span>
@@ -710,9 +710,9 @@ function TrajectoryChart({
           </small>
         </div>
 
-        <div className={styles.trajectoryControls}>
+        <div className={"acc-trajectoryControls"}>
           <div
-            className={styles.segmentedControl}
+            className={"acc-segmentedControl"}
             aria-label={pick(
               language,
               "Mode d’affichage",
@@ -723,7 +723,7 @@ function TrajectoryChart({
               type="button"
               data-testid="advisor-trajectory-mode-amount"
               className={
-                viewMode === "amount" ? styles.activeSegment : undefined
+                viewMode === "amount" ? "acc-activeSegment" : undefined
               }
               onClick={() => setViewMode("amount")}
             >
@@ -733,7 +733,7 @@ function TrajectoryChart({
               type="button"
               data-testid="advisor-trajectory-mode-percent"
               className={
-                viewMode === "percent" ? styles.activeSegment : undefined
+                viewMode === "percent" ? "acc-activeSegment" : undefined
               }
               disabled={!hasTarget}
               onClick={() => setViewMode("percent")}
@@ -743,7 +743,7 @@ function TrajectoryChart({
           </div>
 
           <div
-            className={styles.segmentedControl}
+            className={"acc-segmentedControl"}
             aria-label={pick(
               language,
               "Échelle du graphique",
@@ -754,7 +754,7 @@ function TrajectoryChart({
               type="button"
               data-testid="advisor-trajectory-scale-auto"
               className={
-                scaleMode === "auto" ? styles.activeSegment : undefined
+                scaleMode === "auto" ? "acc-activeSegment" : undefined
               }
               onClick={() => setScaleMode("auto")}
             >
@@ -764,7 +764,7 @@ function TrajectoryChart({
               type="button"
               data-testid="advisor-trajectory-scale-zero"
               className={
-                scaleMode === "zero" ? styles.activeSegment : undefined
+                scaleMode === "zero" ? "acc-activeSegment" : undefined
               }
               onClick={() => setScaleMode("zero")}
             >
@@ -775,7 +775,7 @@ function TrajectoryChart({
               data-testid="advisor-trajectory-scale-target"
               className={
                 scaleMode === "target"
-                  ? styles.activeSegment
+                  ? "acc-activeSegment"
                   : undefined
               }
               disabled={!hasTarget}
@@ -791,7 +791,7 @@ function TrajectoryChart({
       </div>
 
       <div
-        className={styles.trajectoryKpis}
+        className={"acc-trajectoryKpis"}
         data-testid="advisor-trajectory-summary"
       >
         <article>
@@ -829,8 +829,8 @@ function TrajectoryChart({
           <strong
             className={
               gapValue === 0
-                ? styles.positiveValue
-                : styles.negativeValue
+                ? "acc-positiveValue"
+                : "acc-negativeValue"
             }
           >
             {gapValue == null
@@ -871,7 +871,7 @@ function TrajectoryChart({
         </article>
       </div>
 
-      <div className={styles.trajectoryPace}>
+      <div className={"acc-trajectoryPace"}>
         <article>
           <span>
             {pick(
@@ -928,7 +928,7 @@ function TrajectoryChart({
       </div>
 
       {hasTarget ? (
-        <div className={styles.trajectoryMilestones}>
+        <div className={"acc-trajectoryMilestones"}>
           {milestones.map((milestone) => (
             <div key={milestone.ratio}>
               <strong>{Math.round(milestone.ratio * 100)}%</strong>
@@ -956,7 +956,7 @@ function TrajectoryChart({
       scaleMode !== "target" &&
       viewMode === "amount" ? (
         <div
-          className={styles.offScaleBanner}
+          className={"acc-offScaleBanner"}
           data-testid="advisor-target-offscale"
         >
           <div>
@@ -981,9 +981,9 @@ function TrajectoryChart({
         </div>
       ) : null}
 
-      <div className={styles.chartLegend}>
+      <div className={"acc-chartLegend"}>
         <span>
-          <i className={styles.legendBaseline} />
+          <i className={"acc-legendBaseline"} />
           {pick(
             language,
             "Trajectoire actuelle",
@@ -992,12 +992,12 @@ function TrajectoryChart({
         </span>
         {scenarioDistinct ? (
           <span>
-            <i className={styles.legendScenario} />
+            <i className={"acc-legendScenario"} />
             {pick(language, "Scénario", "Scenario")}
           </span>
         ) : (
           <span>
-            <i className={styles.legendScenario} />
+            <i className={"acc-legendScenario"} />
             {pick(
               language,
               "Scénario identique à l’actuel",
@@ -1007,7 +1007,7 @@ function TrajectoryChart({
         )}
         {showTargetPath ? (
           <span>
-            <i className={styles.legendTarget} />
+            <i className={"acc-legendTarget"} />
             {viewMode === "percent"
               ? pick(language, "Objectif = 100%", "Target = 100%")
               : pick(language, "Cible", "Target")}
@@ -1015,9 +1015,9 @@ function TrajectoryChart({
         ) : null}
       </div>
 
-      <div className={styles.chartCanvas}>
+      <div className={"acc-chartCanvas"}>
         <div
-          className={styles.yAxis}
+          className={"acc-yAxis"}
           data-testid="advisor-trajectory-y-axis"
         >
           {yTicks.map((value, index) => (
@@ -1060,7 +1060,7 @@ function TrajectoryChart({
               y1={height * ratio}
               x2={width}
               y2={height * ratio}
-              className={styles.gridLine}
+              className={"acc-gridLine"}
             />
           ))}
 
@@ -1073,7 +1073,7 @@ function TrajectoryChart({
                 minValue,
                 maxValue,
               )}
-              className={styles.scenarioArea}
+              className={"acc-scenarioArea"}
             />
           ) : null}
 
@@ -1087,7 +1087,7 @@ function TrajectoryChart({
                 minValue,
                 maxValue,
               )}
-              className={styles.targetPath}
+              className={"acc-targetPath"}
             />
           ) : null}
 
@@ -1100,7 +1100,7 @@ function TrajectoryChart({
               minValue,
               maxValue,
             )}
-            className={styles.baselinePath}
+            className={"acc-baselinePath"}
           />
 
           {scenarioDistinct ? (
@@ -1113,7 +1113,7 @@ function TrajectoryChart({
                 minValue,
                 maxValue,
               )}
-              className={styles.scenarioPath}
+              className={"acc-scenarioPath"}
             />
           ) : null}
 
@@ -1134,7 +1134,7 @@ function TrajectoryChart({
                   y1="0"
                   x2={x}
                   y2={height}
-                  className={styles.milestoneLine}
+                  className={"acc-milestoneLine"}
                 />
               );
             })}
@@ -1146,20 +1146,20 @@ function TrajectoryChart({
                 y1="0"
                 x2={hoverX}
                 y2={height}
-                className={styles.hoverLine}
+                className={"acc-hoverLine"}
               />
               <circle
                 cx={hoverX}
                 cy={hoverScenarioY}
                 r="5"
-                className={styles.hoverDot}
+                className={"acc-hoverDot"}
               />
             </>
           ) : null}
         </svg>
       </div>
 
-      <div className={styles.xAxis}>
+      <div className={"acc-xAxis"}>
         <span>{pick(language, "Aujourd’hui", "Today")}</span>
         <span>
           {monthLabel(
@@ -1182,7 +1182,7 @@ function TrajectoryChart({
         <span>{monthLabel(safeMonths, language)}</span>
       </div>
 
-      <div className={styles.chartReadout}>
+      <div className={"acc-chartReadout"}>
         <strong>{monthLabel(activeMonth, language)}</strong>
         <span>
           {pick(language, "Actuel", "Current")}{" "}
@@ -1232,7 +1232,7 @@ function TrajectoryChart({
         </span>
       </div>
 
-      <div className={styles.trajectoryNarrative}>
+      <div className={"acc-trajectoryNarrative"}>
         {hasTarget
           ? pick(
               language,
@@ -1798,12 +1798,12 @@ export function AdvisorCommandCenter({
 
   return (
     <section
-      className={styles.command}
+      className={"acc-command"}
       data-testid="advisor-command-center"
     >
-      <header className={styles.commandHeader}>
+      <header className={"acc-commandHeader"}>
         <div>
-          <span className={styles.eyebrow}>
+          <span className={"acc-eyebrow"}>
             <Sparkles size={13} />
             ANATOLE CONSEIL · {dashboardMode ? "COCKPIT" : "LIVE"}
           </span>
@@ -1835,7 +1835,7 @@ export function AdvisorCommandCenter({
           </p>
         </div>
 
-        <div className={styles.headerActions}>
+        <div className={"acc-headerActions"}>
           {dashboardMode ? (
             <>
               <button type="button" onClick={onEditProfile}>
@@ -1848,7 +1848,7 @@ export function AdvisorCommandCenter({
               </button>
             </>
           ) : null}
-          <div className={styles.liveBadge}>
+          <div className={"acc-liveBadge"}>
             <span>{profileProgress}%</span>
             <small>{pick(language, "profil utile", "useful profile")}</small>
           </div>
@@ -1856,8 +1856,8 @@ export function AdvisorCommandCenter({
       </header>
 
       {dashboardMode && profile.goal_type ? (
-        <section className={styles.goalShelf} data-testid="advisor-goal-shelf">
-          <div className={styles.goalShelfTitle}>
+        <section className={"acc-goalShelf"} data-testid="advisor-goal-shelf">
+          <div className={"acc-goalShelfTitle"}>
             <div>
               <span>{pick(language, "MES OBJECTIFS", "MY GOALS")}</span>
               <strong>
@@ -1874,8 +1874,8 @@ export function AdvisorCommandCenter({
             </button>
           </div>
 
-          <div className={styles.goalCards}>
-            <article className={styles.currentGoalCard}>
+          <div className={"acc-goalCards"}>
+            <article className={"acc-currentGoalCard"}>
               <span>{pick(language, "ACTIF", "ACTIVE")}</span>
               <strong>{profile.goal_name || goalLabel}</strong>
               <small>
@@ -1914,15 +1914,15 @@ export function AdvisorCommandCenter({
         </section>
       ) : null}
 
-      <div className={styles.adaptiveStrip}>
-        <div className={styles.adaptiveIcon}>
+      <div className={"acc-adaptiveStrip"}>
+        <div className={"acc-adaptiveIcon"}>
           <Target size={17} />
         </div>
         <div>
           <strong>{focus.title}</strong>
           <p>{focus.detail}</p>
         </div>
-        <div className={styles.adaptiveChips}>
+        <div className={"acc-adaptiveChips"}>
           {focus.chips.map((chip) => (
             <span key={chip}>{chip}</span>
           ))}
@@ -1930,12 +1930,12 @@ export function AdvisorCommandCenter({
       </div>
 
       <nav
-        className={styles.tabs}
+        className={"acc-tabs"}
         aria-label={pick(language, "Vues du plan", "Plan views")}
       >
         <button
           type="button"
-          className={tab === "overview" ? styles.tabActive : styles.tab}
+          className={tab === "overview" ? "acc-tabActive" : "acc-tab"}
           onClick={() => setTab("overview")}
         >
           <Gauge size={14} />
@@ -1944,7 +1944,7 @@ export function AdvisorCommandCenter({
         <button
           type="button"
           data-testid="advisor-tab-scenarios"
-          className={tab === "scenarios" ? styles.tabActive : styles.tab}
+          className={tab === "scenarios" ? "acc-tabActive" : "acc-tab"}
           onClick={() => setTab("scenarios")}
         >
           <LineChart size={14} />
@@ -1952,7 +1952,7 @@ export function AdvisorCommandCenter({
         </button>
         <button
           type="button"
-          className={tab === "timeline" ? styles.tabActive : styles.tab}
+          className={tab === "timeline" ? "acc-tabActive" : "acc-tab"}
           onClick={() => setTab("timeline")}
         >
           <CalendarClock size={14} />
@@ -1960,7 +1960,7 @@ export function AdvisorCommandCenter({
         </button>
         <button
           type="button"
-          className={tab === "twin" ? styles.tabActive : styles.tab}
+          className={tab === "twin" ? "acc-tabActive" : "acc-tab"}
           onClick={() => setTab("twin")}
         >
           <Activity size={14} />
@@ -1969,12 +1969,12 @@ export function AdvisorCommandCenter({
       </nav>
 
       {tab === "overview" ? (
-        <div className={styles.overview}>
-          <section className={styles.primaryPlan} data-testid="advisor-primary-plan">
-            <div className={styles.primaryCopy}>
+        <div className={"acc-overview"}>
+          <section className={"acc-primaryPlan"} data-testid="advisor-primary-plan">
+            <div className={"acc-primaryCopy"}>
               <span>{pick(language, "PLAN PRINCIPAL", "PRIMARY PLAN")}</span>
               <h3>{profile.goal_name || goalLabel}</h3>
-              <div className={styles.bigNumbers}>
+              <div className={"acc-bigNumbers"}>
                 <strong>
                   {formatMoney(currentSavings, profile.currency, language)}
                 </strong>
@@ -1983,7 +1983,7 @@ export function AdvisorCommandCenter({
                 </span>
               </div>
               <div
-                className={styles.progressTrack}
+                className={"acc-progressTrack"}
                 role="progressbar"
                 aria-label={pick(language, "Progression vers lâ€™objectif", "Progress toward goal")}
                 aria-valuenow={Math.round(progress)}
@@ -1992,7 +1992,7 @@ export function AdvisorCommandCenter({
               >
                 <i style={{ width: `${progress}%` }} />
               </div>
-              <div className={styles.progressMeta}>
+              <div className={"acc-progressMeta"}>
                 <b>{Math.round(progress)}%</b>
                 <span>
                   {pick(language, "cible", "target")}{" "}
@@ -2001,7 +2001,7 @@ export function AdvisorCommandCenter({
               </div>
             </div>
 
-            <div className={styles.primaryDates}>
+            <div className={"acc-primaryDates"}>
               <article>
                 <span>{pick(language, "Projection actuelle", "Current projection")}</span>
                 <strong>{monthLabel(baseTargetMonths, language)}</strong>
@@ -2033,7 +2033,7 @@ export function AdvisorCommandCenter({
                       )}
                 </small>
               </article>
-              <article className={styles.nextMilestone}>
+              <article className={"acc-nextMilestone"}>
                 <Flag size={15} />
                 <div>
                   <span>
@@ -2054,8 +2054,8 @@ export function AdvisorCommandCenter({
           </section>
 
           {visibleAlerts.length ? (
-            <section className={styles.alertRail}>
-              <div className={styles.sectionTitleRow}>
+            <section className={"acc-alertRail"}>
+              <div className={"acc-sectionTitleRow"}>
                 <div>
                   <span><Bell size={13} />{pick(language, "VEILLE DU PLAN", "PLAN WATCH")}</span>
                   <strong>
@@ -2067,7 +2067,7 @@ export function AdvisorCommandCenter({
                   </strong>
                 </div>
               </div>
-              <div className={styles.alertGrid}>
+              <div className={"acc-alertGrid"}>
                 {visibleAlerts.slice(0, 4).map((alert) => (
                   <article
                     key={alert.id}
@@ -2089,8 +2089,8 @@ export function AdvisorCommandCenter({
             </section>
           ) : null}
 
-          <section className={styles.sensitivityBlock}>
-            <div className={styles.sectionTitleRow}>
+          <section className={"acc-sensitivityBlock"}>
+            <div className={"acc-sectionTitleRow"}>
               <div>
                 <span>{pick(language, "SENSIBILITÉ", "SENSITIVITY")}</span>
                 <strong>
@@ -2109,7 +2109,7 @@ export function AdvisorCommandCenter({
                 )}
               </small>
             </div>
-            <div className={styles.sensitivityGrid}>
+            <div className={"acc-sensitivityGrid"}>
               {sensitivity.map((lever, index) => (
                 <article key={lever.id}>
                   <span>#{index + 1}</span>
@@ -2121,8 +2121,8 @@ export function AdvisorCommandCenter({
             </div>
           </section>
 
-          <section className={styles.nextBest}>
-            <div className={styles.nextBestIcon}>
+          <section className={"acc-nextBest"}>
+            <div className={"acc-nextBestIcon"}>
               <Sparkles size={18} />
             </div>
             <div>
@@ -2160,10 +2160,10 @@ export function AdvisorCommandCenter({
             </button>
           </section>
 
-          <div className={styles.overviewActions}>
+          <div className={"acc-overviewActions"}>
             <Link
               href={`/assistant/magasiner?category=${shopCategory}`}
-              className={styles.shoppingCta}
+              className={"acc-shoppingCta"}
               data-testid="advisor-contextual-shopping"
             >
               <div>
@@ -2185,7 +2185,7 @@ export function AdvisorCommandCenter({
             {plan ? (
               <button
                 type="button"
-                className={styles.analysisButton}
+                className={"acc-analysisButton"}
                 onClick={onOpenAnalysis}
               >
                 <Landmark size={16} />
@@ -2212,9 +2212,9 @@ export function AdvisorCommandCenter({
       ) : null}
 
       {tab === "scenarios" ? (
-        <div className={styles.scenarioWorkspace} data-testid="advisor-scenario-lab">
-          <section className={styles.chartCard}>
-            <div className={styles.sectionTitleRow}>
+        <div className={"acc-scenarioWorkspace"} data-testid="advisor-scenario-lab">
+          <section className={"acc-chartCard"}>
+            <div className={"acc-sectionTitleRow"}>
               <div>
                 <span>{pick(language, "TRAJECTOIRE", "TRAJECTORY")}</span>
                 <strong>
@@ -2246,9 +2246,9 @@ export function AdvisorCommandCenter({
             />
           </section>
 
-          <div className={styles.lab}>
-            <section className={styles.labControls}>
-              <div className={styles.sectionTitleRow}>
+          <div className={"acc-lab"}>
+            <section className={"acc-labControls"}>
+              <div className={"acc-sectionTitleRow"}>
                 <div>
                   <span>{pick(language, "HYPOTHÈSES", "ASSUMPTIONS")}</span>
                   <strong>
@@ -2340,7 +2340,7 @@ export function AdvisorCommandCenter({
                 />
               </label>
 
-              <div className={styles.saveScenario}>
+              <div className={"acc-saveScenario"}>
                 <input
                   value={scenarioName}
                   onChange={(event) => setScenarioName(event.target.value)}
@@ -2357,7 +2357,7 @@ export function AdvisorCommandCenter({
               </div>
             </section>
 
-            <section className={styles.labResults}>
+            <section className={"acc-labResults"}>
               <article>
                 <span>{pick(language, "Valeur projetée", "Projected value")}</span>
                 <strong>
@@ -2419,8 +2419,8 @@ export function AdvisorCommandCenter({
             </section>
           </div>
 
-          <section className={styles.savedScenarioBlock}>
-            <div className={styles.sectionTitleRow}>
+          <section className={"acc-savedScenarioBlock"}>
+            <div className={"acc-sectionTitleRow"}>
               <div>
                 <span>{pick(language, "SCÉNARIOS ENREGISTRÉS", "SAVED SCENARIOS")}</span>
                 <strong>
@@ -2434,7 +2434,7 @@ export function AdvisorCommandCenter({
             </div>
 
             {savedScenarios.length ? (
-              <div className={styles.savedScenarioGrid}>
+              <div className={"acc-savedScenarioGrid"}>
                 {savedScenarios.map((scenario) => (
                   <article key={scenario.id}>
                     <div>
@@ -2475,7 +2475,7 @@ export function AdvisorCommandCenter({
                 ))}
               </div>
             ) : (
-              <div className={styles.emptyState}>
+              <div className={"acc-emptyState"}>
                 {pick(
                   language,
                   "Aucun scénario enregistré. Ajuste les curseurs puis enregistre une hypothèse.",
@@ -2488,8 +2488,8 @@ export function AdvisorCommandCenter({
       ) : null}
 
       {tab === "timeline" ? (
-        <div className={styles.timeline}>
-          <div className={styles.sectionTitleRow}>
+        <div className={"acc-timeline"}>
+          <div className={"acc-sectionTitleRow"}>
             <div>
               <span>{pick(language, "TIMELINE DU PLAN", "PLAN TIMELINE")}</span>
               <strong>
@@ -2502,7 +2502,7 @@ export function AdvisorCommandCenter({
             </div>
           </div>
 
-          <section className={styles.timelineHero}>
+          <section className={"acc-timelineHero"}>
             <div>
               <span>{pick(language, "PROCHAINE ÉTAPE", "NEXT MILESTONE")}</span>
               <strong>{nextMilestonePercent}%</strong>
@@ -2521,8 +2521,8 @@ export function AdvisorCommandCenter({
             <Flag size={32} />
           </section>
 
-          <div className={styles.timelineList}>
-            <article className={styles.timelineReached}>
+          <div className={"acc-timelineList"}>
+            <article className={"acc-timelineReached"}>
               <i><CheckCircle2 size={13} /></i>
               <div>
                 <span>{pick(language, "Aujourd’hui", "Today")}</span>
@@ -2536,7 +2536,7 @@ export function AdvisorCommandCenter({
             {timelineThresholds.map((item) => (
               <article
                 key={item.percent}
-                className={item.reached ? styles.timelineReached : ""}
+                className={item.reached ? "acc-timelineReached" : ""}
               >
                 <i>
                   {item.reached ? (
@@ -2559,7 +2559,7 @@ export function AdvisorCommandCenter({
               </article>
             ))}
 
-            <article className={styles.timelineContext}>
+            <article className={"acc-timelineContext"}>
               <i><WalletCards size={12} /></i>
               <div>
                 <span>{pick(language, "ÉTAPE CONTEXTUELLE", "CONTEXTUAL STEP")}</span>
@@ -2581,8 +2581,8 @@ export function AdvisorCommandCenter({
       ) : null}
 
       {tab === "twin" ? (
-        <div className={styles.twin} data-testid="advisor-financial-twin">
-          <section className={styles.twinHeader}>
+        <div className={"acc-twin"} data-testid="advisor-financial-twin">
+          <section className={"acc-twinHeader"}>
             <div>
               <span>{pick(language, "JUMEAU FINANCIER", "FINANCIAL TWIN")}</span>
               <h3>
@@ -2603,7 +2603,7 @@ export function AdvisorCommandCenter({
             <Activity size={28} />
           </section>
 
-          <section className={styles.twinInputs}>
+          <section className={"acc-twinInputs"}>
             <label>
               <span>{pick(language, "Revenu mensuel net", "Net monthly income")}</span>
               <input
@@ -2654,7 +2654,7 @@ export function AdvisorCommandCenter({
             </label>
           </section>
 
-          <div className={styles.twinGrid}>
+          <div className={"acc-twinGrid"}>
             <article>
               <span>{pick(language, "Actifs saisis", "Entered assets")}</span>
               <strong>
@@ -2731,7 +2731,7 @@ export function AdvisorCommandCenter({
             </article>
           </div>
 
-          <div className={styles.twinBoundary}>
+          <div className={"acc-twinBoundary"}>
             <Landmark size={16} />
             <p>
               {pick(
