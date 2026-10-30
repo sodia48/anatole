@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -724,24 +725,53 @@ class AnatoleAssistantOrchestrator:
                     if snapshot.market != market or snapshot.symbol != symbol or snapshot.requested_expiration != expiration:
                         raise ValueError("chain identity mismatch")
                     sources = sorted({item.source for item in snapshot.source_statuses if item.status != "unavailable"})
+                    # An inventory is descriptive, not a liquidity or valuation estimate.
+                    # Reject rows that do not belong to the explicitly selected chain.
+                    contracts = [item for item in snapshot.contracts
+                                 if item.market == market and item.underlying.upper() == symbol.upper()
+                                 and (expiration is None or item.expiration == expiration)]
+                    discarded = len(snapshot.contracts) - len(contracts)
+                    calls = sum(item.side == "call" for item in contracts)
+                    puts = sum(item.side == "put" for item in contracts)
+                    quoted = sum(item.bid is not None and item.ask is not None
+                                 and math.isfinite(item.bid) and math.isfinite(item.ask)
+                                 and 0 <= item.bid <= item.ask for item in contracts)
                     if context.language == "fr":
-                        detail = (f"Chaîne {symbol} : {len(snapshot.contracts)} contrats dans l'instantané"
+                        detail = (f"Chaîne {symbol} : {len(contracts)} contrats dans l'instantané"
                                   + (f", échéance demandée {expiration}" if expiration else "")
                                   + f". Instantané généré le {snapshot.generated_at.isoformat()} ; "
                                   + ("cache périmé" if snapshot.stale else "cotations susceptibles d'être différées") + ". "
                                   + ("Sources : " + ", ".join(sources) + "." if sources else "Source de cotation indisponible."))
-                        limitation = "La chaîne est rechargée au moment de la question ; son horodatage de génération n'est pas celui de chaque cotation. Je ne lis ni positions ni scénarios."
+                        detail += (f"\n\nInventaire : calls {calls}, puts {puts} ; bid/ask cohérents : {quoted} sur {len(contracts)} contrats. "
+                                   "Les données manquantes ou incohérentes ne sont pas considérées comme des zéros ni comme une mesure de liquidité.")
+                        if discarded:
+                            detail += f" {discarded} ligne(s) hors de la chaîne demandée ont été exclues."
+                        limitation = "La chaîne est rechargée au moment de la question ; son horodatage de génération n'est pas celui de chaque cotation et sa couverture peut être partielle. Je ne lis ni positions ni scénarios."
                     else:
-                        detail = (f"{symbol} chain: {len(snapshot.contracts)} contracts in the snapshot"
+                        detail = (f"{symbol} chain: {len(contracts)} contracts in the snapshot"
                                   + (f", requested expiry {expiration}" if expiration else "")
                                   + f". Snapshot generated at {snapshot.generated_at.isoformat()}; "
                                   + ("stale cache" if snapshot.stale else "quotes may be delayed") + ". "
                                   + ("Sources: " + ", ".join(sources) + "." if sources else "Quote source unavailable."))
-                        limitation = "The chain is reloaded when asked; its generation time is not the observation time of each quote. I do not read positions or scenarios."
+                        detail += (f"\n\nInventory: calls {calls}, puts {puts}; coherent bid/ask: {quoted} of {len(contracts)} contracts. "
+                                   "Missing or inconsistent data are not treated as zeros or as a liquidity measure.")
+                        if discarded:
+                            detail += f" {discarded} row(s) outside the requested chain were excluded."
+                        limitation = "The chain is reloaded when asked; its generation time is not the observation time of each quote and its coverage may be partial. I do not read positions or scenarios."
                     base.answer = detail + "\n\n" + limitation
                     base.title = "Chaîne d'options" if context.language == "fr" else "Options chain"
                     base.sources = [AssistantSource(label=source, detail="", status="fallback" if snapshot.stale else "delayed") for source in sources]
                     bundle = _bundle_from_response(skill, base, [symbol])
+                    bundle.facts.append(EvidenceFact(
+                        label="Inventaire de la chaîne" if context.language == "fr" else "Chain inventory",
+                        value=f"{calls} calls; {puts} puts; {quoted}/{len(contracts)} bid/ask",
+                        source=", ".join(sources) if sources else ("Source indisponible" if context.language == "fr" else "Source unavailable"),
+                        freshness="stale" if snapshot.stale else "delayed"))
+                    if discarded:
+                        bundle.missing_data.append("Lignes hors chaîne exclues" if context.language == "fr" else "Rows outside the chain excluded")
+                    if quoted < len(contracts):
+                        bundle.missing_data.append("Bid/ask incomplets ou incohérents pour certains contrats" if context.language == "fr"
+                                                   else "Incomplete or inconsistent bid/ask for some contracts")
                     for source in bundle.sources:
                         source.type = "options_chain"
                         source.timestamp = None  # Snapshot generation is not quote observation time.

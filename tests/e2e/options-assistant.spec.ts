@@ -47,7 +47,7 @@ test("opens the options assistant without sending local positions", async ({ pag
   // Synthetic response isolates browser context handling; the API tests exercise the real endpoint.
   await page.route("**/api/anatole/api/v1/assistant/chat", async (route) => {
     calls.push(route.request().postDataJSON() as Record<string, unknown>);
-    await route.fulfill({ json: { intent: "options_education", answer: "Chaîne RY synthétique : cache périmé.",
+    await route.fulfill({ json: { intent: "options_education", answer: "Chaîne RY synthétique : cache périmé.\n\nInventaire : calls 0, puts 0 ; bid/ask cohérents : 0 sur 0 contrats.",
       conversation_id: "00000000-0000-0000-0000-000000000001", evidence: [], actions: [], permission_required: false } });
   });
   await dialog.getByRole("button", { name: "Fermer l’assistant" }).click();
@@ -55,9 +55,11 @@ test("opens the options assistant without sending local positions", async ({ pag
   await expect(dialog.getByText("Options · RY")).toBeVisible();
   await page.getByLabel("Votre question").fill("Analyse la chaîne RY");
   await page.getByRole("button", { name: "Envoyer la question" }).click();
-  await expect(dialog.getByText("Chaîne RY synthétique : cache périmé.")).toBeVisible();
+  await expect(dialog.getByText(/Chaîne RY synthétique : cache périmé/)).toBeVisible();
+  await expect(dialog.getByText(/bid\/ask cohérents : 0 sur 0 contrats/)).toBeVisible();
   expect((calls[2].context as { metadata: Record<string, string> }).metadata).toEqual({ options_market: "tsx", options_expiration: "" });
   expect(calls[2].portfolio_positions).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath("options-assistant-selected-chain.png"), fullPage: true });
   await dialog.getByRole("button", { name: "Retirer le contexte" }).click();
   await page.getByLabel("Votre question").fill("Explique les options");
   await page.getByRole("button", { name: "Envoyer la question" }).click();
@@ -66,5 +68,4 @@ test("opens the options assistant without sending local positions", async ({ pag
   await dialog.getByRole("button", { name: "Fermer l’assistant" }).click();
   await spaces.getByRole("button", { name: "Interroger Anatole sur la chaîne RY" }).click();
   await expect(dialog.getByText("Options · RY")).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath("options-assistant-selected-chain.png"), fullPage: true });
 });
