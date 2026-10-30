@@ -83,7 +83,30 @@ export type OptionChainSnapshot = {
   stale: boolean;
 };
 
+export type OptionPayoffRequest = {
+  legs: { symbol: string; market: "equity" | "futures"; underlying: string; currency: string;
+    expiry: string; side: OptionSide; direction: "long" | "short"; strike: string; premium: string;
+    quantity: number; multiplier: string; price_source: string; premium_style: "upfront" }[];
+  domain_min: string | null;
+  domain_max: string | null;
+  prices: string[];
+};
+
+export type OptionPayoffResponse = {
+  currency: string;
+  points: { price: string; profit_loss: string }[];
+  theoretical_debit: string | null;
+  minimum_profit_loss: string | null;
+  maximum_profit_loss: string | null;
+  loss_unbounded: boolean;
+  gain_unbounded: boolean;
+  break_evens: { lower: string | null; upper: string | null }[];
+};
+
 export const optionsApi = {
+  payoff: (payload: OptionPayoffRequest) => apiRequest<OptionPayoffResponse>("/api/v1/options/strategy/payoff", {
+    method: "POST", body: JSON.stringify(payload), timeoutMs: 15_000,
+  }),
   universe: (market: OptionMarket, signal?: AbortSignal) =>
     apiRequest<OptionUniverseSnapshot>(
       `/api/v1/options/universe?market=${market}`,

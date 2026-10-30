@@ -88,3 +88,9 @@ Les réponses ne constituent pas une analyse du contrat ou des positions. Une an
 ### Inventaire de la chaîne sélectionnée
 
 À la demande explicite de l'utilisateur, l'assistant compte les calls et puts de la chaîne TSX rechargée et indique combien de contrats possèdent un bid et un ask numériques, non négatifs et non croisés. Les lignes d'un autre sous-jacent, marché ou échéance demandée sont exclues et signalées. Ce contrôle de cohérence ne prouve ni la fraîcheur, ni la négociabilité, ni la liquidité des cotations. Les données manquantes restent distinctes de zéro, la couverture peut être partielle et l'horodatage de génération de l'instantané n'est pas celui des cotations. Aucun contrat, position ou scénario n'est transmis à un fournisseur de génération pour cet inventaire déterministe. Les tests emploient des données synthétiques.
+
+### Constructeur mobile natif
+
+La chaîne mobile peut ajouter jusqu'à 20 jambes au constructeur natif. Les quantités, sens, primes hypothétiques et multiplicateurs sont modifiables ; quatre modèles prédéfinis contrôlent la compatibilité des jambes. Une devise et un instant d'échéance communs, y compris le fuseau, ainsi que le paiement initial de la prime doivent être explicitement confirmés. Le calcul transmet les hypothèses à l'API Anatole et réutilise le moteur de résultat à l'échéance ; jusqu'à trois simulations restent visibles, avec leurs hypothèses, points, seuils et bornes. Elles ne sont pas conservées après fermeture de l'écran. Les tests mobiles isolent l'interface à l'aide de résultats synthétiques ; ils ne valident pas des cotations réelles.
+
+Le modèle reste limité à une seule échéance et devise. Les primes de type futures, la valorisation avant échéance, le règlement, la marge, l'exercice anticipé, les frais et le change ne sont pas modélisés. Un test visuel sur un appareil natif reste nécessaire lorsqu'un émulateur ou appareil est disponible.
