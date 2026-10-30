@@ -4,6 +4,7 @@ import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 import { OptionsScreen } from "./OptionsScreen";
 import { OPTION_FILTERS_STORAGE_KEY } from "./optionFilters";
 import { optionsApi } from "@/src/lib/api/options";
+import { workspaceApi } from "@/src/lib/api/workspace";
 
 let mockChainError: Error | null = null;
 jest.mock("@/src/lib/i18n", () => ({ useLocale: () => ({ pick: (fr: string) => fr }) }));
@@ -14,7 +15,7 @@ jest.mock("@tanstack/react-query", () => ({
     return {
       isLoading: false, isRefetching: false, error: universe ? null : mockChainError, refetch: jest.fn(),
       data: universe ? { items: [] } : {
-        symbol: market === "commodities" ? "GC" : "RY", name: "Fixture", generated_at: "2026-10-27T12:00:00Z",
+        market, symbol: market === "commodities" ? "GC" : "RY", name: "Fixture", generated_at: "2026-10-27T12:00:00Z",
         stale: market === "commodities", source_statuses: [], analytics: { contract_count: 3 }, expirations: ["2027-11-25"],
         contracts: market === "commodities" ? [{ symbol: "fixture", underlying: "GC", market: "commodities", contract: "GCZ27", side: "call", strike: 2.5,
           expiration: null, bid: null, ask: null, last: 0, volume: null, open_interest: 0,
@@ -128,5 +129,58 @@ test("native strategy builder validates specifications and compares two hypothet
   await fireEvent.press(view.getByLabelText("Retirer jambe 1"));
   expect(view.queryByText(/1. RY-C/)).toBeNull();
   payoff.mockRestore();
+  await view.unmount();
+});
+
+test("native assistant stays in Options, sends no positions and adds chain context only explicitly", async () => {
+  const response = { intent: "options_education", title: "Options", answer: "Un call donne un droit d'achat.",
+    facts: [], links: [], sources: [], suggestions: [], confidence: "limitée", disclaimer: "Données synthétiques",
+    guardrail_triggered: false, generated_at: "2026-10-30T00:00:00Z", conversation_id: "conversation",
+    permission_required: false, actions: [], synthesis_provider: null };
+  const ask = jest.spyOn(workspaceApi, "assistantUnified").mockResolvedValue(response);
+  const view = await render(<OptionsScreen />);
+  await fireEvent.press(view.getByLabelText("Ouvrir l'assistant Options"));
+  await fireEvent.changeText(view.getByLabelText("Votre question Options"), "Explique un call");
+  await fireEvent.press(view.getByLabelText("Interroger Anatole"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+  expect(view.getByText("Un call donne un droit d'achat.")).toBeTruthy();
+  expect(ask.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ surface: "options", route: "/options", metadata: {}, symbols: [] }));
+  expect(ask.mock.calls[0]?.[3]).toBe(false);
+  expect(ask.mock.calls[0]?.[4]).toEqual([]);
+
+  ask.mockResolvedValueOnce({ ...response, answer: "Chaîne RY synthétique : cache périmé.",
+    sources: [{ label: "Synthetic", detail: "", status: "fallback" }] });
+  await fireEvent.press(view.getByLabelText("Ajouter la chaîne RY au contexte"));
+  await fireEvent.changeText(view.getByLabelText("Votre question Options"), "Analyse la chaîne RY");
+  await fireEvent.press(view.getByLabelText("Interroger Anatole"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(2));
+  expect(ask.mock.calls[1]?.[1]).toEqual(expect.objectContaining({ symbol: "RY", metadata: { options_market: "tsx", options_expiration: "" } }));
+  expect(ask.mock.calls[1]?.[3]).toBe(false);
+  expect(ask.mock.calls[1]?.[4]).toEqual([]);
+  expect(view.getByText("Chaîne RY synthétique : cache périmé.")).toBeTruthy();
+  await fireEvent.press(view.getByLabelText("Retirer le contexte de chaîne"));
+  await fireEvent.press(view.getByLabelText("Ajouter la chaîne RY au contexte"));
+  await fireEvent.press(view.getByText("Matières"));
+  await fireEvent.press(view.getByText("Canada · MX"));
+  expect(view.getByLabelText("Ajouter la chaîne RY au contexte")).toBeTruthy();
+  ask.mockResolvedValueOnce({ ...response, permission_required: true });
+  await fireEvent.changeText(view.getByLabelText("Votre question Options"), "Analyse mon portefeuille");
+  await fireEvent.press(view.getByLabelText("Interroger Anatole"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(3));
+  expect(ask.mock.calls[2]?.[1].metadata).toEqual({});
+  expect(ask.mock.calls[2]?.[4]).toEqual([]);
+  expect(view.getByText(/positions ne sont pas transmises/)).toBeTruthy();
+  ask.mockResolvedValueOnce({ ...response, answer: "Vous devriez acheter cette option." });
+  await fireEvent.changeText(view.getByLabelText("Votre question Options"), "Analyse cette option");
+  await fireEvent.press(view.getByLabelText("Interroger Anatole"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(4));
+  expect(view.queryByText("Vous devriez acheter cette option.")).toBeNull();
+  expect(view.getByText(/ne satisfait pas les garde-fous/)).toBeTruthy();
+  ask.mockResolvedValueOnce({ ...response, answer: "Analyse non sourcée.", synthesis_provider: "external" });
+  await fireEvent.press(view.getByLabelText("Interroger Anatole"));
+  await waitFor(() => expect(ask).toHaveBeenCalledTimes(5));
+  expect(view.queryByText("Analyse non sourcée.")).toBeNull();
+  expect(view.getByText(/ne satisfait pas les garde-fous/)).toBeTruthy();
+  ask.mockRestore();
   await view.unmount();
 });

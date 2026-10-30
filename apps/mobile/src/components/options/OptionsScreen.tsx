@@ -16,6 +16,7 @@ import { radius, spacing, typography } from "@/src/theme/tokens";
 import { createThemedStyles } from "@/src/theme/palettes";
 import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilters, type NumericFilter, type OptionFilters } from "./optionFilters";
 import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
+import { NativeOptionsAssistant } from "./NativeOptionsAssistant";
 
 type SideFilter = "both" | OptionSide;
 
@@ -41,6 +42,7 @@ export function OptionsScreen() {
   const [draft, setDraft] = useState("RY");
   const [side, setSide] = useState<SideFilter>("both");
   const [expiry, setExpiry] = useState("");
+  const [contextRevision, setContextRevision] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [legs, setLegs] = useState<NativeStrategyLeg[]>([]);
   const nextLegId = useRef(0);
@@ -86,6 +88,7 @@ export function OptionsScreen() {
     setDraft(nextSymbol);
     setSide("both");
     setExpiry("");
+    setContextRevision((value) => value + 1);
   }
 
   function applySymbol() {
@@ -93,6 +96,7 @@ export function OptionsScreen() {
     if (/^[A-Z0-9.^-]{1,16}$/.test(next)) {
       setSymbol(next);
       setExpiry("");
+      setContextRevision((value) => value + 1);
     }
   }
 
@@ -164,6 +168,7 @@ export function OptionsScreen() {
                   setDraft(item.symbol);
                   setSymbol(item.symbol);
                   setExpiry("");
+                  setContextRevision((value) => value + 1);
                 }}
                 style={[styles.shortcut, item.symbol === symbol && styles.shortcutActive]}
               >
@@ -174,6 +179,9 @@ export function OptionsScreen() {
           </ScrollView>
         ) : null}
       </Card>
+
+      <NativeOptionsAssistant symbol={symbol} expiration={expiry} revision={contextRevision}
+        canUseChain={market === "tsx" && chain.data?.market === "tsx" && chain.data.symbol === symbol} />
 
       <QueryState
         loading={chain.isLoading && !chain.data}
@@ -232,7 +240,7 @@ export function OptionsScreen() {
             {chain.data.expirations?.length ? <ScrollView horizontal contentContainerStyle={styles.shortcuts}>
               {["", ...chain.data.expirations].map((item) => <Pressable key={item || "all"}
                 accessibilityRole="button" accessibilityState={{ selected: expiry === item }}
-                onPress={() => setExpiry(item)} style={[styles.shortcut, expiry === item && styles.shortcutActive]}>
+                onPress={() => { setExpiry(item); setContextRevision((value) => value + 1); }} style={[styles.shortcut, expiry === item && styles.shortcutActive]}>
                 <Text style={styles.shortcutSymbol}>{item || pick("Toutes les échéances", "All expiries")}</Text>
               </Pressable>)}
             </ScrollView> : null}
