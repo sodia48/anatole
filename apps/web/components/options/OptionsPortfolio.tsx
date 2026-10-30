@@ -16,18 +16,55 @@ function readPositions(): TrackedOption[] | null {
 
 export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { chain: OptionChainSnapshot | null; selected: OptionContract | null; language: Language; onAnalyze: (position: TrackedOption) => boolean }) {
   const { user } = useAccount();
+  return <OptionsPortfolioForAccount key={user?.id ?? "anonymous"} chain={chain} selected={selected} language={language} onAnalyze={onAnalyze} accountId={user?.id ?? null} />;
+}
+
+function OptionsPortfolioForAccount({ chain, selected, language, onAnalyze, accountId }: { chain: OptionChainSnapshot | null; selected: OptionContract | null; language: Language; onAnalyze: (position: TrackedOption) => boolean; accountId: string | null }) {
   const [positions, setPositions] = useState<TrackedOption[] | null>(() => readPositions());
+  const [accountRevision, setAccountRevision] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [analyzed, setAnalyzed] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const changed = (event: StorageEvent) => { if (event.key === KEY || event.key === null) setPositions(readPositions()); };
+    const changed = (event: StorageEvent) => { if (accountRevision === null && (event.key === KEY || event.key === null)) setPositions(readPositions()); };
     window.addEventListener("storage", changed);
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => { window.removeEventListener("storage", changed); window.clearInterval(timer); };
-  }, []);
+  }, [accountRevision]);
 
-  function save(change: (current: TrackedOption[]) => TrackedOption[]) {
+  async function loadAccount() {
+    if (!accountId || busy) return;
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/account/option-positions", { cache: "no-store", headers: { "X-Anatole-Account": accountId } });
+      if (!response.ok) throw new Error();
+      const data = await response.json() as { revision: number; positions: unknown };
+      const parsed = parseTrackedOptions(JSON.stringify({ version: 1, positions: data.positions }));
+      if (!Number.isSafeInteger(data.revision) || data.revision < 0 || !parsed) throw new Error();
+      setPositions(parsed); setAccountRevision(data.revision);
+      setMessage(tr(language, "Positions du compte chargées.", "Account positions loaded."));
+    } catch { setMessage(tr(language, "Chargement du compte impossible.", "Could not load account positions.")); }
+    finally { setBusy(false); }
+  }
+
+  async function save(change: (current: TrackedOption[]) => TrackedOption[]) {
+    if (busy) return false;
+    if (accountRevision !== null && accountId && positions) {
+      const next = change(positions);
+      if (next.length > 100) { setMessage(tr(language, "Limite de 100 positions atteinte.", "100-position limit reached.")); return false; }
+      setBusy(true);
+      try {
+        const response = await fetch("/api/account/option-positions", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ expected_account_id: accountId, expected_revision: accountRevision, positions: next }) });
+        if (response.status === 409) { setMessage(tr(language, "Les données ont changé ailleurs. Actualisez.", "Data changed elsewhere. Refresh.")); return false; }
+        if (!response.ok) throw new Error();
+        const data = await response.json() as { revision: number; positions: unknown };
+        const parsed = parseTrackedOptions(JSON.stringify({ version: 1, positions: data.positions }));
+        if (!Number.isSafeInteger(data.revision) || !parsed) throw new Error();
+        setPositions(parsed); setAccountRevision(data.revision); setMessage(tr(language, "Enregistré dans le compte.", "Saved to your account.")); return true;
+      } catch { setMessage(tr(language, "Échec : actualisez avant de réessayer.", "Save failed: refresh and retry.")); return false; }
+      finally { setBusy(false); }
+    }
     const current = readPositions();
     if (!current) { setPositions(null); setMessage(tr(language, "Stockage indisponible ou données non reconnues ; aucune modification enregistrée.", "Storage unavailable or data unrecognized; nothing was saved.")); return false; }
     const next = change(current);
@@ -40,12 +77,16 @@ export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { cha
 
   return <section id="options-positions" className="panel op-positions" aria-label={tr(language, "Positions d'options", "Options positions")}>
     <h2>{tr(language, "Positions d'options", "Options positions")}</h2>
-    <p>{tr(language, "Suivi manuel enregistré uniquement dans ce navigateur, non synchronisé avec un compte ou un courtier. Les rappels locaux sont visibles ici quand la page est ouverte : aucune notification en arrière-plan pour ces rappels locaux.", "Manual tracking is saved only in this browser, not synced to an account or broker. Local reminders appear here while this page is open: no background notifications for local reminders.")}</p>
+    <p>{tr(language, "Suivi manuel : listes séparées, sans courtier. Rappels locaux visibles sur cette page : aucune notification en arrière-plan.", "Manual tracking: separate lists, no broker. Local reminders appear on this page: no background notifications.")}</p>
+    {accountId ? <div><p>{tr(language, "Le compte stocke contrats, quantités, primes et hypothèses sur le serveur Anatole. Ils ne sont pas automatiquement transmis à l'assistant.", "The account stores contracts, quantities, premiums and assumptions on Anatole's server. They are not automatically sent to the assistant.")}</p>
+      <button type="button" disabled={busy || accountRevision === null} onClick={() => { setPositions(readPositions()); setAccountRevision(null); setMessage(""); }}>{tr(language, "Positions de cet appareil", "Positions on this device")}</button>{" "}
+      <button type="button" disabled={busy} onClick={() => void loadAccount()}>{accountRevision === null ? tr(language, "Ouvrir les positions du compte", "Open account positions") : tr(language, "Actualiser les positions du compte", "Refresh account positions")}</button>
+      <p>{accountRevision === null ? tr(language, "Liste de cet appareil", "This device's list") : tr(language, "Liste du compte", "Account list")}</p></div> : null}
     <p>{tr(language, "Le calcul d'un scénario transmet ses jambes et hypothèses à l'API Anatole.", "Calculating a scenario sends its legs and assumptions to the Anatole API.")}</p>
     <p>{tr(language, "Vérifiez l'identité, la date, le fuseau, le multiplicateur, la devise et la convention de prime auprès d'une source autorisée. Les frais, marges, change, exercice et assignation ne sont pas calculés.", "Verify the identity, date, time zone, multiplier, currency and premium convention with an authorized source. Fees, margin, currency conversion, exercise and assignment are not calculated.")}</p>
-    {user ? <AccountReminders key={user.id} accountId={user.id} positions={positions ?? []} language={language} now={now} /> : <p>{tr(language, "Connectez-vous pour créer des rappels d'échéance sur votre compte.", "Sign in to create account expiry reminders.")}</p>}
+    {accountId ? <AccountReminders key={accountId} accountId={accountId} positions={positions ?? []} language={language} now={now} /> : <p>{tr(language, "Connectez-vous pour créer des rappels d'échéance sur votre compte.", "Sign in to create account expiry reminders.")}</p>}
     {positions === null ? <p role="alert">{tr(language, "Stockage indisponible ou données non reconnues. Elles ne seront pas écrasées.", "Storage unavailable or data unrecognized. It will not be overwritten.")}</p> : <>
-      {selected ? <PositionForm key={JSON.stringify([selected.symbol, selected.market, selected.contract, selected.expiration, selected.side, selected.strike])} selected={selected} language={language} onSave={(position) => save((current) => [...current, position])} /> : <p>{tr(language, "Sélectionnez « Suivre » sur un contrat dans le screener.", "Select “Track” on a contract in the screener.")}</p>}
+      {selected ? <PositionForm key={JSON.stringify([selected.symbol, selected.market, selected.contract, selected.expiration, selected.side, selected.strike, accountRevision !== null])} selected={selected} language={language} busy={busy} onSave={(position) => save((current) => [...current, position])} /> : <p>{tr(language, "Sélectionnez « Suivre » sur un contrat dans le screener.", "Select “Track” on a contract in the screener.")}</p>}
       {message ? <p role="status">{message}</p> : null}
       {analyzed ? <a href="#options-strategy-builder">{tr(language, "Voir le constructeur de stratégie", "View the strategy builder")}</a> : null}
       <h3>{tr(language, "Positions suivies", "Tracked positions")} ({positions.length})</h3>
@@ -64,7 +105,7 @@ export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { cha
           {quote ? <span>{tr(language, "Chaîne chargée", "Loaded chain")}: Bid {quote.bid ?? "N/D"} · Ask {quote.ask ?? "N/D"} · {quote.source}{quote.delayed ? ` · ${tr(language, "différé", "delayed")}` : ""}{chain?.stale ? ` · ${tr(language, "instantané périmé", "stale snapshot")}` : ""} · {chain?.generated_at}</span> : <span>{tr(language, "Cotations non disponibles ou identité ambiguë dans la chaîne chargée.", "Quotes unavailable or identity ambiguous in the loaded chain.")}</span>}
           <span>{tr(language, "Valeur actuelle et risque total non calculés. Le constructeur permet une simulation théorique à l'échéance.", "Current value and total risk are not calculated. The builder can simulate expiry theoretically.")}</span>
           <button type="button" onClick={() => { const added = onAnalyze(position); setAnalyzed(added); setMessage(added ? tr(language, "Position ajoutée au constructeur : renseignez la devise et l'échéance vérifiées.", "Position added to the builder: enter the verified currency and expiry.") : tr(language, "Limite de 20 jambes atteinte.", "20-leg limit reached.")); }}>{tr(language, "Analyser dans le constructeur", "Analyze in builder")}</button>
-          <button type="button" onClick={() => save((current) => current.filter((item) => item.id !== position.id))}>{tr(language, "Retirer du suivi", "Remove from tracking")}</button>
+          <button type="button" disabled={busy} onClick={() => void save((current) => current.filter((item) => item.id !== position.id))}>{tr(language, "Retirer du suivi", "Remove from tracking")}</button>
         </li>;
       })}</ul> : <p>{tr(language, "Aucune position suivie.", "No tracked positions.")}</p>}
     </>}
@@ -120,7 +161,7 @@ function AccountReminders({ accountId, positions, language, now }: { accountId: 
   </div>;
 }
 
-function PositionForm({ selected, language, onSave }: { selected: OptionContract; language: Language; onSave: (position: TrackedOption) => boolean }) {
+function PositionForm({ selected, language, onSave, busy }: { selected: OptionContract; language: Language; onSave: (position: TrackedOption) => Promise<boolean>; busy: boolean }) {
   const [direction, setDirection] = useState<"long" | "short">("long");
   const [quantity, setQuantity] = useState("1");
   const [multiplier, setMultiplier] = useState("");
@@ -130,7 +171,7 @@ function PositionForm({ selected, language, onSave }: { selected: OptionContract
   const [reminder, setReminder] = useState("7");
   const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState("");
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
     const position: TrackedOption = { id: crypto.randomUUID(), symbol: selected.symbol, underlying: selected.underlying,
       market: selected.market, contract: selected.contract, side: selected.side, strike: selected.strike,
@@ -140,7 +181,7 @@ function PositionForm({ selected, language, onSave }: { selected: OptionContract
       setError(tr(language, "Vérifiez tous les champs : échéance avec fuseau correspondant au contrat, quantité, multiplicateur, prime et devise ISO.", "Check all fields: zoned expiry matching the contract, quantity, multiplier, premium and ISO currency.")); return;
     }
     setError("");
-    if (onSave(position)) setConfirmed(false);
+    if (await onSave(position)) setConfirmed(false);
   }
   return <form className="op-position-form" onSubmit={submit}>
     <h3>{tr(language, "Ajouter au suivi", "Add to tracking")}: {selected.symbol}</h3>
@@ -156,6 +197,6 @@ function PositionForm({ selected, language, onSave }: { selected: OptionContract
     </div>
     <label className="op-position-confirm"><input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />{tr(language, "J'ai vérifié les spécifications et la prime est payée initialement.", "I verified the specifications and the premium is paid upfront.")}</label>
     {error ? <p role="alert">{error}</p> : null}
-    <button type="submit">{tr(language, "Enregistrer la position", "Save position")}</button>
+    <button type="submit" disabled={busy}>{tr(language, "Enregistrer la position", "Save position")}</button>
   </form>;
 }
