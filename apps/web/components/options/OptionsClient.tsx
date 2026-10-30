@@ -19,10 +19,12 @@ import {
 import "./options.css";
 import { PremiumChain } from "./PremiumChain";
 import type { StrategyLeg } from "./StrategyBuilder";
+import type { TrackedOption } from "./options-positions";
 
 const StrategyBuilder = dynamic(() => import("./StrategyBuilder").then((module) => module.StrategyBuilder), { ssr: false });
 const VolatilityIntelligence = dynamic(() => import("./VolatilityIntelligence").then((module) => module.VolatilityIntelligence), { ssr: false });
 const OptionsScreener = dynamic(() => import("./OptionsScreener").then((module) => module.OptionsScreener), { ssr: false });
+const OptionsPortfolio = dynamic(() => import("./OptionsPortfolio").then((module) => module.OptionsPortfolio), { ssr: false });
 
 type SideFilter = "both" | "call" | "put";
 
@@ -97,6 +99,8 @@ export function OptionsClient() {
   const [showStrategy, setShowStrategy] = useState(false);
   const [showVolatility, setShowVolatility] = useState(false);
   const [showScreener, setShowScreener] = useState(false);
+  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [trackedContract, setTrackedContract] = useState<OptionContract | null>(null);
   const nextLegId = useRef(0);
 
   function addStrategyLeg(contract: OptionContract) {
@@ -107,6 +111,27 @@ export function OptionsClient() {
     setChainError(null);
     const id = nextLegId.current++;
     setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: "long", quantity: "1", premium: "", multiplier: "", snapshotStale: chain?.stale ?? false, snapshotAt: chain?.generated_at ?? "", upfront: false }]);
+    setShowStrategy(true);
+    return true;
+  }
+
+  function analyzeTracked(position: TrackedOption) {
+    if (legs.length >= 20) return false;
+    const matches = chain?.contracts.filter((item) => item.symbol === position.symbol && item.market === position.market &&
+      item.underlying === position.underlying && item.contract === position.contract && item.expiration === position.expiration &&
+      item.side === position.side && item.strike === position.strike) ?? [];
+    const contract: OptionContract = matches.length === 1 ? matches[0] : {
+      symbol: position.symbol, underlying: position.underlying, market: position.market, contract: position.contract,
+      side: position.side, strike: position.strike, expiration: position.expiration, exchange: "",
+      bid: null, ask: null, last: null, change: null, percent_change: null, volume: null, open_interest: null,
+      implied_volatility: null, delta: null, gamma: null, theta: null, vega: null, in_the_money: null,
+      source: pick(language, "saisie utilisateur", "user entry"), delayed: true,
+    };
+    const id = nextLegId.current++;
+    setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: position.direction,
+      quantity: String(position.quantity), premium: String(position.premium), multiplier: String(position.multiplier),
+      upfront: true, verifiedCurrency: position.currency, verifiedExpiry: position.expiry_at,
+      snapshotStale: matches.length !== 1 || (chain?.stale ?? true), snapshotAt: matches.length === 1 ? chain?.generated_at ?? "" : "" }]);
     setShowStrategy(true);
     return true;
   }
@@ -215,6 +240,9 @@ export function OptionsClient() {
         </button>
         <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showScreener} onClick={() => setShowScreener(!showScreener)}>
           {pick(language, "Screener de contrats", "Contract screener")}
+        </button>
+        <button type="button" className="op-vol-toggle" aria-pressed={showPortfolio} onClick={() => setShowPortfolio(!showPortfolio)}>
+          {pick(language, "Positions d'options", "Options positions")}
         </button>
       </header>
 
@@ -400,7 +428,8 @@ export function OptionsClient() {
 
       {showStrategy ? <StrategyBuilder legs={legs} setLegs={setLegs} language={language} /> : null}
       {showVolatility && chain ? <VolatilityIntelligence chain={chain} language={language} /> : null}
-      {showScreener && chain ? <OptionsScreener chain={chain} language={language} onAddStrategy={addStrategyLeg} /> : null}
+      {showScreener && chain ? <OptionsScreener chain={chain} language={language} onAddStrategy={addStrategyLeg} onTrack={(contract) => { setTrackedContract(contract); setShowPortfolio(true); }} /> : null}
+      {showPortfolio ? <OptionsPortfolio chain={chain} selected={trackedContract} language={language} onAnalyze={analyzeTracked} /> : null}
 
       <p className={"op-disclaimer"}>
         {pick(

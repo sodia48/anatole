@@ -6,11 +6,11 @@ Base : `main` au commit `6e1e5cf41c26116faa455a355550209532fa37f4`. Les PR sont 
 | --- | --- | --- |
 | 1 — Commodity Data Recovery | Instantanés durables, ingestion séparée, performance, droits et observabilité | [#174](https://github.com/sodia48/anatole/pull/174), brouillon ; source et stockage non configurés |
 | 2 — Commodity Coverage | Identité des contrats, expiration, parseurs et audit de couverture | [#175](https://github.com/sodia48/anatole/pull/175), brouillon ; dépend de #174, validation réelle conditionnée aux droits |
-| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | [#176](https://github.com/sodia48/anatole/pull/176), brouillon ; dépend de #175 ; intégration Strategy Builder à construire |
-| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | Fondation API [#177](https://github.com/sodia48/anatole/pull/177) fusionnée dans la branche de #176 ; interface et modèles restent à construire |
-| 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | Données de qualité et modèles validés |
-| 6 — Screener & Heatmap | Filtres et visualisations | PR 3 et données suffisantes |
-| 7 — Options Portfolio & Alerts | Positions, valorisation et alertes | Contrats, devises et fraîcheur vérifiés |
+| 3 — Premium Option Chain | Chaîne Calls / strike / Puts, filtres et mobile | [#176](https://github.com/sodia48/anatole/pull/176), brouillon ; dépend de #175 |
+| 4 — Strategy Builder | Jambes, stratégies, risques et modèles | [#178](https://github.com/sodia48/anatole/pull/178), brouillon web ; fondation API #177 intégrée à la branche de #176 ; modèles et mobile natif incomplets |
+| 5 — Volatility Intelligence | IV, Greeks, smile, structure par échéance et événements | [#179](https://github.com/sodia48/anatole/pull/179), brouillon ; données chargées uniquement, provenance détaillée à vérifier |
+| 6 — Screener & Heatmap | Filtres et visualisations | [#180](https://github.com/sodia48/anatole/pull/180), brouillon ; chaîne chargée uniquement |
+| 7 — Options Portfolio & Alerts | Positions, valorisation et alertes | Suivi local et rappels en page ; valorisation et alertes persistantes à construire |
 | 8 — Assistant & Full Integration | Contexte exact, intégration web/mobile et portefeuille | PR 3–7 |
 
 ## Droits et données
@@ -66,3 +66,9 @@ L'IV et les Greeks peuvent provenir du fournisseur ou d'un modèle : leur origin
 Le screener web filtre les contrats de l'instantané affiché par identifiant ou strike, type, échéance, volume et intérêt ouvert minimaux. Il trie par échéance, volume ou intérêt ouvert et permet d'ajouter un contrat au constructeur de stratégie. La heatmap représente les volumes et intérêts ouverts individuels relativement aux résultats filtrés ; les valeurs absentes ne deviennent pas zéro et leur tri les place après les valeurs connues. La source et le caractère différé des contrats ainsi que l'état périmé de l'instantané sont affichés. Les résultats sont limités à 100 lignes visibles ; le nombre total est indiqué et le tableau mobile défile horizontalement.
 
 Ce screener ne recherche pas encore dans l'ensemble des sous-jacents : il travaille uniquement sur la chaîne chargée. Une recherche multi-chaînes nécessite une couverture fiable, des limites d'accès et des droits fournisseurs vérifiés ; elle reste à réaliser. Les tests et captures utilisent des contrats synthétiques.
+
+## PR 7 — suivi local de positions et rappels visibles
+
+Le suivi web permet de sélectionner un contrat chargé, saisir une position, vérifier la date et le fuseau d'échéance, la devise, le multiplicateur et le paiement initial de la prime, puis enregistrer ou retirer la position. Les données restent dans le stockage de ce navigateur. Un rappel d'échéance s'affiche pendant que la page est ouverte ; ce n'est ni une notification en arrière-plan ni une synchronisation avec un compte ou un courtier. Un contenu local non reconnu n'est pas écrasé. Le flux initial affiché est une estimation, hors frais, financement, change et fiscalité. Les cotations ne sont montrées que si la chaîne chargée contient une correspondance unique de l'identité complète ; leur état différé et celui de l'instantané sont indiqués.
+
+Une position peut être ajoutée au constructeur existant pour simuler son résultat théorique à l'échéance ; la devise et l'instant d'échéance doivent correspondre aux données enregistrées. Le lancement du calcul transmet les jambes et les hypothèses à l'API Anatole. La valeur actuelle, le risque global, la marge, le règlement, l'exercice et l'assignation ne sont pas calculés. Le stockage local n'offre pas de synchronisation multi-appareils ni de résolution transactionnelle entre onglets. Une intégration sécurisée au portefeuille de compte, des alertes persistantes en arrière-plan, la valorisation et les risques complets restent à construire ; ce lot doit rester en brouillon. Les parcours automatisés utilisent des contrats synthétiques.
