@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { OptionChainSnapshot, OptionContract } from "@/lib/options-api";
 import "./options-screener.css";
 
-type Props = { chain: OptionChainSnapshot; language: "fr" | "en"; onAddStrategy: (contract: OptionContract) => boolean };
+type Props = { chain: OptionChainSnapshot; language: "fr" | "en"; onAddStrategy: (contract: OptionContract) => boolean; onTrack: (contract: OptionContract) => void };
 type Sort = "expiry" | "volume" | "interest";
 
 function metric(value: number | null): number | null {
@@ -17,7 +17,7 @@ function threshold(value: string): number | null {
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : NaN;
 }
 
-export function OptionsScreener({ chain, language, onAddStrategy }: Props) {
+export function OptionsScreener({ chain, language, onAddStrategy, onTrack }: Props) {
   const tr = (fr: string, en: string) => language === "fr" ? fr : en;
   const [query, setQuery] = useState("");
   const [side, setSide] = useState("both");
@@ -25,7 +25,7 @@ export function OptionsScreener({ chain, language, onAddStrategy }: Props) {
   const [volume, setVolume] = useState("");
   const [interest, setInterest] = useState("");
   const [sort, setSort] = useState<Sort>("expiry");
-  const [added, setAdded] = useState<string | null>(null);
+  const [added, setAdded] = useState<{ message: string; target?: "strategy" | "positions" } | null>(null);
   const minVolume = threshold(volume);
   const minInterest = threshold(interest);
   const invalid = Number.isNaN(minVolume) || Number.isNaN(minInterest);
@@ -74,13 +74,13 @@ export function OptionsScreener({ chain, language, onAddStrategy }: Props) {
       <label>{tr("Trier par", "Sort by")}<select value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="expiry">{tr("Échéance et strike", "Expiry and strike")}</option><option value="volume">Volume</option><option value="interest">{tr("Intérêt ouvert", "Open interest")}</option></select></label>
     </div>
     {invalid ? <p role="alert">{tr("Les minimums doivent être des entiers positifs ou nuls.", "Minimums must be non-negative integers.")}</p> : <p aria-live="polite">{results.length} {results.length === 1 ? tr("contrat correspondant", "matching contract") : tr("contrats correspondants", "matching contracts")}{results.length > 100 ? ` · ${tr("100 affichés", "100 shown")}` : ""}</p>}
-    {added ? <p aria-live="polite">{added} · <a href="#options-strategy-builder">{tr("Voir la stratégie", "View strategy")}</a></p> : null}
+    {added ? <p aria-live="polite">{added.message}{added.target ? <> · <a href={added.target === "strategy" ? "#options-strategy-builder" : "#options-positions"}>{added.target === "strategy" ? tr("Voir la stratégie", "View strategy") : tr("Voir les positions", "View positions")}</a></> : null}</p> : null}
     {results.length ? <><p className="op-screen-scroll-hint">{tr("Faites défiler le tableau horizontalement pour voir toutes les colonnes.", "Scroll the table horizontally to see all columns.")}</p><div className="op-screen-table" tabIndex={0} aria-label={tr("Résultats et heatmap", "Results and heatmap")}>
-      <table data-mobile-scroll><thead><tr><th>{tr("Contrat", "Contract")}</th><th>{tr("Échéance", "Expiry")}</th><th>Strike</th><th>Volume</th><th>{tr("Intérêt ouvert", "Open interest")}</th><th>Source</th><th>{tr("Stratégie", "Strategy")}</th></tr></thead>
+      <table data-mobile-scroll><thead><tr><th>{tr("Contrat", "Contract")}</th><th>{tr("Échéance", "Expiry")}</th><th>Strike</th><th>Volume</th><th>{tr("Intérêt ouvert", "Open interest")}</th><th>Source</th><th>{tr("Actions", "Actions")}</th></tr></thead>
         <tbody>{results.slice(0, 100).map((item, index) => <tr key={`${item.symbol}:${index}`}>
           <td>{item.side.toUpperCase()} · {item.symbol}{item.contract ? ` · ${item.contract}` : ""}</td><td>{item.expiration ?? "N/D"}</td><td>{format(metric(item.strike))}</td>
           {cell(item.volume, maxVolume)}{cell(item.open_interest, maxInterest)}
-          <td>{item.source || "N/D"}{item.delayed ? ` · ${tr("différé", "delayed")}` : ""}</td><td><button type="button" onClick={() => setAdded(onAddStrategy(item) ? tr("Contrat ajouté", "Contract added") : tr("Limite de 20 jambes atteinte", "20-leg limit reached"))}>{tr("Ajouter", "Add")}</button></td>
+          <td>{item.source || "N/D"}{item.delayed ? ` · ${tr("différé", "delayed")}` : ""}</td><td><button type="button" onClick={() => setAdded(onAddStrategy(item) ? { message: tr("Contrat ajouté", "Contract added"), target: "strategy" } : { message: tr("Limite de 20 jambes atteinte", "20-leg limit reached") })}>{tr("Ajouter", "Add")}</button>{" "}<button type="button" onClick={() => { onTrack(item); setAdded({ message: tr("Contrat sélectionné pour le suivi", "Contract selected for tracking"), target: "positions" }); }}>{tr("Suivre", "Track")}</button></td>
         </tr>)}</tbody></table>
     </div></> : !invalid ? <p>{tr("Aucun contrat ne correspond aux filtres.", "No contracts match the filters.")}</p> : null}
   </section>;

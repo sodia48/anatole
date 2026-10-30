@@ -1,0 +1,12 @@
+.op-positions, .op-position-form { display: grid; gap: 12px; min-width: 0; }
+.op-positions { padding: 18px; }
+.op-positions h2, .op-positions h3, .op-positions p { margin: 0; }
+.op-positions p { color: var(--muted); }
+.op-position-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.op-position-fields label { display: grid; gap: 6px; }
+.op-position-fields input, .op-position-fields select { min-width: 0; min-height: 42px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }
+.op-position-confirm { display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: start; gap: 8px; }
+.op-position-confirm input { width: 18px; height: 18px; margin: 2px 0 0; }
+.op-positions button { justify-self: start; min-height: 40px; border: 1px solid var(--blue); border-radius: 8px; padding: 4px 12px; background: var(--primary-surface); color: var(--accent-text); cursor: pointer; }
+.op-position-list { display: grid; gap: 10px; padding: 0; list-style: none; }
+.op-position-list li { display: grid; gap: 7px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }

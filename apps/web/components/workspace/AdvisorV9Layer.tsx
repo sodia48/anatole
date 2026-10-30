@@ -17,7 +17,7 @@ import {
 import type { AdvisorProfile } from "@/lib/types";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
-import styles from "./AdvisorV9Layer.module.css";
+import "./advisor-v9.css";
 
 const WORKSPACE_KEY = "anatole:advisor-workspace:v4";
 const V9_LOCAL_KEY = "anatole:advisor-v9-local:v1";
@@ -1528,15 +1528,15 @@ export function AdvisorV9Layer({
 
   return (
     <section
-      className={`${styles.shell} ${
-        v9.emergencyMode ? styles.emergencyShell : ""
+      className={`${"anatole-advisor9_shell__"} ${
+        v9.emergencyMode ? "anatole-advisor9_emergencyShell__" : ""
       }`}
       data-testid="advisor-v10-layer"
       data-feature-count="35"
     >
-      <header className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <span className={styles.kicker}>
+      <header className={"anatole-advisor9_hero__"}>
+        <div className={"anatole-advisor9_heroCopy__"}>
+          <span className={"anatole-advisor9_kicker__"}>
             ANATOLE CONSEIL · V10 FINANCIAL OS
           </span>
           <h2>
@@ -1554,7 +1554,7 @@ export function AdvisorV9Layer({
             )}
           </p>
         </div>
-        <div className={styles.heroMetrics}>
+        <div className={"anatole-advisor9_heroMetrics__"}>
           <div>
             <span>{pick(language, "CONFIANCE", "CONFIDENCE")}</span>
             <strong>{health.confidencePercent}%</strong>
@@ -1570,7 +1570,7 @@ export function AdvisorV9Layer({
         </div>
       </header>
 
-      <div className={styles.pulseStrip}>
+      <div className={"anatole-advisor9_pulseStrip__"}>
         <strong>
           {v9.emergencyMode
             ? pick(
@@ -1604,7 +1604,7 @@ export function AdvisorV9Layer({
       </div>
 
       <nav
-        className={styles.tabs}
+        className={"anatole-advisor9_tabs__"}
         aria-label={pick(
           language,
           "Espaces Conseil V10",
@@ -1616,7 +1616,7 @@ export function AdvisorV9Layer({
             key={item.key}
             type="button"
             aria-pressed={tab === item.key}
-            className={tab === item.key ? styles.tabActive : undefined}
+            className={tab === item.key ? "anatole-advisor9_tabActive__" : undefined}
             data-testid={`advisor-v10-tab-${item.key}`}
             onClick={() => setTab(item.key)}
           >
@@ -1627,9 +1627,9 @@ export function AdvisorV9Layer({
       </nav>
 
       {tab === "today" ? (
-        <div className={styles.zone} data-testid="advisor-v9-pulse">
-          <article className={`${styles.card} ${styles.cardHero}`} data-module="01">
-            <div className={styles.cardEyebrow}>01 · BANK CONNECT CENTER</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-pulse">
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_cardHero__"}`} data-module="01">
+            <div className={"anatole-advisor9_cardEyebrow__"}>01 · BANK CONNECT CENTER</div>
             <h3>{pick(language, "Données bancaires en lecture seule", "Read-only banking data")}</h3>
             <p>
               {pick(
@@ -1638,8 +1638,8 @@ export function AdvisorV9Layer({
                 "Live bank OAuth requires an Open Banking provider and user consent. Anatole does not fake a connection: local CSV import works now without uploading the file.",
               )}
             </p>
-            <div className={styles.importRow}>
-              <label className={styles.fileButton}>
+            <div className={"anatole-advisor9_importRow__"}>
+              <label className={"anatole-advisor9_fileButton__"}>
                 {pick(language, "Importer un CSV bancaire", "Import bank CSV")}
                 <input
                   type="file"
@@ -1657,13 +1657,13 @@ export function AdvisorV9Layer({
                 <span>{pick(language, "flux net importé", "imported net flow")}</span>
               </div>
             </div>
-            {csvStatus ? <small className={styles.status}>{csvStatus}</small> : null}
+            {csvStatus ? <small className={"anatole-advisor9_status__"}>{csvStatus}</small> : null}
           </article>
 
-          <article className={styles.card} data-module="03">
-            <div className={styles.cardEyebrow}>03 · ANATOLE PULSE</div>
+          <article className={"anatole-advisor9_card__"} data-module="03">
+            <div className={"anatole-advisor9_cardEyebrow__"}>03 · ANATOLE PULSE</div>
             <h3>{pick(language, "Ce qui mérite ton attention maintenant", "What deserves attention now")}</h3>
-            <div className={styles.changeGrid}>
+            <div className={"anatole-advisor9_changeGrid__"}>
               <div>
                 <span>{pick(language, "Patrimoine", "Net worth")}</span>
                 <strong>{money(netWorthDelta, currency, language)}</strong>
@@ -1677,7 +1677,7 @@ export function AdvisorV9Layer({
                 <strong>{money(debtDelta, currency, language)}</strong>
               </div>
             </div>
-            <div className={styles.signalList}>
+            <div className={"anatole-advisor9_signalList__"}>
               {inbox.slice(0, 3).map((item) => (
                 <div key={item.id} data-tone={item.tone}>
                   <strong>{item.title}</strong>
@@ -1693,10 +1693,10 @@ export function AdvisorV9Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="04">
-            <div className={styles.cardEyebrow}>04 · RECURRING DETECTOR</div>
+          <article className={"anatole-advisor9_card__"} data-module="04">
+            <div className={"anatole-advisor9_cardEyebrow__"}>04 · RECURRING DETECTOR</div>
             <h3>{pick(language, "Abonnements et dépenses récurrentes", "Subscriptions and recurring expenses")}</h3>
-            <div className={styles.list}>
+            <div className={"anatole-advisor9_list__"}>
               {recurring.map((item) => (
                 <div key={item.label}>
                   <strong>{item.label}</strong>
@@ -1710,10 +1710,10 @@ export function AdvisorV9Layer({
             <footer>{pick(language, "Total récurrent détecté", "Detected recurring total")} · <b>{money(estimatedSubscriptions, currency, language)}</b></footer>
           </article>
 
-          <article className={styles.card} data-module="05">
-            <div className={styles.cardEyebrow}>05 · ANOMALY RADAR</div>
+          <article className={"anatole-advisor9_card__"} data-module="05">
+            <div className={"anatole-advisor9_cardEyebrow__"}>05 · ANOMALY RADAR</div>
             <h3>{pick(language, "Transactions inhabituelles", "Unusual transactions")}</h3>
-            <div className={styles.list}>
+            <div className={"anatole-advisor9_list__"}>
               {anomalies.map((item) => (
                 <div key={item.id}>
                   <strong>{item.label}</strong>
@@ -1726,10 +1726,10 @@ export function AdvisorV9Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="06">
-            <div className={styles.cardEyebrow}>06 · UNIVERSAL FINANCIAL CALENDAR</div>
+          <article className={"anatole-advisor9_card__"} data-module="06">
+            <div className={"anatole-advisor9_cardEyebrow__"}>06 · UNIVERSAL FINANCIAL CALENDAR</div>
             <h3>{pick(language, "Tout sur une seule ligne du temps", "Everything on one financial timeline")}</h3>
-            <div className={styles.timelineMini}>
+            <div className={"anatole-advisor9_timelineMini__"}>
               {timeline.slice(0, 7).map((item) => (
                 <div key={item.id}>
                   <span>{futureLabel(item.month, language)}</span>
@@ -1746,13 +1746,13 @@ export function AdvisorV9Layer({
       ) : null}
 
       {tab === "money" ? (
-        <div className={styles.zone} data-testid="advisor-v9-household">
-          <article className={`${styles.card} ${styles.span2}`} data-module="02">
-            <div className={styles.cardEyebrow}>02 · FINANCIAL GRAPH</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-household">
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="02">
+            <div className={"anatole-advisor9_cardEyebrow__"}>02 · FINANCIAL GRAPH</div>
             <h3>{pick(language, "Le réseau derrière chaque dollar", "The network behind every dollar")}</h3>
-            <div className={styles.graph}>
+            <div className={"anatole-advisor9_graph__"}>
               {graphNodes.map((node, index) => (
-                <div key={node.id} className={styles.graphNode}>
+                <div key={node.id} className={"anatole-advisor9_graphNode__"}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <strong>{node.label}</strong>
                   <b>{money(node.value, currency, language)}</b>
@@ -1762,31 +1762,31 @@ export function AdvisorV9Layer({
             <p>{pick(language, "Lecture structurée : revenus → liquidités → dettes / objectifs → placements. Aucun transfert réel n’est exécuté.", "Structured view: income → cash → debt / goals → investments. No real transfer is executed.")}</p>
           </article>
 
-          <article className={styles.card} data-module="07">
-            <div className={styles.cardEyebrow}>07 · COUPLE / FAMILY MODE</div>
+          <article className={"anatole-advisor9_card__"} data-module="07">
+            <div className={"anatole-advisor9_cardEyebrow__"}>07 · COUPLE / FAMILY MODE</div>
             <h3>{pick(language, "Finances solo, couple ou famille", "Solo, couple or family finances")}</h3>
-            <div className={styles.segmented}>
+            <div className={"anatole-advisor9_segmented__"}>
               {(["solo", "couple", "family"] as const).map((mode) => (
                 <button
                   type="button"
                   key={mode}
-                  className={v9.householdMode === mode ? styles.activeButton : undefined}
+                  className={v9.householdMode === mode ? "anatole-advisor9_activeButton__" : undefined}
                   onClick={() => updateV9({ householdMode: mode })}
                 >
                   {mode}
                 </button>
               ))}
             </div>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Revenu ménage", "Household income")}</span><strong>{money(totalIncome, currency, language)}</strong></div>
               <div><span>{pick(language, "Personnes", "People")}</span><strong>{Math.max(1, v9.family.length + 1)}</strong></div>
             </div>
           </article>
 
-          <article className={styles.card} data-module="08">
-            <div className={styles.cardEyebrow}>08 · FAMILY FINANCIAL TREE</div>
+          <article className={"anatole-advisor9_card__"} data-module="08">
+            <div className={"anatole-advisor9_cardEyebrow__"}>08 · FAMILY FINANCIAL TREE</div>
             <h3>{pick(language, "Qui dépend de quoi", "Who depends on what")}</h3>
-            <div className={styles.inlineForm}>
+            <div className={"anatole-advisor9_inlineForm__"}>
               <input
                 value={newFamilyName}
                 placeholder={pick(language, "Nom", "Name")}
@@ -1805,25 +1805,25 @@ export function AdvisorV9Layer({
               </select>
               <button type="button" onClick={addFamilyMember}>{pick(language, "Ajouter", "Add")}</button>
             </div>
-            <div className={styles.chips}>
+            <div className={"anatole-advisor9_chips__"}>
               {v9.family.map((member) => (
                 <span key={member.id}>{member.name} · {member.role}</span>
               ))}
             </div>
           </article>
 
-          <article className={styles.card} data-module="24">
-            <div className={styles.cardEyebrow}>24 · CONSENT & PRIVACY CENTER</div>
+          <article className={"anatole-advisor9_card__"} data-module="24">
+            <div className={"anatole-advisor9_cardEyebrow__"}>24 · CONSENT & PRIVACY CENTER</div>
             <h3>{pick(language, "Chaque source sous ton contrôle", "Every source under your control")}</h3>
-            <div className={styles.privacyStatus}>
+            <div className={"anatole-advisor9_privacyStatus__"}>
               <strong>{pick(language, "Stockage V9 sensible", "Sensitive V9 storage")}</strong>
               <span>{pick(language, "Local uniquement · hors advisor_workspace synchronisé", "Local only · excluded from synced advisor_workspace")}</span>
             </div>
-            <div className={styles.privacyStatus}>
+            <div className={"anatole-advisor9_privacyStatus__"}>
               <strong>{pick(language, "Documents", "Documents")}</strong>
               <span>{pick(language, "Métadonnées seulement · contenu non persisté", "Metadata only · file contents are not persisted")}</span>
             </div>
-            <label className={styles.switchRow}>
+            <label className={"anatole-advisor9_switchRow__"}>
               <input
                 type="checkbox"
                 checked={v9.privacyAllowImports}
@@ -1833,14 +1833,14 @@ export function AdvisorV9Layer({
             </label>
           </article>
 
-          <article className={styles.card} data-module="32">
-            <div className={styles.cardEyebrow}>32 · DIGITAL VAULT</div>
+          <article className={"anatole-advisor9_card__"} data-module="32">
+            <div className={"anatole-advisor9_cardEyebrow__"}>32 · DIGITAL VAULT</div>
             <h3>{pick(language, "Coffre documentaire — métadonnées seulement", "Document vault — metadata only")}</h3>
-            <label className={styles.fileButton}>
+            <label className={"anatole-advisor9_fileButton__"}>
               {pick(language, "Indexer des documents", "Index documents")}
               <input type="file" multiple onChange={onDocumentMetadata} />
             </label>
-            <div className={styles.list}>
+            <div className={"anatole-advisor9_list__"}>
               {v9.documents.slice(-5).map((documentItem) => (
                 <div key={documentItem.id}>
                   <strong>{documentItem.name}</strong>
@@ -1854,78 +1854,78 @@ export function AdvisorV9Layer({
       ) : null}
 
       {tab === "goals" ? (
-        <div className={styles.zone} data-testid="advisor-v9-labs">
-          <article className={`${styles.card} ${styles.span2}`} data-module="09">
-            <div className={styles.cardEyebrow}>09 · RETIREMENT LAB</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-labs">
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="09">
+            <div className={"anatole-advisor9_cardEyebrow__"}>09 · RETIREMENT LAB</div>
             <h3>{pick(language, "Accumulation + décumulation transparente", "Transparent accumulation + decumulation")}</h3>
-            <div className={styles.formGrid}>
+            <div className={"anatole-advisor9_formGrid__"}>
               <label><span>{pick(language, "Âge actuel", "Current age")}</span><input type="number" min="18" max="90" value={v9.currentAge} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ currentAge: finite(Number(event.target.value)) })} /></label>
               <label><span>{pick(language, "Âge retraite", "Retirement age")}</span><input type="number" min="18" max="100" value={v9.retirementAge} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ retirementAge: finite(Number(event.target.value)) })} /></label>
               <label><span>{pick(language, "Revenu retraite souhaité / mois", "Desired retirement income / month")}</span><input type="number" min="0" value={v9.retirementMonthlyNeed ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ retirementMonthlyNeed: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "CPP/RRQ/SV/OAS estimés / mois", "Estimated CPP/QPP/OAS / month")}</span><input type="number" min="0" value={v9.publicPensionMonthly ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ publicPensionMonthly: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "Taux de retrait hypothétique", "Assumed withdrawal rate")}</span><input type="number" min="0.5" max="10" step="0.1" value={v9.withdrawalRatePercent} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ withdrawalRatePercent: finite(Number(event.target.value)) })} /></label>
             </div>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Capital illustratif", "Illustrative capital")}</span><strong>{money(retirementCapital, currency, language)}</strong></div>
               <div><span>{pick(language, "Projection à la retraite", "Projected at retirement")}</span><strong>{money(retirementProjected, currency, language)}</strong></div>
             </div>
             <small>{pick(language, "Les prestations publiques sont saisies par l’utilisateur; Anatole ne les invente pas.", "Public benefits are user-entered; Anatole does not invent them.")}</small>
           </article>
 
-          <article className={styles.card} data-module="10">
-            <div className={styles.cardEyebrow}>10 · INSURANCE GAP LAB</div>
+          <article className={"anatole-advisor9_card__"} data-module="10">
+            <div className={"anatole-advisor9_cardEyebrow__"}>10 · INSURANCE GAP LAB</div>
             <h3>{pick(language, "Couverture déclarée vs besoin déclaré", "Entered coverage vs entered need")}</h3>
-            <div className={styles.formGrid}>
+            <div className={"anatole-advisor9_formGrid__"}>
               <label><span>{pick(language, "Couverture vie", "Life coverage")}</span><input type="number" min="0" value={v9.lifeCoverage ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ lifeCoverage: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "Besoin à protéger", "Protection need")}</span><input type="number" min="0" value={v9.insuranceNeed ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ insuranceNeed: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "Invalidité / mois", "Disability / month")}</span><input type="number" min="0" value={v9.disabilityMonthlyCoverage ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ disabilityMonthlyCoverage: numberFromInput(event.target.value) })} /></label>
             </div>
-            <strong className={styles.bigNumber}>{money(insuranceGap, currency, language)}</strong>
+            <strong className={"anatole-advisor9_bigNumber__"}>{money(insuranceGap, currency, language)}</strong>
             <small>{pick(language, "Écart descriptif basé uniquement sur les montants saisis.", "Descriptive gap based only on entered amounts.")}</small>
           </article>
 
-          <article className={styles.card} data-module="11">
-            <div className={styles.cardEyebrow}>11 · CREDIT CENTER</div>
+          <article className={"anatole-advisor9_card__"} data-module="11">
+            <div className={"anatole-advisor9_cardEyebrow__"}>11 · CREDIT CENTER</div>
             <h3>{pick(language, "Utilisation, coût et échéances", "Utilization, cost and timing")}</h3>
-            <div className={styles.formGrid}>
+            <div className={"anatole-advisor9_formGrid__"}>
               <label><span>{pick(language, "Limite totale", "Total limit")}</span><input type="number" min="0" value={v9.creditLimit ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ creditLimit: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "Solde", "Balance")}</span><input type="number" min="0" value={v9.creditBalance ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ creditBalance: numberFromInput(event.target.value) })} /></label>
               <label><span>APR %</span><input type="number" min="0" step="0.01" value={v9.creditApr ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ creditApr: numberFromInput(event.target.value) })} /></label>
               <label><span>{pick(language, "Score saisi (optionnel)", "Entered score (optional)")}</span><input type="number" min="300" max="900" value={v9.enteredCreditScore ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ enteredCreditScore: numberFromInput(event.target.value) })} /></label>
             </div>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Utilisation", "Utilization")}</span><strong>{pct(creditUtilization, language)}</strong></div>
               <div><span>{pick(language, "Intérêt mensuel approx.", "Approx. monthly interest")}</span><strong>{money(creditMonthlyInterest, currency, language)}</strong></div>
             </div>
           </article>
 
-          <article className={styles.card} data-module="12">
-            <div className={styles.cardEyebrow}>12 · SALARY & CAREER LAB</div>
+          <article className={"anatole-advisor9_card__"} data-module="12">
+            <div className={"anatole-advisor9_cardEyebrow__"}>12 · SALARY & CAREER LAB</div>
             <h3>{pick(language, "Promotion, changement d’emploi, bonus", "Promotion, job change, bonus")}</h3>
-            <label className={styles.field}><span>{pick(language, "Revenu mensuel futur", "Future monthly income")}</span><input type="number" min="0" value={v9.careerFutureMonthlyIncome ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ careerFutureMonthlyIncome: numberFromInput(event.target.value) })} /></label>
-            <label className={styles.field}><span>{pick(language, "À partir du mois", "Starting month")}</span><input type="number" min="0" max="120" value={v9.careerChangeMonth} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ careerChangeMonth: finite(Number(event.target.value)) })} /></label>
-            <strong className={styles.bigNumber}>{careerDelta == null ? pick(language, "N/D", "N/A") : money(careerDelta, currency, language)}</strong>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Revenu mensuel futur", "Future monthly income")}</span><input type="number" min="0" value={v9.careerFutureMonthlyIncome ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ careerFutureMonthlyIncome: numberFromInput(event.target.value) })} /></label>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "À partir du mois", "Starting month")}</span><input type="number" min="0" max="120" value={v9.careerChangeMonth} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ careerChangeMonth: finite(Number(event.target.value)) })} /></label>
+            <strong className={"anatole-advisor9_bigNumber__"}>{careerDelta == null ? pick(language, "N/D", "N/A") : money(careerDelta, currency, language)}</strong>
             <small>{pick(language, "Variation mensuelle avant modélisation fiscale détaillée.", "Monthly change before detailed tax modelling.")}</small>
           </article>
 
-          <article className={styles.card} data-module="13">
-            <div className={styles.cardEyebrow}>13 · SELF-EMPLOYED MODE</div>
+          <article className={"anatole-advisor9_card__"} data-module="13">
+            <div className={"anatole-advisor9_cardEyebrow__"}>13 · SELF-EMPLOYED MODE</div>
             <h3>{pick(language, "Revenus irréguliers et réserve fiscale", "Irregular income and tax reserve")}</h3>
-            <label className={styles.switchRow}><input type="checkbox" checked={v9.selfEmployed} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ selfEmployed: event.target.checked })} /><span>{pick(language, "Travail autonome / entreprise", "Self-employed / business")}</span></label>
-            <label className={styles.field}><span>{pick(language, "Dépenses entreprise / mois", "Business expenses / month")}</span><input type="number" min="0" value={v9.businessMonthlyExpenses ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ businessMonthlyExpenses: numberFromInput(event.target.value) })} /></label>
-            <label className={styles.field}><span>{pick(language, "Réserve fiscale choisie %", "Chosen tax reserve %")}</span><input type="number" min="0" max="100" value={v9.taxReservePercent} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ taxReservePercent: finite(Number(event.target.value)) })} /></label>
-            <strong className={styles.bigNumber}>{v9.selfEmployed ? money(selfEmployedReserve, currency, language) : pick(language, "Mode inactif", "Mode off")}</strong>
+            <label className={"anatole-advisor9_switchRow__"}><input type="checkbox" checked={v9.selfEmployed} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ selfEmployed: event.target.checked })} /><span>{pick(language, "Travail autonome / entreprise", "Self-employed / business")}</span></label>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Dépenses entreprise / mois", "Business expenses / month")}</span><input type="number" min="0" value={v9.businessMonthlyExpenses ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ businessMonthlyExpenses: numberFromInput(event.target.value) })} /></label>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Réserve fiscale choisie %", "Chosen tax reserve %")}</span><input type="number" min="0" max="100" value={v9.taxReservePercent} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ taxReservePercent: finite(Number(event.target.value)) })} /></label>
+            <strong className={"anatole-advisor9_bigNumber__"}>{v9.selfEmployed ? money(selfEmployedReserve, currency, language) : pick(language, "Mode inactif", "Mode off")}</strong>
             <small>{pick(language, "Ce pourcentage est une hypothèse utilisateur, pas un taux fiscal calculé.", "This percentage is a user assumption, not a calculated tax rate.")}</small>
           </article>
         </div>
       ) : null}
 
       {tab === "today" ? (
-        <div className={styles.zone} data-testid="advisor-v9-intelligence">
-          <article className={styles.card} data-module="17">
-            <div className={styles.cardEyebrow}>17 · GOAL SCORECARD</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-intelligence">
+          <article className={"anatole-advisor9_card__"} data-module="17">
+            <div className={"anatole-advisor9_cardEyebrow__"}>17 · GOAL SCORECARD</div>
             <h3>{pick(language, "Quatre dimensions descriptives", "Four descriptive dimensions")}</h3>
-            <div className={styles.scoreGrid}>
+            <div className={"anatole-advisor9_scoreGrid__"}>
               <div><span>{pick(language, "Données", "Data")}</span><strong>{health.completenessPercent}%</strong></div>
               <div><span>{pick(language, "Confiance", "Confidence")}</span><strong>{health.confidencePercent}%</strong></div>
               <div><span>{pick(language, "Progression", "Progress")}</span><strong>{pct(health.goalProgressPercent, language)}</strong></div>
@@ -1933,21 +1933,21 @@ export function AdvisorV9Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="18">
-            <div className={styles.cardEyebrow}>18 · PERSONAL BENCHMARKS</div>
+          <article className={"anatole-advisor9_card__"} data-module="18">
+            <div className={"anatole-advisor9_cardEyebrow__"}>18 · PERSONAL BENCHMARKS</div>
             <h3>{pick(language, "Comparer à ta propre référence", "Compare against your own reference")}</h3>
-            <label className={styles.field}><span>{pick(language, "Épargne mensuelle de référence", "Reference monthly savings")}</span><input type="number" min="0" value={v9.benchmarkMonthlySavings ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ benchmarkMonthlySavings: numberFromInput(event.target.value) })} /></label>
-            <div className={styles.metricGrid}>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Épargne mensuelle de référence", "Reference monthly savings")}</span><input type="number" min="0" value={v9.benchmarkMonthlySavings ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ benchmarkMonthlySavings: numberFromInput(event.target.value) })} /></label>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Taux d’épargne actuel", "Current savings rate")}</span><strong>{pct(personalSavingsRate, language)}</strong></div>
               <div><span>{pick(language, "Écart à ta référence", "Gap vs your reference")}</span><strong>{money(benchmarkGap, currency, language)}</strong></div>
             </div>
             <small>{pick(language, "Aucune comparaison démographique n’est inventée sans source publique explicite.", "No demographic benchmark is invented without an explicit public source.")}</small>
           </article>
 
-          <article className={`${styles.card} ${styles.span2}`} data-module="19">
-            <div className={styles.cardEyebrow}>19 · TRANSPARENT MONTE CARLO</div>
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="19">
+            <div className={"anatole-advisor9_cardEyebrow__"}>19 · TRANSPARENT MONTE CARLO</div>
             <h3>{pick(language, "Une distribution, pas une seule courbe", "A distribution, not one line")}</h3>
-            <div className={styles.monteGrid}>
+            <div className={"anatole-advisor9_monteGrid__"}>
               <div><span>P10</span><strong>{money(monteCarloResult.p10, currency, language)}</strong></div>
               <div><span>{pick(language, "Médiane", "Median")}</span><strong>{money(monteCarloResult.median, currency, language)}</strong></div>
               <div><span>P90</span><strong>{money(monteCarloResult.p90, currency, language)}</strong></div>
@@ -1956,46 +1956,46 @@ export function AdvisorV9Layer({
             <p>{pick(language, `400 simulations déterministes · rendement ${expectedReturn.toFixed(1)} % · volatilité ${volatility.toFixed(1)} %.`, `400 deterministic simulations · return ${expectedReturn.toFixed(1)}% · volatility ${volatility.toFixed(1)}%.`)}</p>
           </article>
 
-          <article className={styles.card} data-module="20">
-            <div className={styles.cardEyebrow}>20 · SCENARIO COMPOSER</div>
+          <article className={"anatole-advisor9_card__"} data-module="20">
+            <div className={"anatole-advisor9_cardEyebrow__"}>20 · SCENARIO COMPOSER</div>
             <h3>{pick(language, "Combiner plusieurs événements", "Combine several events")}</h3>
-            <div className={styles.formGrid}>
+            <div className={"anatole-advisor9_formGrid__"}>
               <label><span>Δ {pick(language, "revenu / mois", "income / month")}</span><input type="number" value={v9.scenarioIncomeDelta} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ scenarioIncomeDelta: finite(Number(event.target.value)) })} /></label>
               <label><span>Δ {pick(language, "dépenses / mois", "expenses / month")}</span><input type="number" value={v9.scenarioExpenseDelta} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ scenarioExpenseDelta: finite(Number(event.target.value)) })} /></label>
               <label><span>{pick(language, "Coût ponctuel", "One-time cost")}</span><input type="number" min="0" value={v9.scenarioOneTimeCost} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ scenarioOneTimeCost: finite(Number(event.target.value)) })} /></label>
               <label><span>{pick(language, "Durée mois", "Months")}</span><input type="number" min="1" max="120" value={v9.scenarioDurationMonths} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ scenarioDurationMonths: Math.max(1, finite(Number(event.target.value))) })} /></label>
             </div>
-            <strong className={styles.bigNumber}>{money(scenarioTwelveMonthImpact, currency, language)}</strong>
+            <strong className={"anatole-advisor9_bigNumber__"}>{money(scenarioTwelveMonthImpact, currency, language)}</strong>
           </article>
 
-          <article className={styles.card} data-module="21">
-            <div className={styles.cardEyebrow}>21 · WHAT WOULD HAVE HAPPENED?</div>
+          <article className={"anatole-advisor9_card__"} data-module="21">
+            <div className={"anatole-advisor9_cardEyebrow__"}>21 · WHAT WOULD HAVE HAPPENED?</div>
             <h3>{pick(language, "Regarder en arrière sans promettre l’avenir", "Look backward without promising the future")}</h3>
-            <label className={styles.field}><span>{pick(language, "Mois passés", "Past months")}</span><input type="number" min="1" max="120" value={v9.hindsightMonths} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ hindsightMonths: Math.max(1, finite(Number(event.target.value))) })} /></label>
-            <label className={styles.field}><span>{pick(language, "Contribution supplémentaire / mois", "Extra contribution / month")}</span><input type="number" min="0" value={v9.hindsightMonthlyDelta} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ hindsightMonthlyDelta: Math.max(0, finite(Number(event.target.value))) })} /></label>
-            <strong className={styles.bigNumber}>{money(hindsightValue, currency, language)}</strong>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Mois passés", "Past months")}</span><input type="number" min="1" max="120" value={v9.hindsightMonths} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ hindsightMonths: Math.max(1, finite(Number(event.target.value))) })} /></label>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Contribution supplémentaire / mois", "Extra contribution / month")}</span><input type="number" min="0" value={v9.hindsightMonthlyDelta} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ hindsightMonthlyDelta: Math.max(0, finite(Number(event.target.value))) })} /></label>
+            <strong className={"anatole-advisor9_bigNumber__"}>{money(hindsightValue, currency, language)}</strong>
             <small>{pick(language, "Illustration calculée avec l’hypothèse de rendement courante; ce n’est pas un rendement historique réel.", "Illustration using the current return assumption; it is not actual historical performance.")}</small>
           </article>
         </div>
       ) : null}
 
       {tab === "decide" ? (
-        <div className={styles.zone} data-testid="advisor-v9-decisions">
-          <article className={styles.card} data-module="14">
-            <div className={styles.cardEyebrow}>14 · DOCUMENT INTELLIGENCE</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-decisions">
+          <article className={"anatole-advisor9_card__"} data-module="14">
+            <div className={"anatole-advisor9_cardEyebrow__"}>14 · DOCUMENT INTELLIGENCE</div>
             <h3>{pick(language, "Classifier avant d’extraire", "Classify before extraction")}</h3>
             <p>{pick(language, "Anatole classe localement les métadonnées par nom de fichier. L’extraction PDF/OCR complète n’est pas simulée : elle nécessite un moteur document explicite.", "Anatole classifies filename metadata locally. Full PDF/OCR extraction is not faked: it requires an explicit document engine.")}</p>
-            <div className={styles.chips}>
+            <div className={"anatole-advisor9_chips__"}>
               {v9.documents.slice(-6).map((documentItem) => (
                 <span key={documentItem.id}>{documentItem.category}</span>
               ))}
             </div>
           </article>
 
-          <article className={styles.card} data-module="15">
-            <div className={styles.cardEyebrow}>15 · FINANCIAL INBOX</div>
+          <article className={"anatole-advisor9_card__"} data-module="15">
+            <div className={"anatole-advisor9_cardEyebrow__"}>15 · FINANCIAL INBOX</div>
             <h3>{pick(language, "Une boîte de réception financière", "A financial inbox")}</h3>
-            <div className={styles.signalList}>
+            <div className={"anatole-advisor9_signalList__"}>
               {inbox.map((item) => (
                 <div key={item.id} data-tone={item.tone}>
                   <strong>{item.title}</strong>
@@ -2005,10 +2005,10 @@ export function AdvisorV9Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="16">
-            <div className={styles.cardEyebrow}>16 · ACTION CENTER</div>
+          <article className={"anatole-advisor9_card__"} data-module="16">
+            <div className={"anatole-advisor9_cardEyebrow__"}>16 · ACTION CENTER</div>
             <h3>{pick(language, "Transformer les signaux en checklist", "Turn signals into a checklist")}</h3>
-            <div className={styles.actionList}>
+            <div className={"anatole-advisor9_actionList__"}>
               {actions.map((action) => (
                 <label key={action.id}>
                   <input
@@ -2027,20 +2027,20 @@ export function AdvisorV9Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="22">
-            <div className={styles.cardEyebrow}>22 · ANATOLE EXPLAIN</div>
+          <article className={"anatole-advisor9_card__"} data-module="22">
+            <div className={"anatole-advisor9_cardEyebrow__"}>22 · ANATOLE EXPLAIN</div>
             <h3>{pick(language, "Pourquoi ce chiffre ?", "Why this number?")}</h3>
-            <div className={styles.explainRows}>
+            <div className={"anatole-advisor9_explainRows__"}>
               <div><strong>{pick(language, "Valeur nette", "Net worth")}</strong><span>{pick(language, "Actifs saisis − dettes détaillées.", "Entered assets − detailed debt.")}</span></div>
               <div><strong>{pick(language, "Marge", "Margin")}</strong><span>{pick(language, "Revenus − dépenses − dette − contributions.", "Income − expenses − debt − contributions.")}</span></div>
               <div><strong>{pick(language, "Projection", "Projection")}</strong><span>{pick(language, "Capital initial + contributions avec rendement hypothétique visible.", "Initial capital + contributions under the visible assumed return.")}</span></div>
             </div>
           </article>
 
-          <article className={styles.card} data-module="23">
-            <div className={styles.cardEyebrow}>23 · CONFIDENCE LAYER</div>
+          <article className={"anatole-advisor9_card__"} data-module="23">
+            <div className={"anatole-advisor9_cardEyebrow__"}>23 · CONFIDENCE LAYER</div>
             <h3>{pick(language, "Confiance dans les données, pas dans la personne", "Confidence in the data, not the person")}</h3>
-            <div className={styles.confidenceRing} style={{ "--confidence": `${health.confidencePercent}%` } as CSSProperties}>
+            <div className={"anatole-advisor9_confidenceRing__"} style={{ "--confidence": `${health.confidencePercent}%` } as CSSProperties}>
               <strong>{health.confidencePercent}%</strong>
             </div>
             <p>{pick(language, `${health.knownFields}/${health.totalFields} champs clés sont connus.`, `${health.knownFields}/${health.totalFields} key fields are known.`)}</p>
@@ -2049,36 +2049,36 @@ export function AdvisorV9Layer({
       ) : null}
 
       {tab === "goals" ? (
-        <div className={styles.zone} data-testid="advisor-v9-optimize">
-          <article className={styles.card} data-module="26">
-            <div className={styles.cardEyebrow}>26 · DECISION HISTORY</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-optimize">
+          <article className={"anatole-advisor9_card__"} data-module="26">
+            <div className={"anatole-advisor9_cardEyebrow__"}>26 · DECISION HISTORY</div>
             <h3>{pick(language, "Pourquoi le plan a changé", "Why the plan changed")}</h3>
             <button
               type="button"
-              className={styles.action}
+              className={"anatole-advisor9_action__"}
               onClick={saveDecisionSnapshot}
             >
               {pick(language, "Enregistrer cette version", "Save this version")}
             </button>
-            <div className={styles.list}>
+            <div className={"anatole-advisor9_list__"}>
               {v9.decisionHistory.slice(-5).reverse().map((item) => (
                 <div key={item.id}><strong>{item.label}</strong><span>{new Date(item.createdAt).toLocaleString(localeFor(language))}</span></div>
               ))}
             </div>
           </article>
 
-          <article className={styles.card} data-module="27">
-            <div className={styles.cardEyebrow}>27 · GOAL CONSTRAINTS</div>
+          <article className={"anatole-advisor9_card__"} data-module="27">
+            <div className={"anatole-advisor9_cardEyebrow__"}>27 · GOAL CONSTRAINTS</div>
             <h3>{pick(language, "Ce qui est négociable ou non", "What is negotiable or not")}</h3>
-            <label className={styles.switchRow}><input type="checkbox" checked={v9.fixedGoalDate} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ fixedGoalDate: event.target.checked })} /><span>{pick(language, "Date fixe", "Fixed date")}</span></label>
-            <label className={styles.switchRow}><input type="checkbox" checked={v9.fixedGoalAmount} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ fixedGoalAmount: event.target.checked })} /><span>{pick(language, "Montant fixe", "Fixed amount")}</span></label>
-            <label className={styles.field}><span>{pick(language, "Réserve minimale", "Minimum reserve")}</span><input type="number" min="0" value={v9.minimumReserve ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ minimumReserve: numberFromInput(event.target.value) })} /></label>
+            <label className={"anatole-advisor9_switchRow__"}><input type="checkbox" checked={v9.fixedGoalDate} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ fixedGoalDate: event.target.checked })} /><span>{pick(language, "Date fixe", "Fixed date")}</span></label>
+            <label className={"anatole-advisor9_switchRow__"}><input type="checkbox" checked={v9.fixedGoalAmount} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ fixedGoalAmount: event.target.checked })} /><span>{pick(language, "Montant fixe", "Fixed amount")}</span></label>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Réserve minimale", "Minimum reserve")}</span><input type="number" min="0" value={v9.minimumReserve ?? ""} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ minimumReserve: numberFromInput(event.target.value) })} /></label>
           </article>
 
-          <article className={`${styles.card} ${styles.span2}`} data-module="28">
-            <div className={styles.cardEyebrow}>28 · CONSTRAINT SOLVER</div>
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="28">
+            <div className={"anatole-advisor9_cardEyebrow__"}>28 · CONSTRAINT SOLVER</div>
             <h3>{pick(language, "Calculer les combinaisons compatibles", "Calculate compatible combinations")}</h3>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Contribution requise", "Required contribution")}</span><strong>{money(solverMonthly, currency, language)}</strong></div>
               <div><span>{pick(language, "Contribution actuelle", "Current contribution")}</span><strong>{money(monthlyContribution, currency, language)}</strong></div>
               <div><span>{pick(language, "Gap de réserve", "Reserve gap")}</span><strong>{money(solverReserveGap, currency, language)}</strong></div>
@@ -2087,26 +2087,26 @@ export function AdvisorV9Layer({
             <p>{pick(language, "Le solver décrit les variables nécessaires; il ne sélectionne pas une décision à ta place.", "The solver describes required variables; it does not select a decision for you.")}</p>
           </article>
 
-          <article className={styles.card} data-module="29">
-            <div className={styles.cardEyebrow}>29 · ANATOLE MARKET BRIDGE</div>
+          <article className={"anatole-advisor9_card__"} data-module="29">
+            <div className={"anatole-advisor9_cardEyebrow__"}>29 · ANATOLE MARKET BRIDGE</div>
             <h3>{pick(language, "Relier Conseil au reste d’Anatole", "Connect Advice to the rest of Anatole")}</h3>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor9_metricGrid__"}>
               <div><span>{pick(language, "Positions reliées", "Linked positions")}</span><strong>{portfolioCount}</strong></div>
               <div><span>{pick(language, "Placements déclarés", "Entered investments")}</span><strong>{money(household.investments, currency, language)}</strong></div>
             </div>
-            <Link href="/portefeuille" className={styles.actionLink}>{pick(language, "Ouvrir Portefeuille", "Open Portfolio")}</Link>
+            <Link href="/portefeuille" className={"anatole-advisor9_actionLink__"}>{pick(language, "Ouvrir Portefeuille", "Open Portfolio")}</Link>
             <small>{pick(language, "Les valeurs de portefeuille ne sont pas ajoutées automatiquement au patrimoine pour éviter le double comptage.", "Portfolio values are not automatically added to net worth to avoid double counting.")}</small>
           </article>
 
-          <article className={styles.card} data-module="30">
-            <div className={styles.cardEyebrow}>30 · ANATOLE AGENT</div>
+          <article className={"anatole-advisor9_card__"} data-module="30">
+            <div className={"anatole-advisor9_cardEyebrow__"}>30 · ANATOLE AGENT</div>
             <h3>{pick(language, "Préparer, structurer, demander confirmation", "Prepare, structure, ask for confirmation")}</h3>
             <textarea
               value={v9.agentGoal}
               placeholder={pick(language, "Ex. Prépare-moi un plan pour acheter dans 24 mois", "E.g. Prepare a plan to buy in 24 months")}
               onChange={(event: ChangeEvent<HTMLTextAreaElement>) => updateV9({ agentGoal: event.target.value })}
             />
-            <div className={styles.agentBrief}>
+            <div className={"anatole-advisor9_agentBrief__"}>
               {agentBrief.map((line) => <span key={line}>{line}</span>)}
             </div>
             <small>{pick(language, "Ce module prépare les données et questions; il n’exécute pas d’opération financière.", "This module prepares data and questions; it does not execute financial transactions.")}</small>
@@ -2115,24 +2115,24 @@ export function AdvisorV9Layer({
       ) : null}
 
       {tab === "file" ? (
-        <div className={styles.zone} data-testid="advisor-v9-pro">
-          <article className={styles.card} data-module="25">
-            <div className={styles.cardEyebrow}>25 · ADVISOR COLLAB PACKAGE</div>
+        <div className={"anatole-advisor9_zone__"} data-testid="advisor-v9-pro">
+          <article className={"anatole-advisor9_card__"} data-module="25">
+            <div className={"anatole-advisor9_cardEyebrow__"}>25 · ADVISOR COLLAB PACKAGE</div>
             <h3>{pick(language, "Partager un scénario, pas tout ton compte", "Share a scenario, not your whole account")}</h3>
-            <label className={styles.field}><span>{pick(language, "Expiration descriptive (jours)", "Descriptive expiry (days)")}</span><input type="number" min="1" max="90" value={v9.shareExpiryDays} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ shareExpiryDays: Math.max(1, finite(Number(event.target.value))) })} /></label>
-            <button type="button" className={styles.action} onClick={exportAdvisorPackage}>{pick(language, "Exporter le package conseiller", "Export advisor package")}</button>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Expiration descriptive (jours)", "Descriptive expiry (days)")}</span><input type="number" min="1" max="90" value={v9.shareExpiryDays} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ shareExpiryDays: Math.max(1, finite(Number(event.target.value))) })} /></label>
+            <button type="button" className={"anatole-advisor9_action__"} onClick={exportAdvisorPackage}>{pick(language, "Exporter le package conseiller", "Export advisor package")}</button>
             <small>{pick(language, "Export local JSON : aucune URL de partage serveur n’est inventée.", "Local JSON export: no server sharing URL is fabricated.")}</small>
           </article>
 
-          <article className={`${styles.card} ${styles.span2}`} data-module="31">
-            <div className={styles.cardEyebrow}>31 · 30-YEAR FINANCIAL TIMELINE</div>
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="31">
+            <div className={"anatole-advisor9_cardEyebrow__"}>31 · 30-YEAR FINANCIAL TIMELINE</div>
             <h3>{pick(language, "Voir les événements sur trente ans", "See events across thirty years")}</h3>
-            <div className={styles.timeline30}>
-              <div className={styles.timelineTrack} />
+            <div className={"anatole-advisor9_timeline30__"}>
+              <div className={"anatole-advisor9_timelineTrack__"} />
               {timeline.map((item) => (
                 <div
                   key={item.id}
-                  className={styles.timelinePoint}
+                  className={"anatole-advisor9_timelinePoint__"}
                   style={{ left: `${Math.min(100, (item.month / 360) * 100)}%` }}
                   title={`${item.label} · ${futureLabel(item.month, language)}`}
                 >
@@ -2141,13 +2141,13 @@ export function AdvisorV9Layer({
                 </div>
               ))}
             </div>
-            <div className={styles.timelineLabels}><span>{pick(language, "Aujourd’hui", "Today")}</span><span>10y</span><span>20y</span><span>30y</span></div>
+            <div className={"anatole-advisor9_timelineLabels__"}><span>{pick(language, "Aujourd’hui", "Today")}</span><span>10y</span><span>20y</span><span>30y</span></div>
           </article>
 
-          <article className={styles.card} data-module="33">
-            <div className={styles.cardEyebrow}>33 · EMERGENCY MODE</div>
+          <article className={"anatole-advisor9_card__"} data-module="33">
+            <div className={"anatole-advisor9_cardEyebrow__"}>33 · EMERGENCY MODE</div>
             <h3>{pick(language, "Recentrer le cockpit sur la liquidité", "Refocus the cockpit on liquidity")}</h3>
-            <label className={styles.switchRow}>
+            <label className={"anatole-advisor9_switchRow__"}>
               <input
                 type="checkbox"
                 data-testid="advisor-v9-emergency-toggle"
@@ -2156,14 +2156,14 @@ export function AdvisorV9Layer({
               />
               <span>{pick(language, "Activer le mode urgence", "Enable emergency mode")}</span>
             </label>
-            <label className={styles.field}><span>{pick(language, "Réduction hypothétique dépenses %", "Assumed expense reduction %")}</span><input type="number" min="0" max="80" value={v9.emergencyExpenseCutPercent} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ emergencyExpenseCutPercent: finite(Number(event.target.value)) })} /></label>
-            <strong className={styles.bigNumber}>{emergencyRunway == null ? "N/D" : `${emergencyRunway.toFixed(1)} ${pick(language, "mois", "months")}`}</strong>
+            <label className={"anatole-advisor9_field__"}><span>{pick(language, "Réduction hypothétique dépenses %", "Assumed expense reduction %")}</span><input type="number" min="0" max="80" value={v9.emergencyExpenseCutPercent} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV9({ emergencyExpenseCutPercent: finite(Number(event.target.value)) })} /></label>
+            <strong className={"anatole-advisor9_bigNumber__"}>{emergencyRunway == null ? "N/D" : `${emergencyRunway.toFixed(1)} ${pick(language, "mois", "months")}`}</strong>
           </article>
 
-          <article className={styles.card} data-module="34">
-            <div className={styles.cardEyebrow}>34 · FINANCIAL HEALTH API</div>
+          <article className={"anatole-advisor9_card__"} data-module="34">
+            <div className={"anatole-advisor9_cardEyebrow__"}>34 · FINANCIAL HEALTH API</div>
             <h3>{pick(language, "Un moteur central pour tous les modules", "One central engine for every module")}</h3>
-            <pre className={styles.apiPreview}>{JSON.stringify({
+            <pre className={"anatole-advisor9_apiPreview__"}>{JSON.stringify({
               netWorth: health.netWorth,
               monthlyMargin: health.monthlyMargin,
               runwayMonths: health.runwayMonths,
@@ -2173,10 +2173,10 @@ export function AdvisorV9Layer({
             <small>{pick(language, "Calculé par apps/web/lib/advisor-financial-health.ts.", "Computed by apps/web/lib/advisor-financial-health.ts.")}</small>
           </article>
 
-          <article className={`${styles.card} ${styles.span2}`} data-module="35">
-            <div className={styles.cardEyebrow}>35 · ANATOLE INTELLIGENCE LAYER</div>
+          <article className={`${"anatole-advisor9_card__"} ${"anatole-advisor9_span2__"}`} data-module="35">
+            <div className={"anatole-advisor9_cardEyebrow__"}>35 · ANATOLE INTELLIGENCE LAYER</div>
             <h3>{pick(language, "Fait → changement → impact → options → hypothèses → source", "Fact → change → impact → options → assumptions → source")}</h3>
-            <div className={styles.intelligenceGrid}>
+            <div className={"anatole-advisor9_intelligenceGrid__"}>
               {intelligenceRows.map((row) => (
                 <div key={row.label}>
                   <span>{row.label}</span>
@@ -2188,7 +2188,7 @@ export function AdvisorV9Layer({
         </div>
       ) : null}
 
-      <footer className={styles.footer}>
+      <footer className={"anatole-advisor9_footer__"}>
         <div>
           <strong>{pick(language, "35 moteurs · V10", "35 engines · V10")}</strong>
           <span>{pick(language, `${modulesByTab[tab].length} capacités regroupées ici`, `${modulesByTab[tab].length} capabilities grouped here`)}</span>

@@ -15,6 +15,8 @@ export type StrategyLeg = {
   snapshotStale: boolean;
   snapshotAt: string;
   upfront: boolean;
+  verifiedCurrency?: string;
+  verifiedExpiry?: string;
 };
 
 type Result = {
@@ -81,7 +83,8 @@ export function StrategyBuilder({ legs, setLegs, language }: {
       Number.isNaN(Date.parse(expiry)) ||
       !minimum || !maximum || !Number.isFinite(low) || !Number.isFinite(high) || high <= low ||
       (first.market === "tsx" && low < 0) || Math.abs(low) > 1e11 || Math.abs(high) > 1e11 ||
-      legs.some(({ contract, quantity, premium, multiplier, upfront }) => !upfront || !contract.expiration || contract.expiration !== expiry.slice(0, 10) ||
+      legs.some(({ contract, quantity, premium, multiplier, upfront, verifiedCurrency, verifiedExpiry }) => !upfront || !contract.expiration || contract.expiration !== expiry.slice(0, 10) ||
+        (verifiedCurrency != null && verifiedCurrency !== currency) || (verifiedExpiry != null && Date.parse(verifiedExpiry) !== Date.parse(expiry)) ||
         contract.market !== first.market || contract.underlying !== first.underlying ||
         (first.market === "commodities" && (!first.contract || contract.contract !== first.contract)) ||
         !multiplier || !Number.isFinite(Number(multiplier)) || Number(multiplier) <= 0 ||
@@ -130,10 +133,11 @@ export function StrategyBuilder({ legs, setLegs, language }: {
         </select>
       </label>
       {!legs.length ? <p>{tr("Choisissez des contrats dans la chaîne et ajoutez-les à la stratégie.", "Choose contracts in the chain and add them to the strategy.")}</p> : null}
-      {legs.map(({ id, contract, direction, quantity, premium, multiplier, snapshotStale, snapshotAt, upfront }) => <fieldset key={id}>
+      {legs.map(({ id, contract, direction, quantity, premium, multiplier, snapshotStale, snapshotAt, upfront, verifiedCurrency, verifiedExpiry }) => <fieldset key={id}>
         <legend>{contract.symbol} · {contract.side.toUpperCase()} · {contract.strike} · {contract.expiration ?? tr("Échéance inconnue", "Unknown expiry")}</legend>
-        <p>{tr("Marché observé", "Observed market")}: Bid {contract.bid ?? "N/D"} · Ask {contract.ask ?? "N/D"} · {contract.source}{contract.delayed || snapshotStale ? ` · ${tr("différé ou périmé", "delayed or stale")}` : ""}{contract.market === "commodities" ? ` · ${tr("fraîcheur de cotation à confirmer", "quote freshness unconfirmed")}` : ""}</p>
+        <p>{contract.bid == null && contract.ask == null ? tr("Cotations indisponibles", "Quotes unavailable") : tr("Marché observé", "Observed market")}: Bid {contract.bid ?? "N/D"} · Ask {contract.ask ?? "N/D"} · {contract.source}{contract.delayed || snapshotStale ? ` · ${tr("différé ou périmé", "delayed or stale")}` : ""}{contract.market === "commodities" ? ` · ${tr("fraîcheur de cotation à confirmer", "quote freshness unconfirmed")}` : ""}</p>
         {snapshotAt ? <p>{tr("Instantané récupéré", "Snapshot retrieved")}: {snapshotAt}</p> : null}
+        {verifiedCurrency && verifiedExpiry ? <p>{tr("Position enregistrée", "Saved position")}: {verifiedCurrency} · {verifiedExpiry}</p> : null}
         <div className="op-strategy-fields">
           <label>{tr("Sens", "Direction")}<select value={direction} onChange={(event) => updateLeg(id, { direction: event.target.value as "long" | "short" })}><option value="long">{tr("Achat", "Buy")}</option><option value="short">{tr("Vente", "Sell")}</option></select></label>
           <label>{tr("Quantité", "Quantity")}<input required type="number" min="1" max="10000" step="1" value={quantity} onChange={(event) => updateLeg(id, { quantity: event.target.value })} /></label>
