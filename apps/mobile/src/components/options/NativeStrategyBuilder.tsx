@@ -121,7 +121,8 @@ export function NativeStrategyBuilder({ legs, setLegs }: {
       <Text style={styles.heading}>{index + 1}. {leg.contract.symbol} · {leg.contract.side.toUpperCase()} {leg.contract.strike} · {leg.contract.expiration ?? "N/D"}</Text>
       <Text style={styles.copy}>{leg.contract.contract ?? leg.contract.underlying} · {leg.contract.source}</Text>
       <Button label={leg.direction === "long" ? pick("Achat (modifier)", "Long (change)") : pick("Vente (modifier)", "Short (change)")}
-        accessibilityLabel={pick(`Changer le sens de la jambe ${index + 1}`, `Change leg ${index + 1} direction`)}
+        accessibilityLabel={pick(`Jambe ${index + 1} : ${leg.direction === "long" ? "achat" : "vente"}, modifier`,
+          `Leg ${index + 1}: ${leg.direction === "long" ? "long" : "short"}, change`)}
         variant="secondary" onPress={() => update(leg.id, { direction: leg.direction === "long" ? "short" : "long" })} />
       <StrategyField label={pick(`Quantité jambe ${index + 1}`, `Leg ${index + 1} quantity`)} value={leg.quantity}
         keyboardType="numeric" onChangeText={(quantity) => update(leg.id, { quantity })} />

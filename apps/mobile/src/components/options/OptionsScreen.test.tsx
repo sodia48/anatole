@@ -111,7 +111,8 @@ test("native strategy builder validates specifications and compares two hypothet
   payoff.mockResolvedValueOnce({ currency: "CAD", theoretical_debit: "-100", minimum_profit_loss: "-19900",
     maximum_profit_loss: null, loss_unbounded: false, gain_unbounded: true,
     break_evens: [{ lower: "99.5", upper: "99.5" }], points: [{ price: "100", profit_loss: "100" }] });
-  await fireEvent.press(view.getByLabelText("Changer le sens de la jambe 2"));
+  await fireEvent.press(view.getByLabelText("Jambe 2 : achat, modifier"));
+  expect(view.getByLabelText("Jambe 2 : vente, modifier")).toBeTruthy();
   await fireEvent.changeText(view.getByLabelText("Quantité jambe 2"), "2");
   await fireEvent.changeText(view.getByLabelText("Prix maximal du sous-jacent"), "130");
   await fireEvent.press(view.getByLabelText("Simuler à l'échéance"));
