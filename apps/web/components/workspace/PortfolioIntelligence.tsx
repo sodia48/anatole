@@ -17,7 +17,7 @@ import type {
   PortfolioStressTest,
 } from "@/lib/types";
 
-import styles from "./Workspace.module.css";
+import "./Workspace.css";
 
 type IntelligenceTab =
   | "performance"
@@ -98,7 +98,7 @@ function coverageText(
 
 function toneClass(value: number | null | undefined): string {
   if (value == null) return "";
-  return value > 0.001 ? styles.positive : value < -0.001 ? styles.negative : "";
+  return value > 0.001 ? "anatole-ws_positive__" : value < -0.001 ? "anatole-ws_negative__" : "";
 }
 
 function PerformanceView({
@@ -109,11 +109,11 @@ function PerformanceView({
   language: AnatoleLanguage;
 }) {
   return (
-    <div className={styles.intelligenceHorizonGrid}>
+    <div className={"anatole-ws_intelligenceHorizonGrid__"}>
       {HORIZONS.map((horizon) => {
         const item = items.find((candidate) => candidate.horizon === horizon);
         return (
-          <article className={styles.intelligenceMetricCard} key={horizon}>
+          <article className={"anatole-ws_intelligenceMetricCard__"} key={horizon}>
             <span>{horizonLabel(horizon, language)}</span>
             <strong className={toneClass(item?.return_percent)}>
               {signedPercent(item?.return_percent)}
@@ -150,12 +150,12 @@ function ContributionView({
   );
 
   return (
-    <div className={styles.intelligenceStack}>
-      <div className={styles.intelligenceSubtabs}>
+    <div className={"anatole-ws_intelligenceStack__"}>
+      <div className={"anatole-ws_intelligenceSubtabs__"}>
         {HORIZONS.map((item) => (
           <button
             aria-pressed={horizon === item}
-            className={horizon === item ? styles.intelligenceSubtabActive : styles.intelligenceSubtab}
+            className={horizon === item ? "anatole-ws_intelligenceSubtabActive__" : "anatole-ws_intelligenceSubtab__"}
             key={item}
             onClick={() => setHorizon(item)}
             type="button"
@@ -165,7 +165,7 @@ function ContributionView({
         ))}
       </div>
 
-      <div className={styles.intelligenceMeta}>
+      <div className={"anatole-ws_intelligenceMeta__"}>
         <strong>
           {horizon === "1d"
             ? pick(language, "Contribution observée de la séance", "Observed session contribution")
@@ -179,14 +179,14 @@ function ContributionView({
       </div>
 
       {selected?.items.length ? (
-        <div className={styles.contributionList}>
+        <div className={"anatole-ws_contributionList__"}>
           {selected.items.map((item) => (
-            <div className={styles.contributionItem} key={item.symbol}>
+            <div className={"anatole-ws_contributionItem__"} key={item.symbol}>
               <strong>{item.symbol}</strong>
               <div>
-                <span className={styles.contributionTrack}>
+                <span className={"anatole-ws_contributionTrack__"}>
                   <i
-                    className={item.contribution_percent >= 0 ? styles.contributionPositive : styles.contributionNegative}
+                    className={item.contribution_percent >= 0 ? "anatole-ws_contributionPositive__" : "anatole-ws_contributionNegative__"}
                     style={{ width: `${Math.max(4, Math.abs(item.contribution_percent) / maxContribution * 100)}%` }}
                   />
                 </span>
@@ -203,7 +203,7 @@ function ContributionView({
           ))}
         </div>
       ) : (
-        <div className={styles.notice}>
+        <div className={"anatole-ws_notice__"}>
           {pick(
             language,
             "Couverture insuffisante pour calculer les contributions sur cet horizon.",
@@ -226,24 +226,24 @@ function RiskView({
   const rows = riskReading(snapshot, language);
 
   return (
-    <div className={styles.intelligenceStack}>
-      <div className={styles.intelligenceSummaryGrid}>
-        <div className={styles.intelligenceSummaryMetric}>
+    <div className={"anatole-ws_intelligenceStack__"}>
+      <div className={"anatole-ws_intelligenceSummaryGrid__"}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Couverture historique", "History coverage")}</span>
           <strong>{risk ? `${risk.history_coverage_percent.toFixed(0)} %` : "N/D"}</strong>
           <small>{risk ? `${risk.history_observations} ${pick(language, "observations", "observations")}` : "—"}</small>
         </div>
-        <div className={styles.intelligenceSummaryMetric}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Plus grande position", "Largest position")}</span>
           <strong>{risk?.top_position_percent == null ? "N/D" : `${risk.top_position_percent.toFixed(1)} %`}</strong>
           <small>{snapshot.positions[0]?.symbol ?? "—"}</small>
         </div>
-        <div className={styles.intelligenceSummaryMetric}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>Top 3</span>
           <strong>{risk?.top_three_percent == null ? "N/D" : `${risk.top_three_percent.toFixed(1)} %`}</strong>
           <small>{pick(language, "Concentration", "Concentration")}</small>
         </div>
-        <div className={styles.intelligenceSummaryMetric}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Corrélation moyenne", "Average correlation")}</span>
           <strong>{number(snapshot.correlation?.average_correlation, 2)}</strong>
           <small>{pick(language, "Rendements quotidiens", "Daily returns")}</small>
@@ -251,16 +251,16 @@ function RiskView({
       </div>
 
       {rows.length ? (
-        <div className={styles.riskReadingList}>
+        <div className={"anatole-ws_riskReadingList__"}>
           {rows.map((row) => (
-            <div className={styles.riskReadingItem} key={row}>
+            <div className={"anatole-ws_riskReadingItem__"} key={row}>
               <span />
               <p>{row}</p>
             </div>
           ))}
         </div>
       ) : (
-        <div className={styles.notice}>
+        <div className={"anatole-ws_notice__"}>
           {pick(
             language,
             "La lecture détaillée du risque sera disponible lorsque la couverture historique sera suffisante.",
@@ -282,7 +282,7 @@ function CorrelationView({
   const correlation = snapshot.correlation;
   if (!correlation?.symbols.length) {
     return (
-      <div className={styles.notice}>
+      <div className={"anatole-ws_notice__"}>
         {pick(
           language,
           "Corrélations indisponibles : au moins 40 observations partagées sont requises.",
@@ -296,27 +296,27 @@ function CorrelationView({
   const indexBySymbol = new Map(correlation.symbols.map((symbol, index) => [symbol, index]));
 
   return (
-    <div className={styles.intelligenceStack}>
-      <div className={styles.intelligenceSummaryGrid}>
-        <div className={styles.intelligenceSummaryMetric}>
+    <div className={"anatole-ws_intelligenceStack__"}>
+      <div className={"anatole-ws_intelligenceSummaryGrid__"}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Moyenne", "Average")}</span>
           <strong>{number(correlation.average_correlation, 2)}</strong>
           <small>{pick(language, "Corrélation du portefeuille", "Portfolio correlation")}</small>
         </div>
-        <div className={styles.intelligenceSummaryMetric}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Paire la plus corrélée", "Highest pair")}</span>
           <strong>{correlation.highest_pair ? `${correlation.highest_pair[0]} / ${correlation.highest_pair[1]}` : "N/D"}</strong>
           <small>{correlation.highest_pair ? number(correlation.highest_pair[2], 2) : "—"}</small>
         </div>
-        <div className={styles.intelligenceSummaryMetric}>
+        <div className={"anatole-ws_intelligenceSummaryMetric__"}>
           <span>{pick(language, "Paire la moins corrélée", "Lowest pair")}</span>
           <strong>{correlation.lowest_pair ? `${correlation.lowest_pair[0]} / ${correlation.lowest_pair[1]}` : "N/D"}</strong>
           <small>{correlation.lowest_pair ? number(correlation.lowest_pair[2], 2) : "—"}</small>
         </div>
       </div>
 
-      <div className={styles.correlationWrap}>
-        <table className={styles.correlationTable}>
+      <div className={"anatole-ws_correlationWrap__"}>
+        <table className={"anatole-ws_correlationTable__"}>
           <thead>
             <tr>
               <th />
@@ -336,12 +336,12 @@ function CorrelationView({
                       <td
                         className={
                           value == null
-                            ? styles.correlationUnavailable
+                            ? "anatole-ws_correlationUnavailable__"
                             : value >= 0.5
-                              ? styles.correlationHigh
+                              ? "anatole-ws_correlationHigh__"
                               : value <= 0
-                                ? styles.correlationLow
-                                : styles.correlationMid
+                                ? "anatole-ws_correlationLow__"
+                                : "anatole-ws_correlationMid__"
                         }
                         key={columnSymbol}
                         title={`${rowSymbol} / ${columnSymbol}`}
@@ -358,7 +358,7 @@ function CorrelationView({
       </div>
 
       {correlation.symbols.length > symbols.length ? (
-        <small className={styles.intelligenceFootnote}>
+        <small className={"anatole-ws_intelligenceFootnote__"}>
           {pick(
             language,
             `Matrice limitée aux ${symbols.length} principales positions à l’écran pour préserver la fluidité.`,
@@ -378,9 +378,9 @@ function StressView({
   language: AnatoleLanguage;
 }) {
   return (
-    <div className={styles.stressGrid}>
+    <div className={"anatole-ws_stressGrid__"}>
       {items.length ? items.map((item) => (
-        <article className={styles.stressCard} key={item.key}>
+        <article className={"anatole-ws_stressCard__"} key={item.key}>
           <span>{stressLabel(item, language)}</span>
           <strong className={toneClass(item.estimated_portfolio_change_percent)}>
             {signedPercent(item.estimated_portfolio_change_percent)}
@@ -395,7 +395,7 @@ function StressView({
           </p>
         </article>
       )) : (
-        <div className={styles.notice}>
+        <div className={"anatole-ws_notice__"}>
           {pick(language, "Aucun stress test exploitable pour le moment.", "No usable stress test is available yet.")}
         </div>
       )}
@@ -443,8 +443,8 @@ export function PortfolioIntelligence({
   ];
 
   return (
-    <section className={`panel ${styles.panel} ${styles.intelligencePanel}`} data-testid="portfolio-intelligence">
-      <div className={styles.intelligenceHeader}>
+    <section className={`panel ${"anatole-ws_panel__"} ${"anatole-ws_intelligencePanel__"}`} data-testid="portfolio-intelligence">
+      <div className={"anatole-ws_intelligenceHeader__"}>
         <div>
           <span className="eyebrow">PORTFOLIO INTELLIGENCE</span>
           <h2>{pick(language, "Intelligence du portefeuille", "Portfolio intelligence")}</h2>
@@ -458,7 +458,7 @@ export function PortfolioIntelligence({
         </div>
       </div>
 
-      <div className={styles.intelligenceQuickStrip}>
+      <div className={"anatole-ws_intelligenceQuickStrip__"}>
         {summary.map(([label, value]) => (
           <div key={label}>
             <span>{label}</span>
@@ -467,13 +467,13 @@ export function PortfolioIntelligence({
         ))}
       </div>
 
-      <div className={styles.intelligenceTabs} role="tablist" aria-label={pick(language, "Vues d’intelligence du portefeuille", "Portfolio intelligence views")}>
+      <div className={"anatole-ws_intelligenceTabs__"} role="tablist" aria-label={pick(language, "Vues d’intelligence du portefeuille", "Portfolio intelligence views")}>
         {tabs.map((item) => {
           const Icon = item.icon;
           return (
             <button
               aria-selected={tab === item.id}
-              className={tab === item.id ? styles.intelligenceTabActive : styles.intelligenceTab}
+              className={tab === item.id ? "anatole-ws_intelligenceTabActive__" : "anatole-ws_intelligenceTab__"}
               key={item.id}
               onClick={() => setTab(item.id)}
               role="tab"
@@ -486,7 +486,7 @@ export function PortfolioIntelligence({
         })}
       </div>
 
-      <div className={styles.intelligenceBody} role="tabpanel">
+      <div className={"anatole-ws_intelligenceBody__"} role="tabpanel">
         {tab === "performance" ? (
           <PerformanceView items={performance} language={language} />
         ) : tab === "contribution" ? (
@@ -501,7 +501,7 @@ export function PortfolioIntelligence({
       </div>
 
       {snapshot.methodology ? (
-        <small className={styles.intelligenceFootnote}>
+        <small className={"anatole-ws_intelligenceFootnote__"}>
           {language === "fr"
             ? snapshot.methodology
             : "Multi-day horizons reconstruct current positions using constant quantities. Correlations and sensitivities use only the market history actually available."}

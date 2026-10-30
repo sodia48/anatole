@@ -12,6 +12,7 @@ type Props = {
   stale: boolean;
   language: "fr" | "en";
   display: (value: number | null | undefined, digits?: number) => string;
+  onAddStrategy: (contract: OptionContract) => void;
 };
 
 const CHAIN_PREFERENCES_KEY = "anatole.options.chain.v1";
@@ -21,7 +22,7 @@ function saveChainPreferences(advanced: boolean, filters: Record<string, string>
   try { window.localStorage.setItem(CHAIN_PREFERENCES_KEY, JSON.stringify({ advanced, filters })); } catch { /* Storage can be unavailable. */ }
 }
 
-export function PremiumChain({ contracts, underlying, stale, language, display }: Props) {
+export function PremiumChain({ contracts, underlying, stale, language, display, onAddStrategy }: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [selected, setSelected] = useState<OptionContract | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
@@ -142,6 +143,7 @@ export function PremiumChain({ contracts, underlying, stale, language, display }
       <p>{pick(language, "Échéance", "Expiry")}: {detail.expiration ?? "N/D"} · {detail.source}
         {detail.delayed || stale ? ` · ${pick(language, "différé ou périmé", "delayed or stale")}` : ""}</p>
       <p>Bid {display(detail.bid)} · Ask {display(detail.ask)} · IV {display(detail.implied_volatility, 1)} % · Δ {display(detail.delta, 3)} · Γ {display(detail.gamma, 4)} · Θ {display(detail.theta, 3)} · Vega {display(detail.vega, 3)}</p>
+      <button type="button" onClick={() => onAddStrategy(detail)}>{pick(language, "Ajouter à la stratégie", "Add to strategy")}</button>
     </section> : null}
   </div>;
 }
