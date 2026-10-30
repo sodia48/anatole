@@ -85,6 +85,13 @@ async def test_options_questions_are_local_education_without_portfolio_or_provid
     assert volatility.intent == "options_education"
     assert "diffère de la volatilité historique" in volatility.answer
 
+    etf_option = await unit.answer(UnifiedAssistantRequest(
+        message="Compare les options de l'ETF XIC et sa performance historique", context=context,
+        conversation_id=response.conversation_id,
+    ))
+    assert etf_option.intent == "options_education"
+    assert etf_option.synthesis_provider is None
+
 
 def test_options_assistant_http_returns_educational_answer():
     with TestClient(app) as client:

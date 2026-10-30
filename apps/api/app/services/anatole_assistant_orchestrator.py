@@ -663,7 +663,7 @@ class AnatoleAssistantOrchestrator:
         symbols = _clean_symbols(request.message, context, state.symbols)
         skill, mixed_macro = _select_skill(request.message, context, symbols, state.skill)
         etf_query = history_query(request.message, context, state.etf_query if state.skill in ETF_HISTORY_SKILLS else None)
-        if etf_query is not None and skill != "guardrail":
+        if etf_query is not None and skill not in {"guardrail", "options_education"}:
             skill, mixed_macro = etf_query.skill, False
             symbols = list(etf_query.symbols)
         logger.info("assistant_skill_selected skill=%s", skill)
