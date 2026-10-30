@@ -61,4 +61,13 @@ test("builds and compares hypothetical spreads using the payoff API", async ({ p
   await expect(builder.locator(".op-scenario").nth(2)).toContainText("illimitée");
   await builder.getByRole("button", { name: "Retirer", exact: true }).last().click();
   await expect(builder.getByLabel("Quantité")).toHaveCount(1);
+  await page.route("**/api/anatole/api/v1/options/chain?**", (route) => route.fulfill({ json: {
+    market, symbol: "TD", provider_symbol: "TD", name: "Synthetic TD", category: "Banks", exchange: "TEST",
+    underlying_price: null, requested_expiration: null, expirations: [], contracts: [],
+    analytics: null, source_statuses: [], generated_at: "2026-10-27T12:00:00Z", refresh_after_seconds: 3600, stale: true,
+  } }));
+  await page.evaluate(() => window.history.pushState(null, "", "/options?symbol=TD"));
+  await expect(page.getByRole("heading", { name: "TD · Synthetic TD" })).toBeVisible();
+  await expect(builder.getByLabel("Prime hypothétique par unité").first()).toHaveValue("3");
+  await expect(builder.locator(".op-scenario")).toHaveCount(3);
 });

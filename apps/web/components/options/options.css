@@ -41,6 +41,9 @@
   cursor: not-allowed;
 }
 
+.op-integrations { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 16px 18px; }
+.op-integrations p { flex-basis: 100%; margin: 0; color: var(--muted); }
+
 .op-controls {
   display: grid;
   gap: 16px;

@@ -2,9 +2,11 @@
 
 import { RefreshCw, Search } from "@/components/layout/AppIcons";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
+import { useAssistantContext } from "@/components/assistant/AssistantContextProvider";
 import { pick } from "@/lib/i18n";
 import {
   getOptionChain,
@@ -80,20 +82,24 @@ function Status({ item }: { item: OptionSourceStatus }) {
 }
 
 export function OptionsClient() {
+  const rawSymbol = useSearchParams().get("symbol");
   const { preferences } = usePreferences();
+  const { openAssistant } = useAssistantContext();
   const language = preferences.language;
+  const requestedSymbol = rawSymbol?.trim().toUpperCase().replace(/\.TO$/, "");
+  const initialSymbol = requestedSymbol === undefined ? "RY" : /^[A-Z0-9.^-]{1,16}$/.test(requestedSymbol) ? requestedSymbol : "";
   const [market, setMarket] = useState<OptionMarket>("tsx");
   const [universe, setUniverse] = useState<OptionUniverseSnapshot | null>(null);
   const [chain, setChain] = useState<OptionChainSnapshot | null>(null);
-  const [symbol, setSymbol] = useState("RY");
-  const [draftSymbol, setDraftSymbol] = useState("RY");
+  const [symbol, setSymbol] = useState(initialSymbol);
+  const [draftSymbol, setDraftSymbol] = useState(initialSymbol);
   const [expiration, setExpiration] = useState("");
   const [side, setSide] = useState<SideFilter>("both");
   const [category, setCategory] = useState("all");
   const [loadingUniverse, setLoadingUniverse] = useState(true);
-  const [loadingChain, setLoadingChain] = useState(true);
+  const [loadingChain, setLoadingChain] = useState(Boolean(initialSymbol));
   const [universeError, setUniverseError] = useState<string | null>(null);
-  const [chainError, setChainError] = useState<string | null>(null);
+  const [chainError, setChainError] = useState<string | null>(initialSymbol ? null : pick(language, "Symbole invalide.", "Invalid symbol."));
   const [refreshKey, setRefreshKey] = useState(0);
   const [legs, setLegs] = useState<StrategyLeg[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
@@ -101,7 +107,20 @@ export function OptionsClient() {
   const [showScreener, setShowScreener] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [trackedContract, setTrackedContract] = useState<OptionContract | null>(null);
+  const [appliedQuery, setAppliedQuery] = useState(rawSymbol);
   const nextLegId = useRef(0);
+
+  if (appliedQuery !== rawSymbol) {
+    setAppliedQuery(rawSymbol);
+    setSymbol(initialSymbol);
+    setDraftSymbol(initialSymbol);
+    if (market !== "tsx") { setMarket("tsx"); setLoadingUniverse(true); setCategory("all"); }
+    setExpiration("");
+    setChain(null);
+    setTrackedContract(null);
+    setLoadingChain(Boolean(initialSymbol));
+    setChainError(initialSymbol ? null : pick(language, "Symbole invalide.", "Invalid symbol."));
+  }
 
   function addStrategyLeg(contract: OptionContract) {
     if (legs.length >= 20) {
@@ -144,6 +163,7 @@ export function OptionsClient() {
   }, [language, market, refreshKey]);
 
   useEffect(() => {
+    if (!symbol) return;
     const controller = new AbortController();
     settleRequest(getOptionChain(market, symbol, expiration || undefined, controller.signal), controller,
       setChain, setChainError, setLoadingChain, pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."));
@@ -245,6 +265,13 @@ export function OptionsClient() {
           {pick(language, "Positions d'options", "Options positions")}
         </button>
       </header>
+
+      <section className="panel op-integrations" aria-label={pick(language, "Assistant et autres espaces", "Assistant and other spaces")}>
+        {chain?.market === "tsx" && /^[A-Z^][A-Z0-9.^-]{0,14}$/.test(chain.symbol) ? <a href={`/focus/${chain.symbol}`}>{pick(language, `Voir ${chain.symbol} dans Focus`, `View ${chain.symbol} in Focus`)}</a> : null}
+        <a href="/portefeuille">{pick(language, "Ouvrir Portefeuille", "Open Portfolio")}</a>
+        {chain?.market === "tsx" && !loadingChain && chain.symbol === symbol && <button type="button" className="op-vol-toggle" onClick={() => openAssistant({ symbol: chain.symbol, symbols: [chain.symbol], metadata: { options_market: chain.market, options_expiration: chain.requested_expiration ?? "" } })}>{pick(language, `Interroger Anatole sur la chaîne ${chain.symbol}`, `Ask Anatole about the ${chain.symbol} chain`)}</button>}
+        <p>{pick(language, "La chaîne sélectionnée peut être rechargée par l'assistant ; les positions et scénarios locaux ne sont pas transmis. Le suivi local n'est pas synchronisé avec Portefeuille.", "The assistant can reload the selected chain; local positions and scenarios are not sent. Local tracking is not synced with Portfolio.")}</p>
+      </section>
 
       <section className="panel op-controls">
         <div className={"op-marketTabs"}>

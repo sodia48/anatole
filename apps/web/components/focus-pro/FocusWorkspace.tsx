@@ -449,6 +449,7 @@ export function FocusWorkspace({ initialSnapshot, embedded = false, initialFunda
               <button className="fp-button" type="button" onClick={() => { setFundamentalView("financials"); setSection("fundamentals"); }}>{pick(language, "Résultats financiers", "Financial results")}</button>
               <button className="fp-button" type="button" onClick={() => { setFundamentalView("capital"); setSection("fundamentals"); }}>{pick(language, "Analystes et capital", "Analysts and capital")}</button>
               <button className="fp-button" type="button" onClick={() => { setFundamentalView("peers"); setSection("fundamentals"); }}>{pick(language, "Comparer", "Compare")}</button>
+              <Link className="fp-button" href={`/options?symbol=${encodeURIComponent(ticker)}`}>{pick(language, "Voir les options canadiennes", "View Canadian options")}</Link>
             </nav>
           ) : null}
           {section === "overview" ? (

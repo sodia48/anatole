@@ -31,6 +31,7 @@ from app.schemas.fundamental_scenarios import ScenarioRequest
 from app.services.fundamental_scenarios import simulate_financial_scenarios
 from app.services.fundamental_assistant import answer_fundamental_question, fundamental_question_kind, FOCUS_VIEW
 from app.services.market_data import market_data_service
+from app.services.options import options_service
 from app.services.stock_research import build_stock_research_bundle, format_stock_research
 from app.services.portfolio import portfolio_service
 from app.services.portfolio_research import (
@@ -156,6 +157,9 @@ def _select_skill(message: str, context: AssistantContext, symbols: list[str], p
     explicit_market = any(cue in text for cue in _MARKET_CUES)
     explicit_news = any(cue in text for cue in _NEWS_CUES)
     explicit_instrument = bool(symbols) and (bool(_explicit_symbols(message)) or bool(re.search(r"\b(?:analyse|cours|prix|etf|ticker|action|titre|holdings)\b", text)))
+    option_cue = bool(re.search(r"\b(?:options?|call|put|strike|delta|gamma|theta|vega|greeks?|prime|échéance|expiration|cha[iî]ne|chain|volatilité implicite|implied volatility)\b", text))
+    if context.surface == "options" and (option_cue or portfolio or not (explicit_government or explicit_market or explicit_news or explicit_instrument)):
+        return "options_education", False
     government = explicit_government or (context.surface == "canada360" or previous == "canada360") and not (portfolio or explicit_instrument or explicit_market or explicit_news)
     mixed_macro = (government and bool(symbols) and any(cue in text for cue in _MACRO_CUES)
                    or (portfolio or previous == "portfolio_analysis")
@@ -660,7 +664,7 @@ class AnatoleAssistantOrchestrator:
         symbols = _clean_symbols(request.message, context, state.symbols)
         skill, mixed_macro = _select_skill(request.message, context, symbols, state.skill)
         etf_query = history_query(request.message, context, state.etf_query if state.skill in ETF_HISTORY_SKILLS else None)
-        if etf_query is not None and skill != "guardrail":
+        if etf_query is not None and skill not in {"guardrail", "options_education"}:
             skill, mixed_macro = etf_query.skill, False
             symbols = list(etf_query.symbols)
         logger.info("assistant_skill_selected skill=%s", skill)
@@ -682,6 +686,79 @@ class AnatoleAssistantOrchestrator:
             base = await assistant_service._guardrail(AssistantRequest(message=request.message,
                                                                       context_symbol=symbols[0] if symbols else None))
             bundle = _bundle_from_response(skill, base, symbols)
+        elif skill == "options_education":
+            context.portfolio_scope.authorized = False
+            context.portfolio_scope.position_count = 0
+            text = request.message.casefold()
+            if re.search(r"\b(delta|gamma|theta|vega|greeks?)\b", text):
+                fr = "Le delta mesure approximativement la variation du prix d'une option pour une variation d'une unité du sous-jacent. Le gamma décrit la variation du delta ; le theta et le vega décrivent des sensibilités au temps et à la volatilité. Ces sensibilités évoluent et ne garantissent aucun résultat."
+                en = "Delta approximates the change in an option's price for a one-unit underlying move. Gamma describes changes in delta; theta and vega describe sensitivities to time and volatility. These sensitivities change and do not guarantee a result."
+            elif "volatilité implicite" in text or "implied volatility" in text:
+                fr = "La volatilité implicite est un paramètre de modèle déduit d'un prix d'option et d'hypothèses. Elle diffère de la volatilité historique et ne prédit pas à elle seule le mouvement futur."
+                en = "Implied volatility is a model parameter inferred from an option price and assumptions. It differs from historical volatility and does not by itself predict a future move."
+            elif re.search(r"\b(call|put|option|options|prime|strike|échéance|expiration)\b", text):
+                fr = "Un call donne un droit d'achat et un put un droit de vente selon les conditions du contrat. La prime, le strike, l'échéance, le multiplicateur, le règlement et le style d'exercice doivent être vérifiés ; la vente d'options peut exposer à des pertes importantes."
+                en = "A call gives a right to buy and a put a right to sell under the contract's terms. Verify the premium, strike, expiry, multiplier, settlement and exercise style; writing options can expose the seller to substantial losses."
+            else:
+                fr = "Je peux expliquer les caractéristiques et risques généraux des options. Le constructeur permet de comparer des scénarios théoriques à l'échéance."
+                en = "I can explain general option characteristics and risks. The builder can compare theoretical expiry scenarios."
+            limitation = ("Je ne lis pas vos positions ni la chaîne ou les scénarios dans cette conversation ; aucune cotation ou recommandation n'est déduite."
+                          if context.language == "fr" else
+                          "I do not read your positions, chain or scenarios in this conversation; no quote or recommendation is inferred.")
+            base = self._simple(skill, "Options : explication générale" if context.language == "fr" else "Options: general explanation",
+                                (fr if context.language == "fr" else en) + "\n\n" + limitation)
+            bundle = _bundle_from_response(skill, base, [])
+            bundle.limitations.append(limitation)
+            # A chain is only requested after the user explicitly opens the assistant
+            # with that context. Position and strategy data are never used here.
+            explicit_symbols = _explicit_symbols(request.message)
+            chain_requested = bool(re.search(r"\b(?:cha[iî]ne|chain)\b", text))
+            symbol = context.symbol
+            market = context.metadata.get("options_market")
+            expiration = context.metadata.get("options_expiration") or None
+            if (chain_requested and context.route == "/options" and market == "tsx"
+                    and symbol and re.fullmatch(r"[A-Z0-9.^-]{1,16}", symbol)
+                    and all(item == symbol for item in explicit_symbols)):
+                try:
+                    snapshot = await options_service.chain(market=market, symbol=symbol, expiration=expiration)
+                    if snapshot.market != market or snapshot.symbol != symbol or snapshot.requested_expiration != expiration:
+                        raise ValueError("chain identity mismatch")
+                    sources = sorted({item.source for item in snapshot.source_statuses if item.status != "unavailable"})
+                    if context.language == "fr":
+                        detail = (f"Chaîne {symbol} : {len(snapshot.contracts)} contrats dans l'instantané"
+                                  + (f", échéance demandée {expiration}" if expiration else "")
+                                  + f". Instantané généré le {snapshot.generated_at.isoformat()} ; "
+                                  + ("cache périmé" if snapshot.stale else "cotations susceptibles d'être différées") + ". "
+                                  + ("Sources : " + ", ".join(sources) + "." if sources else "Source de cotation indisponible."))
+                        limitation = "La chaîne est rechargée au moment de la question ; son horodatage de génération n'est pas celui de chaque cotation. Je ne lis ni positions ni scénarios."
+                    else:
+                        detail = (f"{symbol} chain: {len(snapshot.contracts)} contracts in the snapshot"
+                                  + (f", requested expiry {expiration}" if expiration else "")
+                                  + f". Snapshot generated at {snapshot.generated_at.isoformat()}; "
+                                  + ("stale cache" if snapshot.stale else "quotes may be delayed") + ". "
+                                  + ("Sources: " + ", ".join(sources) + "." if sources else "Quote source unavailable."))
+                        limitation = "The chain is reloaded when asked; its generation time is not the observation time of each quote. I do not read positions or scenarios."
+                    base.answer = detail + "\n\n" + limitation
+                    base.title = "Chaîne d'options" if context.language == "fr" else "Options chain"
+                    base.sources = [AssistantSource(label=source, detail="", status="fallback" if snapshot.stale else "delayed") for source in sources]
+                    bundle = _bundle_from_response(skill, base, [symbol])
+                    for source in bundle.sources:
+                        source.type = "options_chain"
+                        source.timestamp = None  # Snapshot generation is not quote observation time.
+                        if snapshot.stale:
+                            source.freshness = "stale"
+                    if snapshot.stale:
+                        bundle.freshness = "stale"
+                    bundle.limitations.append(limitation)
+                    if snapshot.stale:
+                        bundle.limitations.append("Cache périmé" if context.language == "fr" else "Stale cache")
+                    if not sources:
+                        bundle.missing_data.append("Source de cotation indisponible" if context.language == "fr" else "Quote source unavailable")
+                except Exception:
+                    logger.info("assistant_options_chain_unavailable")
+                    base.answer = ("La chaîne sélectionnée est temporairement indisponible. Aucune cotation n'est déduite."
+                                   if context.language == "fr" else "The selected chain is temporarily unavailable. No quote is inferred.")
+                    bundle.missing_data.append("Chaîne d'options indisponible" if context.language == "fr" else "Options chain unavailable")
         elif skill == "stock_analysis" and symbols:
             raw_scenario = context.metadata.get("scenario_request")
             base, bundle = await self._stock(symbols[0], context.language,
@@ -838,7 +915,7 @@ class AnatoleAssistantOrchestrator:
         bundle.navigation_actions.extend(actions)
         base.intent = skill
         synthesis = None
-        if skill not in {"canada360", "guardrail"} and not scenario_context_applied and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
+        if skill not in {"canada360", "guardrail", "options_education"} and not scenario_context_applied and not (skill == "stock_analysis" and fundamental_question_kind(request.message)):
             macro_suffix = ("\n\n## Contexte macro Canada 360" +
                             base.answer.split("\n\n## Contexte macro Canada 360", 1)[1]
                             if mixed_macro and skill == "portfolio_analysis"
