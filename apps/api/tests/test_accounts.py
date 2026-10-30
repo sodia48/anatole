@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,6 +37,42 @@ def register(client: TestClient, email: str = "beta@example.com") -> dict:
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_option_positions_account_isolation_conflicts_export_and_delete(account_client: TestClient):
+    first = register(account_client, "options-first@example.com")
+    second = register(account_client, "options-second@example.com")
+    first_headers = {**auth(first["token"]), "X-Anatole-Account": first["user"]["id"]}
+    second_headers = {**auth(second["token"]), "X-Anatole-Account": second["user"]["id"]}
+    position = {"id": "7a646545-04ba-443a-9f92-d9a51d260066", "symbol": "RY", "underlying": "RY", "market": "tsx", "contract": None, "side": "call", "strike": 120, "expiration": "2027-06-18", "expiry_at": "2027-06-18T16:00:00-04:00", "direction": "long", "quantity": 2, "multiplier": 100, "premium": 3, "currency": "CAD", "reminder_days": 7}
+    payload = {"expected_account_id": first["user"]["id"], "expected_revision": 0, "positions": [position]}
+    assert account_client.get("/api/v1/account/option-positions", headers=first_headers).json() == {"revision": 0, "positions": []}
+    saved = account_client.put("/api/v1/account/option-positions", headers=first_headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["revision"] == 1
+    assert account_client.get("/api/v1/account/option-positions", headers=second_headers).json() == {"revision": 0, "positions": []}
+    assert account_client.get("/api/v1/account/option-positions", headers={**auth(second["token"]), "X-Anatole-Account": first["user"]["id"]}).status_code == 409
+    assert account_client.put("/api/v1/account/option-positions", headers=second_headers, json=payload).status_code == 409
+    assert account_client.put("/api/v1/account/option-positions", headers=first_headers, json=payload).status_code == 409
+    assert account_client.get("/api/v1/account/export", headers=first_headers).json()["option_positions"]["positions"][0]["symbol"] == "RY"
+    bad = {**payload, "expected_revision": 1, "positions": [position, position]}
+    assert account_client.put("/api/v1/account/option-positions", headers=first_headers, json=bad).status_code == 422
+    for invalid in (
+        {**position, "expiry_at": "2027-06-19T16:00:00-04:00"},
+        {**position, "expiry_at": "2027-06-18T16:00:00"},
+        {**position, "quantity": 0},
+        {**position, "market": "commodities", "contract": None},
+        {**position, "unexpected": "secret"},
+    ):
+        assert account_client.put("/api/v1/account/option-positions", headers=first_headers, json={**payload, "expected_revision": 1, "positions": [invalid]}).status_code == 422
+    concurrent = {**payload, "expected_revision": 1}
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        replies = list(executor.map(lambda _: account_client.put("/api/v1/account/option-positions", headers=first_headers, json=concurrent).status_code, range(2)))
+    assert sorted(replies) == [200, 409]
+    assert account_client.request("DELETE", "/api/v1/account/delete", headers=first_headers, json={"password": "Anatole2026!", "confirmation": "SUPPRIMER"}).status_code == 204
+    service = account_routes.account_service
+    with service.engine.connect() as connection:
+        assert connection.execute(service.option_positions.select()).first() is None
 
 
 def test_sqlite_account_store_waits_for_concurrent_writes(tmp_path: Path):

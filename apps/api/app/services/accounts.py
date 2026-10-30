@@ -39,6 +39,7 @@ from app.schemas.accounts import (
     SyncedWorkspaceData,
     WorkspaceSnapshot,
 )
+from app.schemas.option_positions import AccountOptionPositions, AccountOptionPositionsUpdate
 
 
 class AccountAlreadyExistsError(RuntimeError):
@@ -190,6 +191,12 @@ class AccountService:
             Column("revision", String(20), nullable=False),
             Column("payload", Text, nullable=False),
             Column("updated_at", String(40), nullable=False),
+        )
+        self.option_positions = Table(
+            "account_option_positions", self.metadata,
+            Column("user_id", String(36), primary_key=True),
+            Column("revision", Integer, nullable=False),
+            Column("payload", Text, nullable=False),
         )
         self.mobile_devices = Table(
             "mobile_devices",
@@ -614,6 +621,42 @@ class AccountService:
     ) -> tuple[AccountUser, WorkspaceSnapshot] | None:
         return await self.account_status(user_id)
 
+    async def get_option_positions(self, user_id: str) -> AccountOptionPositions:
+        await self.start()
+        return await asyncio.to_thread(self._get_option_positions_sync, user_id)
+
+    def _get_option_positions_sync(self, user_id: str) -> AccountOptionPositions:
+        with self.engine.connect() as connection:
+            row = connection.execute(select(self.option_positions).where(self.option_positions.c.user_id == user_id)).mappings().first()
+            if row is None:
+                return AccountOptionPositions(revision=0)
+            return AccountOptionPositions.model_validate_json(row.payload)
+
+    async def update_option_positions(self, user_id: str, payload: AccountOptionPositionsUpdate) -> AccountOptionPositions:
+        await self.start()
+        return await asyncio.to_thread(self._update_option_positions_sync, user_id, payload)
+
+    def _update_option_positions_sync(self, user_id: str, payload: AccountOptionPositionsUpdate) -> AccountOptionPositions:
+        result = AccountOptionPositions(revision=payload.expected_revision + 1, positions=payload.positions)
+        with self.engine.begin() as connection:
+            # Serialize creation and account deletion, including the first write.
+            user = connection.execute(select(self.users.c.id).where(self.users.c.id == user_id).with_for_update()).first()
+            if user is None:
+                raise InvalidCredentialsError
+            row = connection.execute(select(self.option_positions.c.revision).where(self.option_positions.c.user_id == user_id)).first()
+            current = row.revision if row else 0
+            if current != payload.expected_revision:
+                raise WorkspaceConflictError(current)
+            if row is None:
+                connection.execute(insert(self.option_positions).values(user_id=user_id, revision=result.revision, payload=result.model_dump_json()))
+            else:
+                changed = connection.execute(update(self.option_positions).where(
+                    (self.option_positions.c.user_id == user_id) & (self.option_positions.c.revision == current)
+                ).values(revision=result.revision, payload=result.model_dump_json()))
+                if changed.rowcount != 1:
+                    raise WorkspaceConflictError(current + 1)
+        return result
+
     async def delete_account(
         self,
         *,
@@ -634,7 +677,7 @@ class AccountService:
     ) -> None:
         with self.engine.begin() as connection:
             row = connection.execute(
-                select(self.users).where(self.users.c.id == user_id)
+                select(self.users).where(self.users.c.id == user_id).with_for_update()
             ).mappings().first()
             if row is None or not _password_matches(password, row.password_hash):
                 raise InvalidCredentialsError
@@ -644,6 +687,9 @@ class AccountService:
             for name in ("option_expiry_reminders", "notification_events", "notification_preferences"):
                 if inspector.has_table(name):
                     connection.execute(text(f"DELETE FROM {name} WHERE user_id = :user_id"), {"user_id": user_id})
+            connection.execute(
+                delete(self.option_positions).where(self.option_positions.c.user_id == user_id)
+            )
             connection.execute(
                 delete(self.workspaces).where(self.workspaces.c.user_id == user_id)
             )

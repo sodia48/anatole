@@ -6,8 +6,9 @@ import threading
 import time
 from datetime import UTC, datetime
 from collections import defaultdict, deque
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
@@ -34,6 +35,7 @@ from app.services.accounts import (
 )
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
+from app.schemas.option_positions import AccountOptionPositions, AccountOptionPositionsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,25 @@ async def workspace(user: AccountUser = Depends(current_user)) -> WorkspaceSnaps
     return await account_service.get_workspace(user.id)
 
 
+@router.get("/option-positions", response_model=AccountOptionPositions)
+async def get_option_positions(account_id: UUID = Header(alias="X-Anatole-Account"), user: AccountUser = Depends(current_user)) -> AccountOptionPositions:
+    if str(account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    return await account_service.get_option_positions(user.id)
+
+
+@router.put("/option-positions", response_model=AccountOptionPositions)
+async def update_option_positions(payload: AccountOptionPositionsUpdate, user: AccountUser = Depends(current_user)) -> AccountOptionPositions:
+    if str(payload.expected_account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    try:
+        return await account_service.update_option_positions(user.id, payload)
+    except WorkspaceConflictError as error:
+        raise HTTPException(status_code=409, detail={"message": "Une version plus récente existe sur un autre appareil.", "current_revision": error.current_revision}) from error
+    except InvalidCredentialsError as error:
+        raise HTTPException(status_code=401, detail="Session expirée ou invalide.") from error
+
+
 @router.put(
     "/workspace",
     response_model=WorkspaceSnapshot,
@@ -317,6 +338,7 @@ async def export_account(
         notification_preferences=preferences,
         notifications=feed.items,
         option_expiry_reminders=await notification_service.list_option_reminders(user.id),
+        option_positions=await account_service.get_option_positions(user.id),
     )
 
 
