@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
+from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 NotificationFrequency = Literal["off", "daily", "weekdays", "weekly"]
@@ -16,6 +17,30 @@ NotificationKind = Literal[
     "digest",
     "system",
 ]
+
+
+class OptionExpiryReminderInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_account_id: UUID
+    position_id: UUID
+    underlying: str = Field(min_length=1, max_length=16, pattern=r"^[A-Z0-9.^-]+$")
+    expires_at: datetime
+    reminder_days: int = Field(ge=0, le=30)
+
+    @field_validator("expires_at")
+    @classmethod
+    def zoned_expiry(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("L'échéance doit inclure un fuseau horaire.")
+        return value.astimezone(UTC)
+
+
+class OptionExpiryReminder(BaseModel):
+    position_id: UUID
+    underlying: str
+    expires_at: datetime
+    reminder_days: int
+    triggered_at: datetime | None = None
 
 
 class NotificationPreferences(BaseModel):

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useAccount } from "@/components/providers/AccountProvider";
 import type { OptionChainSnapshot, OptionContract } from "@/lib/options-api";
 import { parseTrackedOptions, validTrackedOption, type TrackedOption } from "./options-positions";
 import "./options-portfolio.css";
@@ -14,6 +15,7 @@ function readPositions(): TrackedOption[] | null {
 }
 
 export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { chain: OptionChainSnapshot | null; selected: OptionContract | null; language: Language; onAnalyze: (position: TrackedOption) => boolean }) {
+  const { user } = useAccount();
   const [positions, setPositions] = useState<TrackedOption[] | null>(() => readPositions());
   const [message, setMessage] = useState("");
   const [analyzed, setAnalyzed] = useState(false);
@@ -38,9 +40,10 @@ export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { cha
 
   return <section id="options-positions" className="panel op-positions" aria-label={tr(language, "Positions d'options", "Options positions")}>
     <h2>{tr(language, "Positions d'options", "Options positions")}</h2>
-    <p>{tr(language, "Suivi manuel enregistré uniquement dans ce navigateur, non synchronisé avec un compte ou un courtier. Les rappels sont visibles ici quand la page est ouverte : aucune notification en arrière-plan.", "Manual tracking saved only in this browser, not synced to an account or broker. Reminders appear here while this page is open: no background notification.")}</p>
+    <p>{tr(language, "Suivi manuel enregistré uniquement dans ce navigateur, non synchronisé avec un compte ou un courtier. Les rappels locaux sont visibles ici quand la page est ouverte : aucune notification en arrière-plan pour ces rappels locaux.", "Manual tracking is saved only in this browser, not synced to an account or broker. Local reminders appear here while this page is open: no background notifications for local reminders.")}</p>
     <p>{tr(language, "Le calcul d'un scénario transmet ses jambes et hypothèses à l'API Anatole.", "Calculating a scenario sends its legs and assumptions to the Anatole API.")}</p>
     <p>{tr(language, "Vérifiez l'identité, la date, le fuseau, le multiplicateur, la devise et la convention de prime auprès d'une source autorisée. Les frais, marges, change, exercice et assignation ne sont pas calculés.", "Verify the identity, date, time zone, multiplier, currency and premium convention with an authorized source. Fees, margin, currency conversion, exercise and assignment are not calculated.")}</p>
+    {user ? <AccountReminders key={user.id} accountId={user.id} positions={positions ?? []} language={language} now={now} /> : <p>{tr(language, "Connectez-vous pour créer des rappels d'échéance sur votre compte.", "Sign in to create account expiry reminders.")}</p>}
     {positions === null ? <p role="alert">{tr(language, "Stockage indisponible ou données non reconnues. Elles ne seront pas écrasées.", "Storage unavailable or data unrecognized. It will not be overwritten.")}</p> : <>
       {selected ? <PositionForm key={JSON.stringify([selected.symbol, selected.market, selected.contract, selected.expiration, selected.side, selected.strike])} selected={selected} language={language} onSave={(position) => save((current) => [...current, position])} /> : <p>{tr(language, "Sélectionnez « Suivre » sur un contrat dans le screener.", "Select “Track” on a contract in the screener.")}</p>}
       {message ? <p role="status">{message}</p> : null}
@@ -66,6 +69,55 @@ export function OptionsPortfolio({ chain, selected, language, onAnalyze }: { cha
       })}</ul> : <p>{tr(language, "Aucune position suivie.", "No tracked positions.")}</p>}
     </>}
   </section>;
+}
+
+type AccountReminder = { position_id: string; underlying: string; expires_at: string; reminder_days: number; triggered_at: string | null };
+
+function AccountReminders({ accountId, positions, language, now }: { accountId: string; positions: TrackedOption[]; language: Language; now: number }) {
+  const [reminders, setReminders] = useState<AccountReminder[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/notifications/option-reminders", { cache: "no-store", signal: controller.signal })
+      .then((response) => { if (!response.ok) throw new Error(); return response.json() as Promise<AccountReminder[]>; })
+      .then((items) => { if (!Array.isArray(items)) throw new Error(); setReminders(items); setError(""); }).catch(() => { if (!controller.signal.aborted) setError(tr(language, "Rappels de compte indisponibles.", "Account reminders unavailable.")); });
+    return () => controller.abort();
+  }, [attempt, language]);
+
+  async function change(position: TrackedOption | AccountReminder, remove: boolean) {
+    setBusy(true); setError("");
+    const id = "id" in position ? position.id : position.position_id;
+    try {
+      const response = await fetch(`/api/notifications/option-reminders${remove ? `/${encodeURIComponent(id)}` : ""}`, {
+        method: remove ? "DELETE" : "POST", headers: { "Content-Type": "application/json", "X-Anatole-Account": accountId },
+        body: remove ? undefined : JSON.stringify({ expected_account_id: accountId, position_id: id, underlying: position.underlying,
+          expires_at: "expiry_at" in position ? position.expiry_at : position.expires_at, reminder_days: position.reminder_days }),
+      });
+      if (!response.ok) throw new Error();
+      const list = await fetch("/api/notifications/option-reminders", { cache: "no-store" });
+      if (!list.ok) throw new Error();
+      setReminders(await list.json() as AccountReminder[]);
+    } catch { setError(tr(language, "Rappel non modifié ou actualisation impossible. Réessayez.", "Reminder update or refresh failed. Try again.")); }
+    finally { setBusy(false); }
+  }
+  return <div className="op-account-reminders">
+    <h3>{tr(language, "Rappels d'échéance du compte", "Account expiry reminders")}</h3>
+    <p>{tr(language, "L'activation envoie au compte le sous-jacent, l'échéance, le délai et un identifiant technique. Les rappels sont indépendants des positions locales. Ils apparaissent dans Notifications lorsque les alertes sont activées et le serveur fonctionne ; aucun courriel ou push n'est garanti. État au dernier chargement.", "Activation sends the underlying, expiry, interval and a technical ID to your account. Reminders are independent of local positions. They appear in Notifications while alerts are enabled and the server is running; email or push is not guaranteed. Status as last loaded.")}</p>
+    <a href="/notifications">{tr(language, "Ouvrir Notifications", "Open Notifications")}</a>{" "}
+    <button type="button" disabled={busy} onClick={() => setAttempt((value) => value + 1)}>{tr(language, "Actualiser les rappels", "Refresh reminders")}</button>
+    {error ? <p role="alert">{error}</p> : null}
+    {reminders === null ? <p>{tr(language, "Chargement des rappels…", "Loading reminders…")}</p> : <>
+      {positions.filter((position) => !reminders.some((item) => item.position_id.toLowerCase() === position.id.toLowerCase())).map((position) =>
+        <button key={position.id} type="button" disabled={busy || Date.parse(position.expiry_at) <= now || !/^[A-Z0-9.^-]{1,16}$/.test(position.underlying) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(position.id)} onClick={() => void change(position, false)}>{tr(language, `Activer le rappel ${position.symbol}`, `Enable reminder ${position.symbol}`)}</button>)}
+      <ul className="op-position-list">{reminders.map((item) => <li key={item.position_id}>
+        <span>{item.underlying} · {item.expires_at} · {item.reminder_days} j</span>
+        <span>{item.triggered_at ? tr(language, "Notification créée", "Notification created") : tr(language, "En attente", "Pending")}</span>
+        <button type="button" disabled={busy} onClick={() => void change(item, true)}>{tr(language, "Supprimer ce rappel", "Delete reminder")}</button>
+      </li>)}</ul>
+    </>}
+  </div>;
 }
 
 function PositionForm({ selected, language, onSave }: { selected: OptionContract; language: Language; onSave: (position: TrackedOption) => boolean }) {
