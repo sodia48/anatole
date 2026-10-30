@@ -47,7 +47,7 @@ function PortfolioPositionSummary({ evidence }: { evidence: UnifiedAssistantResp
 }
 
 export function GlobalAssistant() {
-  const { context, label, assistantOpen: open, setAssistantOpen: setOpen, openAssistant } = useAssistantContext();
+  const { context, label, selection, assistantOpen: open, setAssistantOpen: setOpen, openAssistant } = useAssistantContext();
   const [removedForRoute, setRemovedForRoute] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -61,8 +61,9 @@ export function GlobalAssistant() {
   const nearBottom = useRef(true);
   const readingPosition = useRef(0);
   const pending = useRef<AbortController | null>(null);
-  const activeContext: AssistantContext = removedForRoute === context.route
-    ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown" }
+  const contextKey = context.surface === "options" ? `${context.route}:${selection}` : context.route;
+  const activeContext: AssistantContext = removedForRoute === contextKey
+    ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown", metadata: {} }
     : context;
   const composerPlaceholder = ({
     portfolio: "Pose une question sur ton portefeuille…",
@@ -178,7 +179,7 @@ export function GlobalAssistant() {
         <header className={styles.header}><div><strong>Anatole Assistant</strong><small>Ask → Analyze → Navigate</small></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Fermer l’assistant"><X size={20} /></button></header>
         <div className={styles.toolbar}>
-          {removedForRoute !== context.route && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(context.route)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
+          {removedForRoute !== contextKey && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(contextKey)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
           <button type="button" className={styles.reset} onClick={() => { pending.current?.abort(); pending.current = null; setLoading(false); setError(null); setMessage(""); nearBottom.current = true; readingPosition.current = 0; setTurns([]); setConversationId(undefined); setAuthorized(false); setPendingPermission(null); }}>Nouvelle conversation</button>
         </div>
         <div className={styles.history} aria-label="Historique de la conversation" role="log" aria-live="polite" ref={history} onScroll={() => {

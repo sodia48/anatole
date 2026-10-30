@@ -9,6 +9,7 @@ import { GlobalAssistant } from "./GlobalAssistant";
 type Bridge = {
   context: AssistantContext;
   label: string;
+  selection: number;
   publish: (extra: Partial<AssistantContext>) => void;
   assistantOpen: boolean;
   setAssistantOpen: (open: boolean) => void;
@@ -38,15 +39,16 @@ export function AssistantContextProvider({ children }: { children: ReactNode }) 
     [route, searchString, preferences.language]);
   const [published, setPublished] = useState<{ route: string; extra: Partial<AssistantContext> } | null>(null);
   const [assistantOpen, setAssistantOpen] = useState(false);
+  const [selection, setSelection] = useState(0);
   const publish = useCallback((extra: Partial<AssistantContext>) => setPublished({ route, extra }), [route]);
   const openAssistant = useCallback((extra?: Partial<AssistantContext>) => {
-    if (extra) setPublished({ route, extra });
+    if (extra) { setPublished({ route, extra }); setSelection((current) => current + 1); }
     setAssistantOpen(true);
   }, [route]);
   const context = useMemo(() => published?.route === route ? { ...base, ...published.extra } : base,
     [base, published, route]);
-  const value = useMemo(() => ({ context, label: assistantContextLabel(context), publish,
-    assistantOpen, setAssistantOpen, openAssistant }), [context, publish, assistantOpen, openAssistant]);
+  const value = useMemo(() => ({ context, label: assistantContextLabel(context), publish, selection,
+    assistantOpen, setAssistantOpen, openAssistant }), [context, publish, selection, assistantOpen, openAssistant]);
   return <BridgeContext.Provider value={value}>
     {children}
     <Suspense fallback={null}><AssistantQueryObserver onChange={setSearchString} /></Suspense>

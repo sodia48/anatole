@@ -102,7 +102,7 @@ export function assistantContextLabel(context: AssistantContext): string {
   if (context.surface === "fixed_income") return "Taux & Obligations";
   if (context.surface === "market") return "Marché";
   if (context.surface === "news") return "Actualités";
-  if (context.surface === "options") return "Options";
+  if (context.surface === "options") return `Options${context.symbol ? ` · ${context.symbol}` : ""}`;
   return "Anatole";
 }
 

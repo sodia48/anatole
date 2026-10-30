@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from app.main import app
 from app.schemas.assistant_context import AssistantContext, NavigationAction, UnifiedAssistantRequest
 from app.schemas.workspace import AssistantFact, AssistantSource
+from app.schemas.options import OptionChainSnapshot, OptionSourceStatus
 from app.services.anatole_assistant_orchestrator import AnatoleAssistantOrchestrator, _clean_symbols
 from app.services.assistant import assistant_service
 from app.services.canada_360_assistant import canada_360_assistant_service
@@ -18,6 +19,7 @@ from app.services.canada_360_providers import ProviderResult
 from app.services.etf_holdings import etf_holdings_service
 from app.services.fundamentals import fundamentals_service
 from app.services.market_data import market_data_service
+from app.services.options import options_service
 from app.services.portfolio import portfolio_service
 from app.services.stock_news import stock_news_service
 from app.services.news import news_service
@@ -102,6 +104,71 @@ def test_options_assistant_http_returns_educational_answer():
     assert response.status_code == 200
     assert response.json()["intent"] == "options_education"
     assert "droit d'achat" in response.json()["answer"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stale", [False, True])
+async def test_options_chain_context_is_explicit_and_never_reads_positions(unit, monkeypatch, stale):
+    calls = []
+    async def chain(**kwargs):
+        calls.append(kwargs)
+        return OptionChainSnapshot(market="tsx", symbol="RY", provider_symbol="RY", name="Royal Bank",
+            category="bank", exchange="MX", generated_at=NOW, stale=stale,
+            source_statuses=[OptionSourceStatus(source="Test source", status="available")])
+    async def forbidden(*_args, **_kwargs):
+        raise AssertionError("positions and synthesis must not be read")
+    monkeypatch.setattr(options_service, "chain", chain)
+    monkeypatch.setattr(unit, "_portfolio", forbidden)
+    monkeypatch.setattr(provider_router, "generate_internal_evidence", forbidden)
+    context = AssistantContext(surface="options", route="/options", symbol="RY",
+                               metadata={"options_market": "tsx", "options_expiration": ""})
+    response = await unit.answer(UnifiedAssistantRequest(message="Analyse la chaîne RY", context=context,
+        portfolio_consent=True, portfolio_positions=POSITIONS))
+    assert response.intent == "options_education"
+    assert calls == [{"market": "tsx", "symbol": "RY", "expiration": None}]
+    assert "0 contrats" in response.answer and "Test source" in response.answer
+    assert ("cache périmé" in response.answer) is stale
+    assert "ni positions ni scénarios" in response.answer
+    assert response.synthesis_provider is None
+    assert response.sources[0].status == ("fallback" if stale else "delayed")
+    assert response.evidence[0].sources[0].freshness == ("stale" if stale else "delayed")
+    assert response.evidence[0].sources[0].timestamp is None
+    assert not response.context.portfolio_scope.authorized
+
+    calls.clear()
+    context.metadata = {}
+    await unit.answer(UnifiedAssistantRequest(message="Analyse la chaîne RY", context=context))
+    assert not calls
+
+
+@pytest.mark.asyncio
+async def test_options_chain_unavailable_does_not_invent_quotes(unit, monkeypatch):
+    async def unavailable(**_kwargs):
+        raise RuntimeError("no source")
+    monkeypatch.setattr(options_service, "chain", unavailable)
+    context = AssistantContext(surface="options", route="/options", symbol="RY", metadata={"options_market": "tsx"})
+    response = await unit.answer(UnifiedAssistantRequest(message="Analyse la chaîne RY", context=context))
+    assert response.intent == "options_education"
+    assert "temporairement indisponible" in response.answer
+    assert "Aucune cotation" in response.answer
+    assert not response.sources
+
+
+def test_options_selected_chain_http_and_invalid_metadata(monkeypatch):
+    async def chain(**_kwargs):
+        return OptionChainSnapshot(market="tsx", symbol="RY", provider_symbol="RY", name="Royal Bank",
+            category="bank", exchange="MX", generated_at=NOW, stale=True,
+            source_statuses=[OptionSourceStatus(source="Synthetic source", status="available")])
+    monkeypatch.setattr(options_service, "chain", chain)
+    payload = {"message": "Analyse la chaîne RY", "context": {"surface": "options", "route": "/options",
+        "symbol": "RY", "metadata": {"options_market": "tsx"}}}
+    with TestClient(app) as client:
+        response = client.post("/api/v1/assistant/chat", json=payload)
+        assert response.status_code == 200
+        assert response.json()["intent"] == "options_education"
+        assert "cache périmé" in response.json()["answer"]
+        payload["context"]["metadata"]["options_market"] = "commodities"
+        assert client.post("/api/v1/assistant/chat", json=payload).status_code == 422
 
 
 @pytest.fixture
