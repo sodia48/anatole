@@ -316,6 +316,7 @@ async def export_account(
         workspace=workspace,
         notification_preferences=preferences,
         notifications=feed.items,
+        option_expiry_reminders=await notification_service.list_option_reminders(user.id),
     )
 
 

@@ -19,6 +19,7 @@ const ROOTS = new Set([
   "read-all",
   "preview",
   "send-test",
+  "option-reminders",
 ]);
 
 type Context = {
@@ -44,6 +45,7 @@ function validSegments(segments: string[]): boolean {
   if (segments[0] === "feed" && segments.length > 1) {
     return segments.length === 3 && segments[2] === "read";
   }
+  if (segments[0] === "option-reminders" && segments.length === 2) return true;
   return segments.length === 1;
 }
 
@@ -75,6 +77,10 @@ async function proxy(
   });
   const requestId = request.headers.get("X-Request-ID");
   if (requestId) headers.set("X-Request-ID", requestId);
+  if (segments[0] === "option-reminders" && request.method === "DELETE") {
+    const account = request.headers.get("X-Anatole-Account");
+    if (account) headers.set("X-Anatole-Account", account);
+  }
 
   let body: ArrayBuffer | undefined;
   if (!["GET", "HEAD"].includes(request.method)) {
@@ -145,3 +151,4 @@ async function proxy(
 export const GET = proxy;
 export const POST = proxy;
 export const PUT = proxy;
+export const DELETE = proxy;

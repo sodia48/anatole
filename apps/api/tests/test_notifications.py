@@ -4,8 +4,9 @@ from pathlib import Path
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 import asyncio
+from uuid import uuid4
 
-from sqlalchemy import update
+from sqlalchemy import event, update
 
 import pytest
 from fastapi.testclient import TestClient
@@ -47,6 +48,114 @@ def register(client: TestClient) -> dict:
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_option_reminders_are_account_scoped_durable_and_idempotent(notification_client):
+    client, service = notification_client
+    first = register(client)
+    second = client.post("/api/v1/account/register", json={"email": "other@example.com", "password": "Anatole2026!",
+        "display_name": "Other", "accepted_terms": True, "accepted_privacy": True}).json()
+    headers, other = auth(first["token"]), auth(second["token"])
+    position_id = str(uuid4())
+    now = datetime.now(UTC)
+    payload = {"expected_account_id": first["user"]["id"], "position_id": position_id, "underlying": "RY", "expires_at": (now + timedelta(days=8)).isoformat(), "reminder_days": 7}
+    url = "/api/v1/notifications/option-reminders"
+    assert client.post(url, json=payload).status_code == 401
+    assert client.post(url, headers=headers, json={**payload, "quantity": 2}).status_code == 422
+    assert client.post(url, headers=headers, json={**payload, "expires_at": "2027-11-25T16:00:00"}).status_code == 422
+    assert client.post(url, headers=headers, json={**payload, "expires_at": (now - timedelta(days=1)).isoformat()}).status_code == 422
+    assert client.post(url, headers=headers, json=payload).status_code == 204
+    assert client.get(url, headers=other).json() == []
+    assert client.post(url, headers=other, json=payload).status_code == 409
+    assert client.delete(f"{url}/{position_id}", headers={**other, "X-Anatole-Account": first['user']['id']}).status_code == 409
+    assert client.delete(f"{url}/{position_id}", headers={**other, "X-Anatole-Account": second['user']['id']}).status_code == 404
+    assert len(client.get("/api/v1/account/export", headers=headers).json()["option_expiry_reminders"]) == 1
+    assert asyncio.run(service.generate_option_reminders(now)) == 0
+    assert asyncio.run(service.generate_option_reminders(now + timedelta(days=2))) == 1
+    assert asyncio.run(service.generate_option_reminders(now + timedelta(days=2))) == 0
+    feed = client.get("/api/v1/notifications/feed", headers=headers).json()["items"]
+    assert len(feed) == 1 and "Échéance saisie à venir" in feed[0]["message"]
+    assert client.get("/api/v1/notifications/feed", headers=other).json()["items"] == []
+    assert client.post(url, headers=headers, json=payload).status_code == 204
+    assert asyncio.run(service.generate_option_reminders(now + timedelta(days=2))) == 0
+    assert client.delete(f"{url}/{position_id}", headers={**headers, "X-Anatole-Account": first['user']['id']}).status_code == 204
+    assert client.get(url, headers=headers).json() == []
+
+
+def test_option_reminder_respects_notification_preferences_and_account_deletion(notification_client):
+    client, service = notification_client
+    session = register(client)
+    headers = auth(session["token"])
+    now = datetime.now(UTC)
+    payload = {"expected_account_id": session["user"]["id"], "position_id": str(uuid4()), "underlying": "TD", "expires_at": (now + timedelta(days=1)).isoformat(), "reminder_days": 7}
+    assert client.post("/api/v1/notifications/option-reminders", headers=headers, json=payload).status_code == 204
+    preferences = client.get("/api/v1/notifications/preferences", headers=headers).json()["preferences"]
+    preferences["include_alerts"] = False
+    assert client.put("/api/v1/notifications/preferences", headers=headers, json=preferences).status_code == 200
+    assert asyncio.run(service.generate_option_reminders(now)) == 0
+    preferences["include_alerts"] = True
+    assert client.put("/api/v1/notifications/preferences", headers=headers, json=preferences).status_code == 200
+    assert asyncio.run(service.generate_option_reminders(now + timedelta(days=2))) == 1
+    assert "Échéance saisie passée" in client.get("/api/v1/notifications/feed", headers=headers).json()["items"][0]["message"]
+    assert client.request("DELETE", "/api/v1/account/delete", headers=headers, json={"password": "Anatole2026!", "confirmation": "SUPPRIMER"}).status_code == 204
+    assert asyncio.run(service.list_option_reminders(session["user"]["id"])) == []
+
+
+def test_option_reminder_workers_do_not_duplicate_events(notification_client):
+    client, service = notification_client
+    session = register(client)
+    now = datetime.now(UTC)
+    payload = {"expected_account_id": session["user"]["id"], "position_id": str(uuid4()), "underlying": "RY", "expires_at": (now + timedelta(days=1)).isoformat(), "reminder_days": 7}
+    assert client.post("/api/v1/notifications/option-reminders", headers=auth(session["token"]), json=payload).status_code == 204
+    async def workers():
+        return await asyncio.gather(*(service.generate_option_reminders(now) for _ in range(4)))
+    assert sum(asyncio.run(workers())) == 1
+    assert len(client.get("/api/v1/notifications/feed", headers=auth(session["token"])).json()["items"]) == 1
+
+
+def test_option_reminder_worker_processes_due_rows(notification_client, monkeypatch):
+    client, service = notification_client
+    session = register(client)
+    payload = {"expected_account_id": session["user"]["id"], "position_id": str(uuid4()), "underlying": "RY",
+        "expires_at": (datetime.now(UTC) + timedelta(days=1)).isoformat(), "reminder_days": 7}
+    assert client.post("/api/v1/notifications/option-reminders", headers=auth(session["token"]), json=payload).status_code == 204
+    async def run_worker():
+        processed = asyncio.Event()
+        generate = service.generate_option_reminders
+        async def observed(*args, **kwargs):
+            result = await generate(*args, **kwargs)
+            processed.set()
+            return result
+        monkeypatch.setattr(service, "generate_option_reminders", observed)
+        task = asyncio.create_task(service.run_option_reminder_worker())
+        try:
+            await asyncio.wait_for(processed.wait(), timeout=5)
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+    asyncio.run(run_worker())
+    assert len(client.get("/api/v1/notifications/feed", headers=auth(session["token"])).json()["items"]) == 1
+
+
+def test_account_delete_rolls_back_if_reminders_cannot_be_removed(notification_client):
+    client, service = notification_client
+    session = register(client)
+    headers = auth(session["token"])
+    payload = {"expected_account_id": session["user"]["id"], "position_id": str(uuid4()), "underlying": "RY",
+        "expires_at": (datetime.now(UTC) + timedelta(days=1)).isoformat(), "reminder_days": 7}
+    assert client.post("/api/v1/notifications/option-reminders", headers=headers, json=payload).status_code == 204
+    def fail_reminder_delete(_connection, _cursor, statement, _parameters, _context, _executemany):
+        if statement.startswith("DELETE FROM option_expiry_reminders"):
+            raise RuntimeError("synthetic database failure")
+    event.listen(service.account_service.engine, "before_cursor_execute", fail_reminder_delete)
+    try:
+        response = client.request("DELETE", "/api/v1/account/delete", headers=headers,
+                                  json={"password": "Anatole2026!", "confirmation": "SUPPRIMER"})
+        assert response.status_code == 500
+    finally:
+        event.remove(service.account_service.engine, "before_cursor_execute", fail_reminder_delete)
+    assert client.get("/api/v1/account/me", headers=headers).status_code == 200
+    assert len(client.get("/api/v1/notifications/option-reminders", headers=headers).json()) == 1
 
 
 def test_fundamental_feed_deduplicates_filing_and_honors_cooldown(notification_client, monkeypatch):

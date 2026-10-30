@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from uuid import UUID
 
 from app.api.routes.accounts import current_user
 from app.schemas.accounts import AccountUser
@@ -9,10 +10,35 @@ from app.schemas.notifications import (
     NotificationFeed,
     NotificationPreferences,
     NotificationPreferencesEnvelope,
+    OptionExpiryReminder,
+    OptionExpiryReminderInput,
 )
 from app.services.notifications import notification_service
 
 router = APIRouter()
+
+
+@router.get("/option-reminders", response_model=list[OptionExpiryReminder])
+async def option_reminders(user: AccountUser = Depends(current_user)) -> list[OptionExpiryReminder]:
+    return await notification_service.list_option_reminders(user.id)
+
+
+@router.post("/option-reminders", status_code=status.HTTP_204_NO_CONTENT)
+async def save_option_reminder(payload: OptionExpiryReminderInput, user: AccountUser = Depends(current_user)) -> None:
+    if str(payload.expected_account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    try:
+        await notification_service.save_option_reminder(user.id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.delete("/option-reminders/{position_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_option_reminder(position_id: UUID, account_id: UUID = Header(alias="X-Anatole-Account"), user: AccountUser = Depends(current_user)) -> None:
+    if str(account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    if not await notification_service.delete_option_reminder(user.id, str(position_id)):
+        raise HTTPException(status_code=404, detail="Rappel introuvable.")
 
 
 @router.get(

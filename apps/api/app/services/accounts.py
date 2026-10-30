@@ -23,6 +23,7 @@ from sqlalchemy import (
     delete,
     func,
     insert,
+    inspect,
     or_,
     select,
     update,
@@ -637,6 +638,12 @@ class AccountService:
             ).mappings().first()
             if row is None or not _password_matches(password, row.password_hash):
                 raise InvalidCredentialsError
+            # Remove notification data in the same transaction as the account.
+            # This also serializes deletion against the option reminder worker.
+            inspector = inspect(connection)
+            for name in ("option_expiry_reminders", "notification_events", "notification_preferences"):
+                if inspector.has_table(name):
+                    connection.execute(text(f"DELETE FROM {name} WHERE user_id = :user_id"), {"user_id": user_id})
             connection.execute(
                 delete(self.workspaces).where(self.workspaces.c.user_id == user_id)
             )
