@@ -19,6 +19,7 @@ import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilte
 import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
 import { NativeOptionsAssistant } from "./NativeOptionsAssistant";
 import { NativeOptionReminders } from "./NativeOptionReminders";
+import { NativeOptionScreener } from "./NativeOptionScreener";
 
 type SideFilter = "both" | OptionSide;
 
@@ -101,6 +102,13 @@ export function OptionsScreen() {
       setExpiry("");
       setContextRevision((value) => value + 1);
     }
+  }
+
+  function addToBuilder(contract: OptionContract) {
+    if (legs.length >= 20) return;
+    const id = ++nextLegId.current;
+    setLegs((current) => current.length >= 20 ? current : [...current, { id, contract,
+      direction: "long", quantity: "1", premium: "", multiplier: "", upfront: false }]);
   }
 
   const analytics = chain.data?.analytics;
@@ -312,11 +320,13 @@ export function OptionsScreen() {
               <Text style={styles.metric}>{detail.source} · {detail.expiration ?? "N/D"}</Text>
               <Text style={styles.metric}>Γ {number(detail.gamma, 4)} · Θ {number(detail.theta, 3)} · Vega {number(detail.vega, 3)}</Text>
               <Button label={pick("Ajouter au constructeur", "Add to builder")} disabled={legs.length >= 20}
-                onPress={() => { const id = ++nextLegId.current; setLegs((current) => current.length >= 20 ? current : [...current, { id, contract: detail,
-                  direction: "long", quantity: "1", premium: "", multiplier: "", upfront: false }]); }} />
+                onPress={() => addToBuilder(detail)} />
               <Button label={pick("Fermer", "Close")} onPress={() => setSelected(null)} />
             </View> : null}
           </Card>
+
+          <NativeOptionScreener contracts={chain.data.contracts} stale={Boolean(chain.data.stale || chain.error)}
+            canAdd={legs.length < 20} onAdd={addToBuilder} />
 
           <Card title={pick("Sources", "Sources")}>
             {chain.data.source_statuses.map((item, index) => (
