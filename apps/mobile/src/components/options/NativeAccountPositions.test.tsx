@@ -25,25 +25,25 @@ const position: AccountOptionPosition = {
 
 afterEach(() => jest.restoreAllMocks());
 
-function fillPosition(view: ReturnType<typeof render>) {
-  fireEvent.changeText(view.getByLabelText("Quantité de contrats"), "2");
-  fireEvent.changeText(view.getByLabelText("Multiplicateur de position"), "100,5");
-  fireEvent.changeText(view.getByLabelText("Prime initiale par unité"), "3,5");
-  fireEvent.changeText(view.getByLabelText("Devise de la position"), "cad");
-  fireEvent.changeText(view.getByLabelText("Échéance de la position avec fuseau"), "2027-11-25T16:00:00-05:00");
+async function fillPosition(view: Awaited<ReturnType<typeof render>>) {
+  await fireEvent.changeText(view.getByLabelText("Quantité de contrats"), "2");
+  await fireEvent.changeText(view.getByLabelText("Multiplicateur de position"), "100,5");
+  await fireEvent.changeText(view.getByLabelText("Prime initiale par unité"), "3,5");
+  await fireEvent.changeText(view.getByLabelText("Devise de la position"), "cad");
+  await fireEvent.changeText(view.getByLabelText("Échéance de la position avec fuseau"), "2027-11-25T16:00:00-05:00");
 }
 
 test("opens only the signed-in account's positions on request", async () => {
   const read = jest.spyOn(optionsApi, "accountPositions").mockResolvedValue({ revision: 4, positions: [position] });
-  const view = render(<NativeAccountPositions accountId={accountA} selected={null} />);
+  const view = await render(<NativeAccountPositions accountId={accountA} selected={null} />);
 
   expect(read).not.toHaveBeenCalled();
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(read).toHaveBeenCalledWith(accountA, expect.any(AbortSignal)));
   expect(view.getByText("RY-C · CALL 100 · 2027-11-25")).toBeTruthy();
   expect(view.getByText("Achat · 2 × 100 · CAD · prime saisie 3.5")).toBeTruthy();
 
-  view.rerender(<NativeAccountPositions key="signed-out" accountId={null} selected={null} />);
+  await view.rerender(<NativeAccountPositions key="signed-out" accountId={null} selected={null} />);
   expect(view.getByText("Connectez-vous pour gérer les positions du compte.")).toBeTruthy();
   expect(view.queryByText("RY-C · CALL 100 · 2027-11-25")).toBeNull();
   expect(view.queryByLabelText("Ouvrir les positions du compte")).toBeNull();
@@ -52,17 +52,17 @@ test("opens only the signed-in account's positions on request", async () => {
 test("creates a position only after explicit confirmation with the account revision", async () => {
   jest.spyOn(optionsApi, "accountPositions").mockResolvedValue(empty);
   const create = jest.spyOn(optionsApi, "createAccountPosition").mockResolvedValue({ revision: 5, positions: [position] });
-  const view = render(<NativeAccountPositions accountId={accountA} selected={selected} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  const view = await render(<NativeAccountPositions accountId={accountA} selected={selected} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(view.getByLabelText("Enregistrer la position du compte")).toBeTruthy());
-  fillPosition(view);
+  await fillPosition(view);
 
-  fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
+  await fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
   expect(create).not.toHaveBeenCalled();
   expect(view.getByText(/Vérifiez la date avec fuseau/)).toBeTruthy();
 
-  fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
-  fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
+  await fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
+  await fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
   expect(create).toHaveBeenCalledWith({
     expected_account_id: accountA, expected_revision: 4,
@@ -80,20 +80,20 @@ test("creates a position only after explicit confirmation with the account revis
 test("requires renewed confirmation when the upfront premium changes", async () => {
   jest.spyOn(optionsApi, "accountPositions").mockResolvedValue(empty);
   const create = jest.spyOn(optionsApi, "createAccountPosition").mockResolvedValue({ revision: 5, positions: [position] });
-  const view = render(<NativeAccountPositions accountId={accountA} selected={selected} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  const view = await render(<NativeAccountPositions accountId={accountA} selected={selected} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(view.getByLabelText("Enregistrer la position du compte")).toBeTruthy());
-  fillPosition(view);
-  fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
+  await fillPosition(view);
+  await fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
   expect(view.getByLabelText("Spécifications confirmées")).toBeTruthy();
 
-  fireEvent.changeText(view.getByLabelText("Prime initiale par unité"), "4,5");
+  await fireEvent.changeText(view.getByLabelText("Prime initiale par unité"), "4,5");
   expect(view.getByLabelText("Confirmer spécifications et prime initiale")).toBeTruthy();
-  fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
+  await fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
   expect(create).not.toHaveBeenCalled();
 
-  fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
-  fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
+  await fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
+  await fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
   expect(create.mock.calls[0]?.[0].position.premium).toBe(4.5);
 });
@@ -101,12 +101,12 @@ test("requires renewed confirmation when the upfront premium changes", async () 
 test("reports revision conflicts and keeps the loaded list for refresh", async () => {
   jest.spyOn(optionsApi, "accountPositions").mockResolvedValue(empty);
   const create = jest.spyOn(optionsApi, "createAccountPosition").mockRejectedValue(new ApiError("conflict", 409, null));
-  const view = render(<NativeAccountPositions accountId={accountA} selected={selected} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  const view = await render(<NativeAccountPositions accountId={accountA} selected={selected} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(view.getByLabelText("Enregistrer la position du compte")).toBeTruthy());
-  fillPosition(view);
-  fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
-  fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
+  await fillPosition(view);
+  await fireEvent.press(view.getByLabelText("Confirmer spécifications et prime initiale"));
+  await fireEvent.press(view.getByLabelText("Enregistrer la position du compte"));
 
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
   expect(view.getByText("Les données ont changé ailleurs. Actualisez.")).toBeTruthy();
@@ -118,10 +118,10 @@ test("removes one position with the current revision and preserves other positio
   const other = { ...position, id: "position-2", symbol: "RY-P", side: "put" as const };
   jest.spyOn(optionsApi, "accountPositions").mockResolvedValue({ revision: 8, positions: [position, other] });
   const save = jest.spyOn(optionsApi, "saveAccountPositions").mockResolvedValue({ revision: 9, positions: [other] });
-  const view = render(<NativeAccountPositions accountId={accountA} selected={null} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  const view = await render(<NativeAccountPositions accountId={accountA} selected={null} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(view.getByLabelText("Retirer position RY-C position-1")).toBeTruthy());
-  fireEvent.press(view.getByLabelText("Retirer position RY-C position-1"));
+  await fireEvent.press(view.getByLabelText("Retirer position RY-C position-1"));
 
   await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
   expect(save).toHaveBeenCalledWith({ expected_account_id: accountA, expected_revision: 8, positions: [other] }, expect.any(AbortSignal));
@@ -134,12 +134,12 @@ test("does not show a late response from a previous account after a keyed remoun
   let resolveA!: (value: AccountOptionPositions) => void;
   const read = jest.spyOn(optionsApi, "accountPositions").mockImplementation((accountId) =>
     accountId === accountA ? new Promise((resolve) => { resolveA = resolve; }) : Promise.resolve(empty));
-  const view = render(<NativeAccountPositions key={accountA} accountId={accountA} selected={null} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  const view = await render(<NativeAccountPositions key={accountA} accountId={accountA} selected={null} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   expect(read).toHaveBeenCalledWith(accountA, expect.any(AbortSignal));
 
-  view.rerender(<NativeAccountPositions key={accountB} accountId={accountB} selected={null} />);
-  fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
+  await view.rerender(<NativeAccountPositions key={accountB} accountId={accountB} selected={null} />);
+  await fireEvent.press(view.getByLabelText("Ouvrir les positions du compte"));
   await waitFor(() => expect(read).toHaveBeenCalledWith(accountB, expect.any(AbortSignal)));
   await act(async () => { resolveA({ revision: 1, positions: [{ ...position, symbol: "PRIVATE" }] }); });
 
