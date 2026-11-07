@@ -19,6 +19,7 @@ import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilte
 import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
 import { NativeOptionsAssistant } from "./NativeOptionsAssistant";
 import { NativeOptionReminders } from "./NativeOptionReminders";
+import { NativeVolatilityIntelligence } from "./NativeVolatilityIntelligence";
 
 type SideFilter = "both" | OptionSide;
 
@@ -317,6 +318,8 @@ export function OptionsScreen() {
               <Button label={pick("Fermer", "Close")} onPress={() => setSelected(null)} />
             </View> : null}
           </Card>
+
+          <NativeVolatilityIntelligence chain={chain.data} expiry={expiry} refreshFailed={Boolean(chain.error)} />
 
           <Card title={pick("Sources", "Sources")}>
             {chain.data.source_statuses.map((item, index) => (
