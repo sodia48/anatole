@@ -106,7 +106,38 @@ export type OptionPayoffResponse = {
 export type OptionAccountReminder = { position_id: string; underlying: string; expires_at: string;
   reminder_days: number; triggered_at: string | null };
 
+export type AccountOptionPositionDraft = {
+  symbol: string;
+  underlying: string;
+  market: OptionMarket;
+  contract: string | null;
+  side: OptionSide;
+  strike: number;
+  expiration: string;
+  expiry_at: string;
+  direction: "long" | "short";
+  quantity: number;
+  multiplier: number;
+  premium: number;
+  currency: string;
+  reminder_days: number;
+};
+
+export type AccountOptionPosition = AccountOptionPositionDraft & { id: string };
+export type AccountOptionPositions = { revision: number; positions: AccountOptionPosition[] };
+
 export const optionsApi = {
+  accountPositions: (accountId: string, signal?: AbortSignal) => apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+    auth: true, headers: { "X-Anatole-Account": accountId }, signal,
+  }),
+  createAccountPosition: (payload: { expected_account_id: string; expected_revision: number; position: AccountOptionPositionDraft }, signal?: AbortSignal) =>
+    apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+      method: "POST", auth: true, body: JSON.stringify(payload), signal,
+    }),
+  saveAccountPositions: (payload: { expected_account_id: string; expected_revision: number; positions: AccountOptionPosition[] }, signal?: AbortSignal) =>
+    apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+      method: "PUT", auth: true, body: JSON.stringify(payload), signal,
+    }),
   reminders: (accountId: string) => apiRequest<OptionAccountReminder[]>("/api/v1/notifications/option-reminders/account", {
     auth: true, headers: { "X-Anatole-Account": accountId },
   }),
