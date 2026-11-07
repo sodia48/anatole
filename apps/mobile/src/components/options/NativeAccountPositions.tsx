@@ -106,11 +106,11 @@ export function NativeAccountPositions({ accountId, selected }: { accountId: str
         {selected ? <>
           <Text style={styles.copy}>{pick("Contrat sélectionné", "Selected contract")}: {selected.symbol} · {selected.side.toUpperCase()} {selected.strike} · {selected.expiration ?? "N/D"}</Text>
           <Button label={direction === "long" ? pick("Sens : achat", "Direction: long") : pick("Sens : vente", "Direction: short")} variant="secondary" onPress={() => setDirection(direction === "long" ? "short" : "long")} />
-          <Field label={pick("Quantité de contrats", "Contract quantity")} value={quantity} keyboardType="numeric" onChangeText={setQuantity} />
-          <Field label={pick("Multiplicateur de position", "Position multiplier")} value={multiplier} keyboardType="decimal-pad" onChangeText={setMultiplier} />
-          <Field label={pick("Prime initiale par unité", "Upfront premium per unit")} value={premium} keyboardType="decimal-pad" onChangeText={setPremium} />
-          <Field label={pick("Devise de la position", "Position currency")} value={currency} autoCapitalize="characters" onChangeText={setCurrency} />
-          <Field label={pick("Échéance de la position avec fuseau", "Position expiry with time zone")} value={expiry} placeholder="2027-11-25T16:00:00-05:00" autoCapitalize="none" onChangeText={(value) => setExpiryDraft({ key: selectedKey, value })} />
+          <Field label={pick("Quantité de contrats", "Contract quantity")} accessibilityLabel={pick("Quantité de contrats", "Contract quantity")} value={quantity} keyboardType="numeric" onChangeText={setQuantity} />
+          <Field label={pick("Multiplicateur de position", "Position multiplier")} accessibilityLabel={pick("Multiplicateur de position", "Position multiplier")} value={multiplier} keyboardType="decimal-pad" onChangeText={setMultiplier} />
+          <Field label={pick("Prime initiale par unité", "Upfront premium per unit")} accessibilityLabel={pick("Prime initiale par unité", "Upfront premium per unit")} value={premium} keyboardType="decimal-pad" onChangeText={setPremium} />
+          <Field label={pick("Devise de la position", "Position currency")} accessibilityLabel={pick("Devise de la position", "Position currency")} value={currency} autoCapitalize="characters" onChangeText={setCurrency} />
+          <Field label={pick("Échéance de la position avec fuseau", "Position expiry with time zone")} accessibilityLabel={pick("Échéance de la position avec fuseau", "Position expiry with time zone")} value={expiry} placeholder="2027-11-25T16:00:00-05:00" autoCapitalize="none" onChangeText={(value) => setExpiryDraft({ key: selectedKey, value })} />
           <Button label={confirmed ? pick("Spécifications confirmées", "Specifications confirmed") : pick("Confirmer spécifications et prime initiale", "Confirm specifications and upfront premium")} variant="secondary" onPress={() => setConfirmedKey(confirmed ? "" : formKey)} />
           <Button label={pick("Enregistrer la position du compte", "Save account position")} disabled={busy} onPress={() => void create()} />
         </> : <Text style={styles.copy}>{pick("Sélectionnez un contrat pour le suivre.", "Select a contract to track it.")}</Text>}
