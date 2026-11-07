@@ -19,6 +19,7 @@ import { defaultOptionFilters, filterOptions, loadOptionFilters, saveOptionFilte
 import { NativeStrategyBuilder, type NativeStrategyLeg } from "./NativeStrategyBuilder";
 import { NativeOptionsAssistant } from "./NativeOptionsAssistant";
 import { NativeOptionReminders } from "./NativeOptionReminders";
+import { NativeAccountPositions } from "./NativeAccountPositions";
 
 type SideFilter = "both" | OptionSide;
 
@@ -342,6 +343,7 @@ export function OptionsScreen() {
       ) : null}
 
       <NativeOptionReminders key={user?.id ?? "anonymous"} accountId={accountState === "authenticated" ? user?.id ?? null : null} selected={detail} />
+      <NativeAccountPositions key={`positions-${accountState === "authenticated" ? user?.id ?? "anonymous" : "signed-out"}`} accountId={accountState === "authenticated" ? user?.id ?? null : null} selected={detail} />
       <NativeStrategyBuilder legs={legs} setLegs={setLegs} />
 
       <Text style={styles.disclaimer}>

@@ -75,6 +75,19 @@ def test_option_positions_account_isolation_conflicts_export_and_delete(account_
         assert connection.execute(service.option_positions.select()).first() is None
 
 
+def test_create_option_position_allocates_id_and_rejects_stale_retry(account_client: TestClient):
+    user = register(account_client, "mobile-options@example.com")
+    headers = {**auth(user["token"]), "X-Anatole-Account": user["user"]["id"]}
+    position = {"symbol": "RY", "underlying": "RY", "market": "tsx", "contract": None, "side": "call", "strike": 120, "expiration": "2027-06-18", "expiry_at": "2027-06-18T16:00:00-04:00", "direction": "long", "quantity": 2, "multiplier": 100, "premium": 3, "currency": "CAD", "reminder_days": 7}
+    request = {"expected_account_id": user["user"]["id"], "expected_revision": 0, "position": position}
+    saved = account_client.post("/api/v1/account/option-positions", headers=headers, json=request)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["revision"] == 1
+    assert saved.json()["positions"][0]["id"]
+    assert account_client.post("/api/v1/account/option-positions", headers=headers, json=request).status_code == 409
+    assert len(account_client.get("/api/v1/account/option-positions", headers=headers).json()["positions"]) == 1
+
+
 def test_sqlite_account_store_waits_for_concurrent_writes(tmp_path: Path):
     service = AccountService(f"sqlite:///{tmp_path / 'concurrent.db'}")
     try:

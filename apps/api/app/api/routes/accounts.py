@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import UTC, datetime
 from collections import defaultdict, deque
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -35,7 +35,7 @@ from app.services.accounts import (
 )
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
-from app.schemas.option_positions import AccountOptionPositions, AccountOptionPositionsUpdate
+from app.schemas.option_positions import AccountOptionPosition, AccountOptionPositionCreate, AccountOptionPositions, AccountOptionPositionsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -249,6 +249,21 @@ async def update_option_positions(payload: AccountOptionPositionsUpdate, user: A
         raise HTTPException(status_code=409, detail={"message": "Une version plus récente existe sur un autre appareil.", "current_revision": error.current_revision}) from error
     except InvalidCredentialsError as error:
         raise HTTPException(status_code=401, detail="Session expirée ou invalide.") from error
+
+
+@router.post("/option-positions", response_model=AccountOptionPositions, status_code=status.HTTP_201_CREATED)
+async def create_option_position(payload: AccountOptionPositionCreate, user: AccountUser = Depends(current_user)) -> AccountOptionPositions:
+    if str(payload.expected_account_id) != user.id:
+        raise HTTPException(status_code=409, detail="Le compte actif a changé.")
+    current = await account_service.get_option_positions(user.id)
+    if current.revision != payload.expected_revision:
+        raise HTTPException(status_code=409, detail="Une version plus récente existe sur un autre appareil.")
+    if len(current.positions) >= 100:
+        raise HTTPException(status_code=422, detail="Limite de 100 positions atteinte.")
+    position = AccountOptionPosition(id=uuid4(), **payload.position.model_dump())
+    updated = AccountOptionPositionsUpdate(expected_account_id=payload.expected_account_id,
+        expected_revision=payload.expected_revision, positions=[*current.positions, position])
+    return await update_option_positions(updated, user)
 
 
 @router.put(
