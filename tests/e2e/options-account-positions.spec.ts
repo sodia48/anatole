@@ -10,11 +10,11 @@ test("tracks an option on the account and detects edits from another device", as
   await page.route("**/api/anatole/api/v1/options/chain?**", (route) => route.fulfill({ json: { market: "tsx", symbol: "RY", provider_symbol: "RY", name: "Synthetic RY", category: "Banks", exchange: "TEST", underlying_price: 100, requested_expiration: null, expirations: ["2027-11-25"], contracts: [contract], analytics: null, source_statuses: [], generated_at: "2027-11-20T12:00:00Z", refresh_after_seconds: 3600, stale: true } }));
   await page.goto("/options");
   await expect(page.getByRole("heading", { name: "RY · Synthetic RY" })).toBeVisible();
-  await page.getByRole("button", { name: "Screener de contrats" }).click();
+  await page.getByRole("navigation", { name: "Vues de la chaîne" }).getByRole("button", { name: "Screener" }).click();
   await page.getByRole("region", { name: "Screener de contrats" }).getByRole("button", { name: "Suivre" }).click();
   const panel = page.getByRole("region", { name: "Positions d'options" });
   await panel.getByRole("button", { name: "Ouvrir les positions du compte" }).click();
-  await expect(panel.getByText("Liste du compte", { exact: true })).toBeVisible();
+  await expect(panel.getByText("Suivi synchronisé · compte Anatole", { exact: true })).toBeVisible();
   await panel.getByLabel("Nombre de contrats").fill("2");
   await panel.getByLabel("Multiplicateur vérifié").fill("100");
   await panel.getByLabel("Prime initiale par unité").fill("3");

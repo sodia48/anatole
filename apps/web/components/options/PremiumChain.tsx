@@ -25,6 +25,7 @@ function saveChainPreferences(advanced: boolean, filters: Record<string, string>
 export function PremiumChain({ contracts, underlying, stale, language, display, onAddStrategy }: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [selected, setSelected] = useState<OptionContract | null>(null);
+  const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<Record<string, string>>({});
   const preferencesChanged = useRef(false);
   useEffect(() => {
@@ -52,6 +53,7 @@ export function PremiumChain({ contracts, underlying, stale, language, display, 
     preferencesChanged.current = true;
     const next = { ...filters, [key]: value };
     setFilters(next);
+    setPage(0);
     saveChainPreferences(advanced, next);
   };
   const { moneyness = "all", freshness = "all", availability = "all" } = filters;
@@ -81,6 +83,10 @@ export function PremiumChain({ contracts, underlying, stale, language, display, 
     }
     return true;
   })), [contracts, filters, moneyness, freshness, availability, stale, underlying, nearest]);
+  const pageSize = 40;
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageRows = rows.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   const fields = [
     [pick(language, "Volume minimum", "Minimum volume"), "volume"],
@@ -125,9 +131,10 @@ export function PremiumChain({ contracts, underlying, stale, language, display, 
         </div>
       </details>
     </div>
-    {rows.length ? <div className={"op-rows"}>
+    <div className="op-chainLayout"><div className="op-chainTable">
+    {rows.length ? <div className={"op-rows"} tabIndex={0} aria-label={pick(language, "Contrats paginés", "Paged contracts")}>
       <div className={"op-head"}><span>CALLS</span><span>STRIKE</span><span>PUTS</span></div>
-      {rows.slice(0, 1200).map((row) => <article className={"op-row"} key={row.key}>
+      {pageRows.map((row) => <article className={"op-row"} key={row.key}>
         <div className={"op-side"}><strong>CALL</strong>{optionButton(row.call)}</div>
         <div className={"op-strike"}><strong>{display(row.strike)}</strong>
           {nearest != null && Math.abs(row.strike - (underlying ?? 0)) === nearest ? <span>ATM</span> : null}
@@ -135,15 +142,16 @@ export function PremiumChain({ contracts, underlying, stale, language, display, 
         </div>
         <div className={"op-side"}><strong>PUT</strong>{optionButton(row.put)}</div>
       </article>)}
-      {rows.length > 1200 ? <p>{pick(language, "Affichage limité à 1 200 lignes.", "Display limited to 1,200 rows.")}</p> : null}
     </div> : <p>{pick(language, "Aucun contrat ne correspond aux filtres.", "No contracts match the filters.")}</p>}
-    {detail ? <section className={"op-detail"} aria-label={pick(language, "Détails du contrat", "Contract details")}>
+    {rows.length ? <div className="op-pagination"><button type="button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>{pick(language, "Précédent", "Previous")}</button><span>{safePage + 1} / {pageCount} · {rows.length} {pick(language, "strikes", "strikes")}</span><button type="button" disabled={safePage + 1 >= pageCount} onClick={() => setPage(safePage + 1)}>{pick(language, "Suivant", "Next")}</button></div> : null}
+    </div>
+    {detail ? <aside className={"op-detail"} aria-label={pick(language, "Détails du contrat", "Contract details")}>
       <button type="button" onClick={() => setSelected(null)}>{pick(language, "Fermer", "Close")}</button>
       <strong>{detail.symbol} · {detail.side.toUpperCase()} · {display(detail.strike)}</strong>
       <p>{pick(language, "Échéance", "Expiry")}: {detail.expiration ?? "N/D"} · {detail.source}
         {detail.delayed || stale ? ` · ${pick(language, "différé ou périmé", "delayed or stale")}` : ""}</p>
       <p>Bid {display(detail.bid)} · Ask {display(detail.ask)} · IV {display(detail.implied_volatility, 1)} % · Δ {display(detail.delta, 3)} · Γ {display(detail.gamma, 4)} · Θ {display(detail.theta, 3)} · Vega {display(detail.vega, 3)}</p>
       <button type="button" onClick={() => onAddStrategy(detail)}>{pick(language, "Ajouter à la stratégie", "Add to strategy")}</button>
-    </section> : null}
+    </aside> : null}</div>
   </div>;
 }

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { OptionChainSnapshot, OptionContract } from "@/lib/options-api";
 import "./options-screener.css";
+import { useOptionsText } from "./OptionsCopyProvider";
 
 type Props = { chain: OptionChainSnapshot; language: "fr" | "en"; onAddStrategy: (contract: OptionContract) => boolean; onTrack: (contract: OptionContract) => void };
 type Sort = "expiry" | "volume" | "interest";
@@ -18,13 +19,15 @@ function threshold(value: string): number | null {
 }
 
 export function OptionsScreener({ chain, language, onAddStrategy, onTrack }: Props) {
-  const tr = (fr: string, en: string) => language === "fr" ? fr : en;
+  const t = useOptionsText(language);
   const [query, setQuery] = useState("");
   const [side, setSide] = useState("both");
   const [expiry, setExpiry] = useState("");
   const [volume, setVolume] = useState("");
   const [interest, setInterest] = useState("");
   const [sort, setSort] = useState<Sort>("expiry");
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<OptionContract | null>(null);
   const [added, setAdded] = useState<{ message: string; target?: "strategy" | "positions" } | null>(null);
   const minVolume = threshold(volume);
   const minInterest = threshold(interest);
@@ -53,6 +56,10 @@ export function OptionsScreener({ chain, language, onAddStrategy, onTrack }: Pro
         a.strike - b.strike || a.symbol.localeCompare(b.symbol);
     });
   }, [chain.contracts, query, side, selectedExpiry, minVolume, minInterest, invalid, sort]);
+  const pageSize = 50;
+  const pageCount = Math.max(1, Math.ceil(results.length / pageSize));
+  const safePage = Math.min(page, pageCount - 1);
+  const pageResults = results.slice(safePage * pageSize, (safePage + 1) * pageSize);
   const maxVolume = results.reduce((best, item) => Math.max(best, metric(item.volume) ?? 0), 0);
   const maxInterest = results.reduce((best, item) => Math.max(best, metric(item.open_interest) ?? 0), 0);
   const format = (number: number | null) => number == null ? "N/D" : number.toLocaleString(language === "fr" ? "fr-CA" : "en-CA");
@@ -61,27 +68,35 @@ export function OptionsScreener({ chain, language, onAddStrategy, onTrack }: Pro
     return <td style={valid != null && max > 0 ? { backgroundColor: `rgb(30 120 220 / ${0.08 + 0.32 * valid / max})` } : undefined}>{format(valid)}</td>;
   };
 
-  return <section className="panel op-screener" aria-label={tr("Screener de contrats", "Contract screener")}>
-    <h2>{tr("Screener et heatmap des contrats", "Contract screener and heatmap")}</h2>
-    <p>{tr("Recherche limitée à la chaîne chargée, pas à tout le marché. Les couleurs comparent les valeurs disponibles dans les résultats filtrés ; N/D reste distinct de zéro.", "Search is limited to the loaded chain, not the entire market. Colors compare available values in the filtered results; N/A is distinct from zero.")}</p>
-    <p>{tr("Instantané récupéré", "Snapshot retrieved")}: {chain.generated_at}{chain.stale ? ` · ${tr("périmé", "stale")}` : ""}. {tr("L'heure de récupération ne garantit pas la fraîcheur de chaque cotation.", "Retrieval time does not guarantee freshness of individual quotes.")}</p>
-    <div className="op-screen-filters">
-      <label>{tr("Contrat ou strike", "Contract or strike")}<input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
-      <label>{tr("Type", "Type")}<select value={side} onChange={(event) => setSide(event.target.value)}><option value="both">Call + Put</option><option value="call">Call</option><option value="put">Put</option></select></label>
-      <label>{tr("Échéance", "Expiry")}<select aria-label={tr("Échéance", "Expiry")} value={selectedExpiry} onChange={(event) => setExpiry(event.target.value)}><option value="">{tr("Toutes", "All")}</option>{expiries.map((date) => <option key={date} value={date}>{date}</option>)}</select></label>
-      <label>{tr("Volume minimum", "Minimum volume")}<input type="number" min="0" step="1" value={volume} onChange={(event) => setVolume(event.target.value)} /></label>
-      <label>{tr("Intérêt ouvert minimum", "Minimum open interest")}<input type="number" min="0" step="1" value={interest} onChange={(event) => setInterest(event.target.value)} /></label>
-      <label>{tr("Trier par", "Sort by")}<select value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="expiry">{tr("Échéance et strike", "Expiry and strike")}</option><option value="volume">Volume</option><option value="interest">{tr("Intérêt ouvert", "Open interest")}</option></select></label>
-    </div>
-    {invalid ? <p role="alert">{tr("Les minimums doivent être des entiers positifs ou nuls.", "Minimums must be non-negative integers.")}</p> : <p aria-live="polite">{results.length} {results.length === 1 ? tr("contrat correspondant", "matching contract") : tr("contrats correspondants", "matching contracts")}{results.length > 100 ? ` · ${tr("100 affichés", "100 shown")}` : ""}</p>}
-    {added ? <p aria-live="polite">{added.message}{added.target ? <> · <a href={added.target === "strategy" ? "#options-strategy-builder" : "#options-positions"}>{added.target === "strategy" ? tr("Voir la stratégie", "View strategy") : tr("Voir les positions", "View positions")}</a></> : null}</p> : null}
-    {results.length ? <><p className="op-screen-scroll-hint">{tr("Faites défiler le tableau horizontalement pour voir toutes les colonnes.", "Scroll the table horizontally to see all columns.")}</p><div className="op-screen-table" tabIndex={0} aria-label={tr("Résultats et heatmap", "Results and heatmap")}>
-      <table data-mobile-scroll><thead><tr><th>{tr("Contrat", "Contract")}</th><th>{tr("Échéance", "Expiry")}</th><th>Strike</th><th>Volume</th><th>{tr("Intérêt ouvert", "Open interest")}</th><th>Source</th><th>{tr("Actions", "Actions")}</th></tr></thead>
-        <tbody>{results.slice(0, 100).map((item, index) => <tr key={`${item.symbol}:${index}`}>
-          <td>{item.side.toUpperCase()} · {item.symbol}{item.contract ? ` · ${item.contract}` : ""}</td><td>{item.expiration ?? "N/D"}</td><td>{format(metric(item.strike))}</td>
+  return <section className="panel op-screener" aria-label={t("screener_001")}>
+    <h2>{t("screener_002")}</h2>
+    <p>{t("screener_003")}</p>
+    <p>{t("screener_004")}: {chain.generated_at}{chain.stale ? ` · ${t("screener_005")}` : ""}. {t("screener_006")}</p>
+    <div className="op-screen-layout"><div className="op-screen-filters">
+      <label>{t("screener_007")}<input value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+      <label>{t("screener_008")}<select value={side} onChange={(event) => setSide(event.target.value)}><option value="both">Call + Put</option><option value="call">Call</option><option value="put">Put</option></select></label>
+      <label>{t("screener_009")}<select aria-label={t("screener_010")} value={selectedExpiry} onChange={(event) => setExpiry(event.target.value)}><option value="">{t("screener_011")}</option>{expiries.map((date) => <option key={date} value={date}>{date}</option>)}</select></label>
+      <label>{t("screener_012")}<input type="number" min="0" step="1" value={volume} onChange={(event) => setVolume(event.target.value)} /></label>
+      <label>{t("screener_013")}<input type="number" min="0" step="1" value={interest} onChange={(event) => setInterest(event.target.value)} /></label>
+      <label>{t("screener_014")}<select value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="expiry">{t("screener_015")}</option><option value="volume">Volume</option><option value="interest">{t("screener_016")}</option></select></label>
+    </div><div className="op-screen-main">
+    {invalid ? <p role="alert">{t("screener_017")}</p> : <p aria-live="polite">{results.length} {results.length === 1 ? t("screener_018") : t("screener_019")}</p>}
+    {added ? <p aria-live="polite">{added.message}</p> : null}
+    {results.length ? <><p className="op-screen-scroll-hint">{t("screener_020")}</p><div className="op-screen-table" tabIndex={0} aria-label={t("screener_021")}>
+      <table data-mobile-scroll><thead><tr><th>{t("screener_022")}</th><th>{t("screener_023")}</th><th>Strike</th><th>Volume</th><th>{t("screener_024")}</th><th>Source</th><th>{t("screener_025")}</th></tr></thead>
+        <tbody>{pageResults.map((item, index) => <tr key={`${item.symbol}:${page}:${index}`}>
+          <td><button type="button" className="op-screen-select" onClick={() => setSelected(item)}>{item.side.toUpperCase()} · {item.symbol}{item.contract ? ` · ${item.contract}` : ""}</button></td><td>{item.expiration ?? "N/D"}</td><td>{format(metric(item.strike))}</td>
           {cell(item.volume, maxVolume)}{cell(item.open_interest, maxInterest)}
-          <td>{item.source || "N/D"}{item.delayed ? ` · ${tr("différé", "delayed")}` : ""}</td><td><button type="button" onClick={() => setAdded(onAddStrategy(item) ? { message: tr("Contrat ajouté", "Contract added"), target: "strategy" } : { message: tr("Limite de 20 jambes atteinte", "20-leg limit reached") })}>{tr("Ajouter", "Add")}</button>{" "}<button type="button" onClick={() => { onTrack(item); setAdded({ message: tr("Contrat sélectionné pour le suivi", "Contract selected for tracking"), target: "positions" }); }}>{tr("Suivre", "Track")}</button></td>
+          <td>{item.source || "N/D"}{item.delayed ? ` · ${t("screener_026")}` : ""}</td><td><button type="button" onClick={() => setAdded(onAddStrategy(item) ? { message: t("screener_027"), target: "strategy" } : { message: t("screener_028") })}>{t("screener_029")}</button>{" "}<button type="button" onClick={() => { onTrack(item); setAdded({ message: t("screener_030"), target: "positions" }); }}>{t("screener_031")}</button></td>
         </tr>)}</tbody></table>
-    </div></> : !invalid ? <p>{tr("Aucun contrat ne correspond aux filtres.", "No contracts match the filters.")}</p> : null}
+    </div><div className="op-pagination"><button type="button" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>{t("screener_032")}</button><span>{safePage + 1} / {pageCount}</span><button type="button" disabled={safePage + 1 >= pageCount} onClick={() => setPage(safePage + 1)}>{t("screener_033")}</button></div></> : !invalid ? <p>{t("screener_034")}</p> : null}
+    </div>{selected && results.includes(selected) ? <aside className="op-screen-detail" aria-label={t("screener_035")}>
+      <button type="button" onClick={() => setSelected(null)}>{t("screener_036")}</button>
+      <h3>{selected.symbol}</h3><p>{selected.side.toUpperCase()} · {selected.strike} · {selected.expiration ?? "N/D"}</p>
+      <p>Bid {format(selected.bid)} · Ask {format(selected.ask)} · Vol {format(selected.volume)} · OI {format(selected.open_interest)}</p>
+      <p>{selected.source}{selected.delayed || chain.stale ? ` · ${t("screener_037")}` : ""}</p>
+      <button type="button" onClick={() => onAddStrategy(selected)}>{t("screener_038")}</button>
+      <button type="button" onClick={() => onTrack(selected)}>{t("screener_039")}</button>
+    </aside> : null}</div>
   </section>;
 }

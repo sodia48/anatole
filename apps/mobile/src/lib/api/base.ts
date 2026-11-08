@@ -59,9 +59,10 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
   const headers = new Headers(init.headers);
   headers.set("Accept", "application/json");
   if (init.body) headers.set("Content-Type", "application/json");
+  let requestToken: string | null = null;
   if (auth) {
-    const token = await sessionStore.get();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
+    requestToken = await sessionStore.get();
+    if (requestToken) headers.set("Authorization", `Bearer ${requestToken}`);
   }
 
   const { signal: externalSignal, ...fetchInit } = init;
@@ -83,7 +84,7 @@ export async function apiRequest<T>(path: string, options: ApiOptions = {}): Pro
     const response = await fetch(`${apiBaseUrl()}${path}`, { ...fetchInit, headers, signal: controller.signal });
     if (!response.ok) {
       const error = await errorFromResponse(response);
-      if (response.status === 401 && auth) await handleUnauthorized();
+      if (response.status === 401 && auth && !controller.signal.aborted) await handleUnauthorized(requestToken);
       throw error;
     }
     if (response.status === 204) return undefined as T;

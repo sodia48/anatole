@@ -21,7 +21,7 @@ test("opens the options assistant without sending local positions", async ({ pag
   await page.goto("/options");
   await expect(page.getByRole("heading", { name: "RY · Synthetic RY" })).toBeVisible();
   const spaces = page.getByRole("region", { name: "Assistant et autres espaces" });
-  await expect(spaces.getByRole("link", { name: "Voir RY dans Focus" })).toHaveAttribute("href", "/focus/RY");
+  await expect(spaces.getByRole("link", { name: "Voir dans Focus" })).toHaveAttribute("href", "/focus/RY");
   await expect(spaces.getByRole("link", { name: "Ouvrir Portefeuille" })).toHaveAttribute("href", "/portefeuille");
   await page.getByRole("button", { name: "Ouvrir Anatole Assistant" }).click();
   const dialog = page.getByRole("dialog", { name: "Anatole Assistant" });
@@ -51,7 +51,7 @@ test("opens the options assistant without sending local positions", async ({ pag
       conversation_id: "00000000-0000-0000-0000-000000000001", evidence: [], actions: [], permission_required: false } });
   });
   await dialog.getByRole("button", { name: "Fermer l’assistant" }).click();
-  await spaces.getByRole("button", { name: "Interroger Anatole sur la chaîne RY" }).click();
+  await spaces.getByRole("button", { name: "Interroger Anatole" }).click();
   await expect(dialog.getByText("Options · RY")).toBeVisible();
   await page.getByLabel("Votre question").fill("Analyse la chaîne RY");
   await page.getByRole("button", { name: "Envoyer la question" }).click();
@@ -66,6 +66,6 @@ test("opens the options assistant without sending local positions", async ({ pag
   await expect.poll(() => calls.length).toBe(4);
   expect((calls[3].context as { metadata: object }).metadata).toEqual({});
   await dialog.getByRole("button", { name: "Fermer l’assistant" }).click();
-  await spaces.getByRole("button", { name: "Interroger Anatole sur la chaîne RY" }).click();
+  await spaces.getByRole("button", { name: "Interroger Anatole" }).click();
   await expect(dialog.getByText("Options · RY")).toBeVisible();
 });

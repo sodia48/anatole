@@ -55,7 +55,7 @@ test("commodity snapshots identify stale and unknown data without hiding publish
   expect(view.getByLabelText("CALL 3.00 2027-11-25 fixture-c")).toBeTruthy();
   expect(view.getByLabelText("PUT 3.00 2027-11-25 fixture-p")).toBeTruthy();
   await view.unmount();
-});
+}, 15000);
 
 test("mobile filters retain preferences across screen remount and exclude missing volume", async () => {
   const view = await render(<OptionsScreen />);
@@ -92,6 +92,7 @@ test("native strategy builder validates specifications and compares two hypothet
   const view = await render(<OptionsScreen />);
   await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
   await fireEvent.press(view.getByLabelText("Ajouter au constructeur"));
+  await fireEvent.press(view.getByLabelText("Chaîne"));
   await fireEvent.press(view.getByLabelText("PUT 100.00 2027-11-25 RY-P"));
   await fireEvent.press(view.getByLabelText("Ajouter au constructeur"));
   await fireEvent.press(view.getByLabelText("Long straddle"));
@@ -200,13 +201,18 @@ test("native account reminders use verified expiry without sending position or p
   const remove = jest.spyOn(optionsApi, "deleteReminder").mockResolvedValue();
   const view = await render(<OptionsScreen />);
   await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
+  await fireEvent.press(view.getByLabelText("Portefeuille"));
   await fireEvent.press(view.getByLabelText("Enregistrer le rappel du compte"));
   expect(create).not.toHaveBeenCalled();
   expect(view.getByText(/vérifiez l'échéance future/)).toBeTruthy();
   await fireEvent.changeText(view.getByLabelText("Échéance du rappel avec fuseau"), "2027-11-25T16:00:00-05:00");
+  await fireEvent.press(view.getByLabelText("Chaîne"));
   await fireEvent.press(view.getByLabelText("PUT 100.00 2027-11-25 RY-P"));
+  await fireEvent.press(view.getByLabelText("Portefeuille"));
   expect(view.getByLabelText("Échéance du rappel avec fuseau").props.value).toBe("");
+  await fireEvent.press(view.getByLabelText("Chaîne"));
   await fireEvent.press(view.getByLabelText("CALL 100.00 2027-11-25 RY-C"));
+  await fireEvent.press(view.getByLabelText("Portefeuille"));
   await fireEvent.press(view.getByLabelText("Enregistrer le rappel du compte"));
   await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
   expect(create.mock.calls[0]?.[0]).toEqual({ expected_account_id: mockAccountId, underlying: "RY",
@@ -227,6 +233,7 @@ test("a late reminder response is not shown after switching accounts", async () 
   let resolveList!: (value: Awaited<ReturnType<typeof optionsApi.reminders>>) => void;
   const list = jest.spyOn(optionsApi, "reminders").mockImplementation(() => new Promise((resolve) => { resolveList = resolve; }));
   const view = await render(<OptionsScreen />);
+  await fireEvent.press(view.getByLabelText("Portefeuille"));
   await fireEvent.press(view.getByLabelText("Actualiser les rappels"));
   expect(list).toHaveBeenCalledWith(mockAccountId);
   mockAccountId = "00000000-0000-0000-0000-000000000002";

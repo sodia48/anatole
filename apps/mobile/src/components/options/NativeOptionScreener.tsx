@@ -23,28 +23,32 @@ function barWidth(value: number | null | undefined, maximum: number): number {
     Math.max(0, Math.min(112, value / maximum * 112));
 }
 
-export function NativeOptionScreener({ contracts, stale, canAdd, onAdd }: {
+export function NativeOptionScreener({ contracts, stale, canAdd, onAdd, defaultOpen = false }: {
   contracts: OptionContract[];
   stale: boolean;
   canAdd: boolean;
   onAdd: (contract: OptionContract) => void;
+  defaultOpen?: boolean;
 }) {
   useMobileTheme();
   const { pick } = useLocale();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState("");
   const [side, setSide] = useState<"both" | OptionSide>("both");
   const [expiration, setExpiration] = useState("");
   const [volume, setVolume] = useState("");
   const [interest, setInterest] = useState("");
   const [sort, setSort] = useState<ScreenerSort>("expiration");
+  const [page, setPage] = useState(0);
 
   const expirations = useMemo(() => [...new Set(contracts.map((item) => item.expiration).filter((value): value is string => Boolean(value)))].sort(), [contracts]);
   const valid = /^\d*$/.test(volume.trim()) && /^\d*$/.test(interest.trim());
   const results = useMemo(() => open && valid ? screenLoadedContracts(contracts, {
     query, side, expiration, minVolume: minimum(volume), minOpenInterest: minimum(interest), sort,
   }) : [], [open, contracts, query, side, expiration, volume, interest, sort, valid]);
-  const visible = results.slice(0, 100);
+  const pageCount = Math.max(1, Math.ceil(results.length / 25));
+  const visiblePage = Math.min(page, pageCount - 1);
+  const visible = results.slice(visiblePage * 25, (visiblePage + 1) * 25);
   const maxVolume = heatmapScale(results, "volume");
   const maxInterest = heatmapScale(results, "open_interest");
 
@@ -90,10 +94,10 @@ export function NativeOptionScreener({ contracts, stale, canAdd, onAdd }: {
         </Pressable>)}
       </ScrollView>
       <Text style={styles.hint}>{results.length} {pick("contrats correspondants", "matching contracts")}
-        {results.length > 100 ? ` · ${pick("100 affichés", "100 shown")}` : ""}
+        {results.length > 25 ? ` · ${pick("25 par page", "25 per page")}` : ""}
         {stale ? ` · ${pick("instantané périmé", "stale snapshot")}` : ""}</Text>
       {valid && results.length === 0 ? <Text style={styles.hint}>{pick("Aucun contrat correspondant dans la chaîne chargée.", "No matching contract in the loaded chain.")}</Text> : null}
-      {visible.map((item) => <View key={JSON.stringify([item.market, item.symbol, item.contract, item.side, item.expiration, item.strike])} style={styles.row}>
+      <ScrollView style={styles.results} nestedScrollEnabled>{visible.map((item) => <View key={JSON.stringify([item.market, item.symbol, item.contract, item.side, item.expiration, item.strike])} style={styles.row}>
         <Text style={styles.contract}>{item.symbol} · {item.side.toUpperCase()} {item.strike} · {item.expiration ?? "N/D"}</Text>
         <Text style={styles.hint}>{item.source} · {item.delayed ? pick("différé", "delayed") : pick("délai non indiqué", "delay unspecified")}</Text>
         <View style={styles.barRow}>
@@ -106,13 +110,20 @@ export function NativeOptionScreener({ contracts, stale, canAdd, onAdd }: {
         </View>
         <Button label={`${pick("Ajouter au constructeur", "Add to builder")} ${item.symbol} ${item.side.toUpperCase()} ${item.strike}`}
           variant="secondary" disabled={!canAdd} onPress={() => onAdd(item)} />
-      </View>)}
+      </View>)}</ScrollView>
+      {results.length > 25 ? <View style={styles.pageRow}>
+        <Button label={pick("Précédent", "Previous")} variant="secondary" disabled={visiblePage === 0} onPress={() => setPage(visiblePage - 1)} />
+        <Text style={styles.hint}>{visiblePage + 1} / {pageCount}</Text>
+        <Button label={pick("Suivant", "Next")} variant="secondary" disabled={visiblePage + 1 >= pageCount} onPress={() => setPage(visiblePage + 1)} />
+      </View> : null}
       {!canAdd ? <Text style={styles.hint}>{pick("Maximum de 20 jambes atteint.", "Maximum of 20 legs reached.")}</Text> : null}
     </> : null}
   </Card>;
 }
 
 const styles = createThemedStyles((colors) => ({
+  results: { maxHeight: 560 },
+  pageRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: spacing.sm },
   hint: { ...typography.caption, color: colors.textMuted },
   controls: { gap: spacing.xs, paddingVertical: spacing.xs },
   choice: { minHeight: 40, paddingHorizontal: spacing.sm, justifyContent: "center", borderWidth: 1,
