@@ -34,6 +34,30 @@ describe("mobile API client", () => {
     expect(SecureStore.deleteItemAsync).toHaveBeenCalled();
   });
 
+  it("does not clear a newer account session for a late 401 from the previous token", async () => {
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValueOnce("old-token").mockResolvedValueOnce("new-token");
+    globalThis.fetch = jest.fn().mockResolvedValue(new Response(JSON.stringify({ detail: "Expired" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    }));
+
+    await expect(apiRequest("/api/v1/account/option-positions", { auth: true })).rejects.toEqual(expect.objectContaining({ status: 401 }));
+    expect(new Headers(jest.mocked(globalThis.fetch).mock.calls[0]?.[1]?.headers).get("Authorization")).toBe("Bearer old-token");
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a session after its request was cancelled", async () => {
+    jest.mocked(SecureStore.getItemAsync).mockResolvedValue("old-token");
+    const controller = new AbortController();
+    globalThis.fetch = jest.fn().mockImplementation(async () => {
+      controller.abort();
+      return new Response(JSON.stringify({ detail: "Expired" }), { status: 401 });
+    });
+
+    await expect(apiRequest("/api/v1/account/option-positions", { auth: true, signal: controller.signal })).rejects.toEqual(expect.objectContaining({ status: 401 }));
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
   it("fails fast without a second transport retry", async () => {
     globalThis.fetch = jest.fn().mockRejectedValue(new TypeError("network unavailable"));
     await expect(apiRequest<{ ok: boolean }>("/api/v1/market/cockpit")).rejects.toThrow("network unavailable");

@@ -6,7 +6,7 @@ import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import type { AdvisorProfile } from "@/lib/types";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
-import styles from "./AdvisorV8Layer.module.css";
+import "./advisor-v8.css";
 
 const WORKSPACE_KEY = "anatole:advisor-workspace:v4";
 const SYNC_EVENT = "anatole-workspace-sync-applied";
@@ -736,10 +736,10 @@ export function AdvisorV8Layer({
   };
 
   return (
-    <section className={styles.shell} data-testid="advisor-v8-layer" data-feature-count="20">
-      <header className={styles.hero}>
-        <div className={styles.heroCopy}>
-          <span className={styles.kicker}>ANATOLE CONSEIL · V8 FINANCIAL COMMAND DECK</span>
+    <section className={"anatole-advisor8_shell__"} data-testid="advisor-v8-layer" data-feature-count="20">
+      <header className={"anatole-advisor8_hero__"}>
+        <div className={"anatole-advisor8_heroCopy__"}>
+          <span className={"anatole-advisor8_kicker__"}>ANATOLE CONSEIL · V8 FINANCIAL COMMAND DECK</span>
           <h2>{pick(language, "Ta vie financière, réunie dans un seul cockpit.", "Your financial life, in one command deck.")}</h2>
           <p>
             {pick(
@@ -749,19 +749,19 @@ export function AdvisorV8Layer({
             )}
           </p>
         </div>
-        <div className={styles.heroPulse}>
+        <div className={"anatole-advisor8_heroPulse__"}>
           <span>{pick(language, "PLAN DOCUMENTÉ", "PLAN DOCUMENTED")}</span>
           <strong>{completeness}%</strong>
           <small>{pick(language, `${modulesByTab[tab].length} modules actifs dans cette vue`, `${modulesByTab[tab].length} active modules in this view`)}</small>
         </div>
       </header>
 
-      <nav className={styles.tabs} aria-label={pick(language, "Espaces Conseil V8", "Advice V8 spaces")}>
+      <nav className={"anatole-advisor8_tabs__"} aria-label={pick(language, "Espaces Conseil V8", "Advice V8 spaces")}>
         {TABS.map((item) => (
           <button
             type="button"
             key={item.key}
-            className={tab === item.key ? styles.tabActive : undefined}
+            className={tab === item.key ? "anatole-advisor8_tabActive__" : undefined}
             aria-pressed={tab === item.key}
             data-testid={`advisor-v8-tab-${item.key}`}
             onClick={() => setTab(item.key)}
@@ -773,11 +773,11 @@ export function AdvisorV8Layer({
       </nav>
 
       {tab === "today" ? (
-        <div className={styles.zone} data-testid="advisor-v8-today">
-          <article className={`${styles.card} ${styles.cardHero}`} data-module="01">
-            <div className={styles.cardEyebrow}>01 · FINANCIAL OS</div>
+        <div className={"anatole-advisor8_zone__"} data-testid="advisor-v8-today">
+          <article className={`${"anatole-advisor8_card__"} ${"anatole-advisor8_cardHero__"}`} data-module="01">
+            <div className={"anatole-advisor8_cardEyebrow__"}>01 · FINANCIAL OS</div>
             <h3>{pick(language, "Ton tableau de bord permanent", "Your permanent financial dashboard")}</h3>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor8_metricGrid__"}>
               <div><span>{pick(language, netWorthIsPartial ? "Valeur nette partielle" : "Valeur nette", netWorthIsPartial ? "Partial net worth" : "Net worth")}</span><strong>{money(netWorth, currency, language)}</strong></div>
               <div><span>{pick(language, "Marge mensuelle", "Monthly margin")}</span><strong>{money(monthlyMargin, currency, language)}</strong></div>
               <div><span>{pick(language, "Runway liquidités", "Cash runway")}</span><strong>{runway == null ? "N/D" : `${runway.toFixed(1)} ${pick(language, "mois", "months")}`}</strong></div>
@@ -785,47 +785,47 @@ export function AdvisorV8Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="02">
-            <div className={styles.cardEyebrow}>02 · {pick(language, "DEPUIS TA DERNIÈRE VISITE", "SINCE YOUR LAST VISIT")}</div>
+          <article className={"anatole-advisor8_card__"} data-module="02">
+            <div className={"anatole-advisor8_cardEyebrow__"}>02 · {pick(language, "DEPUIS TA DERNIÈRE VISITE", "SINCE YOUR LAST VISIT")}</div>
             <h3>{pick(language, "Ce qui a changé", "What changed")}</h3>
-            <div className={styles.changeGrid}>
+            <div className={"anatole-advisor8_changeGrid__"}>
               <div><span>{pick(language, "Patrimoine", "Net worth")}</span><strong>{deltaText(netWorth, previousVisit?.netWorth ?? null, currency, language)}</strong></div>
               <div><span>{pick(language, "Marge", "Margin")}</span><strong>{deltaText(monthlyMargin, previousVisit?.monthlyMargin ?? null, currency, language)}</strong></div>
               <div><span>{pick(language, "Dette", "Debt")}</span><strong>{previousVisit ? deltaText(totalDebt, previousVisit.totalDebt, currency, language) : "N/D"}</strong></div>
             </div>
-            <button type="button" className={styles.action} onClick={captureVisit}>{pick(language, "Mémoriser ce snapshot", "Save this snapshot")}</button>
+            <button type="button" className={"anatole-advisor8_action__"} onClick={captureVisit}>{pick(language, "Mémoriser ce snapshot", "Save this snapshot")}</button>
           </article>
 
-          <article className={styles.card} data-module="09">
-            <div className={styles.cardEyebrow}>09 · CASH-FLOW RADAR</div>
+          <article className={"anatole-advisor8_card__"} data-module="09">
+            <div className={"anatole-advisor8_cardEyebrow__"}>09 · CASH-FLOW RADAR</div>
             <h3>{pick(language, "30 / 60 / 90 jours", "30 / 60 / 90 days")}</h3>
-            <div className={styles.radar}>
+            <div className={"anatole-advisor8_radar__"}>
               {cashRadar.map((item) => (
                 <div key={item.months}>
                   <span>{item.months * 30} j</span>
                   <strong>{money(item.value, currency, language)}</strong>
-                  <i className={item.value != null && item.value < 0 ? styles.badDot : styles.goodDot} />
+                  <i className={item.value != null && item.value < 0 ? "anatole-advisor8_badDot__" : "anatole-advisor8_goodDot__"} />
                 </div>
               ))}
             </div>
           </article>
 
-          <article className={styles.card} data-module="18">
-            <div className={styles.cardEyebrow}>18 · PLAN QUALITY</div>
+          <article className={"anatole-advisor8_card__"} data-module="18">
+            <div className={"anatole-advisor8_cardEyebrow__"}>18 · PLAN QUALITY</div>
             <h3>{pick(language, "Qualité du plan, pas jugement de la personne", "Plan quality, not a judgment of the person")}</h3>
-            <div className={styles.qualityMeter}><span style={{ width: `${completeness}%` }} /></div>
-            <strong className={styles.bigNumber}>{completeness}%</strong>
+            <div className={"anatole-advisor8_qualityMeter__"}><span style={{ width: `${completeness}%` }} /></div>
+            <strong className={"anatole-advisor8_bigNumber__"}>{completeness}%</strong>
             <p>{pick(language, "Mesure uniquement la complétude des données structurantes utilisées dans Conseil.", "Measures only the completeness of the core data used by Advice.")}</p>
           </article>
         </div>
       ) : null}
 
       {tab === "goals" ? (
-        <div className={styles.zone} data-testid="advisor-v8-goals">
-          <article className={styles.card} data-module="06">
-            <div className={styles.cardEyebrow}>06 · GOAL DEPENDENCY MAP</div>
+        <div className={"anatole-advisor8_zone__"} data-testid="advisor-v8-goals">
+          <article className={"anatole-advisor8_card__"} data-module="06">
+            <div className={"anatole-advisor8_cardEyebrow__"}>06 · GOAL DEPENDENCY MAP</div>
             <h3>{pick(language, "Quels objectifs se disputent la même marge ?", "Which goals compete for the same margin?")}</h3>
-            <div className={styles.goalMap}>
+            <div className={"anatole-advisor8_goalMap__"}>
               {(goals.length ? goals : [{ label: goalLabel, target: target ?? 0, current: currentSavings ?? 0, monthly: primaryContribution, horizonMonths }]).map((goal, index) => (
                 <div key={goal.id ?? `${goal.label}-${index}`}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
@@ -855,22 +855,22 @@ export function AdvisorV8Layer({
             </p>
           </article>
 
-          <article className={styles.card} data-module="07">
-            <div className={styles.cardEyebrow}>07 · MONTHLY PLAN</div>
+          <article className={"anatole-advisor8_card__"} data-module="07">
+            <div className={"anatole-advisor8_cardEyebrow__"}>07 · MONTHLY PLAN</div>
             <h3>{pick(language, "Plan mensuel concret", "Concrete monthly plan")}</h3>
-            <div className={styles.planRows}>
+            <div className={"anatole-advisor8_planRows__"}>
               <div><span>{pick(language, "Revenu", "Income")}</span><strong>{money(totalIncome, currency, language)}</strong></div>
               <div><span>{pick(language, "Dépenses", "Expenses")}</span><strong>{money(expenses, currency, language)}</strong></div>
               <div><span>{pick(language, "Dettes", "Debt")}</span><strong>{money(debtPayments, currency, language)}</strong></div>
               <div><span>{pick(language, "Objectifs", "Goals")}</span><strong>{money(goalContributions + primaryContribution, currency, language)}</strong></div>
-              <div className={styles.planTotal}><span>{pick(language, "Reste", "Remaining")}</span><strong>{money(monthlyMargin, currency, language)}</strong></div>
+              <div className={"anatole-advisor8_planTotal__"}><span>{pick(language, "Reste", "Remaining")}</span><strong>{money(monthlyMargin, currency, language)}</strong></div>
             </div>
           </article>
 
-          <article className={styles.card} data-module="14">
-            <div className={styles.cardEyebrow}>14 · GOAL STACK</div>
+          <article className={"anatole-advisor8_card__"} data-module="14">
+            <div className={"anatole-advisor8_cardEyebrow__"}>14 · GOAL STACK</div>
             <h3>{pick(language, "Objectifs imbriqués par horizon", "Goals stacked by horizon")}</h3>
-            <div className={styles.stack}>
+            <div className={"anatole-advisor8_stack__"}>
               {(goals.length ? [...goals].sort((a, b) => finite(a.horizonMonths) - finite(b.horizonMonths)) : [{ label: goalLabel, horizonMonths }]).map((goal, index) => (
                 <div key={goal.id ?? `${goal.label}-${index}`} style={{ width: `${Math.max(34, 100 - index * 12)}%` }}>
                   <span>{index + 1}</span><strong>{goal.label || goalLabel}</strong><small>{Math.round(finite(goal.horizonMonths) / 12)} {pick(language, "ans", "years")}</small>
@@ -879,26 +879,26 @@ export function AdvisorV8Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="16">
-            <div className={styles.cardEyebrow}>16 · FINANCIAL JOURNAL</div>
+          <article className={"anatole-advisor8_card__"} data-module="16">
+            <div className={"anatole-advisor8_cardEyebrow__"}>16 · FINANCIAL JOURNAL</div>
             <h3>{pick(language, "Ton historique de décisions", "Your decision history")}</h3>
-            <div className={styles.journal}>
+            <div className={"anatole-advisor8_journal__"}>
               {v8.journal.slice(-5).reverse().map((entry) => (
                 <div key={entry.id}><strong>{entry.label}</strong><span>{entry.capturedAt.slice(0, 10)}</span><small>{money(entry.netWorth, currency, language)} · {money(entry.monthlyMargin, currency, language)}</small></div>
               ))}
               {!v8.journal.length ? <p>{pick(language, "Aucun snapshot enregistré pour l’instant.", "No snapshots saved yet.")}</p> : null}
             </div>
-            <button type="button" className={styles.action} onClick={captureVisit}>{pick(language, "Ajouter au journal", "Add to journal")}</button>
+            <button type="button" className={"anatole-advisor8_action__"} onClick={captureVisit}>{pick(language, "Ajouter au journal", "Add to journal")}</button>
           </article>
         </div>
       ) : null}
 
       {tab === "scenarios" ? (
-        <div className={styles.zone} data-testid="advisor-v8-scenarios">
-          <article className={styles.card} data-module="03">
-            <div className={styles.cardEyebrow}>03 · FINANCIAL TWIN</div>
+        <div className={"anatole-advisor8_zone__"} data-testid="advisor-v8-scenarios">
+          <article className={"anatole-advisor8_card__"} data-module="03">
+            <div className={"anatole-advisor8_cardEyebrow__"}>03 · FINANCIAL TWIN</div>
             <h3>{pick(language, "Ton jumeau financier en mouvement", "Your financial twin in motion")}</h3>
-            <div className={styles.twinStrip}>
+            <div className={"anatole-advisor8_twinStrip__"}>
               <div><span>{pick(language, "Aujourd’hui", "Today")}</span><strong>{money(currentSavings, currency, language)}</strong></div>
               <b>→</b>
               <div><span>{pick(language, "Horizon", "Horizon")}</span><strong>{money(futureValue(finite(currentSavings), primaryContribution, horizonMonths, v8.expectedReturn), currency, language)}</strong></div>
@@ -907,11 +907,11 @@ export function AdvisorV8Layer({
             </div>
           </article>
 
-          <article className={styles.card} data-module="04">
-            <div className={styles.cardEyebrow}>04 · PROBABILITY LAB</div>
+          <article className={"anatole-advisor8_card__"} data-module="04">
+            <div className={"anatole-advisor8_cardEyebrow__"}>04 · PROBABILITY LAB</div>
             <h3>{pick(language, "Teste la probabilité sous tes hypothèses", "Test probability under your assumptions")}</h3>
             <div
-              className={styles.probabilityRing}
+              className={"anatole-advisor8_probabilityRing__"}
               style={{
                 background: `radial-gradient(circle at center, var(--surface-raised) 57%, transparent 58%), conic-gradient(var(--teal) ${Math.max(0, Math.min(100, probability ?? 0))}%, var(--border) 0)`,
               }}
@@ -919,41 +919,41 @@ export function AdvisorV8Layer({
               <strong>{pct(probability)}</strong>
               <span>{pick(language, "des trajectoires simulées atteignent la cible", "of simulated paths reach the target")}</span>
             </div>
-            <div className={styles.inputs2}>
+            <div className={"anatole-advisor8_inputs2__"}>
               <label><span>{pick(language, "Rendement moyen hypothétique", "Assumed average return")}</span><input type="number" step="0.5" value={v8.expectedReturn} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV8({ expectedReturn: Number(event.target.value) || 0 })} /></label>
               <label><span>{pick(language, "Volatilité hypothétique", "Assumed volatility")}</span><input type="number" step="0.5" min="0" value={v8.volatility} onChange={(event: ChangeEvent<HTMLInputElement>) => updateV8({ volatility: Math.max(0, Number(event.target.value) || 0) })} /></label>
             </div>
             <p>{pick(language, "Simulation déterministe de 320 trajectoires avec hypothèses modifiables; ce n’est pas une prévision garantie.", "Deterministic 320-path simulation with editable assumptions; this is not a guaranteed forecast.")}</p>
           </article>
 
-          <article className={styles.card} data-module="05">
-            <div className={styles.cardEyebrow}>05 · STRESS LAB</div>
+          <article className={"anatole-advisor8_card__"} data-module="05">
+            <div className={"anatole-advisor8_cardEyebrow__"}>05 · STRESS LAB</div>
             <h3>{pick(language, "Que se passe-t-il si le plan prend un choc ?", "What happens if the plan takes a hit?")}</h3>
-            <div className={styles.chips}>{stressTests.map((item) => <button type="button" key={item.key} className={shock === item.key ? styles.chipActive : undefined} onClick={() => setShock(item.key)}>{item.label}</button>)}</div>
-            <div className={styles.stressResult}><span>{pick(language, "Marge après choc", "Margin after shock")}</span><strong>{money(activeStress.margin, currency, language)}</strong><span>{pick(language, "Valeur nette simulée", "Simulated net worth")}</span><strong>{money(activeStress.worth, currency, language)}</strong></div>
+            <div className={"anatole-advisor8_chips__"}>{stressTests.map((item) => <button type="button" key={item.key} className={shock === item.key ? "anatole-advisor8_chipActive__" : undefined} onClick={() => setShock(item.key)}>{item.label}</button>)}</div>
+            <div className={"anatole-advisor8_stressResult__"}><span>{pick(language, "Marge après choc", "Margin after shock")}</span><strong>{money(activeStress.margin, currency, language)}</strong><span>{pick(language, "Valeur nette simulée", "Simulated net worth")}</span><strong>{money(activeStress.worth, currency, language)}</strong></div>
           </article>
 
-          <article className={styles.card} data-module="15">
-            <div className={styles.cardEyebrow}>15 · PLAN B / C / D</div>
+          <article className={"anatole-advisor8_card__"} data-module="15">
+            <div className={"anatole-advisor8_cardEyebrow__"}>15 · PLAN B / C / D</div>
             <h3>{pick(language, "Quatre structures à explorer", "Four structures to explore")}</h3>
-            <div className={styles.variantGrid}>{planVariants.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.title}</strong><b>{money(item.value, currency, language)}</b><small>{item.adjustedTarget != null ? `${pick(language, "Cible", "Target")} ${money(item.adjustedTarget, currency, language)}` : pick(language, "Valeur projetée", "Projected value")}</small></div>)}</div>
+            <div className={"anatole-advisor8_variantGrid__"}>{planVariants.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.title}</strong><b>{money(item.value, currency, language)}</b><small>{item.adjustedTarget != null ? `${pick(language, "Cible", "Target")} ${money(item.adjustedTarget, currency, language)}` : pick(language, "Valeur projetée", "Projected value")}</small></div>)}</div>
           </article>
         </div>
       ) : null}
 
       {tab === "decisions" ? (
-        <div className={styles.zone} data-testid="advisor-v8-decisions">
-          <article className={styles.card} data-module="08">
-            <div className={styles.cardEyebrow}>08 · DEBT CENTER</div>
+        <div className={"anatole-advisor8_zone__"} data-testid="advisor-v8-decisions">
+          <article className={"anatole-advisor8_card__"} data-module="08">
+            <div className={"anatole-advisor8_cardEyebrow__"}>08 · DEBT CENTER</div>
             <h3>{pick(language, "Comparer les stratégies de remboursement", "Compare payoff structures")}</h3>
-            <div className={styles.compare2}><div><span>Avalanche +200</span><strong>{debtAvalanche == null ? "N/D" : `${debtAvalanche} ${pick(language, "mois", "months")}`}</strong></div><div><span>Snowball +200</span><strong>{debtSnowball == null ? "N/D" : `${debtSnowball} ${pick(language, "mois", "months")}`}</strong></div></div>
+            <div className={"anatole-advisor8_compare2__"}><div><span>Avalanche +200</span><strong>{debtAvalanche == null ? "N/D" : `${debtAvalanche} ${pick(language, "mois", "months")}`}</strong></div><div><span>Snowball +200</span><strong>{debtSnowball == null ? "N/D" : `${debtSnowball} ${pick(language, "mois", "months")}`}</strong></div></div>
             <p>{pick(language, "Comparaison descriptive basée sur les soldes, taux et paiements saisis dans Debt Center.", "Descriptive comparison based on balances, rates and payments entered in Debt Center.")}</p>
           </article>
 
-          <article className={styles.card} data-module="10">
-            <div className={styles.cardEyebrow}>10 · HOUSING LAB</div>
+          <article className={"anatole-advisor8_card__"} data-module="10">
+            <div className={"anatole-advisor8_cardEyebrow__"}>10 · HOUSING LAB</div>
             <h3>{pick(language, "Le logement relié au reste du plan", "Housing connected to the rest of the plan")}</h3>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor8_metricGrid__"}>
               <div><span>{pick(language, "Capital hypothécaire", "Mortgage principal")}</span><strong>{money(mortgagePrincipal || null, currency, language)}</strong></div>
               <div><span>{pick(language, "Coût mensuel propriétaire", "Monthly owner carrying cost")}</span><strong>{money(mortgagePrincipal > 0 ? monthlyOwnershipCarrying : null, currency, language)}</strong></div>
               <div><span>{pick(language, "Solde au renouvellement", "Balance at renewal")}</span><strong>{money(mortgagePrincipal > 0 && renewalMonths > 0 ? renewalBalance : null, currency, language)}</strong></div>
@@ -964,10 +964,10 @@ export function AdvisorV8Layer({
             <p>{pick(language, "Le paiement hypothécaire utilise la convention canadienne de taux nominal composé semestriellement. Taxes, condo, assurance et entretien saisis sont ajoutés au coût mensuel.", "The mortgage payment uses the Canadian nominal-rate convention compounded semi-annually. Entered property tax, condo fees, insurance and maintenance are added to monthly carrying cost.")}</p>
           </article>
 
-          <article className={styles.card} data-module="12">
-            <div className={styles.cardEyebrow}>12 · CANADA TAX LENS</div>
+          <article className={"anatole-advisor8_card__"} data-module="12">
+            <div className={"anatole-advisor8_cardEyebrow__"}>12 · CANADA TAX LENS</div>
             <h3>{pick(language, "Enveloppes fiscales + contexte provincial", "Tax accounts + provincial context")}</h3>
-            <label className={styles.selectRow}>
+            <label className={"anatole-advisor8_selectRow__"}>
               <span>{pick(language, "Province / territoire", "Province / territory")}</span>
               <select
                 value={v8.province}
@@ -981,8 +981,8 @@ export function AdvisorV8Layer({
                 ))}
               </select>
             </label>
-            <div className={styles.taxRows}>{taxRows.map(([label, bucket]) => <div key={label}><strong>{label}</strong><span>{pick(language, "Espace saisi", "Entered room")} {money(bucket?.room ?? null, currency, language)}</span><span>{pick(language, "Planifié", "Planned")} {money(bucket?.planned ?? null, currency, language)}</span></div>)}</div>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor8_taxRows__"}>{taxRows.map(([label, bucket]) => <div key={label}><strong>{label}</strong><span>{pick(language, "Espace saisi", "Entered room")} {money(bucket?.room ?? null, currency, language)}</span><span>{pick(language, "Planifié", "Planned")} {money(bucket?.planned ?? null, currency, language)}</span></div>)}</div>
+            <div className={"anatole-advisor8_metricGrid__"}>
               <div><span>{pick(language, "Utilisation planifiée", "Planned utilization")}</span><strong>{taxRoomUtilization == null ? "N/D" : pct(taxRoomUtilization)}</strong></div>
               <div><span>{pick(language, "Espace restant saisi", "Entered room remaining")}</span><strong>{money(taxRoomRemaining, currency, language)}</strong></div>
               <div><span>{pick(language, "Dépassement saisi", "Entered overage")}</span><strong>{money(taxRoomOverage, currency, language)}</strong></div>
@@ -990,21 +990,21 @@ export function AdvisorV8Layer({
             <p>{pick(language, "Anatole relie les plafonds et contributions saisis sans inventer un remboursement d’impôt. Les économies fiscales détaillées exigent les barèmes officiels à jour de la province sélectionnée.", "Anatole links entered room and planned contributions without inventing a tax refund. Detailed tax savings require current official brackets for the selected province.")}</p>
           </article>
 
-          <article className={styles.card} data-module="19">
-            <div className={styles.cardEyebrow}>19 · LIFE EVENTS ENGINE</div>
+          <article className={"anatole-advisor8_card__"} data-module="19">
+            <div className={"anatole-advisor8_cardEyebrow__"}>19 · LIFE EVENTS ENGINE</div>
             <h3>{pick(language, "Les événements qui vont bouger ton plan", "Events that will move your plan")}</h3>
-            <div className={styles.eventList}>{events.slice(0, 6).map((event, index) => <div key={event.id ?? index}><span>M+{Math.round(finite(event.monthOffset))}</span><strong>{event.label || pick(language, "Événement", "Event")}</strong><small>{money(finite(event.oneTimeCost), currency, language)} · {money(finite(event.recurringMonthlyCost), currency, language)}/m</small></div>)}{!events.length ? <p>{pick(language, "Ajoute des événements dans Life Events pour les injecter dans les scénarios.", "Add events in Life Events to inject them into scenarios.")}</p> : null}</div>
+            <div className={"anatole-advisor8_eventList__"}>{events.slice(0, 6).map((event, index) => <div key={event.id ?? index}><span>M+{Math.round(finite(event.monthOffset))}</span><strong>{event.label || pick(language, "Événement", "Event")}</strong><small>{money(finite(event.oneTimeCost), currency, language)} · {money(finite(event.recurringMonthlyCost), currency, language)}/m</small></div>)}{!events.length ? <p>{pick(language, "Ajoute des événements dans Life Events pour les injecter dans les scénarios.", "Add events in Life Events to inject them into scenarios.")}</p> : null}</div>
           </article>
         </div>
       ) : null}
 
       {tab === "products" ? (
-        <div className={styles.zone} data-testid="advisor-v8-products">
-          <article className={`${styles.card} ${styles.cardHero}`} data-module="11">
-            <div className={styles.cardEyebrow}>11 · FINANCIAL SHOP</div>
+        <div className={"anatole-advisor8_zone__"} data-testid="advisor-v8-products">
+          <article className={`${"anatole-advisor8_card__"} ${"anatole-advisor8_cardHero__"}`} data-module="11">
+            <div className={"anatole-advisor8_cardEyebrow__"}>11 · FINANCIAL SHOP</div>
             <h3>{pick(language, "Du profil aux produits disponibles", "From profile to available products")}</h3>
             <p>{pick(language, "Cartes, comptes, hypothèques, prêts étudiants, prêts personnels, assurance auto, assurance-vie et fiscalité : le questionnaire Magasiner transforme les réponses en propositions sourcées lorsque des offres vérifiables sont disponibles.", "Cards, accounts, mortgages, student loans, personal loans, auto insurance, life insurance and tax: Shop turns answers into sourced proposals when verifiable offers are available.")}</p>
-            <div className={styles.chips}>
+            <div className={"anatole-advisor8_chips__"}>
               <span>{pick(language, "Cartes", "Cards")}</span>
               <span>{pick(language, "Comptes", "Accounts")}</span>
               <span>{pick(language, "Hypothèques", "Mortgages")}</span>
@@ -1012,38 +1012,38 @@ export function AdvisorV8Layer({
               <span>{pick(language, "Assurances", "Insurance")}</span>
               <span>{pick(language, "Impôts", "Tax")}</span>
             </div>
-            <Link href="/assistant/magasiner" className={styles.primaryAction}>{pick(language, "Ouvrir Magasiner", "Open Shop")}</Link>
+            <Link href="/assistant/magasiner" className={"anatole-advisor8_primaryAction__"}>{pick(language, "Ouvrir Magasiner", "Open Shop")}</Link>
           </article>
 
-          <article className={styles.card} data-module="13">
-            <div className={styles.cardEyebrow}>13 · WHERE EVERY DOLLAR GOES</div>
+          <article className={"anatole-advisor8_card__"} data-module="13">
+            <div className={"anatole-advisor8_cardEyebrow__"}>13 · WHERE EVERY DOLLAR GOES</div>
             <h3>{pick(language, "Où va ton revenu mensuel ?", "Where does monthly income go?")}</h3>
-            <div className={styles.flowBars}>{dollarFlow.map(([label, value]) => { const share = incomeForFlow > 0 ? Math.min(100, (value / incomeForFlow) * 100) : 0; return <div key={label}><span>{label}</span><div><i style={{ width: `${share}%` }} /></div><strong>{money(value, currency, language)}</strong></div>; })}</div>
+            <div className={"anatole-advisor8_flowBars__"}>{dollarFlow.map(([label, value]) => { const share = incomeForFlow > 0 ? Math.min(100, (value / incomeForFlow) * 100) : 0; return <div key={label}><span>{label}</span><div><i style={{ width: `${share}%` }} /></div><strong>{money(value, currency, language)}</strong></div>; })}</div>
           </article>
 
-          <article className={styles.card} data-module="17">
-            <div className={styles.cardEyebrow}>17 · WHY?</div>
+          <article className={"anatole-advisor8_card__"} data-module="17">
+            <div className={"anatole-advisor8_cardEyebrow__"}>17 · WHY?</div>
             <h3>{pick(language, "Chaque conclusion doit pouvoir s’expliquer", "Every conclusion should be explainable")}</h3>
             <details><summary>{pick(language, "Pourquoi la marge mensuelle ?", "Why monthly margin?")}</summary><p>{pick(language, "Revenus saisis − dépenses − paiements de dettes − contributions aux objectifs.", "Entered income − expenses − debt payments − goal contributions.")}</p></details>
             <details><summary>{pick(language, "Pourquoi la probabilité ?", "Why the probability?")}</summary><p>{pick(language, "320 trajectoires déterministes générées à partir du rendement et de la volatilité hypothétiques affichés.", "320 deterministic paths generated from the displayed assumed return and volatility.")}</p></details>
             <details><summary>{pick(language, "Pourquoi la qualité du plan ?", "Why plan quality?")}</summary><p>{pick(language, "C’est un taux de complétude des champs structurants, pas une note de santé financière.", "It is a completeness rate for core inputs, not a financial-health score.")}</p></details>
           </article>
 
-          <article className={styles.card} data-module="20">
-            <div className={styles.cardEyebrow}>20 · HUMAN ADVISOR MODE</div>
+          <article className={"anatole-advisor8_card__"} data-module="20">
+            <div className={"anatole-advisor8_cardEyebrow__"}>20 · HUMAN ADVISOR MODE</div>
             <h3>{pick(language, "Un dossier transportable vers un professionnel", "A portable dossier for a professional")}</h3>
-            <div className={styles.metricGrid}>
+            <div className={"anatole-advisor8_metricGrid__"}>
               <div><span>{pick(language, "Positions reliées", "Linked positions")}</span><strong>{portfolioCount}</strong></div>
               <div><span>{pick(language, "Objectifs", "Goals")}</span><strong>{Math.max(1, goals.length)}</strong></div>
               <div><span>{pick(language, "Dettes", "Debts")}</span><strong>{debts.length}</strong></div>
               <div><span>{pick(language, "Événements", "Events")}</span><strong>{events.length}</strong></div>
             </div>
-            <button type="button" className={styles.primaryAction} onClick={exportDossier}>{pick(language, "Exporter le dossier JSON", "Export JSON dossier")}</button>
+            <button type="button" className={"anatole-advisor8_primaryAction__"} onClick={exportDossier}>{pick(language, "Exporter le dossier JSON", "Export JSON dossier")}</button>
           </article>
         </div>
       ) : null}
 
-      <footer className={styles.footer}>
+      <footer className={"anatole-advisor8_footer__"}>
         <span>{pick(language, "Anatole calcule et met les scénarios en contexte; les hypothèses restent visibles et modifiables.", "Anatole calculates and puts scenarios in context; assumptions remain visible and editable.")}</span>
         <b>20/20 · V8</b>
       </footer>

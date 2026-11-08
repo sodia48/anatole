@@ -32,7 +32,7 @@ export type OptionContract = {
   contract: string | null;
   side: OptionSide;
   strike: number;
-  expiration: string;
+  expiration: string | null;
   exchange: string;
   bid: number | null;
   ask: number | null;
@@ -55,10 +55,10 @@ export type OptionAnalytics = {
   contract_count: number;
   call_count: number;
   put_count: number;
-  call_volume: number;
-  put_volume: number;
-  call_open_interest: number;
-  put_open_interest: number;
+  call_volume: number | null;
+  put_volume: number | null;
+  call_open_interest: number | null;
+  put_open_interest: number | null;
   put_call_volume_ratio: number | null;
   put_call_open_interest_ratio: number | null;
   atm_implied_volatility: number | null;

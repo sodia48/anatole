@@ -35,6 +35,8 @@ from app.schemas.notifications import (
     NotificationFeed,
     NotificationItem,
     NotificationPreferences,
+    OptionExpiryReminder,
+    OptionExpiryReminderInput,
 )
 from app.schemas.workspace import AlertEvaluateRequest
 from app.services.accounts import AccountService, account_service
@@ -165,6 +167,16 @@ class NotificationService:
             Column("dedupe_key", String(160), nullable=False, index=True),
             Column("created_at", String(40), nullable=False, index=True),
             Column("read_at", String(40), nullable=True),
+        )
+        self.option_reminders = Table(
+            "option_expiry_reminders", self.metadata,
+            Column("user_id", String(36), primary_key=True),
+            Column("position_id", String(36), primary_key=True),
+            Column("underlying", String(16), nullable=False),
+            Column("expires_at", String(40), nullable=False),
+            Column("reminder_days", String(2), nullable=False),
+            Column("trigger_at", String(40), nullable=False, index=True),
+            Column("triggered_at", String(40), nullable=True),
         )
         self.email_sender = EmailSender()
         self._schema_ready_for: str | None = None
@@ -392,6 +404,7 @@ class NotificationService:
 
     def _delete_user_data_sync(self, user_id: str) -> None:
         with self.account_service.engine.begin() as connection:
+            connection.execute(delete(self.option_reminders).where(self.option_reminders.c.user_id == user_id))
             connection.execute(
                 delete(self.events).where(self.events.c.user_id == user_id)
             )
@@ -401,10 +414,101 @@ class NotificationService:
                 )
             )
 
+    async def save_option_reminder(self, user_id: str, reminder: OptionExpiryReminderInput) -> None:
+        await self.start()
+        if reminder.expires_at <= _utc_now():
+            raise ValueError("L'échéance doit être future.")
+        await asyncio.to_thread(self._save_option_reminder_sync, user_id, reminder)
+
+    def _save_option_reminder_sync(self, user_id: str, reminder: OptionExpiryReminderInput) -> None:
+        table = self.option_reminders
+        position_id = str(reminder.position_id)
+        values = dict(underlying=reminder.underlying, expires_at=reminder.expires_at.isoformat(),
+                      reminder_days=str(reminder.reminder_days),
+                      trigger_at=(reminder.expires_at - timedelta(days=reminder.reminder_days)).isoformat(),
+                      triggered_at=None)
+        with self.account_service.engine.begin() as connection:
+            existing = connection.execute(select(table).where(table.c.user_id == user_id, table.c.position_id == position_id)).first()
+            if existing:
+                # Retrying the same request must not create a second notification.
+                if (existing.underlying, existing.expires_at, existing.reminder_days) == (values["underlying"], values["expires_at"], values["reminder_days"]):
+                    return
+                connection.execute(update(table).where(table.c.user_id == user_id, table.c.position_id == position_id).values(**values))
+            else:
+                count = connection.execute(select(func.count()).select_from(table).where(table.c.user_id == user_id)).scalar_one()
+                if count >= 100:
+                    raise ValueError("Limite de 100 rappels atteinte.")
+                connection.execute(insert(table).values(user_id=user_id, position_id=position_id, **values))
+
+    async def list_option_reminders(self, user_id: str) -> list[OptionExpiryReminder]:
+        await self.start()
+        return await asyncio.to_thread(self._list_option_reminders_sync, user_id)
+
+    def _list_option_reminders_sync(self, user_id: str) -> list[OptionExpiryReminder]:
+        with self.account_service.engine.connect() as connection:
+            rows = connection.execute(select(self.option_reminders).where(self.option_reminders.c.user_id == user_id)).all()
+        return [OptionExpiryReminder(position_id=row.position_id, underlying=row.underlying,
+                    expires_at=_from_iso(row.expires_at), reminder_days=int(row.reminder_days),
+                    triggered_at=_from_iso(row.triggered_at)) for row in rows]
+
+    async def delete_option_reminder(self, user_id: str, position_id: str) -> bool:
+        await self.start()
+        def remove() -> bool:
+            with self.account_service.engine.begin() as connection:
+                result = connection.execute(delete(self.option_reminders).where(
+                    self.option_reminders.c.user_id == user_id, self.option_reminders.c.position_id == position_id))
+            return bool(result.rowcount)
+        return await asyncio.to_thread(remove)
+
+    async def generate_option_reminders(self, now: datetime | None = None, user_id: str | None = None) -> int:
+        await self.start()
+        return await asyncio.to_thread(self._generate_option_reminders_sync, now or _utc_now(), user_id)
+
+    def _generate_option_reminders_sync(self, now: datetime, user_id: str | None) -> int:
+        current = now.astimezone(UTC).isoformat()
+        table = self.option_reminders
+        with self.account_service.engine.connect() as connection:
+            query = select(table).where(table.c.triggered_at.is_(None), table.c.trigger_at <= current)
+            if user_id is not None:
+                query = query.where(table.c.user_id == user_id)
+            rows = connection.execute(query).all()
+        count = 0
+        for row in rows:
+            preferences = self._get_preferences_sync(row.user_id)
+            if not preferences.in_app_enabled or not preferences.include_alerts:
+                continue
+            with self.account_service.engine.begin() as connection:
+                # Claim and event insertion are atomic, even with multiple API workers.
+                claimed = connection.execute(update(table).where(table.c.user_id == row.user_id,
+                    table.c.position_id == row.position_id, table.c.triggered_at.is_(None),
+                    table.c.trigger_at == row.trigger_at, table.c.underlying == row.underlying,
+                    table.c.expires_at == row.expires_at, table.c.reminder_days == row.reminder_days).values(triggered_at=current))
+                if not claimed.rowcount:
+                    continue
+                expired = row.expires_at <= current
+                connection.execute(insert(self.events).values(id=str(uuid.uuid4()), user_id=row.user_id,
+                    kind="alert", title=f"Échéance d'option · {row.underlying}",
+                    message=("Échéance saisie passée" if expired else "Échéance saisie à venir") +
+                            f" : {row.expires_at}. Vérifiez les conditions et le règlement du contrat.",
+                    severity="important", symbol=row.underlying, route="/options",
+                    dedupe_key=hashlib.sha256(f"option-expiry|{row.user_id}|{row.position_id}|{row.expires_at}".encode()).hexdigest(),
+                    created_at=current, read_at=None))
+                count += 1
+        return count
+
+    async def run_option_reminder_worker(self) -> None:
+        while True:
+            try:
+                await self.generate_option_reminders()
+            except Exception as error:
+                logger.warning("option_reminder_worker_failed error_type=%s", type(error).__name__)
+            await asyncio.sleep(60)
+
     async def refresh_user(self, user: AccountUser) -> NotificationFeed:
         preferences = await self.get_preferences(user.id)
         if not preferences.in_app_enabled:
             return await self.list_feed(user.id)
+        await self.generate_option_reminders(user_id=user.id)
         workspace = await self.account_service.get_workspace(user.id)
         await self._generate_workspace_events(user, workspace, preferences)
         return await self.list_feed(user.id)

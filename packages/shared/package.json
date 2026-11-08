@@ -15,6 +15,7 @@
     "./fundamental-scenarios": "./src/fundamental-scenarios.ts",
     "./fundamental-documents": "./src/fundamental-documents.ts",
     "./fundamental-capital": "./src/fundamental-capital.ts",
-    "./financial-display": "./src/financial-display.ts"
+    "./financial-display": "./src/financial-display.ts",
+    "./options-chain": "./src/options-chain.ts"
   }
 }

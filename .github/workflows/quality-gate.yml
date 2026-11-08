@@ -44,6 +44,8 @@ jobs:
         run: pnpm typecheck:web
       - name: Test web rendering
         run: pnpm --dir apps/web test:unit
+      - name: Test shared financial analytics
+        run: node --test packages/shared/tests/*.test.mjs
       - name: Lint web
         run: pnpm --filter @anatole/web lint
       - name: Build Next.js

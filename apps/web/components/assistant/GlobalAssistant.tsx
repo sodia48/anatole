@@ -12,7 +12,7 @@ type Turn = { role: "user" | "assistant"; text: string; result?: UnifiedAssistan
 const PORTFOLIO_CUE = /portefeuille|positions|allocation|concentration|diversification|sous.perform|underperform|chevauch|overlap|doublonn|cluster|contribu|watchtower|(?:mon|mes|my).{0,30}risqu|my portfolio|my positions|my risk/i;
 const EXPLICIT_SWITCH = /\b(?:ETF|FNB)\b|gouvernement|province|canada 360|qu[eé]bec|ontario|alberta|passeport|statistique|march[eé]|market|terminal|actualit[eé]|news|\b(?:SHOP|XIC|LSPD)\b|\bcompare\b/i;
 const EXPLICIT_INSTRUMENT = /\b(?:analyse|cours|prix)\s+(?:de|du|pour)\s+[A-Z][A-Z0-9.^-]{0,9}\b/;
-const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", etf_performance: "Performance ETF", etf_ranking: "Classement ETF", etf_comparison: "Comparaison ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données" };
+const SKILL_LABELS: Record<string, string> = { canada360: "Canada 360", fixed_income: "Taux & Obligations", portfolio_analysis: "Portefeuille", stock_analysis: "Focus", etf_analysis: "ETF", etf_performance: "Performance ETF", etf_ranking: "Classement ETF", etf_comparison: "Comparaison ETF", compare: "Comparateur", market_analysis: "Marché", news_context: "Actualités", data_quality: "Qualité des données", options_education: "Options" };
 const SAFE_HREF = /^\/(?:focus\/[A-Z0-9.^-]{1,15}(?:\?view=(?:diagnostic|peers|scenarios|documents))?|etf(?:\/[A-Z0-9.^-]{1,15})?|portefeuille|comparateur(?:\?symbols=[A-Z0-9.^,-]{1,80})?|actualites|canada|taux-obligations|terminal|screener|assistant|qualite)$/;
 
 function AssistantText({ text, collapseSources = false, onReady }: { text: string; collapseSources?: boolean; onReady: () => void }) {
@@ -47,7 +47,7 @@ function PortfolioPositionSummary({ evidence }: { evidence: UnifiedAssistantResp
 }
 
 export function GlobalAssistant() {
-  const { context, label, assistantOpen: open, setAssistantOpen: setOpen, openAssistant } = useAssistantContext();
+  const { context, label, selection, assistantOpen: open, setAssistantOpen: setOpen, openAssistant } = useAssistantContext();
   const [removedForRoute, setRemovedForRoute] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -61,8 +61,9 @@ export function GlobalAssistant() {
   const nearBottom = useRef(true);
   const readingPosition = useRef(0);
   const pending = useRef<AbortController | null>(null);
-  const activeContext: AssistantContext = removedForRoute === context.route
-    ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown" }
+  const contextKey = context.surface === "options" ? `${context.route}:${selection}` : context.route;
+  const activeContext: AssistantContext = removedForRoute === contextKey
+    ? { ...context, surface: "other", route: "", symbol: undefined, symbols: [], instrument_type: "unknown", metadata: {} }
     : context;
   const composerPlaceholder = ({
     portfolio: "Pose une question sur ton portefeuille…",
@@ -71,6 +72,7 @@ export function GlobalAssistant() {
     canada360: "Pose ta question à Canada 360…",
     fixed_income: "Pose une question sur les taux et obligations…",
     market: "Pose une question sur le marché…",
+    options: "Pose une question générale sur les options…",
   } as Partial<Record<AssistantContext["surface"], string>>)[activeContext.surface]
     ?? "Pose une question à Anatole…";
 
@@ -113,7 +115,8 @@ export function GlobalAssistant() {
     const needsPortfolio = PORTFOLIO_CUE.test(text) ||
       !EXPLICIT_SWITCH.test(text) && !EXPLICIT_INSTRUMENT.test(text) &&
       (lastSkill === "portfolio_analysis" || !lastSkill && activeContext.surface === "portfolio");
-    const selectedPositions = positions ?? (consent && needsPortfolio ? readAssistantPortfolio() : []);
+    const consentForRequest = context.route !== "/options" && consent;
+    const selectedPositions = consentForRequest ? (positions ?? (needsPortfolio ? readAssistantPortfolio() : [])) : [];
     setLoading(true);
     const controller = new AbortController();
     pending.current = controller;
@@ -122,12 +125,15 @@ export function GlobalAssistant() {
     if (!resume) setTurns((current) => [...current, { role: "user", text }]);
     try {
       const result = await askUnifiedAssistant({ message: text, context: {
-        ...activeContext, portfolio_scope: { authorized: consent, position_count: consent ? selectedPositions.length : 0 },
-      }, conversation_id: conversationId, portfolio_consent: consent && selectedPositions.length > 0,
+        ...activeContext, portfolio_scope: { authorized: consentForRequest, position_count: consentForRequest ? selectedPositions.length : 0 },
+      }, conversation_id: conversationId, portfolio_consent: consentForRequest && selectedPositions.length > 0,
       portfolio_positions: selectedPositions }, controller.signal);
       if (pending.current !== controller) return;
       setConversationId(result.conversation_id);
-      if (result.permission_required) { setAuthorized(false); setPendingPermission(text); }
+      if (result.permission_required && context.route === "/options") {
+        setAuthorized(false);
+        setTurns((current) => [...current, { role: "assistant", text: context.language === "fr" ? "Depuis Options, je ne transmets pas les positions. Ouvrez Portefeuille pour les analyser." : "Options does not send positions. Open Portfolio to analyze them." }]);
+      } else if (result.permission_required) { setAuthorized(false); setPendingPermission(text); }
       else setTurns((current) => [...current, { role: "assistant", text: result.answer, result }]);
     } catch (cause) {
       if (pending.current !== controller) return;
@@ -173,7 +179,7 @@ export function GlobalAssistant() {
         <header className={styles.header}><div><strong>Anatole Assistant</strong><small>Ask → Analyze → Navigate</small></div>
           <button type="button" onClick={() => setOpen(false)} aria-label="Fermer l’assistant"><X size={20} /></button></header>
         <div className={styles.toolbar}>
-          {removedForRoute !== context.route && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(context.route)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
+          {removedForRoute !== contextKey && context.surface !== "other" && <span className={styles.chip}>{label}<button type="button" onClick={() => setRemovedForRoute(contextKey)} aria-label="Retirer le contexte"><X size={14} /></button></span>}
           <button type="button" className={styles.reset} onClick={() => { pending.current?.abort(); pending.current = null; setLoading(false); setError(null); setMessage(""); nearBottom.current = true; readingPosition.current = 0; setTurns([]); setConversationId(undefined); setAuthorized(false); setPendingPermission(null); }}>Nouvelle conversation</button>
         </div>
         <div className={styles.history} aria-label="Historique de la conversation" role="log" aria-live="polite" ref={history} onScroll={() => {

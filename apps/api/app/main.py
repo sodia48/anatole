@@ -210,16 +210,18 @@ async def lifespan(_: FastAPI):
         production_baseline_store.run(),
         name="anatole-production-baseline",
     )
+    reminder_task = asyncio.create_task(notification_service.run_option_reminder_worker(), name="anatole-option-reminders")
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
-        for task in (warm_task, baseline_task):
+        for task in (warm_task, baseline_task, reminder_task):
             if not task.done():
                 task.cancel()
         await asyncio.gather(
             warm_task,
             baseline_task,
+            reminder_task,
             return_exceptions=True,
         )
         await production_baseline_store.close()

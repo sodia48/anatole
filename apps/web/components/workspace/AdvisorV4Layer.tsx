@@ -27,7 +27,7 @@ import { useMemo, useState } from "react";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 import type { AdvisorProfile } from "@/lib/types";
 
-import styles from "./AdvisorV4Layer.module.css";
+import "./advisor-v4.css";
 
 const STATE_KEY = "anatole:advisor-workspace:v4";
 
@@ -478,8 +478,8 @@ function ForecastChart({
     ((0 - minValue) / Math.max(1, maxValue - minValue)) * height;
 
   return (
-    <div className={styles.forecastChart} data-testid="advisor-v5-cashflow-chart">
-      <div className={styles.forecastScale}>
+    <div className={"anatole-advisor4_forecastChart__"} data-testid="advisor-v5-cashflow-chart">
+      <div className={"anatole-advisor4_forecastScale__"}>
         <span>{money(maxValue, currency, language)}</span>
         <span>{money((maxValue + minValue) / 2, currency, language)}</span>
         <span>{money(minValue, currency, language)}</span>
@@ -498,11 +498,11 @@ function ForecastChart({
           y1={zeroY}
           x2={width}
           y2={zeroY}
-          className={styles.forecastZero}
+          className={"anatole-advisor4_forecastZero__"}
         />
         <path
           d={pathFor(values, width, height, minValue, maxValue)}
-          className={styles.forecastPath}
+          className={"anatole-advisor4_forecastPath__"}
         />
       </svg>
     </div>
@@ -1089,13 +1089,13 @@ export function AdvisorV4Layer({
 
   return (
     <section
-      className={styles.layer}
+      className={"anatole-advisor4_layer__"}
       data-testid="advisor-v4-layer"
       data-version="5"
     >
-      <header className={styles.hero}>
+      <header className={"anatole-advisor4_hero__"}>
         <div>
-          <span className={styles.eyebrow}>
+          <span className={"anatole-advisor4_eyebrow__"}>
             <Sparkles size={13} />
             ANATOLE CONSEIL · V5
             <small>{pick(language, "moteur V4 migré", "V4 engine migrated")}</small>
@@ -1115,7 +1115,7 @@ export function AdvisorV4Layer({
             )}
           </p>
         </div>
-        <div className={styles.heroActions}>
+        <div className={"anatole-advisor4_heroActions__"}>
           <button type="button" onClick={() => setShowBalance((value) => !value)}>
             <Landmark size={13} />
             {pick(language, "Bilan Anatole", "Anatole Balance")}
@@ -1129,7 +1129,7 @@ export function AdvisorV4Layer({
         </div>
       </header>
 
-      <div className={styles.summaryGrid}>
+      <div className={"anatole-advisor4_summaryGrid__"}>
         <article>
           <span>{pick(language, "Valeur nette", "Net worth")}</span>
           <strong>{money(netWorth, currency, language)}</strong>
@@ -1153,7 +1153,7 @@ export function AdvisorV4Layer({
       </div>
 
       {showBalance ? (
-        <section className={styles.quickBalance} data-testid="advisor-v4-balance">
+        <section className={"anatole-advisor4_quickBalance__"} data-testid="advisor-v4-balance">
           <div>
             <span>{pick(language, "BILAN RAPIDE", "QUICK BALANCE")}</span>
             <strong>{money(netWorth, currency, language)}</strong>
@@ -1190,16 +1190,16 @@ export function AdvisorV4Layer({
               aria-label={pick(language, "Dette totale calculée", "Calculated total debt")}
             />
           </label>
-          <div className={styles.quickBalanceFooter}>
+          <div className={"anatole-advisor4_quickBalanceFooter__"}>
             <span>{pick(language, "Flux mensuel libre", "Monthly free cash flow")}</span>
             <strong>{money(baseMonthlyMargin, currency, language)}</strong>
           </div>
         </section>
       ) : null}
 
-      <section className={styles.decisionComposer}>
+      <section className={"anatole-advisor4_decisionComposer__"}>
         <div>
-          <span className={styles.eyebrow}>
+          <span className={"anatole-advisor4_eyebrow__"}>
             {pick(language, "POSE UNE DÉCISION", "ASK A DECISION")}
           </span>
           <h3>{pick(language, "Et si… ?", "What if…?")}</h3>
@@ -1223,7 +1223,7 @@ export function AdvisorV4Layer({
         />
         {decisionPreview ? (
           <div
-            className={styles.decisionPreview}
+            className={"anatole-advisor4_decisionPreview__"}
             data-testid="advisor-decision-preview"
           >
             <strong>
@@ -1237,7 +1237,7 @@ export function AdvisorV4Layer({
       </section>
 
       <nav
-        className={styles.tabs}
+        className={"anatole-advisor4_tabs__"}
         aria-label={pick(language, "Modules Conseil", "Advice modules")}
         data-testid="advisor-v5-tabs"
       >
@@ -1245,7 +1245,7 @@ export function AdvisorV4Layer({
           <button
             type="button"
             key={id}
-            className={tab === id ? styles.tabActive : styles.tab}
+            className={tab === id ? "anatole-advisor4_tabActive__" : "anatole-advisor4_tab__"}
             aria-pressed={tab === id}
             onClick={() => setTab(id)}
             data-testid={`advisor-v5-tab-${id}`}
@@ -1258,8 +1258,8 @@ export function AdvisorV4Layer({
       </nav>
 
       {tab === "twin" ? (
-        <section className={styles.panel} data-testid="advisor-v5-twin">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-twin">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>01 · FINANCIAL TWIN</span>
               <h3>{pick(language, "Jumeau financier du ménage", "Household financial twin")}</h3>
@@ -1267,7 +1267,7 @@ export function AdvisorV4Layer({
             </div>
             <Users size={24} />
           </div>
-          <div className={styles.formGrid}>
+          <div className={"anatole-advisor4_formGrid__"}>
             {([
               ["userIncome", pick(language, "Revenu net / mois", "Net income / month")],
               ["partnerIncome", pick(language, "Revenu partenaire / mois", "Partner income / month")],
@@ -1294,7 +1294,7 @@ export function AdvisorV4Layer({
               </label>
             ))}
           </div>
-          <div className={styles.metricStrip}>
+          <div className={"anatole-advisor4_metricStrip__"}>
             <article><span>{pick(language, "Actifs saisis", "Entered assets")}</span><strong>{money(totalAssets, currency, language)}</strong></article>
             <article><span>{pick(language, "Dettes", "Debt")}</span><strong>{money(debtsTotal, currency, language)}</strong></article>
             <article><span>{pick(language, "Valeur nette", "Net worth")}</span><strong>{money(netWorth, currency, language)}</strong></article>
@@ -1304,19 +1304,19 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "cashflow" ? (
-        <section className={styles.panel} data-testid="advisor-v5-cashflow">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-cashflow">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>02 · CASH-FLOW 12–36 MOIS</span>
               <h3>{pick(language, "Voir la marge avant qu’elle ne disparaisse", "See margin before it disappears")}</h3>
               <p>{pick(language, "La projection additionne les valeurs saisies, les événements et le scénario actif. Ce n’est pas une prévision de marché.", "The projection combines entered values, events and the active scenario. It is not a market forecast.")}</p>
             </div>
-            <div className={styles.segmented}>
+            <div className={"anatole-advisor4_segmented__"}>
               {[12, 24, 36].map((months) => (
                 <button
                   type="button"
                   key={months}
-                  className={os.forecastMonths === months ? styles.segmentedActive : ""}
+                  className={os.forecastMonths === months ? "anatole-advisor4_segmentedActive__" : ""}
                   onClick={() =>
                     updateFinancialOs((current) => ({
                       ...current,
@@ -1334,7 +1334,7 @@ export function AdvisorV4Layer({
             currency={currency}
             language={language}
           />
-          <div className={styles.metricStrip}>
+          <div className={"anatole-advisor4_metricStrip__"}>
             <article><span>{pick(language, "Départ", "Opening")}</span><strong>{money(forecast[0], currency, language)}</strong></article>
             <article><span>{pick(language, "Minimum", "Minimum")}</span><strong>{money(forecastMinimum, currency, language)}</strong></article>
             <article><span>{pick(language, "Fin de période", "Period end")}</span><strong>{money(forecast[forecast.length - 1], currency, language)}</strong></article>
@@ -1344,15 +1344,15 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "decisions" ? (
-        <section className={styles.panel} data-testid="advisor-v5-decisions">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-decisions">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>03 · DECISION LAB</span>
               <h3>{pick(language, "Tester une décision sans la confondre avec une recommandation", "Test a decision without treating it as a recommendation")}</h3>
             </div>
             <Calculator size={24} />
           </div>
-          <div className={styles.formGrid}>
+          <div className={"anatole-advisor4_formGrid__"}>
             <label>
               <span>{pick(language, "Nom du scénario", "Scenario name")}</span>
               <input
@@ -1433,7 +1433,7 @@ export function AdvisorV4Layer({
               />
             </label>
           </div>
-          <div className={styles.compareGrid}>
+          <div className={"anatole-advisor4_compareGrid__"}>
             <article>
               <span>{pick(language, "Base", "Base")}</span>
               <strong>{money(baseMonthlyMargin, currency, language)} / {pick(language, "mois", "month")}</strong>
@@ -1465,19 +1465,19 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "goals" ? (
-        <section className={styles.panel} data-testid="advisor-v5-goals">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-goals">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>04 · OBJECTIFS MULTIPLES</span>
               <h3>{pick(language, "Voir les objectifs ensemble, pas en silos", "See goals together, not in silos")}</h3>
             </div>
-            <button type="button" className={styles.addButton} onClick={addGoal}>
+            <button type="button" className={"anatole-advisor4_addButton__"} onClick={addGoal}>
               <Plus size={12} />
               {pick(language, "Ajouter", "Add")}
             </button>
           </div>
-          <div className={styles.goalTable}>
-            <article className={styles.goalCurrent}>
+          <div className={"anatole-advisor4_goalTable__"}>
+            <article className={"anatole-advisor4_goalCurrent__"}>
               <div><strong>{currentGoal.label}</strong><small>{pick(language, "Objectif principal", "Primary goal")}</small></div>
               <span>{money(currentGoal.current, currency, language)} / {money(currentGoal.target, currency, language)}</span>
               <span>{money(currentGoal.monthly, currency, language)} / {pick(language, "mois", "month")}</span>
@@ -1491,7 +1491,7 @@ export function AdvisorV4Layer({
                     updateGoal(goal.id, { label: event.target.value })
                   }
                 />
-                <div className={styles.inlineNumbers}>
+                <div className={"anatole-advisor4_inlineNumbers__"}>
                   <input
                     aria-label={pick(language, "Capital actuel", "Current capital")}
                     type="number"
@@ -1527,7 +1527,7 @@ export function AdvisorV4Layer({
                     })
                   }
                 />
-                <div className={styles.goalActions}>
+                <div className={"anatole-advisor4_goalActions__"}>
                   <input
                     aria-label={pick(language, "Horizon en mois", "Horizon in months")}
                     type="number"
@@ -1558,7 +1558,7 @@ export function AdvisorV4Layer({
               </article>
             ))}
           </div>
-          <div className={styles.metricStrip}>
+          <div className={"anatole-advisor4_metricStrip__"}>
             <article><span>{pick(language, "Capital suivi", "Tracked capital")}</span><strong>{money(totalGoalCurrent, currency, language)}</strong></article>
             <article><span>{pick(language, "Cibles cumulées", "Combined targets")}</span><strong>{money(totalGoalTarget, currency, language)}</strong></article>
             <article><span>{pick(language, "Contributions / mois", "Contributions / month")}</span><strong>{money(goalOutflows, currency, language)}</strong></article>
@@ -1567,8 +1567,8 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "tax" ? (
-        <section className={styles.panel} data-testid="advisor-v5-tax">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-tax">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>05 · HUB FISCAL CANADIEN</span>
               <h3>{pick(language, "Suivre les espaces que tu connais déjà", "Track contribution room you already know")}</h3>
@@ -1576,7 +1576,7 @@ export function AdvisorV4Layer({
             </div>
             <FileCheck2 size={24} />
           </div>
-          <div className={styles.taxGrid}>
+          <div className={"anatole-advisor4_taxGrid__"}>
             {taxRows.map(([key, label]) => {
               const bucket = os.tax[key];
               const remaining =
@@ -1616,7 +1616,7 @@ export function AdvisorV4Layer({
               );
             })}
           </div>
-          <div className={styles.disclaimer}>
+          <div className={"anatole-advisor4_disclaimer__"}>
             <ShieldCheck size={14} />
             <span>{pick(language, "Les plafonds légaux et l’admissibilité ne sont pas déduits automatiquement ici. Vérifie les données officielles avant une décision fiscale.", "Legal limits and eligibility are not inferred automatically here. Verify official information before a tax decision.")}</span>
           </div>
@@ -1624,18 +1624,18 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "debt" ? (
-        <section className={styles.panel} data-testid="advisor-v5-debt">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-debt">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>06 · DEBT CENTER</span>
               <h3>{pick(language, "Mesurer le coût des dettes saisies", "Measure the cost of entered debt")}</h3>
             </div>
-            <button type="button" className={styles.addButton} onClick={addDebt}>
+            <button type="button" className={"anatole-advisor4_addButton__"} onClick={addDebt}>
               <Plus size={12} />
               {pick(language, "Ajouter une dette", "Add debt")}
             </button>
           </div>
-          <div className={styles.debtRows}>
+          <div className={"anatole-advisor4_debtRows__"}>
             {os.debts.map((debt) => {
               const payoff = debtPayoffMonths(debt);
               const payoffPlus200 = debtPayoffMonths({
@@ -1690,7 +1690,7 @@ export function AdvisorV4Layer({
                       }
                     />
                   </label>
-                  <div className={styles.debtOutcome}>
+                  <div className={"anatole-advisor4_debtOutcome__"}>
                     <span>{pick(language, "Intérêt mensuel estimé", "Estimated monthly interest")}</span>
                     <b>{money(debt.balance * debt.annualRate / 100 / 12, currency, language)}</b>
                     <small>
@@ -1718,10 +1718,10 @@ export function AdvisorV4Layer({
               );
             })}
             {!os.debts.length ? (
-              <div className={styles.emptyState}>{pick(language, "Ajoute une carte, marge, prêt étudiant, auto ou autre dette pour commencer.", "Add a card, line of credit, student loan, auto loan or other debt to begin.")}</div>
+              <div className={"anatole-advisor4_emptyState__"}>{pick(language, "Ajoute une carte, marge, prêt étudiant, auto ou autre dette pour commencer.", "Add a card, line of credit, student loan, auto loan or other debt to begin.")}</div>
             ) : null}
           </div>
-          <div className={styles.metricStrip}>
+          <div className={"anatole-advisor4_metricStrip__"}>
             <article><span>{pick(language, "Solde total", "Total balance")}</span><strong>{money(debtsTotal, currency, language)}</strong></article>
             <article><span>{pick(language, "Taux pondéré", "Weighted rate")}</span><strong>{percent(weightedDebtRate)}</strong></article>
             <article><span>{pick(language, "Intérêt / mois", "Interest / month")}</span><strong>{money(monthlyInterest, currency, language)}</strong></article>
@@ -1731,8 +1731,8 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "mortgage" ? (
-        <section className={styles.panel} data-testid="advisor-v5-mortgage">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-mortgage">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>07 · MORTGAGE LAB</span>
               <h3>{pick(language, "Achat, coût mensuel et renouvellement", "Purchase, monthly carrying cost and renewal")}</h3>
@@ -1740,7 +1740,7 @@ export function AdvisorV4Layer({
             </div>
             <Home size={24} />
           </div>
-          <div className={styles.formGrid}>
+          <div className={"anatole-advisor4_formGrid__"}>
             {([
               ["purchasePrice", pick(language, "Prix d’achat", "Purchase price")],
               ["downPayment", pick(language, "Mise de fonds", "Down payment")],
@@ -1771,7 +1771,7 @@ export function AdvisorV4Layer({
               </label>
             ))}
           </div>
-          <div className={styles.metricStrip}>
+          <div className={"anatole-advisor4_metricStrip__"}>
             <article><span>{pick(language, "Capital hypothécaire", "Mortgage principal")}</span><strong>{money(mortgagePrincipal, currency, language)}</strong></article>
             <article><span>{pick(language, "Paiement estimé", "Estimated payment")}</span><strong>{money(mortgagePrincipal > 0 ? monthlyMortgage : null, currency, language)}</strong></article>
             <article><span>{pick(language, "Coût logement / mois", "Housing cost / month")}</span><strong>{money(mortgagePrincipal > 0 ? housingMonthly : null, currency, language)}</strong></article>
@@ -1780,7 +1780,7 @@ export function AdvisorV4Layer({
             <article><span>{pick(language, "Scénario +2 points", "Scenario +2 points")}</span><strong>{money(mortgagePrincipal > 0 ? mortgagePayment(balanceAtRenewal, mortgageRate + 2, remainingAmortization) : null, currency, language)}</strong></article>
           </div>
           <Link
-            className={styles.shoppingLink}
+            className={"anatole-advisor4_shoppingLink__"}
             href="/assistant/magasiner?category=mortgage"
           >
             <WalletCards size={14} />
@@ -1791,18 +1791,18 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "events" ? (
-        <section className={styles.panel} data-testid="advisor-v5-events">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-events">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>08 · LIFE EVENTS ENGINE</span>
               <h3>{pick(language, "Mettre les événements dans le temps", "Put life events on the timeline")}</h3>
             </div>
-            <button type="button" className={styles.addButton} onClick={addEvent}>
+            <button type="button" className={"anatole-advisor4_addButton__"} onClick={addEvent}>
               <Plus size={12} />
               {pick(language, "Ajouter", "Add")}
             </button>
           </div>
-          <div className={styles.eventRows}>
+          <div className={"anatole-advisor4_eventRows__"}>
             {os.events.map((event) => (
               <article key={event.id}>
                 <input
@@ -1865,7 +1865,7 @@ export function AdvisorV4Layer({
                     }
                   />
                 </label>
-                <div className={styles.eventDate}>
+                <div className={"anatole-advisor4_eventDate__"}>
                   <CalendarClock size={13} />
                   <span>{futureMonthLabel(event.monthOffset, language)}</span>
                 </div>
@@ -1884,15 +1884,15 @@ export function AdvisorV4Layer({
               </article>
             ))}
             {!os.events.length ? (
-              <div className={styles.emptyState}>{pick(language, "Ajoute une propriété, un enfant, des études, une voiture, une interruption de revenu ou tout autre événement.", "Add a home purchase, child, education, vehicle, income interruption or any other event.")}</div>
+              <div className={"anatole-advisor4_emptyState__"}>{pick(language, "Ajoute une propriété, un enfant, des études, une voiture, une interruption de revenu ou tout autre événement.", "Add a home purchase, child, education, vehicle, income interruption or any other event.")}</div>
             ) : null}
           </div>
         </section>
       ) : null}
 
       {tab === "brief" ? (
-        <section className={styles.panel} data-testid="advisor-v5-brief">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-brief">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>09 · FINANCIAL BRIEF</span>
               <h3>{pick(language, "Ce qui a du poids dans ton modèle aujourd’hui", "What carries weight in your model today")}</h3>
@@ -1900,7 +1900,7 @@ export function AdvisorV4Layer({
             </div>
             <Bell size={24} />
           </div>
-          <div className={styles.briefGrid}>
+          <div className={"anatole-advisor4_briefGrid__"}>
             {briefItems.map((item, index) => (
               <article key={item}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
@@ -1908,7 +1908,7 @@ export function AdvisorV4Layer({
               </article>
             ))}
           </div>
-          <div className={styles.briefFooter}>
+          <div className={"anatole-advisor4_briefFooter__"}>
             <Gauge size={15} />
             <span>{pick(language, `${portfolioCount} position(s) de portefeuille sont reliées au compte; les valeurs du portefeuille ne sont pas automatiquement ajoutées au patrimoine pour éviter le double comptage.`, `${portfolioCount} portfolio position(s) are linked to the account; portfolio values are not automatically added to net worth to avoid double counting.`)}</span>
           </div>
@@ -1916,16 +1916,16 @@ export function AdvisorV4Layer({
       ) : null}
 
       {tab === "quality" ? (
-        <section className={styles.panel} data-testid="advisor-v5-quality">
-          <div className={styles.panelHeading}>
+        <section className={"anatole-advisor4_panel__"} data-testid="advisor-v5-quality">
+          <div className={"anatole-advisor4_panelHeading__"}>
             <div>
               <span>10 · EXPLAINABILITY + DATA QUALITY</span>
               <h3>{pick(language, "D’où vient chaque chiffre ?", "Where does each number come from?")}</h3>
             </div>
             <Database size={24} />
           </div>
-          <div className={styles.qualityTable}>
-            <div className={styles.qualityHead}>
+          <div className={"anatole-advisor4_qualityTable__"}>
+            <div className={"anatole-advisor4_qualityHead__"}>
               <span>{pick(language, "Mesure", "Metric")}</span>
               <span>{pick(language, "Valeur", "Value")}</span>
               <span>{pick(language, "Source", "Source")}</span>
@@ -1937,21 +1937,21 @@ export function AdvisorV4Layer({
                 <strong>{row.label}</strong>
                 <b>{row.value}</b>
                 <span>{row.source}</span>
-                <span className={row.status === "N/D" ? styles.nd : styles.known}>
+                <span className={row.status === "N/D" ? "anatole-advisor4_nd__" : "anatole-advisor4_known__"}>
                   {row.status}
                 </span>
                 <small>{row.formula}</small>
               </article>
             ))}
           </div>
-          <div className={styles.disclaimer}>
+          <div className={"anatole-advisor4_disclaimer__"}>
             <ShieldCheck size={14} />
             <span>{pick(language, "Une valeur N/D reste N/D. Les calculs affichés sont des simulations descriptives basées sur les hypothèses saisies.", "An N/A value stays N/A. Displayed calculations are descriptive simulations based on entered assumptions.")}</span>
           </div>
         </section>
       ) : null}
 
-      <footer className={styles.footer}>
+      <footer className={"anatole-advisor4_footer__"}>
         <div>
           <ShieldCheck size={14} />
           <span>{pick(language, "Synchronisé via le workspace Anatole lorsqu’un compte est connecté.", "Synced through the Anatole workspace when an account is signed in.")}</span>

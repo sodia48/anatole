@@ -49,7 +49,7 @@ import {
   type ShoppingQuestion,
 } from "@/lib/shoppingWizard";
 
-import styles from "./Shopping.module.css";
+import "./shopping.css";
 
 const ICONS = {
   credit_card: CreditCard,
@@ -114,7 +114,7 @@ function QuestionView({
 }) {
   if (question.type === "number") {
     return (
-      <div className={styles.numberAnswer}>
+      <div className={"anatole-shopping_numberAnswer__"}>
         <input
           autoFocus
           min={question.min}
@@ -145,7 +145,7 @@ function QuestionView({
     return (
       <select
         autoFocus
-        className={styles.selectAnswer}
+        className={"anatole-shopping_selectAnswer__"}
         value={typeof answer === "string" ? answer : ""}
         onChange={(event) => onAnswer(event.target.value)}
       >
@@ -162,19 +162,19 @@ function QuestionView({
   }
 
   return (
-    <div className={styles.answerGrid}>
+    <div className={"anatole-shopping_answerGrid__"}>
       {question.options?.map((option) => {
         const active = answer === option.value;
         return (
           <button
             key={option.value}
             type="button"
-            className={`${styles.answerCard} ${
-              active ? styles.answerCardActive : ""
+            className={`${"anatole-shopping_answerCard__"} ${
+              active ? "anatole-shopping_answerCardActive__" : ""
             }`}
             onClick={() => onAnswer(option.value)}
           >
-            <span className={styles.answerCheck}>
+            <span className={"anatole-shopping_answerCheck__"}>
               {active ? <Check size={14} /> : null}
             </span>
             <strong>
@@ -314,14 +314,14 @@ export function ShoppingClient() {
   }
 
   return (
-    <main className={styles.page}>
-      <header className={styles.hero}>
+    <main className={"anatole-shopping_page__"}>
+      <header className={"anatole-shopping_hero__"}>
         <div>
-          <Link href="/assistant" className={styles.backLink}>
+          <Link href="/assistant" className={"anatole-shopping_backLink__"}>
             <ArrowLeft size={15} />
             {pick(language, "Anatole Conseil", "Anatole Advice")}
           </Link>
-          <span className={styles.eyebrow}>
+          <span className={"anatole-shopping_eyebrow__"}>
             ANATOLE {pick(language, "MAGASINER", "SHOP")}
           </span>
           <h1>
@@ -339,7 +339,7 @@ export function ShoppingClient() {
             )}
           </p>
         </div>
-        <div className={styles.heroSeal}>
+        <div className={"anatole-shopping_heroSeal__"}>
           <Sparkles size={22} />
           <strong>
             {stage === "results"
@@ -354,7 +354,7 @@ export function ShoppingClient() {
         </div>
       </header>
 
-      <section className={styles.promiseBar}>
+      <section className={"anatole-shopping_promiseBar__"}>
         <span>
           <ShieldCheck size={15} />
           {pick(
@@ -374,8 +374,8 @@ export function ShoppingClient() {
       </section>
 
       {stage === "category" ? (
-        <section className={styles.categoryStage}>
-          <div className={styles.stageHeading}>
+        <section className={"anatole-shopping_categoryStage__"}>
+          <div className={"anatole-shopping_stageHeading__"}>
             <span>01</span>
             <div>
               <h2>
@@ -395,17 +395,17 @@ export function ShoppingClient() {
             </div>
           </div>
 
-          <div className={styles.categoryGrid}>
+          <div className={"anatole-shopping_categoryGrid__"}>
             {SHOPPING_CATEGORIES.map((item) => {
               const Icon = ICONS[item.id];
               return (
                 <button
                   key={item.id}
                   type="button"
-                  className={styles.categoryCard}
+                  className={"anatole-shopping_categoryCard__"}
                   onClick={() => chooseCategory(item.id)}
                 >
-                  <span className={styles.categoryIcon}>
+                  <span className={"anatole-shopping_categoryIcon__"}>
                     <Icon size={24} />
                   </span>
                   <strong>
@@ -418,7 +418,7 @@ export function ShoppingClient() {
                       item.descriptionEn,
                     )}
                   </small>
-                  <span className={styles.categoryCta}>
+                  <span className={"anatole-shopping_categoryCta__"}>
                     {pick(language, "Commencer", "Start")}{" "}
                     <ArrowRight size={13} />
                   </span>
@@ -430,11 +430,11 @@ export function ShoppingClient() {
       ) : null}
 
       {stage === "quiz" && category && currentQuestion ? (
-        <section className={styles.quizShell}>
-          <aside className={styles.quizRail}>
+        <section className={"anatole-shopping_quizShell__"}>
+          <aside className={"anatole-shopping_quizRail__"}>
             <button
               type="button"
-              className={styles.categoryMini}
+              className={"anatole-shopping_categoryMini__"}
               onClick={() => setStage("category")}
             >
               {(() => {
@@ -450,14 +450,14 @@ export function ShoppingClient() {
               </span>
             </button>
 
-            <div className={styles.progressBlock}>
+            <div className={"anatole-shopping_progressBlock__"}>
               <div>
                 <span>
                   {pick(language, "Progression", "Progress")}
                 </span>
                 <strong>{progress}%</strong>
               </div>
-              <div className={styles.progressTrack}>
+              <div className={"anatole-shopping_progressTrack__"}>
                 <span style={{ width: `${progress}%` }} />
               </div>
               <small>
@@ -469,7 +469,7 @@ export function ShoppingClient() {
               </small>
             </div>
 
-            <div className={styles.railNote}>
+            <div className={"anatole-shopping_railNote__"}>
               <WalletCards size={18} />
               <p>
                 {pick(
@@ -482,14 +482,14 @@ export function ShoppingClient() {
           </aside>
 
           <div
-            className={styles.questionPanel}
+            className={"anatole-shopping_questionPanel__"}
             data-testid={`shopping-question-${currentQuestion.id}`}
           >
-            <div className={styles.questionNumber}>
+            <div className={"anatole-shopping_questionNumber__"}>
               {String(questionIndex + 1).padStart(2, "0")}
             </div>
-            <div className={styles.questionCopy}>
-              <span className={styles.eyebrow}>
+            <div className={"anatole-shopping_questionCopy__"}>
+              <span className={"anatole-shopping_eyebrow__"}>
                 {pick(
                   language,
                   "TON PROFIL DE MAGASINAGE",
@@ -519,10 +519,10 @@ export function ShoppingClient() {
               onAnswer={answer}
             />
 
-            <div className={styles.quizActions}>
+            <div className={"anatole-shopping_quizActions__"}>
               <button
                 type="button"
-                className={styles.secondaryButton}
+                className={"anatole-shopping_secondaryButton__"}
                 onClick={previous}
               >
                 <ChevronLeft size={15} />
@@ -531,7 +531,7 @@ export function ShoppingClient() {
               <button
                 type="button"
                 data-testid="shopping-continue"
-                className={styles.primaryButton}
+                className={"anatole-shopping_primaryButton__"}
                 disabled={!questionAnswered(currentQuestion, answers)}
                 onClick={next}
               >
@@ -550,10 +550,10 @@ export function ShoppingClient() {
       ) : null}
 
       {stage === "results" && category && profile ? (
-        <section className={styles.resultsStage}>
-          <div className={styles.resultsHero}>
+        <section className={"anatole-shopping_resultsStage__"}>
+          <div className={"anatole-shopping_resultsHero__"}>
             <div>
-              <span className={styles.eyebrow}>
+              <span className={"anatole-shopping_eyebrow__"}>
                 {pick(
                   language,
                   "PROFIL TERMINÉ",
@@ -575,10 +575,10 @@ export function ShoppingClient() {
                 )}
               </p>
             </div>
-            <div className={styles.resultsActions}>
+            <div className={"anatole-shopping_resultsActions__"}>
               <button
                 type="button"
-                className={styles.secondaryButton}
+                className={"anatole-shopping_secondaryButton__"}
                 onClick={() => {
                   setStage("quiz");
                   setQuestionIndex(0);
@@ -589,7 +589,7 @@ export function ShoppingClient() {
               </button>
               <button
                 type="button"
-                className={styles.ghostButton}
+                className={"anatole-shopping_ghostButton__"}
                 onClick={restartQuiz}
               >
                 <RotateCcw size={14} />
@@ -598,7 +598,7 @@ export function ShoppingClient() {
             </div>
           </div>
 
-          <div className={styles.answerSummary}>
+          <div className={"anatole-shopping_answerSummary__"}>
             {questions.map((question) => {
               const label = answerLabel(
                 question,
@@ -629,7 +629,7 @@ export function ShoppingClient() {
             />
           ) : null}
 
-          <div className={styles.stageHeading}>
+          <div className={"anatole-shopping_stageHeading__"}>
             <span>↳</span>
             <div>
               <h2>
@@ -645,7 +645,7 @@ export function ShoppingClient() {
             </div>
           </div>
 
-          <div className={styles.suggestionGrid}>
+          <div className={"anatole-shopping_suggestionGrid__"}>
             {suggestions.slice(0, 3).map((suggestion, index) => {
               const source = suggestion.sourceIds
                 .map(shoppingSourceById)
@@ -653,17 +653,17 @@ export function ShoppingClient() {
               return (
                 <article
                   key={suggestion.id}
-                  className={`${styles.suggestionCard} ${
-                    index === 0 ? styles.suggestionPrimary : ""
+                  className={`${"anatole-shopping_suggestionCard__"} ${
+                    index === 0 ? "anatole-shopping_suggestionPrimary__" : ""
                   }`}
                 >
                   <header>
-                    <span className={styles.rankTag}>
+                    <span className={"anatole-shopping_rankTag__"}>
                       {index === 0
                         ? pick(language, "MEILLEURE CORRESPONDANCE", "TOP MATCH")
                         : `#${index + 1}`}
                     </span>
-                    <div className={styles.matchScore}>
+                    <div className={"anatole-shopping_matchScore__"}>
                       <strong>{suggestion.matchScore}%</strong>
                       <span>
                         {pick(language, "match", "match")}
@@ -678,7 +678,7 @@ export function ShoppingClient() {
                       suggestion.titleEn,
                     )}
                   </h3>
-                  <p className={styles.suggestionDescription}>
+                  <p className={"anatole-shopping_suggestionDescription__"}>
                     {pick(
                       language,
                       suggestion.descriptionFr,
@@ -686,7 +686,7 @@ export function ShoppingClient() {
                     )}
                   </p>
 
-                  <div className={styles.reasonBlock}>
+                  <div className={"anatole-shopping_reasonBlock__"}>
                     <strong>
                       {pick(
                         language,
@@ -707,7 +707,7 @@ export function ShoppingClient() {
                     </ul>
                   </div>
 
-                  <div className={styles.watchBlock}>
+                  <div className={"anatole-shopping_watchBlock__"}>
                     <strong>
                       {pick(
                         language,
@@ -734,7 +734,7 @@ export function ShoppingClient() {
                       }
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={styles.sourceButton}
+                      className={"anatole-shopping_sourceButton__"}
                     >
                       <FileText size={14} />
                       {pick(
@@ -751,8 +751,8 @@ export function ShoppingClient() {
           </div>
 
           {productMatches.length ? null : verifiedOffers.length ? (
-            <section className={styles.verifiedSection}>
-              <div className={styles.stageHeading}>
+            <section className={"anatole-shopping_verifiedSection__"}>
+              <div className={"anatole-shopping_stageHeading__"}>
                 <span>+</span>
                 <div>
                   <h2>
@@ -772,7 +772,7 @@ export function ShoppingClient() {
                 </div>
               </div>
 
-              <div className={styles.verifiedGrid}>
+              <div className={"anatole-shopping_verifiedGrid__"}>
                 {verifiedOffers.map((evaluation) => (
                   <article key={evaluation.offer.id}>
                     <div>
@@ -811,7 +811,7 @@ export function ShoppingClient() {
               </div>
             </section>
           ) : (
-            <section className={styles.dataBoundary}>
+            <section className={"anatole-shopping_dataBoundary__"}>
               <ShieldCheck size={19} />
               <div>
                 <strong>

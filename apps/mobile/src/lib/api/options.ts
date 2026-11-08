@@ -34,7 +34,7 @@ export type OptionContract = {
   contract: string | null;
   side: OptionSide;
   strike: number;
-  expiration: string;
+  expiration: string | null;
   exchange: string;
   bid: number | null;
   ask: number | null;
@@ -68,10 +68,10 @@ export type OptionChainSnapshot = {
     contract_count: number;
     call_count: number;
     put_count: number;
-    call_volume: number;
-    put_volume: number;
-    call_open_interest: number;
-    put_open_interest: number;
+    call_volume: number | null;
+    put_volume: number | null;
+    call_open_interest: number | null;
+    put_open_interest: number | null;
     put_call_volume_ratio: number | null;
     put_call_open_interest_ratio: number | null;
     atm_implied_volatility: number | null;
@@ -83,7 +83,72 @@ export type OptionChainSnapshot = {
   stale: boolean;
 };
 
+export type OptionPayoffRequest = {
+  legs: { symbol: string; market: "equity" | "futures"; underlying: string; currency: string;
+    expiry: string; side: OptionSide; direction: "long" | "short"; strike: string; premium: string;
+    quantity: number; multiplier: string; price_source: string; premium_style: "upfront" }[];
+  domain_min: string | null;
+  domain_max: string | null;
+  prices: string[];
+};
+
+export type OptionPayoffResponse = {
+  currency: string;
+  points: { price: string; profit_loss: string }[];
+  theoretical_debit: string | null;
+  minimum_profit_loss: string | null;
+  maximum_profit_loss: string | null;
+  loss_unbounded: boolean;
+  gain_unbounded: boolean;
+  break_evens: { lower: string | null; upper: string | null }[];
+};
+
+export type OptionAccountReminder = { position_id: string; underlying: string; expires_at: string;
+  reminder_days: number; triggered_at: string | null };
+
+export type AccountOptionPositionDraft = {
+  symbol: string;
+  underlying: string;
+  market: OptionMarket;
+  contract: string | null;
+  side: OptionSide;
+  strike: number;
+  expiration: string;
+  expiry_at: string;
+  direction: "long" | "short";
+  quantity: number;
+  multiplier: number;
+  premium: number;
+  currency: string;
+  reminder_days: number;
+};
+
+export type AccountOptionPosition = AccountOptionPositionDraft & { id: string };
+export type AccountOptionPositions = { revision: number; positions: AccountOptionPosition[] };
+
 export const optionsApi = {
+  accountPositions: (accountId: string, signal?: AbortSignal) => apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+    auth: true, headers: { "X-Anatole-Account": accountId }, signal,
+  }),
+  createAccountPosition: (payload: { expected_account_id: string; expected_revision: number; position: AccountOptionPositionDraft }, signal?: AbortSignal) =>
+    apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+      method: "POST", auth: true, body: JSON.stringify(payload), signal,
+    }),
+  saveAccountPositions: (payload: { expected_account_id: string; expected_revision: number; positions: AccountOptionPosition[] }, signal?: AbortSignal) =>
+    apiRequest<AccountOptionPositions>("/api/v1/account/option-positions", {
+      method: "PUT", auth: true, body: JSON.stringify(payload), signal,
+    }),
+  reminders: (accountId: string) => apiRequest<OptionAccountReminder[]>("/api/v1/notifications/option-reminders/account", {
+    auth: true, headers: { "X-Anatole-Account": accountId },
+  }),
+  createReminder: (payload: { expected_account_id: string; underlying: string; expires_at: string; reminder_days: number }) =>
+    apiRequest<{ position_id: string }>("/api/v1/notifications/option-reminders/create", { method: "POST", auth: true, body: JSON.stringify(payload) }),
+  deleteReminder: (id: string, accountId: string) => apiRequest<void>(`/api/v1/notifications/option-reminders/${encodeURIComponent(id)}`, {
+    method: "DELETE", auth: true, headers: { "X-Anatole-Account": accountId },
+  }),
+  payoff: (payload: OptionPayoffRequest) => apiRequest<OptionPayoffResponse>("/api/v1/options/strategy/payoff", {
+    method: "POST", body: JSON.stringify(payload), timeoutMs: 15_000,
+  }),
   universe: (market: OptionMarket, signal?: AbortSignal) =>
     apiRequest<OptionUniverseSnapshot>(
       `/api/v1/options/universe?market=${market}`,

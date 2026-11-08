@@ -27,6 +27,7 @@ const ROUTES = new Map<string, ReadonlySet<string>>([
   ["logout", new Set(["POST"])],
   ["logout-all", new Set(["POST"])],
   ["workspace", new Set(["GET", "PUT"])],
+  ["option-positions", new Set(["GET", "PUT"])],
   ["profile", new Set(["PUT"])],
   ["change-password", new Set(["POST"])],
   ["export", new Set(["GET"])],
@@ -128,6 +129,10 @@ async function proxy(
   }
   const requestId = request.headers.get("X-Request-ID");
   if (requestId) headers.set("X-Request-ID", requestId);
+  if (route === "option-positions") {
+    const expectedAccount = request.headers.get("X-Anatole-Account");
+    if (expectedAccount) headers.set("X-Anatole-Account", expectedAccount);
+  }
 
   let body: ArrayBuffer | undefined;
   if (!["GET", "HEAD"].includes(request.method)) {

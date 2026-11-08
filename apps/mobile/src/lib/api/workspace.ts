@@ -2,17 +2,19 @@ import { apiRequest } from "./base";
 import type { AlertRule, AlertSnapshot, AssistantResponse, PortfolioPositionInput, PortfolioSnapshot } from "./types";
 
 export type MobileAssistantContext = {
-  surface: "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "compare" | "other";
+  surface: "stock" | "etf" | "portfolio" | "market" | "news" | "canada360" | "compare" | "options" | "other";
   route: string;
   symbol?: string;
   symbols: string[];
   instrument_type: "stock" | "etf" | "index" | "unknown";
   portfolio_scope: { authorized: boolean; position_count: number };
   language: "fr" | "en";
+  metadata?: Record<string, string>;
 };
 export type MobileUnifiedAssistantResponse = AssistantResponse & {
   conversation_id: string;
   permission_required: boolean;
+  synthesis_provider?: string | null;
   actions: { label: string; href: string; kind: "navigate" }[];
 };
 

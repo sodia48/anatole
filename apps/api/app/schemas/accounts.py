@@ -12,7 +12,8 @@ from pydantic import (
     model_validator,
 )
 
-from app.schemas.notifications import NotificationItem, NotificationPreferences
+from app.schemas.notifications import NotificationItem, NotificationPreferences, OptionExpiryReminder
+from app.schemas.option_positions import AccountOptionPositions
 from app.schemas.workspace import AdvisorProfile, AlertRule, PortfolioPositionInput
 
 
@@ -425,3 +426,5 @@ class AccountExport(BaseModel):
     workspace: WorkspaceSnapshot
     notification_preferences: NotificationPreferences | None = None
     notifications: list[NotificationItem] = Field(default_factory=list)
+    option_expiry_reminders: list[OptionExpiryReminder] = Field(default_factory=list)
+    option_positions: AccountOptionPositions = Field(default_factory=lambda: AccountOptionPositions(revision=0))
