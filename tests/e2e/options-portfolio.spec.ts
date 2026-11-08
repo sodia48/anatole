@@ -16,10 +16,11 @@ test("tracks a verified option locally with an expiry reminder", async ({ page }
   } }));
   await page.goto("/options");
   await expect(page.getByRole("heading", { name: "RY · Synthetic RY" })).toBeVisible();
-  await page.getByRole("button", { name: "Screener de contrats" }).click();
+  await page.getByRole("navigation", { name: "Vues de la chaîne" }).getByRole("button", { name: "Screener" }).click();
   await page.getByRole("region", { name: "Screener de contrats" }).getByRole("button", { name: "Suivre" }).click();
-  await expect(page.getByRole("link", { name: "Voir les positions" })).toHaveAttribute("href", "#options-positions");
+  await expect(page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Portefeuille" })).toHaveAttribute("aria-current", "page");
   const panel = page.getByRole("region", { name: "Positions d'options" });
+  await panel.getByText("Méthode, limites et confidentialité").click();
   await expect(panel.getByText(/aucune notification en arrière-plan/i)).toBeVisible();
   await panel.getByLabel("Nombre de contrats").fill("2");
   await panel.getByLabel("Multiplicateur vérifié").fill("100");
@@ -48,7 +49,7 @@ test("tracks a verified option locally with an expiry reminder", async ({ page }
   await expect(builder.locator(".op-scenario").first()).toContainText("Débit théorique: 600");
   await page.screenshot({ path: testInfo.outputPath("options-position-synthetic.png"), fullPage: true });
   await page.reload();
-  await page.getByRole("button", { name: "Positions d'options" }).click();
+  await page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Portefeuille" }).click();
   const restored = page.getByRole("region", { name: "Positions d'options" });
   await expect(restored.getByText("Rappel : échéance proche.")).toBeVisible();
   await restored.getByRole("button", { name: "Retirer du suivi" }).click();

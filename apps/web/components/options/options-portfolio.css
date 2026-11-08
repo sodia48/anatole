@@ -2,6 +2,12 @@
 .op-positions { padding: 18px; }
 .op-positions h2, .op-positions h3, .op-positions p { margin: 0; }
 .op-positions p { color: var(--muted); }
+.op-positionIntro { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; color: var(--muted); }
+.op-positionIntro strong { color: var(--accent-text); font-size: 13px; letter-spacing: .02em; }
+.op-positionSource { display: flex; flex-wrap: wrap; gap: 8px; }
+.op-positionNotes { border-top: 1px solid var(--border); padding-top: 10px; }
+.op-positionNotes summary { color: var(--accent-text); cursor: pointer; font-weight: 700; }
+.op-positionNotes[open] { display: grid; gap: 10px; }
 .op-position-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .op-position-fields label { display: grid; gap: 6px; }
 .op-position-fields input, .op-position-fields select { min-width: 0; min-height: 42px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); }

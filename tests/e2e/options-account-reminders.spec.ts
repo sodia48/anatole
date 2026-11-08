@@ -27,7 +27,7 @@ test("creates and removes an account expiry reminder without sending position am
     source_statuses: [], generated_at: expiry, refresh_after_seconds: 3600, stale: false,
   } }));
   await page.goto("/options");
-  await page.getByRole("button", { name: "Positions d'options" }).click();
+  await page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Portefeuille" }).click();
   const panel = page.getByRole("region", { name: "Positions d'options" });
   await expect(panel.getByText("Rappels d'échéance du compte")).toBeVisible();
   const submit = page.waitForRequest((request) => request.url().endsWith("/api/notifications/option-reminders") && request.method() === "POST");
@@ -43,7 +43,7 @@ test("creates and removes an account expiry reminder without sending position am
   await expect(panel.getByRole("link", { name: "Ouvrir Notifications" })).toHaveAttribute("href", "/notifications");
   await page.screenshot({ path: testInfo.outputPath("account-reminder-synthetic.png"), fullPage: true });
   await page.reload();
-  await page.getByRole("button", { name: "Positions d'options" }).click();
+  await page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Portefeuille" }).click();
   await panel.getByRole("button", { name: "Supprimer ce rappel" }).click();
   await expect(panel.getByRole("button", { name: "Activer le rappel SYNTH-RY-CALL" })).toBeVisible();
   expect((await (await page.request.get("/api/notifications/option-reminders")).json())).toEqual([]);

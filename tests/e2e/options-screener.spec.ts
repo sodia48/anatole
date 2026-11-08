@@ -21,9 +21,9 @@ test("filters the loaded chain, distinguishes missing liquidity and adds a contr
   } }));
   await page.goto("/options");
   await expect(page.getByRole("heading", { name: "RY · Synthetic RY" })).toBeVisible();
-  await page.getByRole("button", { name: "Screener de contrats" }).click();
+  await page.getByRole("navigation", { name: "Vues de la chaîne" }).getByRole("button", { name: "Screener" }).click();
   const screen = page.getByRole("region", { name: "Screener de contrats" });
-  await expect(screen.getByText(/chaîne chargée, pas à tout le marché/i)).toBeVisible();
+  await expect(screen.getByText(/Chaîne chargée uniquement, pas tout le marché/i)).toBeVisible();
   await expect(screen.getByText(/instantané récupéré/i)).toContainText("périmé");
   await expect(screen.getByRole("row", { name: /SYNTH-PUT-90/ })).toContainText("N/D");
   const zeroRow = screen.getByRole("row", { name: /SYNTH-CALL-100/ });
@@ -38,9 +38,6 @@ test("filters the loaded chain, distinguishes missing liquidity and adds a contr
   await screen.getByRole("combobox", { name: "Échéance", exact: true }).selectOption("2027-12-23");
   await expect(screen.getByText("1 contrat correspondant")).toBeVisible();
   await screen.getByLabel("Contrat ou strike").fill("110");
-  await screen.getByRole("row", { name: /SYNTH-CALL-110/ }).getByRole("button", { name: "Ajouter" }).click();
-  await expect(screen.getByText("Contrat ajouté")).toBeVisible();
-  await expect(page.getByRole("region", { name: "Constructeur de stratégie" }).getByText(/SYNTH-CALL-110/)).toBeVisible();
   if (testInfo.project.name.startsWith("mobile")) {
     const table = screen.locator(".op-screen-table");
     await expect(screen.getByText(/défiler le tableau horizontalement/)).toBeVisible();
@@ -49,5 +46,8 @@ test("filters the loaded chain, distinguishes missing liquidity and adds a contr
     const button = screen.getByRole("row", { name: /SYNTH-CALL-110/ }).getByRole("button", { name: "Ajouter" });
     expect((await button.boundingBox())!.height).toBeLessThan(70);
   }
+  await screen.getByRole("row", { name: /SYNTH-CALL-110/ }).getByRole("button", { name: "Ajouter" }).click();
+  await expect(page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Stratégies" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("region", { name: "Constructeur de stratégie" }).getByText(/SYNTH-CALL-110/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("screener-synthetic.png"), fullPage: true });
 });

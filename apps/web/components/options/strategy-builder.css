@@ -17,4 +17,11 @@
 .op-strategy table { width: 100%; border-collapse: collapse; text-align: left; }
 .op-strategy td, .op-strategy th { padding: 5px; border-bottom: 1px solid var(--border); }
 .op-strategy summary { cursor: pointer; }
+.op-strategyLayout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 20px; align-items: start; }
+.op-strategyEditor, .op-strategyResults, .op-strategyEmpty { display: grid; gap: 12px; min-width: 0; }
+.op-strategyResults { position: sticky; top: 12px; max-height: min(80vh, 900px); overflow-y: auto; }
+.op-strategyEmpty { padding: 22px; border: 1px dashed var(--border); border-radius: 12px; }
+.op-strategyEmpty strong { color: var(--text); }
+.op-strategyEmpty button { justify-self: start; }
+@media (max-width: 920px) { .op-strategyLayout { grid-template-columns: 1fr; } .op-strategyResults { position: static; max-height: none; } }
 @media (max-width: 720px) { .op-strategy-fields > label { flex-basis: 100%; } }

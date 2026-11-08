@@ -7,7 +7,6 @@ import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } 
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { useAssistantContext } from "@/components/assistant/AssistantContextProvider";
-import { pick } from "@/lib/i18n";
 import {
   getOptionChain,
   getOptionsUniverse,
@@ -19,6 +18,7 @@ import {
 } from "@/lib/options-api";
 
 import "./options.css";
+import { useOptionsText } from "./OptionsCopyProvider";
 import { PremiumChain } from "./PremiumChain";
 import type { StrategyLeg } from "./StrategyBuilder";
 import type { TrackedOption } from "./options-positions";
@@ -29,6 +29,23 @@ const OptionsScreener = dynamic(() => import("./OptionsScreener").then((module) 
 const OptionsPortfolio = dynamic(() => import("./OptionsPortfolio").then((module) => module.OptionsPortfolio), { ssr: false });
 
 type SideFilter = "both" | "call" | "put";
+type Workspace = "chain" | "strategies" | "volatility" | "portfolio";
+type ChainView = "quotes" | "screener";
+const WORKSPACES: Workspace[] = ["chain", "strategies", "volatility", "portfolio"];
+const SYMBOL_KEY = "anatole.options.symbol.v2";
+const RECENT_KEY = "anatole.options.recent.v2";
+const FAVORITES_KEY = "anatole.options.favorites.v2";
+
+function storedSymbols(key: string): string[] {
+  try {
+    const values: unknown = JSON.parse(window.localStorage.getItem(key) ?? "[]");
+    return Array.isArray(values) ? values.filter((value): value is string => typeof value === "string" && /^[A-Z0-9.^-]{1,16}$/.test(value)).slice(0, 12) : [];
+  } catch { return []; }
+}
+
+function workspaceFrom(value: string | null): Workspace {
+  return WORKSPACES.find((item) => item === value) ?? "chain";
+}
 
 function SelectControl({ label, value, onChange, disabled, children }: {
   label: string; value: string; onChange: (value: string) => void; disabled?: boolean; children: ReactNode;
@@ -82,10 +99,12 @@ function Status({ item }: { item: OptionSourceStatus }) {
 }
 
 export function OptionsClient() {
-  const rawSymbol = useSearchParams().get("symbol");
+  const params = useSearchParams();
+  const rawSymbol = params.get("symbol");
   const { preferences } = usePreferences();
   const { openAssistant } = useAssistantContext();
   const language = preferences.language;
+  const t = useOptionsText(language);
   const requestedSymbol = rawSymbol?.trim().toUpperCase().replace(/\.TO$/, "");
   const initialSymbol = requestedSymbol === undefined ? "RY" : /^[A-Z0-9.^-]{1,16}$/.test(requestedSymbol) ? requestedSymbol : "";
   const [market, setMarket] = useState<OptionMarket>("tsx");
@@ -99,16 +118,64 @@ export function OptionsClient() {
   const [loadingUniverse, setLoadingUniverse] = useState(true);
   const [loadingChain, setLoadingChain] = useState(Boolean(initialSymbol));
   const [universeError, setUniverseError] = useState<string | null>(null);
-  const [chainError, setChainError] = useState<string | null>(initialSymbol ? null : pick(language, "Symbole invalide.", "Invalid symbol."));
+  const [chainError, setChainError] = useState<string | null>(initialSymbol ? null : t("client_001"));
   const [refreshKey, setRefreshKey] = useState(0);
   const [legs, setLegs] = useState<StrategyLeg[]>([]);
-  const [showStrategy, setShowStrategy] = useState(false);
-  const [showVolatility, setShowVolatility] = useState(false);
-  const [showScreener, setShowScreener] = useState(false);
-  const [showPortfolio, setShowPortfolio] = useState(false);
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>(() => workspaceFrom(params.get("workspace")));
+  const [chainView, setChainView] = useState<ChainView>(params.get("view") === "screener" ? "screener" : "quotes");
+  const [visited, setVisited] = useState<Workspace[]>([workspaceFrom(params.get("workspace"))]);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [screenerOpened, setScreenerOpened] = useState(params.get("view") === "screener");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [symbolReady, setSymbolReady] = useState(rawSymbol !== null);
   const [trackedContract, setTrackedContract] = useState<OptionContract | null>(null);
   const [appliedQuery, setAppliedQuery] = useState(rawSymbol);
   const nextLegId = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setFavorites(storedSymbols(FAVORITES_KEY));
+      setRecent(storedSymbols(RECENT_KEY));
+      if (rawSymbol === null) {
+        try {
+          const saved = window.localStorage.getItem(`${SYMBOL_KEY}.tsx`);
+          if (saved && /^[A-Z0-9.^-]{1,16}$/.test(saved)) { setSymbol(saved); setDraftSymbol(saved); }
+        } catch { /* Storage is optional. */ }
+        setSymbolReady(true);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [rawSymbol]);
+
+  useEffect(() => {
+    const sync = () => {
+      const url = new URL(window.location.href);
+      const workspace = workspaceFrom(url.searchParams.get("workspace"));
+      setActiveWorkspace(workspace);
+      setChainView(url.searchParams.get("view") === "screener" ? "screener" : "quotes");
+      setVisited((current) => current.includes(workspace) ? current : [...current, workspace]);
+    };
+    window.addEventListener("popstate", sync);
+    return () => window.removeEventListener("popstate", sync);
+  }, []);
+
+  function navigate(workspace: Workspace, view: ChainView = chainView) {
+    const url = new URL(window.location.href);
+    if (workspace === "chain") {
+      url.searchParams.delete("workspace");
+      if (view === "screener") url.searchParams.set("view", "screener");
+      else url.searchParams.delete("view");
+    } else {
+      url.searchParams.set("workspace", workspace);
+      url.searchParams.delete("view");
+    }
+    window.history.pushState(null, "", url);
+    setActiveWorkspace(workspace);
+    setChainView(view);
+    if (view === "screener" && workspace === "chain") setScreenerOpened(true);
+    setVisited((current) => current.includes(workspace) ? current : [...current, workspace]);
+  }
 
   if (appliedQuery !== rawSymbol) {
     setAppliedQuery(rawSymbol);
@@ -119,18 +186,24 @@ export function OptionsClient() {
     setChain(null);
     setTrackedContract(null);
     setLoadingChain(Boolean(initialSymbol));
-    setChainError(initialSymbol ? null : pick(language, "Symbole invalide.", "Invalid symbol."));
+    setChainError(initialSymbol ? null : t("client_002"));
   }
 
   function addStrategyLeg(contract: OptionContract) {
+    if (legs.some((leg) => leg.contract.market === contract.market && leg.contract.underlying === contract.underlying &&
+      leg.contract.contract === contract.contract && leg.contract.symbol === contract.symbol &&
+      leg.contract.expiration === contract.expiration && leg.contract.side === contract.side && leg.contract.strike === contract.strike)) {
+      navigate("strategies");
+      return true;
+    }
     if (legs.length >= 20) {
-      setChainError(pick(language, "La stratégie est limitée à 20 jambes.", "A strategy is limited to 20 legs."));
+      setChainError(t("client_003"));
       return false;
     }
     setChainError(null);
     const id = nextLegId.current++;
     setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: "long", quantity: "1", premium: "", multiplier: "", snapshotStale: chain?.stale ?? false, snapshotAt: chain?.generated_at ?? "", upfront: false }]);
-    setShowStrategy(true);
+    navigate("strategies");
     return true;
   }
 
@@ -144,31 +217,31 @@ export function OptionsClient() {
       side: position.side, strike: position.strike, expiration: position.expiration, exchange: "",
       bid: null, ask: null, last: null, change: null, percent_change: null, volume: null, open_interest: null,
       implied_volatility: null, delta: null, gamma: null, theta: null, vega: null, in_the_money: null,
-      source: pick(language, "saisie utilisateur", "user entry"), delayed: true,
+      source: t("client_004"), delayed: true,
     };
     const id = nextLegId.current++;
     setLegs((current) => current.length >= 20 ? current : [...current, { id, contract, direction: position.direction,
       quantity: String(position.quantity), premium: String(position.premium), multiplier: String(position.multiplier),
       upfront: true, verifiedCurrency: position.currency, verifiedExpiry: position.expiry_at,
       snapshotStale: matches.length !== 1 || (chain?.stale ?? true), snapshotAt: matches.length === 1 ? chain?.generated_at ?? "" : "" }]);
-    setShowStrategy(true);
+    navigate("strategies");
     return true;
   }
 
   useEffect(() => {
     const controller = new AbortController();
     settleRequest(getOptionsUniverse(market, controller.signal), controller, setUniverse, setUniverseError, setLoadingUniverse,
-      pick(language, "Univers d'options indisponible.", "Options universe unavailable."));
+      t("client_005"));
     return () => controller.abort();
-  }, [language, market, refreshKey]);
+  }, [language, market, refreshKey, t]);
 
   useEffect(() => {
-    if (!symbol) return;
+    if (!symbol || !symbolReady) return;
     const controller = new AbortController();
     settleRequest(getOptionChain(market, symbol, expiration || undefined, controller.signal), controller,
-      setChain, setChainError, setLoadingChain, pick(language, "Chaîne d'options indisponible.", "Options chain unavailable."));
+      setChain, setChainError, setLoadingChain, t("client_006"));
     return () => controller.abort();
-  }, [expiration, language, market, refreshKey, symbol]);
+  }, [expiration, language, market, refreshKey, symbol, symbolReady, t]);
 
   const categories = useMemo(() => {
     const items = universe?.items ?? [];
@@ -181,6 +254,13 @@ export function OptionsClient() {
       ? items
       : items.filter((item) => item.category === category);
   }, [category, universe]);
+
+  const suggestions = useMemo(() => {
+    const query = draftSymbol.trim().toUpperCase();
+    if (!query || query === symbol) return [];
+    return universeItems.filter((item) => item.symbol.startsWith(query) || item.name.toUpperCase().includes(query))
+      .sort((a, b) => Number(b.symbol === query) - Number(a.symbol === query) || a.symbol.localeCompare(b.symbol)).slice(0, 6);
+  }, [draftSymbol, symbol, universeItems]);
 
   const contracts = useMemo(() => {
     const items = chain?.contracts ?? [];
@@ -198,7 +278,11 @@ export function OptionsClient() {
 
   function changeMarket(next: OptionMarket) {
     if (next === market) return;
-    const nextSymbol = next === "tsx" ? "RY" : "GC";
+    let nextSymbol = next === "tsx" ? "RY" : "GC";
+    try {
+      const saved = window.localStorage.getItem(`${SYMBOL_KEY}.${next}`);
+      if (saved && /^[A-Z0-9.^-]{1,16}$/.test(saved)) nextSymbol = saved;
+    } catch { /* Storage is optional. */ }
     setLoadingUniverse(true);
     setLoadingChain(true);
     setMarket(next);
@@ -214,7 +298,7 @@ export function OptionsClient() {
     event.preventDefault();
     const next = draftSymbol.trim().toUpperCase();
     if (!/^[A-Z0-9.^-]{1,16}$/.test(next)) {
-      setChainError(pick(language, "Symbole invalide.", "Invalid symbol."));
+      setChainError(t("client_007"));
       return;
     }
     chooseSymbol(next);
@@ -228,94 +312,104 @@ export function OptionsClient() {
     setDraftSymbol(next);
     setSymbol(next);
     setExpiration("");
+    try {
+      window.localStorage.setItem(`${SYMBOL_KEY}.${market}`, next);
+      const updated = [next, ...recent.filter((item) => item !== next)].slice(0, 6);
+      window.localStorage.setItem(RECENT_KEY, JSON.stringify(updated));
+      setRecent(updated);
+    } catch { /* Storage is optional. */ }
   }
 
   const analytics = chain?.analytics;
   const metrics = [
-    [pick(language, "Contrats", "Contracts"), analytics ? integer(analytics.contract_count) : "—", chain ? `${chain.name} · ${chain.exchange}` : symbol],
     ["Put / Call · Vol.", analytics?.put_call_volume_ratio == null ? null : ratio(analytics.put_call_volume_ratio), `${integer(analytics?.put_volume)} P / ${integer(analytics?.call_volume)} C`],
     ["Put / Call · OI", analytics?.put_call_open_interest_ratio == null ? null : ratio(analytics.put_call_open_interest_ratio), `${integer(analytics?.put_open_interest)} P / ${integer(analytics?.call_open_interest)} C`],
-    ["IV ATM", analytics?.atm_implied_volatility == null ? null : `${value(analytics.atm_implied_volatility, 1)} %`, pick(language, "Fournisseur ou estimation Anatole", "Provider or Anatole estimate")],
-    [pick(language, "Max pain estimé", "Estimated max pain"), analytics?.max_pain_estimate == null ? null : value(analytics.max_pain_estimate), pick(language, "Calcul descriptif à partir de l'OI", "Descriptive calculation from OI")],
+    ["IV ATM", analytics?.atm_implied_volatility == null ? null : `${value(analytics.atm_implied_volatility, 1)} %`, t("client_008")],
+    [t("client_009"), analytics?.max_pain_estimate == null ? null : value(analytics.max_pain_estimate), t("client_010")],
   ];
+
+  function toggleFavorite() {
+    const updated = favorites.includes(symbol) ? favorites.filter((item) => item !== symbol) : [symbol, ...favorites].slice(0, 12);
+    setFavorites(updated);
+    try { window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(updated)); } catch { /* Storage is optional. */ }
+  }
 
   return (
     <main className={"op-page"}>
-      <header className="panel op-hero">
-        <div>
-          <span className="eyebrow">
-            {pick(language, "DÉRIVÉS · OPTIONS", "DERIVATIVES · OPTIONS")}
-          </span>
-          <h1>{pick(language, "Options", "Options")}</h1>
-          <p>
-            {pick(
-              language,
-              "Options canadiennes et sur contrats à terme.",
-              "Canadian and futures options.",
-            )}
-          </p>
+      <header className="panel op-terminalHeader">
+        <div className="op-terminalIdentity">
+          <span className="eyebrow">ANATOLE OPTIONS PRO</span>
+          <h1>{chain ? `${chain.symbol} · ${chain.name}` : symbol || t("client_011")}</h1>
+          <span>{market === "tsx" ? t("client_012") : t("client_013")}{chain ? ` · ${chain.exchange}` : ""}</span>
         </div>
-        <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showVolatility} onClick={() => setShowVolatility(!showVolatility)}>
-          {pick(language, "Intelligence de volatilité", "Volatility intelligence")}
-        </button>
-        <button type="button" className="op-vol-toggle" disabled={!chain} aria-pressed={showScreener} onClick={() => setShowScreener(!showScreener)}>
-          {pick(language, "Screener de contrats", "Contract screener")}
-        </button>
-        <button type="button" className="op-vol-toggle" aria-pressed={showPortfolio} onClick={() => setShowPortfolio(!showPortfolio)}>
-          {pick(language, "Positions d'options", "Options positions")}
-        </button>
+        <div className="op-terminalQuote">
+          <strong>{chain?.underlying_price == null ? "N/D" : value(chain.underlying_price)}</strong>
+          <span>{t("client_014")}</span>
+          <small>{chain?.stale ? t("client_015") : chain ? t("client_016") : t("client_017")}{chain ? ` · ${new Date(chain.generated_at).toLocaleString(language === "fr" ? "fr-CA" : "en-CA")}` : ""}</small>
+        </div>
+        <div className="op-terminalTools" role="region" aria-label={t("client_018")}>
+          {chain?.market === "tsx" && /^[A-Z^][A-Z0-9.^-]{0,14}$/.test(chain.symbol) ? <a href={`/focus/${chain.symbol}`}>{t("client_019")}</a> : null}
+          <a href="/portefeuille">{t("client_020")}</a>
+          <button type="button" disabled={chain?.market !== "tsx" || loadingChain || chain?.symbol !== symbol} onClick={() => chain && openAssistant({ symbol: chain.symbol, symbols: [chain.symbol], metadata: { options_market: chain.market, options_expiration: chain.requested_expiration ?? "" } })}>{t("client_021")}</button>
+        </div>
       </header>
+      <nav className="op-workspaceNav" aria-label={t("client_022")}>
+        {([ ["chain", t("client_023")], ["strategies", t("client_024")],
+          ["volatility", t("client_025")], ["portfolio", t("client_026")] ] as const).map(([workspace, label]) =>
+          <button key={workspace} type="button" className={activeWorkspace === workspace ? "op-workspaceActive" : undefined}
+            aria-current={activeWorkspace === workspace ? "page" : undefined} onClick={() => navigate(workspace)}>{label}</button>)}
+      </nav>
 
-      <section className="panel op-integrations" aria-label={pick(language, "Assistant et autres espaces", "Assistant and other spaces")}>
-        {chain?.market === "tsx" && /^[A-Z^][A-Z0-9.^-]{0,14}$/.test(chain.symbol) ? <a href={`/focus/${chain.symbol}`}>{pick(language, `Voir ${chain.symbol} dans Focus`, `View ${chain.symbol} in Focus`)}</a> : null}
-        <a href="/portefeuille">{pick(language, "Ouvrir Portefeuille", "Open Portfolio")}</a>
-        {chain?.market === "tsx" && !loadingChain && chain.symbol === symbol && <button type="button" className="op-vol-toggle" onClick={() => openAssistant({ symbol: chain.symbol, symbols: [chain.symbol], metadata: { options_market: chain.market, options_expiration: chain.requested_expiration ?? "" } })}>{pick(language, `Interroger Anatole sur la chaîne ${chain.symbol}`, `Ask Anatole about the ${chain.symbol} chain`)}</button>}
-        <p>{pick(language, "La chaîne sélectionnée peut être rechargée par l'assistant ; les positions et scénarios locaux ne sont pas transmis. Le suivi local n'est pas synchronisé avec Portefeuille.", "The assistant can reload the selected chain; local positions and scenarios are not sent. Local tracking is not synced with Portfolio.")}</p>
-      </section>
-
-      <section className="panel op-controls">
+      <section className={`panel op-controls ${activeWorkspace === "chain" ? "op-controlsActive" : ""} ${filtersOpen ? "op-filtersOpen" : ""}`} aria-label={t("client_027")}>
         <div className={"op-marketTabs"}>
           <button
             type="button"
             className={market === "tsx" ? "op-activeTab" : undefined}
             onClick={() => changeMarket("tsx")}
           >
-            {pick(language, "Canada · Montréal", "Canada · Montréal")}
+            {t("client_028")}
           </button>
           <button
             type="button"
             className={market === "commodities" ? "op-activeTab" : undefined}
             onClick={() => changeMarket("commodities")}
           >
-            {pick(language, "Matières premières", "Commodities")}
+            {t("client_029")}
           </button>
         </div>
+
+        <button type="button" className="op-mobileFilterToggle" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}>{t("client_030")}</button>
 
         <div className={"op-controlGrid"}>
           <form className={"op-symbolForm"} onSubmit={submitSymbol}>
             <label>
-              <span>{pick(language, "Sous-jacent / racine", "Underlying / root")}</span>
+              <span>{t("client_031")}</span>
               <div>
                 <Search size={17} />
                 <input
                   value={draftSymbol}
                   onChange={(event) => setDraftSymbol(event.target.value)}
                   placeholder={market === "tsx" ? "RY, TD, XIU…" : "GC, CL, ZC…"}
+                  autoComplete="off"
                 />
-                <button type="submit">{pick(language, "Charger", "Load")}</button>
+                <button type="submit">{t("client_032")}</button>
               </div>
             </label>
           </form>
 
-          <SelectControl label={pick(language, "Catégorie", "Category")} value={category} onChange={setCategory}>
+          <button type="button" className="op-favoriteButton" disabled={!symbol} aria-pressed={favorites.includes(symbol)} onClick={toggleFavorite}>
+            {favorites.includes(symbol) ? "★" : "☆"}<span className="sr-only">{t("client_033")}</span>
+          </button>
+
+          <SelectControl label={t("client_034")} value={category} onChange={setCategory}>
               {categories.map((item) => (
                 <option key={item} value={item}>
-                  {item === "all" ? pick(language, "Toutes", "All") : item}
+                  {item === "all" ? t("client_035") : item}
                 </option>
               ))}
           </SelectControl>
 
-          <SelectControl label={pick(language, "Échéance", "Expiry")}
+          <SelectControl label={t("client_036")}
               value={expiration}
               onChange={(next) => {
                 setLoadingChain(true);
@@ -323,7 +417,7 @@ export function OptionsClient() {
               }}
               disabled={!chain?.expirations.length}
             >
-              <option value="">{pick(language, "Toutes / plus proche", "All / nearest")}</option>
+              <option value="">{t("client_037")}</option>
               {chain?.expirations.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
@@ -346,54 +440,43 @@ export function OptionsClient() {
             disabled={loadingUniverse || loadingChain}
           >
             <RefreshCw className={loadingUniverse || loadingChain ? "op-spin" : undefined} size={17} />
-            {pick(language, "Actualiser", "Refresh")}
+            {t("client_038")}
           </button>
         </div>
 
-        <div className={"op-shortcuts"}>
-          {loadingUniverse ? (
-            <span>{pick(language, "Chargement de l'univers…", "Loading universe…")}</span>
-          ) : (
-            universeItems.slice(0, 80).map((item) => (
-              <button
-                type="button"
-                key={`${item.provider_symbol}-${item.symbol}`}
-                className={symbol === item.symbol ? "op-selectedShortcut" : undefined}
-                onClick={() => chooseSymbol(item.symbol)}
-                title={item.name}
-              >
-                <strong>{item.symbol}</strong>
-                <small>{item.name}</small>
-              </button>
-            ))
-          )}
-        </div>
+        {suggestions.length ? <div className="op-symbolResults" aria-label={t("client_039")}>
+          {suggestions.map((item) => <button type="button" key={`${item.provider_symbol}-${item.symbol}`} onClick={() => chooseSymbol(item.symbol)}>
+            <strong>{item.symbol}</strong><span>{item.name}</span><small>{item.category}</small>
+          </button>)}
+        </div> : null}
+        {(favorites.length || recent.length) ? <div className="op-quickSymbols">
+          {favorites.length ? <div><span>{t("client_040")}</span>{favorites.slice(0, 5).map((item) => <button type="button" key={item} onClick={() => chooseSymbol(item)}>{item}</button>)}</div> : null}
+          {recent.length ? <div><span>{t("client_041")}</span>{recent.slice(0, 5).map((item) => <button type="button" key={item} onClick={() => chooseSymbol(item)}>{item}</button>)}</div> : null}
+        </div> : null}
       </section>
 
       {[universeError, chainError].map((error, index) => error ? <div className={"op-error"} role="alert" key={index}>{error}</div> : null)}
 
-      <section className={"op-metrics"}>
+      <div className="op-workspaceBody" hidden={activeWorkspace !== "chain"}>
+      <nav className="op-chainNav" aria-label={t("client_042")}>
+        <button type="button" aria-current={chainView === "quotes" ? "page" : undefined} onClick={() => navigate("chain", "quotes")}>{t("client_043")}</button>
+        <button type="button" aria-current={chainView === "screener" ? "page" : undefined} onClick={() => navigate("chain", "screener")}>{t("client_044")}</button>
+      </nav>
+      <div hidden={chainView !== "quotes"}>
+      {metrics.some(([, result]) => result != null) ? <section className={"op-metrics"}>
         {metrics.map(([label, result, detail]) => result == null ? null : <article className="panel" key={label}>
           <span>{label}</span><strong>{result}</strong><small>{detail}</small>
         </article>)}
-      </section>
+      </section> : null}
 
       <details className="panel op-dataState">
-        <summary>{pick(language, "État des données", "Data status")}</summary>
+        <summary>{t("client_045")}</summary>
         <div className={"op-sourcePanel"}>
         <div>
           <p>
             {market === "tsx"
-              ? pick(
-                  language,
-                  "Bourse de Montréal et fournisseurs ; IV et Greeks parfois estimés par Black-Scholes.",
-                  "Montréal Exchange and providers; IV and Greeks may be Black-Scholes estimates.",
-                )
-              : pick(
-                  language,
-                  "Instantanés issus d'une source autorisée ; couverture variable et cotations parfois différées.",
-                  "Snapshots from an authorized source; coverage varies and quotes may be delayed.",
-                )}
+              ? t("client_046")
+              : t("client_047")}
           </p>
         </div>
         <div className={"op-statuses"}>
@@ -408,62 +491,62 @@ export function OptionsClient() {
         <div className={"op-chainHeader"}>
           <div>
             <span className="eyebrow">{market === "tsx" ? "MX" : "COMMODITIES"}</span>
-            <h2>{chain ? `${chain.symbol} · ${chain.name}` : symbol}</h2>
+            <h2>{t("client_048")} · {chain?.symbol ?? symbol}</h2>
             <p>
               {chain?.underlying_price != null
-                ? `${pick(language, "Sous-jacent", "Underlying")}: ${value(chain.underlying_price)}`
-                : pick(language, "Prix du sous-jacent non fourni par cette source.", "Underlying price not supplied by this source.")}
+                ? `${t("client_049")}: ${value(chain.underlying_price)}`
+                : t("client_050")}
             </p>
             {market === "commodities" && chain?.contracts.length ? <p>
-              {pick(language, "Instantané récupéré", "Snapshot retrieved")}: {new Date(chain.generated_at).toLocaleString(language === "fr" ? "fr-CA" : "en-CA")}
-              {chain.stale ? ` · ${pick(language, "instantané périmé", "stale snapshot")}` : ""}
-              {` · ${pick(language, "fraîcheur des cotations à confirmer", "quote freshness unconfirmed")}`}
+              {t("client_051")}: {new Date(chain.generated_at).toLocaleString(language === "fr" ? "fr-CA" : "en-CA")}
+              {chain.stale ? ` · ${t("client_052")}` : ""}
+              {` · ${t("client_053")}`}
             </p> : null}
           </div>
           <div className={"op-chainMeta"}>
             <strong>{contracts.length.toLocaleString("fr-CA")}</strong>
-            <span>{pick(language, "contrats chargés", "contracts loaded")}</span>
+            <span>{t("client_054")}</span>
           </div>
         </div>
 
         {loadingChain && !chain ? (
           <div className={"op-empty"}>
-            {pick(language, "Chargement de la chaîne…", "Loading option chain…")}
+            {t("client_055")}
           </div>
         ) : contracts.length ? (
           <PremiumChain contracts={contracts} underlying={chain?.underlying_price ?? null}
             stale={chain?.stale ?? false} language={language} display={value} onAddStrategy={addStrategyLeg} />
         ) : (
           <div className={"op-empty"}>
-            <strong>{pick(language, "Aucune chaîne exploitable pour l'instant.", "No usable chain yet.")}</strong>
+            <strong>{t("client_056")}</strong>
             <span>
               {market === "commodities"
-                ? pick(
-                    language,
-                    "Source autorisée et collecte configurée nécessaires.",
-                    "Authorized source and configured ingestion required.",
-                  )
-                : pick(
-                    language,
-                    "La chaîne peut être absente chez le fournisseur.",
-                    "The provider may not have this chain.",
-                  )}
+                ? t("client_057")
+                : t("client_058")}
             </span>
           </div>
         )}
       </section>
+      </div>
+      {screenerOpened && chain ? <div hidden={chainView !== "screener"}>
+        <OptionsScreener chain={chain} language={language} onAddStrategy={addStrategyLeg}
+          onTrack={(contract) => { setTrackedContract(contract); navigate("portfolio"); }} />
+      </div> : null}
+      {chainView === "screener" && !chain ? <div className="panel op-empty">{t("client_059")}</div> : null}
+      </div>
 
-      {showStrategy ? <StrategyBuilder legs={legs} setLegs={setLegs} language={language} /> : null}
-      {showVolatility && chain ? <VolatilityIntelligence chain={chain} language={language} /> : null}
-      {showScreener && chain ? <OptionsScreener chain={chain} language={language} onAddStrategy={addStrategyLeg} onTrack={(contract) => { setTrackedContract(contract); setShowPortfolio(true); }} /> : null}
-      {showPortfolio ? <OptionsPortfolio chain={chain} selected={trackedContract} language={language} onAnalyze={analyzeTracked} /> : null}
+      {visited.includes("strategies") ? <div className="op-workspaceBody" hidden={activeWorkspace !== "strategies"}>
+        <StrategyBuilder legs={legs} setLegs={setLegs} language={language} onChooseContracts={() => navigate("chain", "quotes")} />
+      </div> : null}
+      {visited.includes("volatility") ? <div className="op-workspaceBody" hidden={activeWorkspace !== "volatility"}>
+        {chain ? <VolatilityIntelligence chain={chain} language={language} active={activeWorkspace === "volatility"} /> : <div className="panel op-empty">{t("client_060")}</div>}
+      </div> : null}
+      {visited.includes("portfolio") ? <div className="op-workspaceBody" hidden={activeWorkspace !== "portfolio"}>
+        <OptionsPortfolio chain={chain} selected={trackedContract} language={language} onAnalyze={analyzeTracked} />
+      </div> : null}
 
       <p className={"op-disclaimer"}>
-        {pick(
-          language,
-          "* Vol. : séance ; OI : intérêt ouvert ; N/D : donnée absente. Nature du prix fourni à confirmer. Cotations parfois différées.",
-          "* Vol.: session; OI: open interest; N/D: missing. Provider price type unconfirmed. Quotes may be delayed.",
-        )}
+        {t("client_061")}
       </p>
     </main>
   );

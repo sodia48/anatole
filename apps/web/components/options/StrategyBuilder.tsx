@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import { pick } from "@/lib/i18n";
 import type { OptionContract } from "@/lib/options-api";
 import "./strategy-builder.css";
+import { useOptionsText } from "./OptionsCopyProvider";
 
 export type StrategyLeg = {
   id: number;
@@ -32,12 +32,13 @@ type Result = {
 
 type Scenario = { id: number; result: Result; description: string };
 
-export function StrategyBuilder({ legs, setLegs, language }: {
+export function StrategyBuilder({ legs, setLegs, language, onChooseContracts }: {
   legs: StrategyLeg[];
   setLegs: Dispatch<SetStateAction<StrategyLeg[]>>;
   language: "fr" | "en";
+  onChooseContracts: () => void;
 }) {
-  const tr = (fr: string, en: string) => pick(language, fr, en);
+  const t = useOptionsText(language);
   const [currency, setCurrency] = useState("");
   const [expiry, setExpiry] = useState("");
   const [minimum, setMinimum] = useState("");
@@ -66,7 +67,7 @@ export function StrategyBuilder({ legs, setLegs, language }: {
     if (template === "straddle" && sorted.length === 2 && sameSeries &&
       first.contract.side !== second.contract.side && first.contract.strike === second.contract.strike) directions = ["long", "long"];
     if (!directions) {
-      setError(tr("Les contrats sélectionnés ne correspondent pas au modèle choisi.", "The selected contracts do not match this template."));
+      setError(t("strategy_001"));
       return;
     }
     setError("");
@@ -89,7 +90,7 @@ export function StrategyBuilder({ legs, setLegs, language }: {
         (first.market === "commodities" && (!first.contract || contract.contract !== first.contract)) ||
         !multiplier || !Number.isFinite(Number(multiplier)) || Number(multiplier) <= 0 ||
         !/^[1-9]\d*$/.test(quantity) || Number(quantity) > 10000 || premium === "" || !Number.isFinite(Number(premium)) || Number(premium) < 0)) {
-      setError(tr("Vérifiez les jambes, les spécifications et la plage de prix. La date et le fuseau de l'échéance sont obligatoires.", "Check the legs, specifications and price range. The expiry date and time zone are required."));
+      setError(t("strategy_002"));
       return;
     }
     const prices = Array.from({ length: 21 }, (_, index) => (low + (high - low) * index / 20).toFixed(6));
@@ -107,63 +108,68 @@ export function StrategyBuilder({ legs, setLegs, language }: {
       const response = await fetch("/api/anatole/api/v1/options/strategy/payoff", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
       });
-      if (!response.ok) throw new Error(tr("Calcul refusé : vérifiez la compatibilité des contrats et leurs spécifications.", "Calculation rejected: check contract compatibility and specifications."));
+      if (!response.ok) throw new Error(t("strategy_003"));
       const result = await response.json() as Result;
       setScenarios((current) => [...current, {
         id: Date.now(), result,
         description: `${legs.map((leg) => `${leg.direction} ${leg.quantity} × ${leg.contract.symbol} @ ${leg.premium} (×${leg.multiplier})`).join(" · ")} | ${expiry} | ${minimum}–${maximum}`,
       }].slice(-3));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : tr("Calcul indisponible.", "Calculation unavailable."));
+      setError(reason instanceof Error ? reason.message : t("strategy_004"));
     } finally {
       setPending(false);
     }
   }
 
-  return <section id="options-strategy-builder" className="op-strategy panel" aria-label={tr("Constructeur de stratégie", "Strategy builder")}>
-    <h2>{tr("Constructeur de stratégie", "Strategy builder")}</h2>
-    <p>{tr("Simulation théorique à une échéance, à partir d'hypothèses saisies. Les primes saisies ne sont pas des cotations vérifiées.", "Theoretical single-expiry simulation using entered assumptions. Entered premiums are not verified quotes.")}</p>
-    <p>{tr("Les options à prime de type futures, les échéances mixtes et les devises différentes ne sont pas prises en charge.", "Futures-style premium margining, mixed expiries and currencies are not supported.")}</p>
+  return <section id="options-strategy-builder" className="op-strategy panel" aria-label={t("strategy_005")}>
+    <h2>{t("strategy_006")}</h2>
+    <p>{t("strategy_007")}</p>
+    <div className="op-strategyLayout"><div className="op-strategyEditor">
+    {!legs.length ? <div className="op-strategyEmpty"><strong>{t("strategy_008")}</strong>
+      <p>{t("strategy_009")}</p>
+      <button type="button" onClick={onChooseContracts}>{t("strategy_010")}</button></div> : null}
     <form onSubmit={(event) => void calculate(event)}>
-      <label>{tr("Stratégie prédéfinie", "Strategy template")}
+      <label>{t("strategy_011")}
         <select defaultValue="custom" onChange={(event) => { applyTemplate(event.target.value); event.target.value = "custom"; }}>
-          <option value="custom">{tr("Personnalisée", "Custom")}</option>
+          <option value="custom">{t("strategy_012")}</option>
           <option value="long-call">Long call</option><option value="long-put">Long put</option>
           <option value="bull-call">Bull call spread</option><option value="straddle">Long straddle</option>
         </select>
       </label>
-      {!legs.length ? <p>{tr("Choisissez des contrats dans la chaîne et ajoutez-les à la stratégie.", "Choose contracts in the chain and add them to the strategy.")}</p> : null}
       {legs.map(({ id, contract, direction, quantity, premium, multiplier, snapshotStale, snapshotAt, upfront, verifiedCurrency, verifiedExpiry }) => <fieldset key={id}>
-        <legend>{contract.symbol} · {contract.side.toUpperCase()} · {contract.strike} · {contract.expiration ?? tr("Échéance inconnue", "Unknown expiry")}</legend>
-        <p>{contract.bid == null && contract.ask == null ? tr("Cotations indisponibles", "Quotes unavailable") : tr("Marché observé", "Observed market")}: Bid {contract.bid ?? "N/D"} · Ask {contract.ask ?? "N/D"} · {contract.source}{contract.delayed || snapshotStale ? ` · ${tr("différé ou périmé", "delayed or stale")}` : ""}{contract.market === "commodities" ? ` · ${tr("fraîcheur de cotation à confirmer", "quote freshness unconfirmed")}` : ""}</p>
-        {snapshotAt ? <p>{tr("Instantané récupéré", "Snapshot retrieved")}: {snapshotAt}</p> : null}
-        {verifiedCurrency && verifiedExpiry ? <p>{tr("Position enregistrée", "Saved position")}: {verifiedCurrency} · {verifiedExpiry}</p> : null}
+        <legend>{contract.symbol} · {contract.side.toUpperCase()} · {contract.strike} · {contract.expiration ?? t("strategy_013")}</legend>
+        <p>{contract.bid == null && contract.ask == null ? t("strategy_014") : t("strategy_015")}: Bid {contract.bid ?? "N/D"} · Ask {contract.ask ?? "N/D"} · {contract.source}{contract.delayed || snapshotStale ? ` · ${t("strategy_016")}` : ""}{contract.market === "commodities" ? ` · ${t("strategy_017")}` : ""}</p>
+        {snapshotAt ? <p>{t("strategy_018")}: {snapshotAt}</p> : null}
+        {verifiedCurrency && verifiedExpiry ? <p>{t("strategy_019")}: {verifiedCurrency} · {verifiedExpiry}</p> : null}
         <div className="op-strategy-fields">
-          <label>{tr("Sens", "Direction")}<select value={direction} onChange={(event) => updateLeg(id, { direction: event.target.value as "long" | "short" })}><option value="long">{tr("Achat", "Buy")}</option><option value="short">{tr("Vente", "Sell")}</option></select></label>
-          <label>{tr("Quantité", "Quantity")}<input required type="number" min="1" max="10000" step="1" value={quantity} onChange={(event) => updateLeg(id, { quantity: event.target.value })} /></label>
-          <label>{tr("Prime hypothétique par unité", "Hypothetical premium per unit")}<input required type="number" min="0" step="any" value={premium} onChange={(event) => updateLeg(id, { premium: event.target.value })} /></label>
-          <label>{tr("Multiplicateur vérifié", "Verified multiplier")}<input required type="number" min="0" step="any" value={multiplier} onChange={(event) => updateLeg(id, { multiplier: event.target.value })} /></label>
-          <button type="button" onClick={() => setLegs((current) => current.filter((leg) => leg.id !== id))}>{tr("Retirer", "Remove")}</button>
+          <label>{t("strategy_020")}<select value={direction} onChange={(event) => updateLeg(id, { direction: event.target.value as "long" | "short" })}><option value="long">{t("strategy_021")}</option><option value="short">{t("strategy_022")}</option></select></label>
+          <label>{t("strategy_023")}<input required type="number" min="1" max="10000" step="1" value={quantity} onChange={(event) => updateLeg(id, { quantity: event.target.value })} /></label>
+          <label>{t("strategy_024")}<input required type="number" min="0" step="any" value={premium} onChange={(event) => updateLeg(id, { premium: event.target.value })} /></label>
+          <label>{t("strategy_025")}<input required type="number" min="0" step="any" value={multiplier} onChange={(event) => updateLeg(id, { multiplier: event.target.value })} /></label>
+          <button type="button" onClick={() => setLegs((current) => current.filter((leg) => leg.id !== id))}>{t("strategy_026")}</button>
         </div>
-        <label className="op-strategy-confirm"><input type="checkbox" required checked={upfront} onChange={(event) => updateLeg(id, { upfront: event.target.checked })} /><span>{tr("J'ai vérifié que ce contrat utilise une prime payée initialement.", "I verified that this contract uses an upfront premium.")}</span></label>
+        <label className="op-strategy-confirm"><input type="checkbox" required checked={upfront} onChange={(event) => updateLeg(id, { upfront: event.target.checked })} /><span>{t("strategy_027")}</span></label>
       </fieldset>)}
-      <p>{tr("Renseignez les spécifications vérifiées du contrat. Le calcul suppose une prime payée initialement.", "Enter verified contract specifications. The calculation assumes an upfront premium.")}</p>
+      <p>{t("strategy_028")}</p>
       <div className="op-strategy-fields">
-        <label>{tr("Devise commune vérifiée (ISO)", "Verified common currency (ISO)")}<input required maxLength={3} value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} placeholder="CAD" /></label>
-        <label>{tr("Échéance avec fuseau", "Expiry with time zone")}<input required value={expiry} onChange={(event) => setExpiry(event.target.value)} placeholder="2027-11-25T16:00:00-05:00" /></label>
-        <label>{tr("Sous-jacent minimum simulé", "Simulated underlying minimum")}<input required type="number" step="any" value={minimum} onChange={(event) => setMinimum(event.target.value)} /></label>
-        <label>{tr("Sous-jacent maximum simulé", "Simulated underlying maximum")}<input required type="number" step="any" value={maximum} onChange={(event) => setMaximum(event.target.value)} /></label>
+        <label>{t("strategy_029")}<input required maxLength={3} value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} placeholder="CAD" /></label>
+        <label>{t("strategy_030")}<input required value={expiry} onChange={(event) => setExpiry(event.target.value)} placeholder="2027-11-25T16:00:00-05:00" /></label>
+        <label>{t("strategy_031")}<input required type="number" step="any" value={minimum} onChange={(event) => setMinimum(event.target.value)} /></label>
+        <label>{t("strategy_032")}<input required type="number" step="any" value={maximum} onChange={(event) => setMaximum(event.target.value)} /></label>
       </div>
       {error ? <p className="op-error" role="alert">{error}</p> : null}
-      <button type="submit" disabled={pending || !legs.length}>{pending ? tr("Calcul…", "Calculating…") : tr("Calculer un scénario", "Calculate scenario")}</button>
+      <button type="submit" disabled={pending || !legs.length}>{pending ? t("strategy_033") : t("strategy_034")}</button>
     </form>
+    </div><div className="op-strategyResults">
+    {!scenarios.length ? <div className="op-strategyEmpty"><strong>{t("strategy_035")}</strong><p>{t("strategy_036")}</p></div> : null}
     {scenarios.map((scenario, index) => <ScenarioResult key={scenario.id} scenario={scenario} index={index} language={language} onRemove={() => setScenarios((current) => current.filter((item) => item.id !== scenario.id))} />)}
-    <p>{tr("Résultat à l'échéance uniquement. Frais, fiscalité, change, financement, marge, exercice anticipé, assignation et règlement sont exclus. Aucune recommandation.", "Expiration payoff only. Fees, taxes, FX, financing, margin, early exercise, assignment and settlement are excluded. Not a recommendation.")}</p>
+    <p>{t("strategy_037")}</p>
+    </div></div>
   </section>;
 }
 
 function ScenarioResult({ scenario, index, language, onRemove }: { scenario: Scenario; index: number; language: "fr" | "en"; onRemove: () => void }) {
-  const tr = (fr: string, en: string) => pick(language, fr, en);
+  const t = useOptionsText(language);
   const { result } = scenario;
   const points = result.points.map((point) => ({ x: Number(point.price), y: Number(point.profit_loss) }));
   const ys = points.map((point) => point.y);
@@ -173,15 +179,15 @@ function ScenarioResult({ scenario, index, language, onRemove }: { scenario: Sce
   const xMax = points.at(-1)?.x ?? 1;
   const path = points.map((point, i) => `${i ? "L" : "M"} ${20 + (point.x - xMin) / (xMax - xMin || 1) * 560} ${180 - (point.y - yMin) / (yMax - yMin || 1) * 160}`).join(" ");
   return <article className="op-scenario">
-    <h3>{tr("Scénario", "Scenario")} {index + 1}</h3><p>{scenario.description}</p>
-    <p>{tr("Débit théorique", "Theoretical debit")}: {result.theoretical_debit ?? "N/D"} {result.currency}</p>
-    <p>{tr("Perte / gain", "Loss / gain")}: {result.loss_unbounded ? tr("illimitée", "unbounded") : result.minimum_profit_loss ?? "N/D"} / {result.gain_unbounded ? tr("illimité", "unbounded") : result.maximum_profit_loss ?? "N/D"} {result.currency}</p>
-    <p>{tr("Seuils de rentabilité", "Break-even")}: {result.break_evens.length ? result.break_evens.map((root) => root.lower != null && root.lower === root.upper ? root.lower : `${root.lower ?? "−∞"} – ${root.upper ?? "+∞"}`).join(", ") : tr("aucun", "none")}</p>
-    <svg viewBox="0 0 600 200" role="img" aria-label={tr("Profits et pertes à l'échéance selon le sous-jacent", "Expiration profit and loss by underlying price")}>
+    <h3>{t("strategy_038")} {index + 1}</h3><p>{scenario.description}</p>
+    <p>{t("strategy_039")}: {result.theoretical_debit ?? "N/D"} {result.currency}</p>
+    <p>{t("strategy_040")}: {result.loss_unbounded ? t("strategy_041") : result.minimum_profit_loss ?? "N/D"} / {result.gain_unbounded ? t("strategy_042") : result.maximum_profit_loss ?? "N/D"} {result.currency}</p>
+    <p>{t("strategy_043")}: {result.break_evens.length ? result.break_evens.map((root) => root.lower != null && root.lower === root.upper ? root.lower : `${root.lower ?? "−∞"} – ${root.upper ?? "+∞"}`).join(", ") : t("strategy_044")}</p>
+    <svg viewBox="0 0 600 200" role="img" aria-label={t("strategy_045")}>
       <line x1="20" x2="580" y1={180 - (0 - yMin) / (yMax - yMin || 1) * 160} y2={180 - (0 - yMin) / (yMax - yMin || 1) * 160} stroke="currentColor" strokeDasharray="4 4" />
       <path d={path} fill="none" stroke="var(--accent-text)" strokeWidth="3" />
     </svg>
-    <details><summary>{tr("Valeurs simulées", "Simulated values")}</summary><table><thead><tr><th>{tr("Sous-jacent", "Underlying")}</th><th>P/L ({result.currency})</th></tr></thead><tbody>{result.points.map((point, i) => <tr key={i}><td>{point.price}</td><td>{point.profit_loss}</td></tr>)}</tbody></table></details>
-    <button type="button" onClick={onRemove}>{tr("Retirer ce scénario", "Remove scenario")}</button>
+    <details><summary>{t("strategy_046")}</summary><table><thead><tr><th>{t("strategy_047")}</th><th>P/L ({result.currency})</th></tr></thead><tbody>{result.points.map((point, i) => <tr key={i}><td>{point.price}</td><td>{point.profit_loss}</td></tr>)}</tbody></table></details>
+    <button type="button" onClick={onRemove}>{t("strategy_048")}</button>
   </article>;
 }

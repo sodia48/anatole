@@ -8,3 +8,12 @@
 .op-vol-table table { width: 100%; min-width: 480px; border-collapse: collapse; text-align: left; font-variant-numeric: tabular-nums; }
 .op-vol-table td, .op-vol-table th { padding: 7px; border-bottom: 1px solid var(--border); }
 .op-volatility li { margin: 6px 0; overflow-wrap: anywhere; }
+.op-vol-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
+.op-vol-head small { color: var(--muted); }
+.op-vol-nav { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); }
+.op-vol-nav button { min-height: 44px; padding: 0 12px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--muted); cursor: pointer; white-space: nowrap; font-weight: 800; }
+.op-vol-nav button[aria-current="page"] { border-bottom-color: var(--blue); color: var(--accent-text); }
+.op-vol-feature { display: grid; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+.op-vol-feature details { color: var(--muted); }
+.op-vol-feature circle:focus-visible { outline: 2px solid var(--blue); }
+@media (max-width: 720px) { .op-vol-head { display: grid; } }

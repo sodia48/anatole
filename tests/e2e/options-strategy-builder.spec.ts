@@ -20,8 +20,9 @@ test("builds and compares hypothetical spreads using the payoff API", async ({ p
   await page.goto("/options");
   await expect(page.getByRole("heading", { name: "RY · Synthetic RY" })).toBeVisible();
   for (const strike of ["100,00", "110,00"]) {
+    await page.getByRole("navigation", { name: "Espaces Options Pro" }).getByRole("button", { name: "Chaîne" }).click();
     await page.getByRole("button", { name: new RegExp(`CALL ${strike}`) }).click();
-    await page.getByRole("region", { name: "Détails du contrat" }).getByRole("button", { name: "Ajouter à la stratégie" }).click();
+    await page.getByRole("complementary", { name: "Détails du contrat" }).getByRole("button", { name: "Ajouter à la stratégie" }).click();
   }
   const builder = page.getByRole("region", { name: "Constructeur de stratégie" });
   await expect(builder.getByText(/simulation théorique à une échéance/i)).toBeVisible();

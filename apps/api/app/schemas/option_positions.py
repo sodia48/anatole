@@ -8,10 +8,9 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class AccountOptionPosition(BaseModel):
+class AccountOptionPositionDraft(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID
     symbol: str = Field(min_length=1, max_length=160)
     underlying: str = Field(min_length=1, max_length=80)
     market: Literal["tsx", "commodities"]
@@ -35,7 +34,7 @@ class AccountOptionPosition(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def check_contract(self) -> AccountOptionPosition:
+    def check_contract(self) -> AccountOptionPositionDraft:
         if self.expiry_at.tzinfo is None or self.expiry_at.utcoffset() is None or self.expiry_at.date() != self.expiration:
             raise ValueError("L'échéance avec fuseau doit correspondre à la date du contrat.")
         if self.market == "commodities" and not self.contract:
@@ -43,6 +42,10 @@ class AccountOptionPosition(BaseModel):
         if self.currency == "XXX":
             raise ValueError("Devise invalide.")
         return self
+
+
+class AccountOptionPosition(AccountOptionPositionDraft):
+    id: UUID
 
 
 class AccountOptionPositions(BaseModel):
@@ -62,3 +65,10 @@ class AccountOptionPositionsUpdate(BaseModel):
         if len({item.id for item in positions}) != len(positions):
             raise ValueError("Identifiants de positions dupliqués.")
         return positions
+
+
+class AccountOptionPositionCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_account_id: UUID
+    expected_revision: int = Field(strict=True, ge=0)
+    position: AccountOptionPositionDraft
