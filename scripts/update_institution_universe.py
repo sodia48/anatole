@@ -9,7 +9,7 @@ import tempfile
 import urllib.parse
 import urllib.request
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -227,6 +227,17 @@ def status(current: RawHolding | None, previous: RawHolding | None) -> str:
     return "unchanged"
 
 
+def previous_quarter_end(period: date) -> date:
+    if (period.month, period.day) not in {(3, 31), (6, 30), (9, 30), (12, 31)}:
+        raise ValueError(f"Période 13F non trimestrielle : {period}")
+    return {
+        3: date(period.year - 1, 12, 31),
+        6: date(period.year, 3, 31),
+        9: date(period.year, 6, 30),
+        12: date(period.year, 9, 30),
+    }[period.month]
+
+
 def build_payload(
     current_zip: Path,
     previous_zip: Path,
@@ -234,9 +245,33 @@ def build_payload(
     current_url: str,
     previous_url: str,
     universe_size: int,
+    report_period: date | None = None,
 ) -> dict[str, object]:
+    extracted_at = datetime.now(UTC)
     with zipfile.ZipFile(current_zip) as current_archive:
         current_all = effective_filings(current_archive)
+        if report_period is None:
+            periods = Counter(
+                filings[-1].report_period
+                for filings in current_all.values()
+                if filings
+            )
+            periods = Counter({
+                period: count for period, count in periods.items()
+                if (period.month, period.day) in {
+                    (3, 31), (6, 30), (9, 30), (12, 31)
+                }
+            })
+            if not periods:
+                raise RuntimeError("Aucune période 13F trimestrielle dans le dataset SEC.")
+            report_period = periods.most_common(1)[0][0]
+        previous_period = previous_quarter_end(report_period)
+        current_all = {
+            cik: filings for cik, filings in current_all.items()
+            if filings[-1].report_period == report_period
+        }
+        if not current_all:
+            raise RuntimeError(f"Aucun dépôt 13F pour {report_period}.")
         ranked = sorted(
             current_all,
             key=lambda cik: sum(
@@ -253,6 +288,7 @@ def build_payload(
             cik: previous_all[cik]
             for cik in ranked
             if cik in previous_all
+            and previous_all[cik][-1].report_period == previous_period
         }
         previous_holdings = load_holdings(previous_archive, previous_filings)
 
@@ -264,14 +300,17 @@ def build_payload(
         latest = filings[-1]
         current = current_holdings.get(cik, {})
         previous = previous_holdings.get(cik, {})
+        comparison_available = cik in previous_filings
         keys = set(current) | set(previous)
         counts = {name: 0 for name in ("new", "increased", "reduced", "closed")}
         for key in keys:
-            change_status = status(current.get(key), previous.get(key))
-            if change_status in counts:
+            change_status = status(current.get(key), previous.get(key)) if comparison_available else "unchanged"
+            if comparison_available and change_status in counts:
                 counts[change_status] += 1
 
             if cik not in top50:
+                continue
+            if not comparison_available:
                 continue
             current_item = current.get(key)
             previous_item = previous.get(key)
@@ -342,6 +381,7 @@ def build_payload(
             "increased_positions_count": counts["increased"],
             "reduced_positions_count": counts["reduced"],
             "closed_positions_count": counts["closed"],
+            "comparison_available": comparison_available,
         })
 
     flows: list[dict[str, object]] = []
@@ -365,15 +405,22 @@ def build_payload(
             reverse=True,
         )[:20]
 
+    generated_at = datetime.now(UTC).isoformat()
+    if len({item["cik"] for item in institutions}) != len(institutions):
+        raise RuntimeError("CIK dupliqué dans le snapshot 13F.")
+    if any(item["report_period"] != report_period.isoformat() for item in institutions):
+        raise RuntimeError("Périodes mélangées dans le snapshot 13F.")
     return {
-        "generated_at": datetime.now(UTC).isoformat(),
+        "generated_at": generated_at,
+        "extracted_at": extracted_at.isoformat(),
+        "validated_at": generated_at,
         "source_url": current_url,
         "previous_source_url": previous_url,
-        "report_period": institutions[0]["report_period"] if institutions else None,
-        "previous_report_period": (
-            previous_filings[ranked[0]][-1].report_period.isoformat()
-            if ranked and ranked[0] in previous_filings else None
-        ),
+        "report_period": report_period.isoformat(),
+        "previous_report_period": previous_period.isoformat(),
+        "period_status": "published_dataset",
+        "institutions_reporting": len(institutions),
+        "institutions_comparable": sum(bool(item["comparison_available"]) for item in institutions),
         "institutions": institutions,
         "top_increased": top("institutions_increased"),
         "top_new": top("institutions_new"),
@@ -392,6 +439,10 @@ def main() -> None:
     parser.add_argument("--current-url")
     parser.add_argument("--previous-url")
     parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument(
+        "--report-period", type=date.fromisoformat,
+        help="Trimestre à inclure, au format AAAA-MM-JJ ; jamais de mélange de périodes.",
+    )
     parser.add_argument(
         "--user-agent",
         default="Anatole contact@anatole.app",
@@ -420,6 +471,7 @@ def main() -> None:
             current_url=current_url,
             previous_url=previous_url,
             universe_size=max(50, min(args.limit, 100)),
+            report_period=args.report_period,
         )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)

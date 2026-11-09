@@ -5,7 +5,7 @@ import json
 import math
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from time import monotonic
 from typing import Any, Awaitable, Callable, Generic, TypeVar
@@ -126,6 +126,29 @@ def _date(value: Any) -> date | None:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def latest_due_13f_period(as_of: date) -> date | None:
+    """Dernier trimestre dont l'échéance 13F est passée, sans présumer du dépôt."""
+    candidates = [
+        date(year, month, day)
+        for year in (as_of.year - 1, as_of.year)
+        for month, day in ((3, 31), (6, 30), (9, 30), (12, 31))
+    ]
+    due: list[date] = []
+    for period in candidates:
+        deadline = period + timedelta(days=45)
+        # L'échéance est reportée au jour ouvrable suivant. Le report de
+        # février peut également tomber le Presidents' Day (3e lundi).
+        february_first = date(deadline.year, 2, 1)
+        presidents_day = february_first + timedelta(
+            days=(0 - february_first.weekday()) % 7 + 14
+        )
+        while deadline.weekday() >= 5 or deadline == presidents_day:
+            deadline += timedelta(days=1)
+        if deadline <= as_of:
+            due.append(period)
+    return max(due) if due else None
 
 
 def parse_13f_information_table(
@@ -656,6 +679,14 @@ class InstitutionService:
         generated = datetime.fromisoformat(
             str(payload.get("generated_at") or datetime.now(UTC).isoformat())
         )
+        report_period = _date(payload.get("report_period"))
+        expected_period = latest_due_13f_period(datetime.now(UTC).date())
+        stale = (
+            self._universe_path == UNIVERSE_PATH
+            and (report_period is None or (
+                expected_period is not None and report_period < expected_period
+            ))
+        )
         return InstitutionsSnapshot(
             institutions=institutions[:limit],
             top_increased=[
@@ -674,19 +705,42 @@ class InstitutionService:
                 InstitutionFlow.model_validate(item)
                 for item in payload.get("top_closed", [])
             ],
-            report_period=_date(payload.get("report_period")),
+            report_period=report_period,
             previous_report_period=_date(payload.get("previous_report_period")),
             generated_at=generated,
+            extracted_at=(
+                datetime.fromisoformat(str(payload["extracted_at"]))
+                if payload.get("extracted_at") else None
+            ),
+            validated_at=(
+                datetime.fromisoformat(str(payload["validated_at"]))
+                if payload.get("validated_at") else None
+            ),
+            period_status=payload.get("period_status", "legacy"),
+            institutions_reporting=payload.get("institutions_reporting"),
+            institutions_comparable=payload.get("institutions_comparable"),
+            partial_report_period=_date(payload.get("partial_report_period")),
+            partial_institutions_reporting=int(
+                payload.get("partial_institutions_reporting") or 0
+            ),
             sources=[InstitutionSourceStatus(
                 source="SEC EDGAR — Form 13F-HR",
-                status="available",
+                status="stale" if stale else "available",
                 detail=(
                     "Classement calculé depuis les datasets structurés SEC; "
                     "les positions détaillées sont chargées à la demande."
                 ),
                 url=str(payload.get("source_url") or SEC_13F_DATASETS_URL),
-                updated_at=generated,
+                updated_at=(
+                    datetime.fromisoformat(str(payload["validated_at"]))
+                    if payload.get("validated_at") else generated
+                ),
             )],
+            stale=stale,
+            message=(
+                "Le dernier trimestre 13F exigible n'est pas encore validé dans cet instantané."
+                if stale else None
+            ),
         )
 
     async def _live_summary(

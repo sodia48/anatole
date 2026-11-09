@@ -183,10 +183,14 @@ function Disclosure({ language }: { language: "fr" | "en" }) {
 function SourcePanel({
   sources,
   generatedAt,
+  extractedAt,
+  validatedAt,
   language,
 }: {
   sources: InstitutionSourceStatus[];
   generatedAt: string;
+  extractedAt?: string | null;
+  validatedAt?: string | null;
   language: "fr" | "en";
 }) {
   const locale = localeFor(language);
@@ -198,6 +202,8 @@ function SourcePanel({
         <p>
           {pick(language, "Instantané généré le", "Snapshot generated on")} {formatDate(generatedAt, locale)}
         </p>
+        {extractedAt && <p>{pick(language, "Données extraites le", "Data extracted on")} {formatDate(extractedAt, locale)}</p>}
+        {validatedAt && <p>{pick(language, "Dernière validation le", "Last validated on")} {formatDate(validatedAt, locale)}</p>}
       </div>
       <div className={styles.sourceList}>
         {sources.map((source) => (
@@ -477,8 +483,8 @@ export function InstitutionsClient() {
     <main className={styles.page}>
       {(snapshot.stale || error) && <div className={styles.staleBanner}><strong>STALE</strong><span>{snapshot.message ?? error ?? pick(language, "Dernier instantané fiable affiché.", "Last reliable snapshot shown.")}</span></div>}
       <section className={styles.hero}>
-        <div><span className={styles.eyebrow}>INSTITUTIONS</span><h1>{pick(language, "Suivre les grands gestionnaires à travers leurs déclarations 13F.", "Track major institutional managers through their 13F filings.")}</h1><p>{pick(language, "Données officielles SEC, comparées entre deux trimestres.", "Official SEC data compared across two quarters.")}</p></div>
-        <div className={styles.heroAside}><strong>{snapshot.institutions.length}</strong><span>{pick(language, "institutions suivies", "tracked institutions")}</span><small>{pick(language, "Dernier trimestre", "Latest quarter")} · {quarterLabel(snapshot.report_period, language)}</small></div>
+        <div><span className={styles.eyebrow}>INSTITUTIONS</span><h1>{pick(language, "Suivre les grands gestionnaires à travers leurs déclarations 13F.", "Track major institutional managers through their 13F filings.")}</h1><p>{pick(language, "Données officielles SEC, comparées entre deux trimestres.", "Official SEC data compared across two quarters.")}</p><p>{pick(language, "Période de référence", "Reference period")} : {quarterLabel(snapshot.report_period, language)} · {snapshot.period_status === "published_dataset" ? pick(language, "jeu trimestriel SEC publié", "published SEC quarterly dataset") : pick(language, "couverture à vérifier", "coverage to verify")}</p>{snapshot.institutions_reporting != null && <p>{pick(language, "Gestionnaires présents dans l’échantillon", "Managers in the sample")} : {snapshot.institutions_reporting} · {pick(language, "comparables au trimestre précédent", "comparable with the previous quarter")} : {snapshot.institutions_comparable ?? 0}</p>}{snapshot.partial_report_period && <p>{pick(language, "Trimestre suivant partiel", "Partial following quarter")} : {quarterLabel(snapshot.partial_report_period, language)} ({snapshot.partial_institutions_reporting ?? 0})</p>}</div>
+        <div className={styles.heroAside}><strong>{snapshot.institutions.length}</strong><span>{pick(language, "institutions affichées", "institutions shown")}</span><small>{pick(language, "Période", "Period")} · {quarterLabel(snapshot.report_period, language)}</small></div>
       </section>
       <section className={styles.metrics} aria-label={pick(language, "Indicateurs", "Metrics")}>
         <div><span>{pick(language, "Valeur 13F suivie", "Tracked 13F value")}</span><strong>{formatMoney(totalValue, locale)}</strong></div>
@@ -503,7 +509,7 @@ export function InstitutionsClient() {
         </div>
         <Radar snapshot={snapshot} language={language} locale={locale} />
       </section>
-      <SourcePanel sources={snapshot.sources} generatedAt={snapshot.generated_at} language={language} />
+      <SourcePanel sources={snapshot.sources} generatedAt={snapshot.generated_at} extractedAt={snapshot.extracted_at} validatedAt={snapshot.validated_at} language={language} />
     </main>
   );
 }
