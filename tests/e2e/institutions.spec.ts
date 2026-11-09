@@ -59,6 +59,11 @@ const snapshot = {
   report_period: "2026-06-30",
   previous_report_period: "2026-03-31",
   generated_at: "2026-08-12T16:00:00Z",
+  extracted_at: "2026-08-12T15:00:00Z",
+  validated_at: "2026-08-12T16:00:00Z",
+  period_status: "published_dataset",
+  institutions_reporting: 2,
+  institutions_comparable: 1,
   sources: [source],
   stale: false,
   message: null,
@@ -127,6 +132,9 @@ test.beforeEach(async ({ page }) => {
 test("classement, recherche, tri et radar Institutions", async ({ page }) => {
   await page.goto("/institutions");
   await expect(page.getByRole("heading", { name: /Suivre les grands gestionnaires/i })).toBeVisible();
+  await expect(page.getByText(/Période de référence : T2 2026 · jeu trimestriel SEC publié/)).toBeVisible();
+  await expect(page.getByText(/comparables au trimestre précédent : 1/)).toBeVisible();
+  await expect(page.getByText(/Données extraites le 12 août 2026/)).toBeVisible();
   await expect(page.locator('a[href="/institutions/0001234567"]:visible').first()).toBeVisible();
   await page.getByLabel("Rechercher une institution").fill("North Star");
   await expect(page.locator('a[href="/institutions/0001234567"]:visible').first()).toBeVisible();
