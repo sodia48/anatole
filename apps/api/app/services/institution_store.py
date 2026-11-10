@@ -32,6 +32,10 @@ from sqlalchemy.exc import IntegrityError
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
+    InstitutionHistory,
+    InstitutionHistoryPoint,
+    InstitutionPositionHistory,
+    InstitutionPositionHistoryPoint,
     InstitutionSourceStatus,
     InstitutionsSnapshot,
 )
@@ -413,6 +417,145 @@ class InstitutionStore:
                 select(self.snapshots.c.payload).order_by(self.snapshots.c.period.desc()).limit(1)
             ).scalar_one_or_none()
         return InstitutionsSnapshot.model_validate_json(row) if row else None
+
+    def published_periods(self) -> list[date]:
+        """Only periods with an atomically published snapshot are visible."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(self.snapshots.c.period).order_by(self.snapshots.c.period.desc())
+            ).scalars().all()
+        return [date.fromisoformat(row) for row in rows]
+
+    def snapshot_for_period(self, period: date) -> InstitutionsSnapshot | None:
+        with self.engine.connect() as connection:
+            payload = connection.execute(
+                select(self.snapshots.c.payload).where(self.snapshots.c.period == period.isoformat())
+            ).scalar_one_or_none()
+        return InstitutionsSnapshot.model_validate_json(payload) if payload else None
+
+    def manager_history(self, cik: str) -> InstitutionHistory:
+        with self.engine.connect() as connection:
+            payloads = connection.execute(
+                select(self.snapshots.c.payload).order_by(self.snapshots.c.period)
+            ).scalars().all()
+        points: list[InstitutionHistoryPoint] = []
+        name = cik
+        for payload in payloads:
+            snapshot = InstitutionsSnapshot.model_validate_json(payload)
+            summary = next((item for item in snapshot.institutions if item.cik == cik), None)
+            if summary is None:
+                continue
+            name = summary.name
+            points.append(InstitutionHistoryPoint(
+                report_period=summary.report_period, filed_at=summary.filed_at,
+                filing_url=summary.filing_url,
+                total_13f_value=summary.total_13f_value,
+                top10_concentration_percent=summary.top10_concentration_percent,
+                holdings_count=summary.holdings_count,
+                new_positions_count=summary.new_positions_count,
+                closed_positions_count=summary.closed_positions_count,
+                comparison_available=summary.comparison_available,
+            ))
+        return InstitutionHistory(cik=cik, name=name, periods=points)
+
+    def position_history(self, query: str) -> InstitutionPositionHistory:
+        """Aggregate stored 13F values by actual published period, never interpolating."""
+        periods = self.published_periods()
+        if not periods:
+            return InstitutionPositionHistory(query=query, periods=[])
+        with self.engine.connect() as connection:
+            cusip = self._cusip_for_query(connection, query, periods[0])
+            if not cusip:
+                return InstitutionPositionHistory(query=query, periods=[])
+            rows = connection.execute(
+                select(self.holdings).where(self.holdings.c.cusip == cusip)
+                .order_by(self.holdings.c.period)
+            ).mappings().all()
+            snapshot_rows = connection.execute(
+                select(self.snapshots.c.period, self.snapshots.c.payload)
+            ).all()
+        published = {period.isoformat() for period in periods}
+        urls = {
+            period: {item.cik: item.filing_url for item in InstitutionsSnapshot.model_validate_json(payload).institutions}
+            for period, payload in snapshot_rows
+        }
+        grouped: dict[str, list[Any]] = {}
+        for row in rows:
+            if row["period"] in published:
+                grouped.setdefault(row["period"], []).append(row)
+        points = []
+        for period in sorted(grouped):
+            group = grouped[period]
+            active = [row for row in group if row["status"] != "closed"]
+            points.append(InstitutionPositionHistoryPoint(
+                report_period=date.fromisoformat(period), cusip=cusip,
+                ticker=next((row["ticker"] for row in group if row["ticker"]), None),
+                issuer=group[0]["issuer"],
+                shares=(sum(row["shares"] for row in active)
+                        if all(row["put_call"] == "" and row["amount_type"] == "SH" for row in active)
+                        else None),
+                value=sum(row["value"] for row in active),
+                managers_holding=len({row["cik"] for row in active}),
+                filing_urls=list(dict.fromkeys(
+                    url for row in active if (url := urls.get(period, {}).get(row["cik"]))
+                ))[:10],
+            ))
+        return InstitutionPositionHistory(query=query, periods=points)
+
+    def quality(self) -> dict[str, Any]:
+        """Operational facts for an authenticated administrator only."""
+        self.create_schema()
+        with self.engine.connect() as connection:
+            latest = connection.execute(
+                select(self.snapshots).order_by(self.snapshots.c.period.desc()).limit(1)
+            ).mappings().first()
+            run = connection.execute(
+                select(self.runs).order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
+            success = connection.execute(
+                select(self.runs).where(self.runs.c.status == "succeeded")
+                .order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
+            if latest:
+                period = latest["period"]
+                details_count = connection.execute(select(func.count()).select_from(self.details).where(
+                    self.details.c.period == period
+                )).scalar_one()
+                filings_count = connection.execute(select(func.count()).select_from(self.filings).where(
+                    self.filings.c.period == period
+                )).scalar_one()
+                partial_period = connection.execute(select(func.max(self.filings.c.period)).where(
+                    self.filings.c.period > period
+                )).scalar_one_or_none()
+                partial_ciks = set(connection.execute(select(self.filings.c.cik).where(
+                    self.filings.c.period == partial_period
+                )).scalars()) if partial_period else set()
+            else:
+                details_count = filings_count = 0
+                partial_period = None
+                partial_ciks = set()
+        snapshot = InstitutionsSnapshot.model_validate_json(latest["payload"]) if latest else None
+        expected = len(snapshot.institutions) if snapshot else 0
+        covered = min(details_count, expected)
+        duration = None
+        if run and run["finished_at"]:
+            duration = (datetime.fromisoformat(run["finished_at"]) - datetime.fromisoformat(run["started_at"])).total_seconds()
+        return {
+            "latest_period": latest["period"] if latest else None,
+            "published_at": latest["published_at"] if latest else None,
+            "last_success_at": success["finished_at"] if success else None,
+            "last_run_status": run["status"] if run else None,
+            "last_error_category": run["error_category"] if run else None,
+            "last_run_duration_seconds": duration,
+            "managers_expected": expected,
+            "managers_updated": covered,
+            "managers_lagging": len({item.cik for item in snapshot.institutions} - partial_ciks) if snapshot and partial_period else 0,
+            "partial_period": partial_period,
+            "coverage_percent": round(covered / expected * 100, 1) if expected else 0.0,
+            "filings_count": filings_count,
+            "sources_unavailable": [source.source for source in snapshot.sources if source.status == "unavailable"] if snapshot else [],
+            "consistency_ok": expected == details_count if snapshot else False,
+        }
 
     def verified_ticker_exists(self, ticker: str) -> bool:
         with self.engine.connect() as connection:

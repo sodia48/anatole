@@ -75,6 +75,34 @@ def test_admin_access_overview_and_users(admin_client: TestClient):
     assert users.json()["users"][0]["is_admin"] is False
 
 
+def test_institution_quality_is_admin_only(admin_client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from datetime import date
+    from sqlalchemy import create_engine
+    from app.services.institution_store import InstitutionStore
+    from app.services.institutions import InstitutionService
+    from test_institution_store import fixture_data
+
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'quality.db'}"))
+    snapshot, details = fixture_data()
+    store.publish(snapshot, details)
+    store.start_run("failed-run", "https://www.sec.gov/failed.zip")
+    store.finish_run("failed-run", period=date(2026, 6, 30), institutions_count=0, error_category="sec_unavailable")
+    monkeypatch.setattr(admin_routes, "institution_service", InstitutionService(store=store))
+    admin = register(admin_client, "owner@example.com")
+    regular = register(admin_client, "reader@example.com")
+    path = "/api/v1/admin/institutions/quality"
+    assert admin_client.get(path).status_code == 401
+    assert admin_client.get(path, headers=auth(regular["token"])).status_code == 403
+    response = admin_client.get(path, headers=auth(admin["token"]))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["latest_period"] == "2026-06-30"
+    assert body["managers_updated"] == 2
+    assert body["coverage_percent"] == 100
+    assert body["last_error_category"] == "sec_unavailable"
+    assert "pipeline_failed" in body["alerts"]
+
+
 def test_dynamic_invite_single_use(admin_client: TestClient):
     admin = register(admin_client, "owner@example.com")
 

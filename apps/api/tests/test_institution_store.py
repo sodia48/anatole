@@ -190,6 +190,56 @@ def test_http_index_search_is_paginated_without_sec(tmp_path: Path, monkeypatch:
     assert body["results"][0]["cik"] == "0000000001"
 
 
+def test_history_uses_only_published_periods_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db = tmp_path / "history.db"
+    store = InstitutionStore(create_engine(f"sqlite:///{db}"))
+    q2, q2_details = fixture_data()
+    q1_date = date(2026, 3, 31)
+    q1_summaries = [item.model_copy(update={
+        "report_period": q1_date, "filed_at": date(2026, 5, 12),
+        "total_13f_value": item.total_13f_value / 2,
+        "holdings_count": 1, "new_positions_count": 1,
+        "increased_positions_count": 0, "comparison_available": False,
+    }) for item in q2.institutions]
+    q1 = q2.model_copy(update={
+        "report_period": q1_date, "previous_report_period": None,
+        "institutions": q1_summaries,
+    })
+    q1_details = [detail.model_copy(update={
+        "institution": summary, "previous_report_period": None,
+        "holdings": [detail.holdings[0].model_copy(update={
+            "shares": detail.holdings[0].shares / 2,
+            "value": detail.holdings[0].value / 2,
+            "status": "new",
+        })],
+    }) for detail, summary in zip(q2_details, q1_summaries, strict=True)]
+    store.publish(q1, q1_details)
+    store.publish(q2, q2_details)
+    seed_nvda(store, tmp_path)
+    restarted = InstitutionStore(create_engine(f"sqlite:///{db}"))
+    assert restarted.published_periods() == [date(2026, 6, 30), q1_date]
+    history = restarted.manager_history("0000000001")
+    assert [point.report_period for point in history.periods] == [q1_date, date(2026, 6, 30)]
+    assert [point.total_13f_value for point in history.periods] == [500, 1000]
+    position = restarted.position_history("NVDA")
+    assert [point.report_period for point in position.periods] == [q1_date, date(2026, 6, 30)]
+    assert [point.managers_holding for point in position.periods] == [2, 2]
+    assert [point.value for point in position.periods] == [1500, 3000]
+    assert position.periods[0].filing_urls[0].startswith("https://www.sec.gov/")
+    assert restarted.quality()["consistency_ok"] is True
+
+    service = InstitutionService(store=restarted, universe_path=tmp_path / "missing.json")
+    monkeypatch.setattr(routes, "institution_service", service)
+    client = TestClient(app)
+    assert client.get("/api/v1/discovery/institutions/periods").json() == ["2026-06-30", "2026-03-31"]
+    assert len(client.get("/api/v1/discovery/institutions/history/1").json()["periods"]) == 2
+    assert len(client.get("/api/v1/discovery/institutions/security/history?q=NVDA").json()["periods"]) == 2
+    assert client.get("/api/v1/discovery/institutions?period=2026-03-31").json()["institutions"][0]["total_13f_value"] == 500
+    assert client.get("/api/v1/discovery/institutions/1?period=2026-03-31").json()["institution"]["total_13f_value"] == 500
+    assert client.get("/api/v1/discovery/institutions?period=2025-12-31").status_code == 404
+    assert client.get("/api/v1/discovery/institutions/1?period=2025-12-31").status_code == 400
+
+
 @pytest.mark.asyncio
 async def test_daily_discovery_keeps_partial_quarter_separate(tmp_path: Path) -> None:
     store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))

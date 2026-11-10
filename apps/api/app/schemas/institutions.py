@@ -131,3 +131,37 @@ class InstitutionsSnapshot(BaseModel):
     sources: list[InstitutionSourceStatus] = Field(default_factory=list)
     stale: bool = False
     message: str | None = None
+
+
+class InstitutionHistoryPoint(BaseModel):
+    report_period: date
+    filed_at: date
+    filing_url: str
+    total_13f_value: float = Field(ge=0)
+    top10_concentration_percent: float = Field(ge=0, le=100)
+    holdings_count: int = Field(ge=0)
+    new_positions_count: int = Field(ge=0)
+    closed_positions_count: int = Field(ge=0)
+    comparison_available: bool
+
+
+class InstitutionHistory(BaseModel):
+    cik: str
+    name: str
+    periods: list[InstitutionHistoryPoint] = Field(default_factory=list)
+
+
+class InstitutionPositionHistoryPoint(BaseModel):
+    report_period: date
+    cusip: str
+    ticker: str | None = None
+    issuer: str
+    shares: float | None = Field(default=None, ge=0)
+    value: float = Field(ge=0)
+    managers_holding: int = Field(ge=0)
+    filing_urls: list[str] = Field(default_factory=list)
+
+
+class InstitutionPositionHistory(BaseModel):
+    query: str
+    periods: list[InstitutionPositionHistoryPoint] = Field(default_factory=list)
