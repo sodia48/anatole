@@ -266,6 +266,9 @@ test("historique accessible sur ordinateur et mobile sans inventer de périodes"
   await expect(emptyPosition).toBeVisible();
   await emptyPosition.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("institution-position-history.png"), fullPage: true });
+  await page.goto("/institutions/security/history?q=AAPL&q=MSFT");
+  await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
+  await expect(page.getByLabel("Ticker vérifié ou CUSIP")).toHaveValue("");
 });
 
 test("la page Institutions conserve un contraste lisible avec Anatole Blanc", async ({ page }) => {

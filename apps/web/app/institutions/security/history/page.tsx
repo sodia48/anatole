@@ -4,9 +4,9 @@ import styles from "../../history.module.css";
 
 export const dynamic = "force-dynamic";
 
-export default async function SecurityHistoryPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+export default async function SecurityHistoryPage({ searchParams }: { searchParams: Promise<{ q?: string | string[] }> }) {
   const { q = "" } = await searchParams;
-  const query = q.trim().slice(0, 80);
+  const query = typeof q === "string" ? q.trim().slice(0, 80) : "";
   const history = query ? await positionHistory(query) : null;
   const periods = history?.periods ?? [];
   const maximum = Math.max(1, ...periods.map((period) => period.value));
