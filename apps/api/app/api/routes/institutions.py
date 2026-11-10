@@ -23,7 +23,7 @@ router = APIRouter()
     summary="Principaux gestionnaires institutionnels suivis via Form 13F",
 )
 async def institutions_directory(
-    limit: int = Query(default=50, ge=1, le=50),
+    limit: int = Query(default=50, ge=1, le=100),
     refresh: bool = Query(default=False),
 ) -> InstitutionsSnapshot:
     try:

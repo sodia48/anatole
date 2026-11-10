@@ -11,6 +11,7 @@ import type {
   EtfDirectorySnapshot,
   InstitutionDetail,
   InstitutionFlow,
+  InstitutionSecuritySearch,
   InstitutionsSnapshot,
   FocusSnapshot,
   FocusFundamentalOverlaySnapshot,
@@ -756,6 +757,21 @@ export function getInstitutionSecurityActivity(
     {},
     signal,
     120_000,
+  );
+}
+
+export function getInstitutionSecurityHoldings(
+  query: string,
+  limit = 20,
+  offset = 0,
+  signal?: AbortSignal,
+): Promise<InstitutionSecuritySearch> {
+  const params = new URLSearchParams({
+    q: query.trim(), limit: String(limit), offset: String(offset),
+  });
+  return apiRequest<InstitutionSecuritySearch>(
+    `/api/v1/discovery/institutions/security/holdings?${params.toString()}`,
+    {}, signal, 20_000,
   );
 }
 

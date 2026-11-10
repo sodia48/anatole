@@ -110,11 +110,38 @@ const detail = {
   message: null,
 };
 
+const securityHoldings = {
+  query: "037833100",
+  report_period: "2026-06-30",
+  total: 1,
+  limit: 20,
+  offset: 0,
+  results: [{
+    cik: institution.cik,
+    institution_name: institution.name,
+    filing_url: institution.filing_url,
+    cusip: flow.cusip,
+    ticker: flow.ticker,
+    issuer: flow.issuer,
+    security_class: "COM",
+    put_call: null,
+    shares: 12_000_000,
+    previous_shares: 10_000_000,
+    share_change: 2_000_000,
+    value: 2_250_000_000,
+    status: "increased",
+  }],
+};
+
 async function mockInstitutionApi(page: Page): Promise<void> {
   await page.route("**/api/anatole/api/v1/discovery/institutions**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.endsWith("/security/activity")) {
       await route.fulfill({ json: flow });
+      return;
+    }
+    if (url.pathname.endsWith("/security/holdings")) {
+      await route.fulfill({ json: securityHoldings });
       return;
     }
     if (url.pathname.endsWith(`/${institution.cik}`)) {
@@ -129,19 +156,28 @@ test.beforeEach(async ({ page }) => {
   await mockInstitutionApi(page);
 });
 
-test("classement, recherche, tri et radar Institutions", async ({ page }) => {
+test("classement, recherche, tri et radar Institutions", async ({ page }, testInfo) => {
   await page.goto("/institutions");
-  await expect(page.getByRole("heading", { name: /Suivre les grands gestionnaires/i })).toBeVisible();
-  await expect(page.getByText(/Période de référence : T2 2026 · jeu trimestriel SEC publié/)).toBeVisible();
-  await expect(page.getByText(/comparables au trimestre précédent : 1/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Intelligence institutionnelle" })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("institutions-overview.png"), fullPage: true });
+  await expect(page.getByText(/Dernier trimestre complet : T2 2026/)).toBeVisible();
+  await expect(page.getByText("1 comparables")).toBeVisible();
   await expect(page.getByText(/Données extraites le 12 août 2026/)).toBeVisible();
+  await page.getByRole("button", { name: "Gestionnaires", exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath("institutions-managers.png"), fullPage: true });
   await expect(page.locator('a[href="/institutions/0001234567"]:visible').first()).toBeVisible();
   await page.getByLabel("Rechercher une institution").fill("North Star");
   await expect(page.locator('a[href="/institutions/0001234567"]:visible').first()).toBeVisible();
   await expect(page.locator('a[href="/institutions/0007654321"]:visible')).toHaveCount(0);
   await page.getByLabel("Trier les institutions").selectOption("new");
+  await page.getByRole("button", { name: "Radar", exact: true }).click();
   await page.getByRole("tab", { name: "Nouvelles positions" }).click();
   await expect(page.getByText("APPLE INC", { exact: true }).last()).toBeVisible();
+  await page.getByRole("button", { name: "Voir les déclarants" }).click();
+  await expect(page.getByLabel("Ticker ou CUSIP")).toHaveValue("037833100");
+  await page.getByRole("button", { name: "Consulter les déclarants" }).click();
+  await expect(page.getByText("Positions déclarées")).toBeVisible();
+  await expect(page.locator('a[href="/institutions/0001234567"]:visible')).toHaveCount(1);
   const width = await page.evaluate(() => ({
     client: document.documentElement.clientWidth,
     scroll: document.documentElement.scrollWidth,
@@ -151,10 +187,12 @@ test("classement, recherche, tri et radar Institutions", async ({ page }) => {
 
 test("activité par titre et détail des positions", async ({ page }) => {
   await page.goto("/institutions");
+  await page.getByRole("button", { name: "Titres", exact: true }).click();
   await page.getByLabel("Ticker ou CUSIP").fill("AAPL");
   await page.getByRole("button", { name: "Rechercher", exact: true }).click();
   await expect(page.getByText("Principaux déclarants :")).toBeVisible();
   await expect(page.getByRole("link", { name: /Ouvrir Focus/ })).toHaveAttribute("href", "/focus/AAPL");
+  await page.getByRole("button", { name: "Consulter les déclarants" }).click();
   await page.locator('a[href="/institutions/0001234567"]:visible').first().click();
   await expect(page).toHaveURL(/\/institutions\/0001234567$/);
   await expect(page.getByRole("heading", { name: institution.name })).toBeVisible();
@@ -167,6 +205,27 @@ test("activité par titre et détail des positions", async ({ page }) => {
     scroll: document.documentElement.scrollWidth,
   }));
   expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
+});
+
+test("classement complet paginé sur mobile et ordinateur", async ({ page }) => {
+  const managers = Array.from({ length: 25 }, (_, index) => ({
+    ...institution,
+    cik: String(index + 1).padStart(10, "0"),
+    name: `GESTIONNAIRE ${String(index + 1).padStart(2, "0")}`,
+    total_13f_value: 125_000_000_000 - index * 1_000_000_000,
+  }));
+  await page.route("**/api/anatole/api/v1/discovery/institutions?**", async (route) => {
+    await route.fulfill({ json: { ...snapshot, institutions: managers, institutions_reporting: 25 } });
+  });
+  await page.goto("/institutions");
+  await page.getByRole("button", { name: "Gestionnaires", exact: true }).click();
+  await expect(page.getByText("GESTIONNAIRE 01", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByText("GESTIONNAIRE 25", { exact: true }).filter({ visible: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Suivant", exact: true }).click();
+  await expect(page.getByText("GESTIONNAIRE 25", { exact: true }).filter({ visible: true })).toBeVisible();
+  await page.getByLabel("Rechercher une institution").fill("GESTIONNAIRE 01");
+  await expect(page.getByText("GESTIONNAIRE 01", { exact: true }).filter({ visible: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Précédent", exact: true })).toHaveCount(0);
 });
 
 test("la section Institutions suit la préférence anglaise", async ({ page }) => {
@@ -182,8 +241,8 @@ test("la section Institutions suit la préférence anglaise", async ({ page }) =
   });
   await page.goto("/institutions");
   await expect(page.locator("html")).toHaveAttribute("lang", "en-CA");
-  await expect(page.getByRole("heading", { name: /Track major institutional managers/ })).toBeVisible();
-  await expect(page.getByText(/Changes are inferred by comparing quarterly 13F filings/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Institutional intelligence" })).toBeVisible();
+  await expect(page.getByText(/Share changes compare two quarterly 13F filings/)).toBeVisible();
 });
 
 test("la page Institutions conserve un contraste lisible avec Anatole Blanc", async ({ page }) => {
@@ -202,9 +261,10 @@ test("la page Institutions conserve un contraste lisible avec Anatole Blanc", as
   await page.goto("/institutions");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "blue");
 
-  const heading = page.getByRole("heading", { name: /Suivre les grands gestionnaires/i });
-  const metric = page.getByText("Valeur 13F suivie", { exact: true }).locator("..").locator("strong");
-  const ranking = page.getByRole("heading", { name: "Principaux gestionnaires 13F" });
+  const heading = page.getByRole("heading", { name: "Intelligence institutionnelle" });
+  const metric = page.getByText("Valeur 13F déclarée", { exact: true }).locator("..").locator("strong");
+  await page.getByRole("button", { name: "Gestionnaires", exact: true }).click();
+  const ranking = page.getByRole("heading", { name: "Gestionnaires 13F" });
 
   await expect(heading).toHaveCSS("color", "rgb(8, 32, 51)");
   await expect(metric).toHaveCSS("color", "rgb(8, 32, 51)");
