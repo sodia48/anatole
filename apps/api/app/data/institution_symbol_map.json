@@ -1,0 +1,32 @@
+[
+  {
+    "cusip": "67066G104",
+    "ticker": "NVDA",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1618627/000119312526438867/primary_doc.xml",
+    "verified_at": "2026-11-09T00:00:00+00:00"
+  },
+  {
+    "cusip": "037833100",
+    "ticker": "AAPL",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1782952/000119312526440724/primary_doc.xml",
+    "verified_at": "2026-11-09T00:00:00+00:00"
+  },
+  {
+    "cusip": "594918104",
+    "ticker": "MSFT",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1592900/000159290026004846/primary_doc.xml",
+    "verified_at": "2026-11-09T00:00:00+00:00"
+  },
+  {
+    "cusip": "023135106",
+    "ticker": "AMZN",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1592900/000159290026004087/primary_doc.xml",
+    "verified_at": "2026-11-09T00:00:00+00:00"
+  },
+  {
+    "cusip": "88160R101",
+    "ticker": "TSLA",
+    "source_url": "https://www.sec.gov/Archives/edgar/data/1592900/000159290026004087/primary_doc.xml",
+    "verified_at": "2026-11-09T00:00:00+00:00"
+  }
+]

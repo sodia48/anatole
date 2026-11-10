@@ -1,0 +1,36 @@
+name: Institutions 13F Sync
+
+on:
+  schedule:
+    - cron: "17 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: institutions-13f-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ACCOUNT_DATABASE_URL: ${{ secrets.INSTITUTIONS_DATABASE_URL }}
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Explain missing database connection
+        if: env.ACCOUNT_DATABASE_URL == ''
+        run: echo 'INSTITUTIONS_DATABASE_URL is not configured; SEC dataset sync skipped.'
+      - name: Install API
+        if: env.ACCOUNT_DATABASE_URL != ''
+        run: python -m pip install -e apps/api
+      - name: Publish only a new verified SEC dataset
+        if: env.ACCOUNT_DATABASE_URL != ''
+        run: python scripts/sync_institution_store.py --if-new
