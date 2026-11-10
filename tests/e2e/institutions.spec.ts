@@ -262,7 +262,9 @@ test("historique accessible sur ordinateur et mobile sans inventer de périodes"
   await page.getByRole("link", { name: "Historique de la position" }).click();
   await expect(page).toHaveURL(/\/institutions\/security\/history\?q=AAPL$/);
   await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
-  await expect(page.getByText("Aucune période publiée pour ce titre.")).toBeVisible();
+  const emptyPosition = page.getByText("Aucune période publiée pour ce titre.");
+  await expect(emptyPosition).toBeVisible();
+  await emptyPosition.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("institution-position-history.png"), fullPage: true });
 });
 

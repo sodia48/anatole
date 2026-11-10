@@ -101,6 +101,11 @@ def test_institution_quality_is_admin_only(admin_client: TestClient, tmp_path: P
     assert body["coverage_percent"] == 100
     assert body["last_error_category"] == "sec_unavailable"
     assert "pipeline_failed" in body["alerts"]
+    assert "p95_duration_ms" in body["runtime"]
+    monkeypatch.setattr(admin_routes, "latest_due_13f_period", lambda _: date(2026, 9, 30))
+    overdue = admin_client.get(path, headers=auth(admin["token"])).json()
+    assert "period_overdue" in overdue["alerts"]
+    assert overdue["managers_lagging"] == 2
 
 
 def test_dynamic_invite_single_use(admin_client: TestClient):

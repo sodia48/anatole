@@ -108,6 +108,15 @@ def test_store_rejects_mixed_period_without_replacing_last_good(tmp_path: Path) 
     assert store.latest_snapshot().institutions == snapshot.institutions
 
 
+def test_store_rejects_incomplete_manager_detail_coverage(tmp_path: Path) -> None:
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))
+    snapshot, details = fixture_data()
+    with pytest.raises(ValueError, match="Incomplete"):
+        store.publish(snapshot, details[:1])
+    store.create_schema()
+    assert store.latest_snapshot() is None
+
+
 @pytest.mark.asyncio
 async def test_reads_never_call_sec_even_when_refresh_requested(tmp_path: Path) -> None:
     store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))

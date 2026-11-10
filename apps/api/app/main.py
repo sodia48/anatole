@@ -27,6 +27,7 @@ from app.services.canada_360 import canada_360_service
 from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
 from app.services.institution_collector import maintain_recent_13f
+from app.services.institution_metrics import institution_runtime_metrics
 from app.services.institutions import institution_service
 from app.services.news import news_service
 from app.services.notifications import notification_service
@@ -327,6 +328,10 @@ async def request_observability(
     request.state.request_id = request_id
     cf_ray = request.headers.get("CF-Ray", "-")
     started = time.perf_counter()
+    institution_path = request.url.path.startswith("/api/v1/discovery/institutions")
+    institution_search = institution_path and "/security/" in request.url.path
+    if institution_search:
+        institution_runtime_metrics.begin_search()
 
     logger.info(
         "request_started id=%s cf_ray=%s method=%s path=%s",
@@ -340,6 +345,10 @@ async def request_observability(
         response = await call_next(request)
     except Exception:
         elapsed_ms = (time.perf_counter() - started) * 1000
+        if institution_path:
+            institution_runtime_metrics.http(elapsed_ms, None)
+        if institution_search:
+            institution_runtime_metrics.end_search()
         reliability_monitor.record_exception(
             path=request.url.path,
             method=request.method,
@@ -363,6 +372,11 @@ async def request_observability(
         )
 
     elapsed_ms = (time.perf_counter() - started) * 1000
+    if institution_path:
+        length = response.headers.get("content-length", "")
+        institution_runtime_metrics.http(elapsed_ms, int(length) if length.isdigit() else None)
+    if institution_search:
+        institution_runtime_metrics.end_search()
     reliability_monitor.record_request(
         path=request.url.path,
         method=request.method,

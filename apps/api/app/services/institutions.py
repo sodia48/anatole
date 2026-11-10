@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.resilience import shared_http_client
 from app.services.accounts import account_service
 from app.services.institution_store import InstitutionStore
+from app.services.institution_metrics import institution_runtime_metrics
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
@@ -460,6 +461,7 @@ class InstitutionService:
     async def _sec_request(self, url: str) -> httpx.Response:
         await self._respect_fair_access()
         async with self._sec_semaphore:
+            institution_runtime_metrics.sec_request()
             if self._sec_transport is not None:
                 async with httpx.AsyncClient(
                     transport=self._sec_transport,
@@ -491,6 +493,7 @@ class InstitutionService:
             and not force_refresh
             and monotonic() - cached.stored_at <= ttl
         ):
+            institution_runtime_metrics.cache(hit=True)
             return cached.value, False
         async with self._lock_for(key):
             cached = cache.get(key)
@@ -499,7 +502,9 @@ class InstitutionService:
                 and not force_refresh
                 and monotonic() - cached.stored_at <= ttl
             ):
+                institution_runtime_metrics.cache(hit=True)
                 return cached.value, False
+            institution_runtime_metrics.cache(hit=False)
             try:
                 value = await loader()
             except asyncio.CancelledError:
@@ -509,6 +514,7 @@ class InstitutionService:
                     cached is not None
                     and monotonic() - cached.stored_at <= STALE_TTL_SECONDS
                 ):
+                    institution_runtime_metrics.stale_served()
                     return cached.value, True
                 raise
             cache[key] = CacheEntry(value=value, stored_at=monotonic())
@@ -1005,12 +1011,16 @@ class InstitutionService:
         period: date | None = None,
     ) -> InstitutionsSnapshot:
         bounded_limit = max(1, min(limit, 100))
+        if period and self._store is None:
+            raise ValueError("Historique 13F non configuré")
         if self._store is not None:
             try:
                 prepared = await asyncio.to_thread(
                     self._store.snapshot_for_period, period
                 ) if period else await asyncio.to_thread(self._store.latest_snapshot)
-            except Exception:
+            except Exception as exc:
+                if period:
+                    raise InstitutionsUnavailable("L'historique institutionnel est indisponible.") from exc
                 prepared = None
             if period and prepared is None:
                 raise ValueError("Période 13F non publiée")
@@ -1119,6 +1129,8 @@ class InstitutionService:
         normalized = str(cik).strip().zfill(10)
         if not re.fullmatch(r"\d{10}", normalized):
             raise ValueError("CIK invalide")
+        if period and self._store is None:
+            raise ValueError("Historique 13F non configuré")
         if self._store is not None:
             try:
                 if period and await asyncio.to_thread(self._store.snapshot_for_period, period) is None:

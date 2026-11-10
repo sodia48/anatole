@@ -366,6 +366,8 @@ class InstitutionStore:
             raise ValueError("Duplicate institution CIK")
         if any(item.institution.cik not in known or item.institution.report_period != period for item in details):
             raise ValueError("Detail outside the validated period")
+        if {item.institution.cik for item in details} != known or len(details) != len(known):
+            raise ValueError("Incomplete or duplicate manager detail coverage")
         period_text = period.isoformat()
         amount_types = amount_types or {}
         self.create_schema()
@@ -516,6 +518,10 @@ class InstitutionStore:
                 select(self.runs).where(self.runs.c.status == "succeeded")
                 .order_by(self.runs.c.started_at.desc()).limit(1)
             ).mappings().first()
+            last_failure = connection.execute(
+                select(self.runs).where(self.runs.c.status == "failed")
+                .order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
             if latest:
                 period = latest["period"]
                 details_count = connection.execute(select(func.count()).select_from(self.details).where(
@@ -545,7 +551,8 @@ class InstitutionStore:
             "published_at": latest["published_at"] if latest else None,
             "last_success_at": success["finished_at"] if success else None,
             "last_run_status": run["status"] if run else None,
-            "last_error_category": run["error_category"] if run else None,
+            "last_error_category": last_failure["error_category"] if last_failure else None,
+            "last_error_at": last_failure["finished_at"] if last_failure else None,
             "last_run_duration_seconds": duration,
             "managers_expected": expected,
             "managers_updated": covered,

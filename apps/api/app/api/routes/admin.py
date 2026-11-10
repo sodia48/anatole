@@ -21,6 +21,7 @@ from app.schemas.admin import (
 from app.services.accounts import account_service
 from app.services.canada_360_assistant import check_provider_health
 from app.services.institutions import institution_service, latest_due_13f_period
+from app.services.institution_metrics import institution_runtime_metrics
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -72,9 +73,14 @@ async def institutions_quality(_: AccountUser = Depends(current_admin)) -> dict[
         alerts.append("pipeline_failed")
     if due and (quality["latest_period"] is None or quality["latest_period"] < due.isoformat()):
         alerts.append("period_overdue")
+        if quality["partial_period"] != due.isoformat():
+            quality["managers_lagging"] = quality["managers_expected"]
     if not quality["consistency_ok"]:
         alerts.append("coverage_inconsistent")
-    return {**quality, "due_period": due.isoformat() if due else None, "alerts": alerts}
+    return {
+        **quality, "due_period": due.isoformat() if due else None, "alerts": alerts,
+        "runtime": institution_runtime_metrics.snapshot(),
+    }
 
 
 @router.get("/users", response_model=AdminUserList)

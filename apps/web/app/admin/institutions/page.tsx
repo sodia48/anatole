@@ -13,6 +13,7 @@ type Quality = {
   last_success_at: string | null;
   last_run_status: string | null;
   last_error_category: string | null;
+  last_error_at: string | null;
   last_run_duration_seconds: number | null;
   managers_expected: number;
   managers_updated: number;
@@ -24,6 +25,17 @@ type Quality = {
   consistency_ok: boolean;
   due_period: string | null;
   alerts: string[];
+  runtime: {
+    requests: number;
+    p95_duration_ms: number;
+    response_bytes_observed: number;
+    sec_requests: number;
+    cache_hit_percent: number | null;
+    active_searches: number;
+    max_concurrent_searches: number;
+    process_cpu_seconds: number;
+    process_memory_high_water_mb: number | null;
+  };
 };
 
 const API_URL = (
@@ -54,6 +66,20 @@ const alertLabels: Record<string, string> = {
   coverage_inconsistent: "Couverture du snapshot incohérente",
 };
 
+function displayedDate(value: string | null): string {
+  if (!value) return "N/D";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? value
+    : new Intl.DateTimeFormat("fr-CA", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Toronto" }).format(parsed);
+}
+
+const runStatusLabels: Record<string, string> = {
+  succeeded: "Réussie",
+  failed: "Échouée",
+  running: "En cours",
+};
+
 export default async function InstitutionalQualityPage() {
   const quality = await readQuality();
   return <main className={styles.page}>
@@ -62,9 +88,10 @@ export default async function InstitutionalQualityPage() {
     {!quality ? <p className={styles.notice}>Connexion administrateur requise ou suivi temporairement indisponible.</p> : <>
       {quality.alerts.length > 0 && <section className={styles.notice} role="alert"><strong>Alertes internes</strong><ul>{quality.alerts.map((alert) => <li key={alert}>{alertLabels[alert] ?? alert}</li>)}</ul></section>}
       <section className={styles.details} aria-label="État du pipeline">
-        <details open><summary>Collecte et période</summary><dl><dt>Dernier trimestre publié</dt><dd>{quality.latest_period ?? "Aucun"}</dd><dt>Trimestre exigible</dt><dd>{quality.due_period ?? "Aucun"}</dd><dt>Publication</dt><dd>{quality.published_at ?? "N/D"}</dd><dt>Dernière collecte réussie</dt><dd>{quality.last_success_at ?? "N/D"}</dd><dt>Statut dernière exécution</dt><dd>{quality.last_run_status ?? "N/D"}</dd><dt>Durée</dt><dd>{quality.last_run_duration_seconds === null ? "N/D" : `${quality.last_run_duration_seconds.toFixed(1)} s`}</dd></dl></details>
+        <details open><summary>Collecte et période</summary><dl><dt>Dernier trimestre publié</dt><dd>{quality.latest_period ?? "Aucun"}</dd><dt>Trimestre exigible</dt><dd>{quality.due_period ?? "Aucun"}</dd><dt>Publication</dt><dd>{displayedDate(quality.published_at)}</dd><dt>Dernière collecte réussie</dt><dd>{displayedDate(quality.last_success_at)}</dd><dt>Statut dernière exécution</dt><dd>{quality.last_run_status ? runStatusLabels[quality.last_run_status] ?? quality.last_run_status : "N/D"}</dd><dt>Durée</dt><dd>{quality.last_run_duration_seconds === null ? "N/D" : `${quality.last_run_duration_seconds.toFixed(1)} s`}</dd></dl></details>
         <details open><summary>Couverture et cohérence</summary><dl><dt>Gestionnaires actualisés</dt><dd>{quality.managers_updated} / {quality.managers_expected}</dd><dt>Couverture</dt><dd>{quality.coverage_percent.toFixed(1)} %</dd><dt>Gestionnaires en attente</dt><dd>{quality.managers_lagging}</dd><dt>Période partielle observée</dt><dd>{quality.partial_period ?? "Aucune"}</dd><dt>Déclarations intégrées</dt><dd>{quality.filings_count}</dd><dt>Cohérence</dt><dd>{quality.consistency_ok ? "Conforme" : "À vérifier"}</dd></dl></details>
-        <details open><summary>Sources et erreurs</summary><dl><dt>Sources indisponibles</dt><dd>{quality.sources_unavailable.length ? quality.sources_unavailable.join(", ") : "Aucune"}</dd><dt>Dernière catégorie d’erreur</dt><dd>{quality.last_error_category ?? "Aucune"}</dd></dl></details>
+        <details open><summary>Sources et erreurs</summary><dl><dt>Sources indisponibles</dt><dd>{quality.sources_unavailable.length ? quality.sources_unavailable.join(", ") : "Aucune"}</dd><dt>Dernière catégorie d’erreur</dt><dd>{quality.last_error_category ?? "Aucune"}</dd><dt>Date de la dernière erreur</dt><dd>{displayedDate(quality.last_error_at)}</dd></dl></details>
+        <details><summary>Performance du processus API</summary><dl><dt>Lectures Institutions</dt><dd>{quality.runtime.requests}</dd><dt>Latence p95</dt><dd>{quality.runtime.p95_duration_ms} ms</dd><dt>Volume des réponses mesurées</dt><dd>{quality.runtime.response_bytes_observed} octets</dd><dt>Requêtes SEC du processus</dt><dd>{quality.runtime.sec_requests}</dd><dt>Cache hit</dt><dd>{quality.runtime.cache_hit_percent === null ? "N/D" : `${quality.runtime.cache_hit_percent} %`}</dd><dt>Recherches simultanées</dt><dd>{quality.runtime.active_searches} (max {quality.runtime.max_concurrent_searches})</dd><dt>CPU du processus</dt><dd>{quality.runtime.process_cpu_seconds} s</dd><dt>Mémoire maximale</dt><dd>{quality.runtime.process_memory_high_water_mb === null ? "N/D" : `${quality.runtime.process_memory_high_water_mb} Mo`}</dd></dl></details>
       </section>
     </>}
   </main>;
