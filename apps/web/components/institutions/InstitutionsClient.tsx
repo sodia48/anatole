@@ -494,7 +494,6 @@ export function InstitutionsClient() {
     try {
       const next = await getInstitutionsSnapshot(100, refresh, signal);
       setSnapshot(next);
-      setPage(0);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : pick(language, "Les données institutionnelles sont temporairement indisponibles.", "Institutional data is temporarily unavailable."));
