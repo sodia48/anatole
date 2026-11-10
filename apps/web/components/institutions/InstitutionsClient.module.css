@@ -121,6 +121,73 @@
   overflow-wrap: anywhere;
 }
 
+.metrics small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.overviewHero {
+  min-height: 0;
+  padding: 20px 24px;
+  gap: 18px;
+}
+
+.overviewHero h1 {
+  font-size: clamp(24px, 2.6vw, 36px);
+}
+
+.overviewHero p {
+  margin-top: 7px;
+  font-size: 12px;
+}
+
+.overviewHero .refreshButton { flex: 0 0 auto; z-index: 1; }
+
+.viewTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+
+.viewTabs button {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.viewTabs button[aria-current="page"] {
+  border-bottom-color: var(--blue);
+  color: var(--accent-text);
+}
+
+.latestList { list-style: none; padding: 0; margin: 14px 0 0; }
+.latestList li { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-top: 1px solid var(--border); }
+.latestList a { min-width: 0; display: grid; gap: 3px; }
+.latestList a strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.latestList a span, .latestList time { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.latestList time { flex: 0 0 auto; }
+.textButton, .exploreButton { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--accent-text); cursor: pointer; font-size: 12px; font-weight: 700; }
+.radarContext { color: var(--muted); font-size: 11px; }
+.flowNumbers button { margin-top: 4px; padding: 3px 0; border: 0; background: transparent; color: var(--accent-text); cursor: pointer; font-size: 10px; font-weight: 700; }
+.positionResults { grid-column: 1 / -1; margin-top: 16px; }
+.positionResults ul { list-style: none; padding: 0; margin: 8px 0; }
+.positionResults li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.positionResults li span { color: var(--muted); }
+.positionResults li a { display: inline-flex; align-items: center; gap: 3px; color: var(--accent-text); }
+.pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 18px; font-size: 12px; }
+.pager button { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; background: var(--primary-surface); color: var(--accent-text); cursor: pointer; }
+.pager button:disabled { opacity: .45; cursor: default; }
+
 .disclosure {
   display: flex;
   align-items: flex-start;
@@ -785,6 +852,11 @@
   .hero h1 {
     font-size: 31px;
   }
+
+  .overviewHero { gap: 10px; }
+  .overviewHero h1 { font-size: 27px; }
+  .viewTabs button { padding: 10px 12px; font-size: 12px; }
+  .latestList li { align-items: flex-start; flex-direction: column; gap: 4px; }
 
   .heroAside {
     min-width: 0;

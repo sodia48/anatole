@@ -269,6 +269,9 @@ async def test_snapshot_sorts_and_limits_top_50(tmp_path: Path) -> None:
     assert snapshot.institutions[0].total_13f_value == 55
     assert snapshot.institutions[-1].total_13f_value == 6
     assert snapshot.sources[0].status == "available"
+    full_snapshot = await service.institutions_snapshot(limit=100)
+    assert len(full_snapshot.institutions) == 55
+    assert full_snapshot.institutions[-1].total_13f_value == 1
 
 
 @pytest.mark.asyncio
@@ -545,7 +548,10 @@ def test_institution_routes_and_static_path_order(
         institution_names=["Example Manager"],
     )
 
+    requested_limits: list[int] = []
+
     async def fake_snapshot(**kwargs: Any) -> InstitutionsSnapshot:
+        requested_limits.append(kwargs["limit"])
         return sample_snapshot
 
     async def fake_detail(*args: Any, **kwargs: Any) -> InstitutionDetail:
@@ -573,6 +579,9 @@ def test_institution_routes_and_static_path_order(
     client = TestClient(app)
 
     assert client.get("/api/v1/discovery/institutions").status_code == 200
+    assert client.get("/api/v1/discovery/institutions?limit=100").status_code == 200
+    assert requested_limits == [50, 100]
+    assert client.get("/api/v1/discovery/institutions?limit=101").status_code == 422
     activity_response = client.get(
         "/api/v1/discovery/institutions/security/activity?q=AAPL"
     )

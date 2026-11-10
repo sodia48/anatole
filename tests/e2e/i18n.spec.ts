@@ -8,7 +8,7 @@ const ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["/calendrier", /Preparing calendar|Economic events/],
   ["/etf", /Canadian ETF map/],
   ["/ipo-insiders", /IPOs & insider transactions/],
-  ["/institutions", /Track major institutional managers/],
+  ["/institutions", /Institutional intelligence/],
   ["/focus/RY", /PROFESSIONAL CHART|Overview/],
   ["/comparateur", /Comparator/],
   ["/psychologie", /Calculating market psychology|Anatole Canada Index/],
