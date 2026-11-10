@@ -6,6 +6,8 @@ import time
 import uuid
 from collections.abc import Awaitable
 from contextlib import asynccontextmanager
+from datetime import date
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +26,8 @@ from app.services.calendar import calendar_service
 from app.services.canada_360 import canada_360_service
 from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
+from app.services.institution_collector import maintain_recent_13f
+from app.services.institutions import institution_service
 from app.services.news import news_service
 from app.services.notifications import notification_service
 from app.services.paper_trading import paper_trading_service
@@ -58,6 +62,35 @@ async def _warm_source(
             type(error).__name__,
             error,
         )
+
+
+async def _bootstrap_institutions_bundle(path: Path) -> None:
+    store = institution_service._store
+    if store is None:
+        return
+    run_id = str(uuid.uuid4())
+    if not await asyncio.to_thread(store.start_run, run_id, "bundled:SEC-13F-2026-Q2"):
+        logger.info("institution_bundle_bootstrap skipped=collector_busy")
+        return
+    started = time.perf_counter()
+    try:
+        installed = await asyncio.to_thread(store.bootstrap_bundle, path)
+        await asyncio.to_thread(
+            store.finish_run, run_id, period=date(2026, 6, 30),
+            institutions_count=100 if installed else 0,
+        )
+        logger.info(
+            "institution_bundle_bootstrap installed=%s duration_ms=%.1f",
+            installed, (time.perf_counter() - started) * 1000,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as error:  # noqa: BLE001
+        await asyncio.to_thread(
+            store.finish_run, run_id, period=None,
+            institutions_count=0, error_category=type(error).__name__,
+        )
+        logger.error("institution_bundle_bootstrap_failed category=%s", type(error).__name__)
 
 
 async def _warm_public_snapshots_once() -> None:
@@ -196,6 +229,20 @@ async def _maintain_public_hotset() -> None:
 async def lifespan(_: FastAPI):
     await shared_http_client.start()
     await account_service.start()
+    institution_bootstrap_task: asyncio.Task[None] | None = None
+    if institution_service._store is not None:
+        store = institution_service._store
+        await asyncio.to_thread(store.create_schema)
+        symbols = Path(__file__).resolve().parent / "data" / "institution_symbol_map.json"
+        await asyncio.to_thread(store.seed_symbols, symbols)
+        if settings.app_env == "production":
+            latest = await asyncio.to_thread(store.latest_snapshot)
+            if latest is None or latest.report_period is None or latest.report_period < date(2026, 6, 30):
+                bundle = Path(__file__).resolve().parent / "data" / "institution_details_t2_2026.json.gz"
+                institution_bootstrap_task = asyncio.create_task(
+                    _bootstrap_institutions_bundle(bundle),
+                    name="anatole-institution-bundle-bootstrap",
+                )
     await company_network_service.start()
     notification_service.account_service = account_service
     await notification_service.start()
@@ -211,17 +258,33 @@ async def lifespan(_: FastAPI):
         name="anatole-production-baseline",
     )
     reminder_task = asyncio.create_task(notification_service.run_option_reminder_worker(), name="anatole-option-reminders")
+    institution_discovery_task = (
+        asyncio.create_task(
+            maintain_recent_13f(institution_service._store),
+            name="anatole-institution-discovery",
+        )
+        if settings.app_env == "production" and institution_service._store is not None
+        else None
+    )
     logger.info("anatole_api_started shared_http_pool=true")
     try:
         yield
     finally:
-        for task in (warm_task, baseline_task, reminder_task):
+        tasks_to_stop = (
+            warm_task, baseline_task, reminder_task,
+            institution_bootstrap_task, institution_discovery_task,
+        )
+        for task in tasks_to_stop:
+            if task is None:
+                continue
+            if task is institution_bootstrap_task:
+                # A DB transaction is still running in a worker thread; let it
+                # finish rather than releasing the collection lease early.
+                continue
             if not task.done():
                 task.cancel()
         await asyncio.gather(
-            warm_task,
-            baseline_task,
-            reminder_task,
+            *(task for task in tasks_to_stop if task is not None),
             return_exceptions=True,
         )
         await production_baseline_store.close()

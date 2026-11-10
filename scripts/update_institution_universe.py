@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import gzip
 import io
 import json
 import re
@@ -246,6 +247,9 @@ def build_payload(
     previous_url: str,
     universe_size: int,
     report_period: date | None = None,
+    details_out: dict[str, dict[str, object]] | None = None,
+    filings_out: list[dict[str, str]] | None = None,
+    amount_types_out: dict[tuple[str, str, str, str], str] | None = None,
 ) -> dict[str, object]:
     extracted_at = datetime.now(UTC)
     with zipfile.ZipFile(current_zip) as current_archive:
@@ -383,6 +387,71 @@ def build_payload(
             "closed_positions_count": counts["closed"],
             "comparison_available": comparison_available,
         })
+        if details_out is not None:
+            detail_holdings: list[dict[str, object]] = []
+            for key in sorted(keys):
+                current_item = current.get(key)
+                previous_item = previous.get(key) if comparison_available else None
+                reference = current_item or previous_item
+                assert reference is not None
+                shares = current_item.shares if current_item else 0.0
+                prior_shares = previous_item.shares if previous_item else 0.0
+                value = current_item.value if current_item else 0.0
+                change = shares - prior_shares
+                detail_holdings.append({
+                    "cusip": reference.cusip,
+                    "ticker": None,
+                    "issuer": reference.issuer,
+                    "security_class": reference.security_class,
+                    "shares": shares,
+                    "previous_shares": prior_shares,
+                    "share_change": change,
+                    "share_change_percent": (
+                        change / prior_shares * 100 if prior_shares else None
+                    ),
+                    "value": value,
+                    "portfolio_weight_percent": (
+                        min(100.0, value / total_value * 100) if total_value else 0.0
+                    ),
+                    "previous_value": previous_item.value if previous_item else 0.0,
+                    "put_call": reference.put_call or None,
+                    "status": (
+                        status(current_item, previous_item)
+                        if comparison_available else "unchanged"
+                    ),
+                })
+                if amount_types_out is not None:
+                    amount_types_out[(cik, reference.cusip, reference.security_class, reference.put_call)] = reference.amount_type
+            details_out[cik] = {
+                "institution": institutions[-1],
+                "holdings": detail_holdings,
+                "previous_report_period": previous_period.isoformat() if comparison_available else None,
+                "source_statuses": [{
+                    "source": "SEC EDGAR — Form 13F-HR",
+                    "status": "available",
+                    "detail": "Déclaration et table officielle SEC, préparées hors requête.",
+                    "url": filing_url,
+                    "updated_at": extracted_at.isoformat(),
+                }],
+                "generated_at": extracted_at.isoformat(),
+                "stale": False,
+                "message": None,
+            }
+        if filings_out is not None:
+            for filing in filings:
+                compact = filing.accession.replace("-", "")
+                filings_out.append({
+                    "accession": filing.accession,
+                    "cik": cik,
+                    "period": filing.report_period.isoformat(),
+                    "form": filing.form,
+                    "amendment_type": filing.amendment_type,
+                    "filed_at": filing.filing_date.isoformat(),
+                    "source_url": (
+                        f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+                        f"{compact}/{filing.accession}-index.html"
+                    ),
+                })
 
     flows: list[dict[str, object]] = []
     for flow in flow_rows.values():
@@ -434,6 +503,10 @@ def main() -> None:
         description="Construit l’univers institutionnel depuis les datasets 13F SEC."
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--details-output", type=Path,
+        help="Archive gzip initiale des détails indexés, sans accès SEC à la lecture.",
+    )
     parser.add_argument("--current-zip", type=Path)
     parser.add_argument("--previous-zip", type=Path)
     parser.add_argument("--current-url")
@@ -465,6 +538,9 @@ def main() -> None:
             download(current_url, current_zip, args.user_agent)
         if args.previous_zip is None:
             download(previous_url, previous_zip, args.user_agent)
+        details: dict[str, dict[str, object]] | None = {} if args.details_output else None
+        filings: list[dict[str, str]] | None = [] if args.details_output else None
+        amount_types: dict[tuple[str, str, str, str], str] | None = {} if args.details_output else None
         payload = build_payload(
             current_zip,
             previous_zip,
@@ -472,6 +548,9 @@ def main() -> None:
             previous_url=previous_url,
             universe_size=max(50, min(args.limit, 100)),
             report_period=args.report_period,
+            details_out=details,
+            filings_out=filings,
+            amount_types_out=amount_types,
         )
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -479,6 +558,23 @@ def main() -> None:
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+    if args.details_output:
+        args.details_output.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(args.details_output, "wt", encoding="utf-8", compresslevel=9) as output:
+            def write_row(row: dict[str, object]) -> None:
+                output.write(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n")
+
+            write_row({"kind": "snapshot", "payload": payload})
+            types_by_cik: dict[str, list[list[str]]] = defaultdict(list)
+            for key, value in (amount_types or {}).items():
+                types_by_cik[key[0]].append([key[1], key[2], key[3], value])
+            for cik, detail in (details or {}).items():
+                write_row({
+                    "kind": "detail", "payload": detail,
+                    "amount_types": types_by_cik.get(cik, []),
+                })
+            for filing in filings or []:
+                write_row({"kind": "filing", "payload": filing})
     print(
         f"{len(payload['institutions'])} institutions écrites dans {args.output}"
     )
