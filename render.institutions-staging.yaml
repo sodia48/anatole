@@ -1,6 +1,6 @@
 # Inert until a separate Render Blueprint instance is explicitly created.
 # Never sync this file with the production anatole-api Blueprint.
-# Incremental list price: Postgres $6/month (1 GB included) + web $7/month.
+# Render creation quote: Postgres $6.30/month (1 GB) + web $7/month.
 databases:
   - name: anatole-institutions-staging-pg
     databaseName: anatole_institutions_staging
