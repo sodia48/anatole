@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 import gzip
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import httpx
 import pytest
@@ -19,6 +22,43 @@ from app.services.institution_collector import discover_recent_13f
 from app.services.institutions import InstitutionService
 from app.api.routes import institutions as routes
 from app.main import app
+
+
+def test_migration_up_preserves_existing_account_rows(tmp_path: Path) -> None:
+    database = tmp_path / "accounts.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE account_users (id TEXT PRIMARY KEY, password_hash TEXT NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO account_users (id, password_hash) VALUES (?, ?)",
+            ("account-sentinel", "unchanged-hash"),
+        )
+    with engine.connect() as connection:
+        before_schema = list(connection.exec_driver_sql("PRAGMA table_info(account_users)"))
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment.pop("DATABASE_URL", None)
+    for _ in range(2):
+        subprocess.run(
+            [sys.executable, str(root / "scripts" / "migrate_institutions.py"), "up"],
+            cwd=root, env=environment, check=True, capture_output=True, text=True,
+            timeout=30,
+        )
+    with engine.connect() as connection:
+        after_schema = list(connection.exec_driver_sql("PRAGMA table_info(account_users)"))
+        rows = list(connection.exec_driver_sql("SELECT id, password_hash FROM account_users"))
+        institution_tables = {
+            row[0] for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'institution_%'"
+            )
+        }
+    assert before_schema == after_schema
+    assert rows == [("account-sentinel", "unchanged-hash")]
+    assert institution_tables == set(InstitutionStore(engine).metadata.tables)
 
 
 def fixture_data() -> tuple[InstitutionsSnapshot, list[InstitutionDetail]]:
