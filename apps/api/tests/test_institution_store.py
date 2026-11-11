@@ -21,7 +21,19 @@ from app.services.institution_store import InstitutionStore
 from app.services.institution_collector import discover_recent_13f
 from app.services.institutions import InstitutionService
 from app.api.routes import institutions as routes
-from app.main import app
+from app.main import app, _prepare_institutions_on_startup, institution_service, settings
+
+
+@pytest.mark.asyncio
+async def test_startup_waits_for_manual_institution_migration(monkeypatch: pytest.MonkeyPatch) -> None:
+    class UnpreparedStore:
+        def create_schema(self) -> None:
+            raise AssertionError("Startup must not migrate Institutions")
+
+    monkeypatch.setattr(institution_service, "_store", UnpreparedStore())
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "institutions_startup_initialization_enabled", False)
+    assert await _prepare_institutions_on_startup() is None
 
 
 def test_migration_up_preserves_existing_account_rows(tmp_path: Path) -> None:
@@ -204,6 +216,83 @@ def test_streamed_bootstrap_preserves_newer_period_and_verifies_symbols(tmp_path
     assert store.bootstrap_bundle(bundle)
     assert not store.bootstrap_bundle(bundle)
     assert store.activity("NVDA", snapshot.report_period).institutions_holding == 2
+
+
+def test_controlled_bundle_cli_import_and_restart_verification(tmp_path: Path) -> None:
+    database = tmp_path / "stage.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE account_users (id TEXT PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO account_users (id) VALUES (?)", ("account-sentinel",))
+    store = InstitutionStore(engine)
+    store.create_schema()
+    snapshot, details = fixture_data()
+    bundle = tmp_path / "bundle.json.gz"
+    with gzip.open(bundle, "wt", encoding="utf-8") as output:
+        output.write(json.dumps({"kind": "snapshot", "payload": snapshot.model_dump(mode="json")}) + "\n")
+        for detail in details:
+            output.write(json.dumps({
+                "kind": "detail", "payload": detail.model_dump(mode="json"), "amount_types": [],
+            }) + "\n")
+    symbols = tmp_path / "symbols.json"
+    symbols.write_text(json.dumps([{
+        "cusip": "67066G104", "ticker": "NVDA",
+        "source_url": "https://www.sec.gov/Archives/example.xml",
+        "verified_at": "2026-11-09T00:00:00+00:00",
+    }]), encoding="utf-8")
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment["APP_ENV"] = "staging"
+    args = [
+        sys.executable, str(root / "scripts" / "import_institution_bundle.py"),
+        "--expected-database", engine.url.database,
+        "--bundle", str(bundle), "--symbols", str(symbols),
+        "--managers", "2", "--positions", "2", "--allow-sqlite-tests",
+    ]
+    for command in ("import", "verify"):
+        result = subprocess.run(
+            [*args[:2], command, *args[2:]], cwd=root, env=environment,
+            check=True, capture_output=True, text=True, timeout=30,
+        )
+        assert json.loads(result.stdout)["positions"] == 2
+        assert database_url not in result.stdout
+    with engine.connect() as connection:
+        assert list(connection.exec_driver_sql("SELECT id FROM account_users")) == [("account-sentinel",)]
+
+    environment["APP_ENV"] = "production"
+    blocked = subprocess.run(
+        [*args[:2], "import", *args[2:]], cwd=root, env=environment,
+        capture_output=True, text=True, timeout=30,
+    )
+    assert blocked.returncode != 0
+    assert "--allow-production" in blocked.stderr
+
+
+def test_controlled_migration_detects_incompatible_existing_table(tmp_path: Path) -> None:
+    database = tmp_path / "incompatible.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE account_users (id TEXT PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO account_users (id) VALUES (?)", ("account-sentinel",))
+        connection.exec_driver_sql("CREATE TABLE institution_snapshots (wrong_column TEXT PRIMARY KEY)")
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment["APP_ENV"] = "staging"
+    result = subprocess.run(
+        [
+            sys.executable, str(root / "scripts" / "import_institution_bundle.py"),
+            "migrate-up", "--expected-database", engine.url.database, "--allow-sqlite-tests",
+        ],
+        cwd=root, env=environment, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "Institution columns are missing" in result.stderr
+    with engine.connect() as connection:
+        assert list(connection.exec_driver_sql("SELECT id FROM account_users")) == [("account-sentinel",)]
 
 
 def test_incomplete_bootstrap_never_exposes_staged_details(tmp_path: Path) -> None:

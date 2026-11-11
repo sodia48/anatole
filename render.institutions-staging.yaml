@@ -1,0 +1,46 @@
+# Inert until a separate Render Blueprint instance is explicitly created.
+# Never sync this file with the production anatole-api Blueprint.
+# Incremental list price: Postgres $6/month (1 GB included) + web $7/month.
+databases:
+  - name: anatole-institutions-staging-pg
+    databaseName: anatole_institutions_staging
+    postgresMajorVersion: '18'
+    region: oregon
+    plan: 0.1c-256mb
+    diskSizeGB: 1
+    storageAutoscalingEnabled: false
+    ipAllowList: []
+
+services:
+  - type: web
+    name: anatole-api-institutions-staging
+    runtime: python
+    region: oregon
+    plan: 0.5c-512mb
+    branch: codex/institutions-history
+    autoDeployTrigger: 'off'
+    # Keep the repo root so the migration wrappers are available in Render Shell.
+    buildCommand: pip install -e apps/api
+    startCommand: >-
+      cd apps/api &&
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port $PORT
+      --workers 1
+      --timeout-keep-alive 30
+      --limit-concurrency 100
+      --backlog 2048
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: staging
+      - key: ACCOUNT_DATABASE_URL
+        fromDatabase:
+          name: anatole-institutions-staging-pg
+          property: connectionString
+      - key: ACCOUNT_REGISTRATION_ENABLED
+        value: 'false'
+      - key: INSTITUTIONS_STARTUP_INITIALIZATION_ENABLED
+        value: 'false'
+      - key: INSTITUTIONS_BACKGROUND_DISCOVERY_ENABLED
+        value: 'false'
