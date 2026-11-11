@@ -379,6 +379,7 @@ export default function AdminPage() {
           <p>
             {pick(language, "Comptes, invitations, signalements et santé opérationnelle dans un seul espace.", "Accounts, invitations, reports, and operational health in one workspace.")}
           </p>
+          <a href="/admin/institutions">{pick(language, "Suivi des données institutionnelles", "Institutional data quality")}</a>
         </div>
 
         <button

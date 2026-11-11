@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import UTC, date, datetime
 import gzip
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
 import httpx
 import pytest
@@ -18,7 +21,56 @@ from app.services.institution_store import InstitutionStore
 from app.services.institution_collector import discover_recent_13f
 from app.services.institutions import InstitutionService
 from app.api.routes import institutions as routes
-from app.main import app
+from app.main import app, _prepare_institutions_on_startup, institution_service, settings
+
+
+@pytest.mark.asyncio
+async def test_startup_waits_for_manual_institution_migration(monkeypatch: pytest.MonkeyPatch) -> None:
+    class UnpreparedStore:
+        def create_schema(self) -> None:
+            raise AssertionError("Startup must not migrate Institutions")
+
+    monkeypatch.setattr(institution_service, "_store", UnpreparedStore())
+    monkeypatch.setattr(settings, "app_env", "production")
+    monkeypatch.setattr(settings, "institutions_startup_initialization_enabled", False)
+    assert await _prepare_institutions_on_startup() is None
+
+
+def test_migration_up_preserves_existing_account_rows(tmp_path: Path) -> None:
+    database = tmp_path / "accounts.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE account_users (id TEXT PRIMARY KEY, password_hash TEXT NOT NULL)"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO account_users (id, password_hash) VALUES (?, ?)",
+            ("account-sentinel", "unchanged-hash"),
+        )
+    with engine.connect() as connection:
+        before_schema = list(connection.exec_driver_sql("PRAGMA table_info(account_users)"))
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment.pop("DATABASE_URL", None)
+    for _ in range(2):
+        subprocess.run(
+            [sys.executable, str(root / "scripts" / "migrate_institutions.py"), "up"],
+            cwd=root, env=environment, check=True, capture_output=True, text=True,
+            timeout=30,
+        )
+    with engine.connect() as connection:
+        after_schema = list(connection.exec_driver_sql("PRAGMA table_info(account_users)"))
+        rows = list(connection.exec_driver_sql("SELECT id, password_hash FROM account_users"))
+        institution_tables = {
+            row[0] for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'institution_%'"
+            )
+        }
+    assert before_schema == after_schema
+    assert rows == [("account-sentinel", "unchanged-hash")]
+    assert institution_tables == set(InstitutionStore(engine).metadata.tables)
 
 
 def fixture_data() -> tuple[InstitutionsSnapshot, list[InstitutionDetail]]:
@@ -108,6 +160,15 @@ def test_store_rejects_mixed_period_without_replacing_last_good(tmp_path: Path) 
     assert store.latest_snapshot().institutions == snapshot.institutions
 
 
+def test_store_rejects_incomplete_manager_detail_coverage(tmp_path: Path) -> None:
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))
+    snapshot, details = fixture_data()
+    with pytest.raises(ValueError, match="Incomplete"):
+        store.publish(snapshot, details[:1])
+    store.create_schema()
+    assert store.latest_snapshot() is None
+
+
 @pytest.mark.asyncio
 async def test_reads_never_call_sec_even_when_refresh_requested(tmp_path: Path) -> None:
     store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))
@@ -157,6 +218,83 @@ def test_streamed_bootstrap_preserves_newer_period_and_verifies_symbols(tmp_path
     assert store.activity("NVDA", snapshot.report_period).institutions_holding == 2
 
 
+def test_controlled_bundle_cli_import_and_restart_verification(tmp_path: Path) -> None:
+    database = tmp_path / "stage.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE account_users (id TEXT PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO account_users (id) VALUES (?)", ("account-sentinel",))
+    store = InstitutionStore(engine)
+    store.create_schema()
+    snapshot, details = fixture_data()
+    bundle = tmp_path / "bundle.json.gz"
+    with gzip.open(bundle, "wt", encoding="utf-8") as output:
+        output.write(json.dumps({"kind": "snapshot", "payload": snapshot.model_dump(mode="json")}) + "\n")
+        for detail in details:
+            output.write(json.dumps({
+                "kind": "detail", "payload": detail.model_dump(mode="json"), "amount_types": [],
+            }) + "\n")
+    symbols = tmp_path / "symbols.json"
+    symbols.write_text(json.dumps([{
+        "cusip": "67066G104", "ticker": "NVDA",
+        "source_url": "https://www.sec.gov/Archives/example.xml",
+        "verified_at": "2026-11-09T00:00:00+00:00",
+    }]), encoding="utf-8")
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment["APP_ENV"] = "staging"
+    args = [
+        sys.executable, str(root / "scripts" / "import_institution_bundle.py"),
+        "--expected-database", engine.url.database,
+        "--bundle", str(bundle), "--symbols", str(symbols),
+        "--managers", "2", "--positions", "2", "--allow-sqlite-tests",
+    ]
+    for command in ("import", "verify"):
+        result = subprocess.run(
+            [*args[:2], command, *args[2:]], cwd=root, env=environment,
+            check=True, capture_output=True, text=True, timeout=30,
+        )
+        assert json.loads(result.stdout)["positions"] == 2
+        assert database_url not in result.stdout
+    with engine.connect() as connection:
+        assert list(connection.exec_driver_sql("SELECT id FROM account_users")) == [("account-sentinel",)]
+
+    environment["APP_ENV"] = "production"
+    blocked = subprocess.run(
+        [*args[:2], "import", *args[2:]], cwd=root, env=environment,
+        capture_output=True, text=True, timeout=30,
+    )
+    assert blocked.returncode != 0
+    assert "--allow-production" in blocked.stderr
+
+
+def test_controlled_migration_detects_incompatible_existing_table(tmp_path: Path) -> None:
+    database = tmp_path / "incompatible.db"
+    database_url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE account_users (id TEXT PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO account_users (id) VALUES (?)", ("account-sentinel",))
+        connection.exec_driver_sql("CREATE TABLE institution_snapshots (wrong_column TEXT PRIMARY KEY)")
+    root = Path(__file__).resolve().parents[3]
+    environment = os.environ.copy()
+    environment["ACCOUNT_DATABASE_URL"] = database_url
+    environment["APP_ENV"] = "staging"
+    result = subprocess.run(
+        [
+            sys.executable, str(root / "scripts" / "import_institution_bundle.py"),
+            "migrate-up", "--expected-database", engine.url.database, "--allow-sqlite-tests",
+        ],
+        cwd=root, env=environment, capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode != 0
+    assert "Institution columns are missing" in result.stderr
+    with engine.connect() as connection:
+        assert list(connection.exec_driver_sql("SELECT id FROM account_users")) == [("account-sentinel",)]
+
+
 def test_incomplete_bootstrap_never_exposes_staged_details(tmp_path: Path) -> None:
     store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))
     snapshot, details = fixture_data()
@@ -188,6 +326,56 @@ def test_http_index_search_is_paginated_without_sec(tmp_path: Path, monkeypatch:
     assert body["total"] == 2
     assert len(body["results"]) == 1
     assert body["results"][0]["cik"] == "0000000001"
+
+
+def test_history_uses_only_published_periods_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db = tmp_path / "history.db"
+    store = InstitutionStore(create_engine(f"sqlite:///{db}"))
+    q2, q2_details = fixture_data()
+    q1_date = date(2026, 3, 31)
+    q1_summaries = [item.model_copy(update={
+        "report_period": q1_date, "filed_at": date(2026, 5, 12),
+        "total_13f_value": item.total_13f_value / 2,
+        "holdings_count": 1, "new_positions_count": 1,
+        "increased_positions_count": 0, "comparison_available": False,
+    }) for item in q2.institutions]
+    q1 = q2.model_copy(update={
+        "report_period": q1_date, "previous_report_period": None,
+        "institutions": q1_summaries,
+    })
+    q1_details = [detail.model_copy(update={
+        "institution": summary, "previous_report_period": None,
+        "holdings": [detail.holdings[0].model_copy(update={
+            "shares": detail.holdings[0].shares / 2,
+            "value": detail.holdings[0].value / 2,
+            "status": "new",
+        })],
+    }) for detail, summary in zip(q2_details, q1_summaries, strict=True)]
+    store.publish(q1, q1_details)
+    store.publish(q2, q2_details)
+    seed_nvda(store, tmp_path)
+    restarted = InstitutionStore(create_engine(f"sqlite:///{db}"))
+    assert restarted.published_periods() == [date(2026, 6, 30), q1_date]
+    history = restarted.manager_history("0000000001")
+    assert [point.report_period for point in history.periods] == [q1_date, date(2026, 6, 30)]
+    assert [point.total_13f_value for point in history.periods] == [500, 1000]
+    position = restarted.position_history("NVDA")
+    assert [point.report_period for point in position.periods] == [q1_date, date(2026, 6, 30)]
+    assert [point.managers_holding for point in position.periods] == [2, 2]
+    assert [point.value for point in position.periods] == [1500, 3000]
+    assert position.periods[0].filing_urls[0].startswith("https://www.sec.gov/")
+    assert restarted.quality()["consistency_ok"] is True
+
+    service = InstitutionService(store=restarted, universe_path=tmp_path / "missing.json")
+    monkeypatch.setattr(routes, "institution_service", service)
+    client = TestClient(app)
+    assert client.get("/api/v1/discovery/institutions/periods").json() == ["2026-06-30", "2026-03-31"]
+    assert len(client.get("/api/v1/discovery/institutions/history/1").json()["periods"]) == 2
+    assert len(client.get("/api/v1/discovery/institutions/security/history?q=NVDA").json()["periods"]) == 2
+    assert client.get("/api/v1/discovery/institutions?period=2026-03-31").json()["institutions"][0]["total_13f_value"] == 500
+    assert client.get("/api/v1/discovery/institutions/1?period=2026-03-31").json()["institution"]["total_13f_value"] == 500
+    assert client.get("/api/v1/discovery/institutions?period=2025-12-31").status_code == 404
+    assert client.get("/api/v1/discovery/institutions/1?period=2025-12-31").status_code == 400
 
 
 @pytest.mark.asyncio

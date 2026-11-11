@@ -17,10 +17,13 @@ from app.core.config import settings
 from app.core.resilience import shared_http_client
 from app.services.accounts import account_service
 from app.services.institution_store import InstitutionStore
+from app.services.institution_metrics import institution_runtime_metrics
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
     InstitutionHolding,
+    InstitutionHistory,
+    InstitutionPositionHistory,
     InstitutionSecurityPosition,
     InstitutionSecuritySearch,
     InstitutionSourceStatus,
@@ -458,6 +461,7 @@ class InstitutionService:
     async def _sec_request(self, url: str) -> httpx.Response:
         await self._respect_fair_access()
         async with self._sec_semaphore:
+            institution_runtime_metrics.sec_request()
             if self._sec_transport is not None:
                 async with httpx.AsyncClient(
                     transport=self._sec_transport,
@@ -489,6 +493,7 @@ class InstitutionService:
             and not force_refresh
             and monotonic() - cached.stored_at <= ttl
         ):
+            institution_runtime_metrics.cache(hit=True)
             return cached.value, False
         async with self._lock_for(key):
             cached = cache.get(key)
@@ -497,7 +502,9 @@ class InstitutionService:
                 and not force_refresh
                 and monotonic() - cached.stored_at <= ttl
             ):
+                institution_runtime_metrics.cache(hit=True)
                 return cached.value, False
+            institution_runtime_metrics.cache(hit=False)
             try:
                 value = await loader()
             except asyncio.CancelledError:
@@ -507,6 +514,7 @@ class InstitutionService:
                     cached is not None
                     and monotonic() - cached.stored_at <= STALE_TTL_SECONDS
                 ):
+                    institution_runtime_metrics.stale_served()
                     return cached.value, True
                 raise
             cache[key] = CacheEntry(value=value, stored_at=monotonic())
@@ -1000,14 +1008,25 @@ class InstitutionService:
         *,
         limit: int = 50,
         force_refresh: bool = False,
+        period: date | None = None,
     ) -> InstitutionsSnapshot:
         bounded_limit = max(1, min(limit, 100))
+        if period and self._store is None:
+            raise ValueError("Historique 13F non configuré")
         if self._store is not None:
             try:
-                prepared = await asyncio.to_thread(self._store.latest_snapshot)
-            except Exception:
+                prepared = await asyncio.to_thread(
+                    self._store.snapshot_for_period, period
+                ) if period else await asyncio.to_thread(self._store.latest_snapshot)
+            except Exception as exc:
+                if period:
+                    raise InstitutionsUnavailable("L'historique institutionnel est indisponible.") from exc
                 prepared = None
+            if period and prepared is None:
+                raise ValueError("Période 13F non publiée")
             snapshot = prepared or self._seed_snapshot(100)
+            if period:
+                return snapshot.model_copy(update={"institutions": snapshot.institutions[:bounded_limit]})
             if prepared is not None and prepared.report_period is not None:
                 try:
                     partial_period, partial_count, amendment = await asyncio.to_thread(
@@ -1105,13 +1124,20 @@ class InstitutionService:
         cik: str,
         *,
         force_refresh: bool = False,
+        period: date | None = None,
     ) -> InstitutionDetail:
         normalized = str(cik).strip().zfill(10)
         if not re.fullmatch(r"\d{10}", normalized):
             raise ValueError("CIK invalide")
+        if period and self._store is None:
+            raise ValueError("Historique 13F non configuré")
         if self._store is not None:
             try:
-                detail = await asyncio.to_thread(self._store.detail, normalized)
+                if period and await asyncio.to_thread(self._store.snapshot_for_period, period) is None:
+                    raise ValueError("Période 13F non publiée")
+                detail = await asyncio.to_thread(self._store.detail, normalized, period)
+            except ValueError:
+                raise
             except Exception as exc:
                 raise InstitutionsUnavailable("Le stockage institutionnel est indisponible.") from exc
             if detail is None:
@@ -1402,6 +1428,42 @@ class InstitutionService:
                 share_change=row["share_change"], value=row["value"], status=row["status"],
             ) for row in rows],
         )
+
+
+    async def published_periods(self) -> list[date]:
+        if self._store is None:
+            return []
+        try:
+            return await asyncio.to_thread(self._store.published_periods)
+        except Exception as exc:
+            raise InstitutionsUnavailable("L'historique institutionnel est indisponible.") from exc
+
+    async def manager_history(self, cik: str) -> InstitutionHistory:
+        normalized = str(cik).strip().zfill(10)
+        if not re.fullmatch(r"\d{10}", normalized):
+            raise ValueError("CIK invalide")
+        if self._store is None:
+            raise InstitutionsUnavailable("L'historique institutionnel n'est pas configuré.")
+        try:
+            return await asyncio.to_thread(self._store.manager_history, normalized)
+        except Exception as exc:
+            raise InstitutionsUnavailable("L'historique institutionnel est indisponible.") from exc
+
+    async def position_history(self, query: str) -> InstitutionPositionHistory:
+        needle = query.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9.\-]{1,32}", needle):
+            raise ValueError("Titre ou CUSIP invalide")
+        if self._store is None:
+            raise InstitutionsUnavailable("L'historique institutionnel n'est pas configuré.")
+        if not re.fullmatch(r"[A-Z0-9]{9}", needle):
+            if not await asyncio.to_thread(self._store.verified_ticker_exists, needle):
+                raise ValueError("Symbole non vérifié dans l'index 13F ; recherchez par CUSIP.")
+        try:
+            return await asyncio.to_thread(self._store.position_history, needle)
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise InstitutionsUnavailable("L'historique des titres est indisponible.") from exc
 
 
 institution_service = InstitutionService(store=InstitutionStore(account_service.engine))

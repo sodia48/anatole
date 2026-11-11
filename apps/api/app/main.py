@@ -27,6 +27,7 @@ from app.services.canada_360 import canada_360_service
 from app.services.cockpit import cockpit_service
 from app.services.company_network import company_network_service
 from app.services.institution_collector import maintain_recent_13f
+from app.services.institution_metrics import institution_runtime_metrics
 from app.services.institutions import institution_service
 from app.services.news import news_service
 from app.services.notifications import notification_service
@@ -91,6 +92,25 @@ async def _bootstrap_institutions_bundle(path: Path) -> None:
             institutions_count=0, error_category=type(error).__name__,
         )
         logger.error("institution_bundle_bootstrap_failed category=%s", type(error).__name__)
+
+
+async def _prepare_institutions_on_startup() -> asyncio.Task[None] | None:
+    store = institution_service._store
+    if store is None or not settings.institutions_startup_initialization_enabled:
+        return None
+    await asyncio.to_thread(store.create_schema)
+    symbols = Path(__file__).resolve().parent / "data" / "institution_symbol_map.json"
+    await asyncio.to_thread(store.seed_symbols, symbols)
+    if settings.app_env != "production":
+        return None
+    latest = await asyncio.to_thread(store.latest_snapshot)
+    if latest is not None and latest.report_period is not None and latest.report_period >= date(2026, 6, 30):
+        return None
+    bundle = Path(__file__).resolve().parent / "data" / "institution_details_t2_2026.json.gz"
+    return asyncio.create_task(
+        _bootstrap_institutions_bundle(bundle),
+        name="anatole-institution-bundle-bootstrap",
+    )
 
 
 async def _warm_public_snapshots_once() -> None:
@@ -229,20 +249,7 @@ async def _maintain_public_hotset() -> None:
 async def lifespan(_: FastAPI):
     await shared_http_client.start()
     await account_service.start()
-    institution_bootstrap_task: asyncio.Task[None] | None = None
-    if institution_service._store is not None:
-        store = institution_service._store
-        await asyncio.to_thread(store.create_schema)
-        symbols = Path(__file__).resolve().parent / "data" / "institution_symbol_map.json"
-        await asyncio.to_thread(store.seed_symbols, symbols)
-        if settings.app_env == "production":
-            latest = await asyncio.to_thread(store.latest_snapshot)
-            if latest is None or latest.report_period is None or latest.report_period < date(2026, 6, 30):
-                bundle = Path(__file__).resolve().parent / "data" / "institution_details_t2_2026.json.gz"
-                institution_bootstrap_task = asyncio.create_task(
-                    _bootstrap_institutions_bundle(bundle),
-                    name="anatole-institution-bundle-bootstrap",
-                )
+    institution_bootstrap_task = await _prepare_institutions_on_startup()
     await company_network_service.start()
     notification_service.account_service = account_service
     await notification_service.start()
@@ -263,7 +270,11 @@ async def lifespan(_: FastAPI):
             maintain_recent_13f(institution_service._store),
             name="anatole-institution-discovery",
         )
-        if settings.app_env == "production" and institution_service._store is not None
+        if (
+            settings.app_env == "production"
+            and settings.institutions_background_discovery_enabled
+            and institution_service._store is not None
+        )
         else None
     )
     logger.info("anatole_api_started shared_http_pool=true")
@@ -327,6 +338,10 @@ async def request_observability(
     request.state.request_id = request_id
     cf_ray = request.headers.get("CF-Ray", "-")
     started = time.perf_counter()
+    institution_path = request.url.path.startswith("/api/v1/discovery/institutions")
+    institution_search = institution_path and "/security/" in request.url.path
+    if institution_search:
+        institution_runtime_metrics.begin_search()
 
     logger.info(
         "request_started id=%s cf_ray=%s method=%s path=%s",
@@ -340,6 +355,10 @@ async def request_observability(
         response = await call_next(request)
     except Exception:
         elapsed_ms = (time.perf_counter() - started) * 1000
+        if institution_path:
+            institution_runtime_metrics.http(elapsed_ms, None)
+        if institution_search:
+            institution_runtime_metrics.end_search()
         reliability_monitor.record_exception(
             path=request.url.path,
             method=request.method,
@@ -363,6 +382,11 @@ async def request_observability(
         )
 
     elapsed_ms = (time.perf_counter() - started) * 1000
+    if institution_path:
+        length = response.headers.get("content-length", "")
+        institution_runtime_metrics.http(elapsed_ms, int(length) if length.isdigit() else None)
+    if institution_search:
+        institution_runtime_metrics.end_search()
     reliability_monitor.record_request(
         path=request.url.path,
         method=request.method,

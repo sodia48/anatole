@@ -19,8 +19,6 @@ import {
 
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import {
-  INSTITUTIONAL_AREAS,
-  INSTITUTIONAL_CAPABILITIES,
   type InstitutionalCapability,
   type InstitutionalCapabilityStage,
 } from "@/lib/institutional-capabilities";
@@ -151,7 +149,13 @@ function normalize(value: string): string {
     .trim();
 }
 
-export function InstitutionalHub() {
+export function InstitutionalHub({
+  areas,
+  capabilities,
+}: {
+  areas: readonly string[];
+  capabilities: InstitutionalCapability[];
+}) {
   const { preferences } = usePreferences();
   const language = preferences.language;
   const [query, setQuery] = useState("");
@@ -173,7 +177,7 @@ export function InstitutionalHub() {
 
   const normalizedQuery = normalize(query);
 
-  const filtered = INSTITUTIONAL_CAPABILITIES.filter(
+  const filtered = capabilities.filter(
     (capability) => {
       const matchesArea =
         area === "all" || capability.area === area;
@@ -190,16 +194,16 @@ export function InstitutionalHub() {
     },
   );
 
-  const bridgeCount = INSTITUTIONAL_CAPABILITIES.filter(
+  const bridgeCount = capabilities.filter(
     (capability) => capability.stage === "bridge",
   ).length;
 
   const foundationCount =
-    INSTITUTIONAL_CAPABILITIES.filter(
+    capabilities.filter(
       (capability) => capability.stage === "foundation",
     ).length;
 
-  const roadmapCount = INSTITUTIONAL_CAPABILITIES.filter(
+  const roadmapCount = capabilities.filter(
     (capability) => capability.stage === "roadmap",
   ).length;
 
@@ -207,7 +211,7 @@ export function InstitutionalHub() {
     <section
       className={styles.shell}
       data-testid="institutional-hub"
-      data-capability-count="70"
+      data-capability-count={capabilities.length}
     >
       <header className={styles.hero}>
         <div className={styles.heroCopy}>
@@ -464,7 +468,7 @@ export function InstitutionalHub() {
             <option value="all">
               {pick(language, "Tous les domaines", "All domains")}
             </option>
-            {INSTITUTIONAL_AREAS.map((item) => (
+            {areas.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>

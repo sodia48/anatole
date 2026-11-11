@@ -90,6 +90,8 @@ class Settings(BaseSettings):
         default="sqlite:///./anatole_accounts.db",
         validation_alias=AliasChoices("ACCOUNT_DATABASE_URL", "DATABASE_URL"),
     )
+    institutions_startup_initialization_enabled: bool = False
+    institutions_background_discovery_enabled: bool = False
     account_session_days: int = 30
     account_registration_enabled: bool = True
     account_invite_codes: str = ""

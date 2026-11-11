@@ -165,8 +165,8 @@ function Disclosure({ language }: { language: "fr" | "en" }) {
         <p>
           {pick(
             language,
-            "Variations de quantités entre deux 13F trimestriels, pas des transactions. Un dépôt peut paraître 45 jours après la fin du trimestre.",
-            "Share changes compare two quarterly 13F filings, not trades. Filings may arrive 45 days after quarter-end.",
+            "Variations de quantités entre deux 13F, pas des transactions. Dépôt possible 45 jours après le trimestre.",
+            "Share changes compare two 13F filings, not trades. Filing may follow quarter-end by 45 days.",
           )}
         </p>
         <details>
@@ -174,8 +174,8 @@ function Disclosure({ language }: { language: "fr" | "en" }) {
           <p>
             {pick(
               language,
-              "Le 13F décrit certains titres de grands gestionnaires à la fin du trimestre, sans couvrir nécessairement tout leur portefeuille.",
-              "A 13F reports certain securities held by large managers at quarter-end; it need not cover their whole portfolio.",
+              "Le 13F déclare certains titres en fin de trimestre, pas tout le portefeuille.",
+              "A 13F reports certain quarter-end holdings, not the full portfolio.",
             )}
           </p>
         </details>
@@ -450,6 +450,7 @@ function ActivitySearch({ language, locale, initialQuery = "" }: { language: "fr
               <div><dt>{pick(language, "Valeur déclarée", "Reported value")}</dt><dd>{formatMoney(result.current_reported_value, locale)}</dd></div>
             </dl>
             <p><strong>{pick(language, "Principaux déclarants :", "Top filers:")}</strong> {result.institution_names.join(" · ")}</p>
+            <Link href={`/institutions/security/history?q=${encodeURIComponent(searchedQuery)}`}>{pick(language, "Historique de la position", "Position history")} →</Link>
             <button type="button" onClick={() => void loadPositions()} disabled={positionsLoading}>
               {pick(language, "Consulter les déclarants", "View reporting managers")}
             </button>
@@ -496,7 +497,7 @@ export function InstitutionsClient() {
       setSnapshot(next);
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : pick(language, "Les données institutionnelles sont temporairement indisponibles.", "Institutional data is temporarily unavailable."));
+      setError(caught instanceof Error ? caught.message : pick(language, "Données 13F indisponibles.", "13F data unavailable."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -543,7 +544,7 @@ export function InstitutionsClient() {
   }
 
   if (snapshot === null) {
-    return <main className={styles.page}><section className={styles.failure}><Building2 aria-hidden="true" size={34} /><h1>{pick(language, "Données temporairement indisponibles", "Data temporarily unavailable")}</h1><p>{error ?? pick(language, "Les données institutionnelles sont temporairement indisponibles.", "Institutional data is temporarily unavailable.")}</p><button type="button" onClick={() => void load()}>{pick(language, "Réessayer", "Try again")}</button></section></main>;
+    return <main className={styles.page}><section className={styles.failure}><Building2 aria-hidden="true" size={34} /><h1>{pick(language, "Données indisponibles", "Data unavailable")}</h1><p>{error ?? pick(language, "Données 13F indisponibles.", "13F data unavailable.")}</p><button type="button" onClick={() => void load()}>{pick(language, "Réessayer", "Try again")}</button></section></main>;
   }
 
   return (
@@ -620,7 +621,7 @@ export function InstitutionDetailClient() {
       setDetail(await getInstitutionDetail(cik, refresh, signal));
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : pick(language, "Les données institutionnelles sont temporairement indisponibles.", "Institutional data is temporarily unavailable."));
+      setError(caught instanceof Error ? caught.message : pick(language, "Données 13F indisponibles.", "13F data unavailable."));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -652,7 +653,7 @@ export function InstitutionDetailClient() {
   }, [detail?.holdings, filter, query, sort]);
 
   if (loading && detail === null) return <main className={styles.page}><section className={styles.loading}><span className={styles.spinner} /><div><h1>{pick(language, "Chargement des positions 13F…", "Loading 13F holdings…")}</h1><p>SEC EDGAR</p></div></section></main>;
-  if (detail === null) return <main className={styles.page}><section className={styles.failure}><Building2 aria-hidden="true" size={34} /><h1>{pick(language, "Données temporairement indisponibles", "Data temporarily unavailable")}</h1><p>{error}</p><Link href="/institutions">{pick(language, "Retour aux institutions", "Back to institutions")}</Link></section></main>;
+  if (detail === null) return <main className={styles.page}><section className={styles.failure}><Building2 aria-hidden="true" size={34} /><h1>{pick(language, "Données indisponibles", "Data unavailable")}</h1><p>{error}</p><Link href="/institutions">{pick(language, "Retour aux institutions", "Back to institutions")}</Link></section></main>;
 
   const institution = detail.institution;
   const metrics: Array<[string, string]> = [
@@ -674,8 +675,9 @@ export function InstitutionDetailClient() {
         <button className={styles.refreshButton} type="button" onClick={() => void load(true)} disabled={refreshing}><RefreshCw aria-hidden="true" size={15} className={refreshing ? styles.spinning : undefined} />{pick(language, "Actualiser", "Refresh")}</button>
       </section>
       <section className={`${styles.metrics} ${styles.detailMetrics}`}>{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</section>
-      {!institution.comparison_available && <div className={styles.staleBanner}><strong>{pick(language, "COMPARAISON INDISPONIBLE", "COMPARISON UNAVAILABLE")}</strong><span>{pick(language, "Aucun trimestre précédent officiel exploitable n’a été trouvé; aucune variation n’est inventée.", "No usable official previous quarter was found; no changes are fabricated.")}</span></div>}
-      {normalizedCountry(institution.country) === "canada" && <aside className={styles.canadaNote}>{pick(language, "Le Form 13F couvre les titres visés par la réglementation américaine 13F et ne représente pas nécessairement l’ensemble du portefeuille canadien ou mondial du gestionnaire.", "Form 13F covers securities subject to U.S. 13F rules and does not necessarily represent the manager’s entire Canadian or global portfolio.")}</aside>}
+      <Link className={styles.backLink} href={`/institutions/${encodeURIComponent(cik)}/history`}>{pick(language, "Historique trimestriel", "Quarterly history")} →</Link>
+      {!institution.comparison_available && <div className={styles.staleBanner}><strong>{pick(language, "COMPARAISON INDISPONIBLE", "COMPARISON UNAVAILABLE")}</strong><span>{pick(language, "Trimestre précédent officiel absent : aucune variation calculée.", "No official prior quarter: no change calculated.")}</span></div>}
+      {normalizedCountry(institution.country) === "canada" && <aside className={styles.canadaNote}>{pick(language, "Le 13F américain ne couvre pas nécessairement tout le portefeuille canadien ou mondial.", "U.S. 13F filings may omit parts of a Canadian or global portfolio.")}</aside>}
       <Disclosure language={language} />
       <section className={styles.holdingsPanel}>
         <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>{pick(language, "POSITIONS DÉCLARÉES", "REPORTED HOLDINGS")}</span><h2>{pick(language, "Comparaison trimestrielle", "Quarterly comparison")}</h2><p>{formatDate(detail.previous_report_period, locale)} → {formatDate(institution.report_period, locale)}</p></div><strong>{formatNumber(holdings.length, locale)}</strong></div>

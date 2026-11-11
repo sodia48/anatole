@@ -33,6 +33,7 @@ function noStoreHeaders(
 function allowed(segments: string[], method: string): boolean {
   const path = segments.join("/");
   if (path === "overview") return method === "GET";
+  if (path === "institutions/quality") return method === "GET";
   if (path === "users") return method === "GET";
   if (path === "invites") return method === "GET" || method === "POST";
   if (/^invites\/[a-zA-Z0-9_-]+\/revoke$/.test(path)) return method === "POST";

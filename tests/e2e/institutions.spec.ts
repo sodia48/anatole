@@ -242,7 +242,33 @@ test("la section Institutions suit la préférence anglaise", async ({ page }) =
   await page.goto("/institutions");
   await expect(page.locator("html")).toHaveAttribute("lang", "en-CA");
   await expect(page.getByRole("heading", { name: "Institutional intelligence" })).toBeVisible();
-  await expect(page.getByText(/Share changes compare two quarterly 13F filings/)).toBeVisible();
+  await expect(page.getByText(/Share changes compare two 13F filings/)).toBeVisible();
+});
+
+test("historique accessible sur ordinateur et mobile sans inventer de périodes", async ({ page }, testInfo) => {
+  await page.goto("/institutions/0001234567");
+  await page.getByRole("link", { name: "Historique trimestriel" }).click();
+  await expect(page).toHaveURL(/\/institutions\/0001234567\/history$/);
+  await expect(page.getByRole("heading", { name: /Historique trimestriel/ })).toBeVisible();
+  await expect(page.getByText("Aucun trimestre publié pour ce gestionnaire.")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("institutions-history.png"), fullPage: true });
+  const width = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
+
+  await page.goto("/institutions");
+  await page.getByRole("button", { name: "Titres", exact: true }).click();
+  await page.getByLabel("Ticker ou CUSIP").fill("AAPL");
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  await page.getByRole("link", { name: "Historique de la position" }).click();
+  await expect(page).toHaveURL(/\/institutions\/security\/history\?q=AAPL$/);
+  await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
+  const emptyPosition = page.getByText("Aucune période publiée pour ce titre.");
+  await expect(emptyPosition).toBeVisible();
+  await emptyPosition.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-position-history.png"), fullPage: true });
+  await page.goto("/institutions/security/history?q=AAPL&q=MSFT");
+  await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
+  await expect(page.getByLabel("Ticker vérifié ou CUSIP")).toHaveValue("");
 });
 
 test("la page Institutions conserve un contraste lisible avec Anatole Blanc", async ({ page }) => {
