@@ -66,6 +66,9 @@ class InstitutionHolding(BaseModel):
 class InstitutionDetail(BaseModel):
     institution: InstitutionSummary
     holdings: list[InstitutionHolding] = Field(default_factory=list)
+    holdings_total: int | None = Field(default=None, ge=0)
+    holdings_limit: int | None = Field(default=None, ge=1)
+    holdings_offset: int | None = Field(default=None, ge=0)
     previous_report_period: date | None = None
     source_statuses: list[InstitutionSourceStatus] = Field(default_factory=list)
     generated_at: datetime

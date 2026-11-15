@@ -45,6 +45,7 @@ type InstitutionSort = "value" | "new" | "increased" | "reduced";
 type RadarTab = "increased" | "new" | "reduced" | "closed";
 type InstitutionView = "overview" | "managers" | "securities" | "radar";
 const MANAGERS_PER_PAGE = 20;
+const HOLDINGS_PER_PAGE = 100;
 type HoldingSort = "weight" | "value" | "shares" | "percent";
 type HoldingFilter = "all" | InstitutionHoldingStatus;
 
@@ -612,34 +613,42 @@ export function InstitutionDetailClient() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<HoldingFilter>("all");
   const [sort, setSort] = useState<HoldingSort>("weight");
+  const [offset, setOffset] = useState(0);
 
   const load = useCallback(async (refresh = false, signal?: AbortSignal) => {
     if (!cik) return;
     if (refresh) setRefreshing(true);
     else setLoading(true);
     try {
-      setDetail(await getInstitutionDetail(cik, refresh, signal));
+      const nextDetail = await getInstitutionDetail(cik, refresh, signal, {
+        limit: HOLDINGS_PER_PAGE, offset, query: query.trim(), status: filter, sort,
+      });
+      if (signal?.aborted) return;
+      setDetail(nextDetail);
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : pick(language, "Données 13F indisponibles.", "13F data unavailable."));
+      if (!signal?.aborted) setError(caught instanceof Error ? caught.message : pick(language, "Données 13F indisponibles.", "13F data unavailable."));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
-  }, [cik, language]);
+  }, [cik, language, offset, query, filter, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void load(false, controller.signal);
-    }, 0);
+    }, query ? 200 : 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [load]);
+  }, [load, query]);
 
   const holdings = useMemo(() => {
+    if (typeof detail?.holdings_total === "number") return detail.holdings;
     const needle = query.trim().toLowerCase();
     return [...(detail?.holdings ?? [])]
       .filter((holding) => filter === "all" || holding.status === filter)
@@ -650,7 +659,8 @@ export function InstitutionDetailClient() {
         if (sort === "shares") return Math.abs(right.share_change) - Math.abs(left.share_change);
         return Math.abs(right.share_change_percent ?? 0) - Math.abs(left.share_change_percent ?? 0);
       });
-  }, [detail?.holdings, filter, query, sort]);
+  }, [detail?.holdings, detail?.holdings_total, filter, query, sort]);
+  const holdingsTotal = typeof detail?.holdings_total === "number" ? detail.holdings_total : holdings.length;
 
   if (loading && detail === null) return <main className={styles.page}><section className={styles.loading}><span className={styles.spinner} /><div><h1>{pick(language, "Chargement des positions 13F…", "Loading 13F holdings…")}</h1><p>SEC EDGAR</p></div></section></main>;
   if (detail === null) return <main className={styles.page}><section className={styles.failure}><Building2 aria-hidden="true" size={34} /><h1>{pick(language, "Données indisponibles", "Data unavailable")}</h1><p>{error}</p><Link href="/institutions">{pick(language, "Retour aux institutions", "Back to institutions")}</Link></section></main>;
@@ -679,14 +689,15 @@ export function InstitutionDetailClient() {
       {!institution.comparison_available && <div className={styles.staleBanner}><strong>{pick(language, "COMPARAISON INDISPONIBLE", "COMPARISON UNAVAILABLE")}</strong><span>{pick(language, "Trimestre précédent officiel absent : aucune variation calculée.", "No official prior quarter: no change calculated.")}</span></div>}
       {normalizedCountry(institution.country) === "canada" && <aside className={styles.canadaNote}>{pick(language, "Le 13F américain ne couvre pas nécessairement tout le portefeuille canadien ou mondial.", "U.S. 13F filings may omit parts of a Canadian or global portfolio.")}</aside>}
       <Disclosure language={language} />
-      <section className={styles.holdingsPanel}>
-        <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>{pick(language, "POSITIONS DÉCLARÉES", "REPORTED HOLDINGS")}</span><h2>{pick(language, "Comparaison trimestrielle", "Quarterly comparison")}</h2><p>{formatDate(detail.previous_report_period, locale)} → {formatDate(institution.report_period, locale)}</p></div><strong>{formatNumber(holdings.length, locale)}</strong></div>
-        <div className={styles.holdingTabs} role="tablist" aria-label={pick(language, "Statut des positions", "Holding status")}>{(["all", ...STATUS_ORDER.slice(0, 4)] as HoldingFilter[]).map((status) => <button key={status} type="button" role="tab" aria-selected={filter === status} onClick={() => setFilter(status)}>{status === "all" ? pick(language, "Toutes", "All") : statusLabel(status, language)}</button>)}</div>
+      <section className={styles.holdingsPanel} aria-busy={loading}>
+        <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>{pick(language, "POSITIONS DÉCLARÉES", "REPORTED HOLDINGS")}</span><h2>{pick(language, "Comparaison trimestrielle", "Quarterly comparison")}</h2><p>{formatDate(detail.previous_report_period, locale)} → {formatDate(institution.report_period, locale)}</p></div><strong>{formatNumber(holdingsTotal, locale)}</strong></div>
+        <div className={styles.holdingTabs} role="tablist" aria-label={pick(language, "Statut des positions", "Holding status")}>{(["all", ...STATUS_ORDER.slice(0, 4)] as HoldingFilter[]).map((status) => <button key={status} type="button" role="tab" aria-selected={filter === status} onClick={() => { setOffset(0); setFilter(status); }}>{status === "all" ? pick(language, "Toutes", "All") : statusLabel(status, language)}</button>)}</div>
         <div className={styles.filters}>
-          <label className={styles.searchBox}><Search aria-hidden="true" size={17} /><span className={styles.srOnly}>{pick(language, "Rechercher une position", "Search a holding")}</span><input aria-label={pick(language, "Rechercher une position", "Search a holding")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pick(language, "Ticker, émetteur ou CUSIP", "Ticker, issuer or CUSIP")} /></label>
-          <label><span>{pick(language, "Trier par", "Sort by")}</span><select value={sort} onChange={(event) => setSort(event.target.value as HoldingSort)}><option value="weight">{pick(language, "Poids", "Weight")}</option><option value="value">{pick(language, "Valeur", "Value")}</option><option value="shares">∆ {pick(language, "actions", "shares")}</option><option value="percent">∆ %</option></select></label>
+          <label className={styles.searchBox}><Search aria-hidden="true" size={17} /><span className={styles.srOnly}>{pick(language, "Rechercher une position", "Search a holding")}</span><input aria-label={pick(language, "Rechercher une position", "Search a holding")} value={query} maxLength={80} onChange={(event) => { setOffset(0); setQuery(event.target.value); }} placeholder={pick(language, "Ticker, émetteur ou CUSIP", "Ticker, issuer or CUSIP")} /></label>
+          <label><span>{pick(language, "Trier par", "Sort by")}</span><select value={sort} onChange={(event) => { setOffset(0); setSort(event.target.value as HoldingSort); }}><option value="weight">{pick(language, "Poids", "Weight")}</option><option value="value">{pick(language, "Valeur", "Value")}</option><option value="shares">∆ {pick(language, "actions", "shares")}</option><option value="percent">∆ %</option></select></label>
         </div>
         {holdings.length > 0 ? <><div className={styles.desktopTable}><table><thead><tr><th>Ticker</th><th>{pick(language, "Émetteur", "Issuer")}</th><th>{pick(language, "Actions déclarées", "Reported shares")}</th><th>{pick(language, "Variation actions", "Share change")}</th><th>{pick(language, "Variation %", "Change %")}</th><th>{pick(language, "Valeur déclarée", "Reported value")}</th><th>{pick(language, "Poids portefeuille", "Portfolio weight")}</th><th>{pick(language, "Statut", "Status")}</th></tr></thead><tbody>{holdings.map((holding) => <tr key={`${holding.cusip}-${holding.put_call ?? "shares"}`}><td><strong>{holding.ticker ?? "—"}</strong>{holding.put_call && <span className={styles.optionBadge}>{holding.put_call}</span>}<small>CUSIP {holding.cusip}</small></td><td>{holding.issuer}<small>{holding.security_class}</small></td><td>{formatNumber(holding.shares, locale)}</td><td className={holding.share_change >= 0 ? styles.positive : styles.negative}>{formatSigned(holding.share_change, locale)}</td><td className={(holding.share_change_percent ?? 0) >= 0 ? styles.positive : styles.negative}>{formatPercent(holding.share_change_percent, locale)}</td><td>{formatMoney(holding.value, locale)}</td><td>{formatPercent(holding.portfolio_weight_percent, locale)}</td><td><StatusBadge status={holding.status} language={language} /></td></tr>)}</tbody></table></div><HoldingCards holdings={holdings} language={language} locale={locale} /></> : <p className={styles.emptyInline}>{pick(language, "Aucune position ne correspond à ces filtres.", "No holding matches these filters.")}</p>}
+        {typeof detail.holdings_total === "number" && (holdingsTotal > HOLDINGS_PER_PAGE || offset > 0) && <div className={styles.pager}><button type="button" disabled={loading || offset === 0} onClick={() => setOffset((current) => Math.max(0, current - HOLDINGS_PER_PAGE))}>{pick(language, "Précédent", "Previous")}</button><span>{formatNumber(holdingsTotal ? offset + 1 : 0, locale)}–{formatNumber(Math.min(offset + HOLDINGS_PER_PAGE, holdingsTotal), locale)} / {formatNumber(holdingsTotal, locale)}</span><button type="button" disabled={loading || offset + HOLDINGS_PER_PAGE >= holdingsTotal} onClick={() => setOffset((current) => current + HOLDINGS_PER_PAGE)}>{pick(language, "Suivant", "Next")}</button></div>}
       </section>
       <SourcePanel sources={detail.source_statuses} generatedAt={detail.generated_at} language={language} />
     </main>

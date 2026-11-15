@@ -11,6 +11,7 @@ import sys
 import httpx
 import pytest
 from sqlalchemy import create_engine
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.schemas.institutions import (
@@ -326,6 +327,64 @@ def test_http_index_search_is_paginated_without_sec(tmp_path: Path, monkeypatch:
     assert body["total"] == 2
     assert len(body["results"]) == 1
     assert body["results"][0]["cik"] == "0000000001"
+
+
+def test_manager_detail_pagination_preserves_global_filters_and_legacy_response(
+    tmp_path: Path,
+) -> None:
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'detail-pages.db'}"))
+    snapshot, details = fixture_data()
+    original = details[0].holdings[0].model_copy(update={
+        "portfolio_weight_percent": 50,
+    })
+    new = original.model_copy(update={
+        "cusip": "594918104", "ticker": "MSFT", "issuer": "MICROSOFT CORP",
+        "value": 2000, "portfolio_weight_percent": 40, "status": "new",
+    })
+    reduced = original.model_copy(update={
+        "cusip": "02079K305", "ticker": "GOOG", "issuer": "ALPHABET INC",
+        "value": 500, "portfolio_weight_percent": 10, "status": "reduced",
+    })
+    summary = details[0].institution.model_copy(update={"holdings_count": 3})
+    snapshot = snapshot.model_copy(update={
+        "institutions": [summary, snapshot.institutions[1]],
+    })
+    details[0] = details[0].model_copy(update={
+        "institution": summary, "holdings": [original, new, reduced],
+    })
+    store.publish(snapshot, details)
+    seed_nvda(store, tmp_path)
+
+    full = store.detail(summary.cik)
+    assert full is not None and len(full.holdings) == 3
+    assert full.holdings_total is None
+    first = store.detail(summary.cik, limit=1)
+    assert first is not None and first.holdings_total == 3
+    assert [item.cusip for item in first.holdings] == ["67066G104"]
+    second = store.detail(summary.cik, limit=1, offset=1)
+    assert second is not None and [item.cusip for item in second.holdings] == ["594918104"]
+    filtered = store.detail(summary.cik, limit=1, query="msft", status="new", sort="value")
+    assert filtered is not None and filtered.holdings_total == 1
+    assert [item.cusip for item in filtered.holdings] == ["594918104"]
+    assert store.detail(summary.cik, limit=1, query="absent").holdings_total == 0
+
+
+def test_http_manager_detail_accepts_page_params(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'http-detail-pages.db'}"))
+    snapshot, details = fixture_data()
+    store.publish(snapshot, details)
+    service = InstitutionService(store=store, universe_path=tmp_path / "missing.json")
+    monkeypatch.setattr(routes, "institution_service", service)
+    route_app = FastAPI()
+    route_app.include_router(routes.router, prefix="/api/v1/discovery")
+    client = TestClient(route_app)
+    response = client.get("/api/v1/discovery/institutions/1?limit=1&offset=0&sort=value")
+    assert response.status_code == 200
+    assert response.json()["holdings_total"] == 1
+    assert response.json()["holdings"][0]["cusip"] == "67066G104"
+    assert client.get("/api/v1/discovery/institutions/1?limit=201").status_code == 422
+    assert client.get("/api/v1/discovery/institutions/1?offset=1").status_code == 400
+    assert client.get("/api/v1/discovery/institutions/1?limit=1&status=invalid").status_code == 422
 
 
 def test_history_uses_only_published_periods_and_survives_restart(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

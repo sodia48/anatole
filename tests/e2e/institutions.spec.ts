@@ -207,6 +207,45 @@ test("activité par titre et détail des positions", async ({ page }) => {
   expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
 });
 
+test("détail gestionnaire paginé et filtré sur le serveur", async ({ page }, testInfo) => {
+  const allHoldings = Array.from({ length: 205 }, (_, index) => ({
+    ...detail.holdings[0],
+    cusip: String(index).padStart(9, "0"),
+    ticker: null,
+    issuer: `POSITION ${String(index).padStart(3, "0")}`,
+    value: 205 - index,
+    portfolio_weight_percent: (205 - index) / 205,
+    status: index === 202 ? "new" : "increased",
+  }));
+  await page.route(/\/api\/anatole\/api\/v1\/discovery\/institutions\/0001234567(?:\?|$)/, async (route) => {
+    const url = new URL(route.request().url());
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const status = url.searchParams.get("status") ?? "all";
+    const query = (url.searchParams.get("q") ?? "").toLowerCase();
+    const filtered = allHoldings.filter((holding) =>
+      (status === "all" || holding.status === status)
+      && (!query || holding.issuer.toLowerCase().includes(query)),
+    );
+    await route.fulfill({ json: {
+      ...detail, holdings: filtered.slice(offset, offset + limit),
+      holdings_total: filtered.length, holdings_limit: limit, holdings_offset: offset,
+    } });
+  });
+  await page.goto("/institutions/0001234567");
+  await expect(page.getByRole("heading", { name: institution.name })).toBeVisible();
+  await expect(page.getByText("POSITION 000", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Suivant", exact: true }).click();
+  await expect(page.getByText("POSITION 100", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await page.getByRole("tab", { name: "Nouvelle position" }).click();
+  await expect(page.getByText("POSITION 202", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Suivant", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Toutes" }).click();
+  await page.getByLabel("Rechercher une position").fill("POSITION 150");
+  await expect(page.getByText("POSITION 150", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("institution-paginated-detail.png"), fullPage: true });
+});
+
 test("classement complet paginé sur mobile et ordinateur", async ({ page }) => {
   const managers = Array.from({ length: 25 }, (_, index) => ({
     ...institution,

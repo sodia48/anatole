@@ -595,6 +595,9 @@ export type InstitutionHolding = {
 export type InstitutionDetail = {
   institution: InstitutionSummary;
   holdings: InstitutionHolding[];
+  holdings_total?: number | null;
+  holdings_limit?: number | null;
+  holdings_offset?: number | null;
   previous_report_period: string | null;
   source_statuses: InstitutionSourceStatus[];
   generated_at: string;

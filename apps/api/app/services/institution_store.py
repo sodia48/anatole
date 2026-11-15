@@ -28,6 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
+from pydantic_core import from_json
 
 from app.schemas.institutions import (
     InstitutionDetail,
@@ -588,28 +589,74 @@ class InstitutionStore:
             raise ValueError("Symbole ambigu : recherchez par CUSIP")
         return cusips[0] if cusips else None
 
-    def detail(self, cik: str, period: date | None = None) -> InstitutionDetail | None:
-        if period is None:
-            active = self.latest_snapshot()
-            period = active.report_period if active else None
-        if period is None:
-            return None
+    def detail(
+        self, cik: str, period: date | None = None, *,
+        limit: int | None = None, offset: int = 0, query: str = "",
+        status: str = "all", sort: str = "weight",
+    ) -> InstitutionDetail | None:
+        if limit is None and (offset or query or status != "all" or sort != "weight"):
+            raise ValueError("La pagination est requise pour filtrer les positions")
         with self.engine.connect() as connection:
-            statement = select(self.details.c.payload).where(self.details.c.cik == cik)
-            statement = statement.where(self.details.c.period == period.isoformat())
-            row = connection.execute(statement.order_by(self.details.c.period.desc()).limit(1)).scalar_one_or_none()
-            detail = InstitutionDetail.model_validate_json(row) if row else None
-            if detail:
-                symbols = dict(connection.execute(
-                    select(self.symbols.c.cusip, self.symbols.c.ticker)
-                ).all())
-                detail = detail.model_copy(update={
-                    "holdings": [
-                        item.model_copy(update={"ticker": symbols.get(item.cusip) or item.ticker})
-                        for item in detail.holdings
-                    ]
-                })
-        return detail
+            if period is None:
+                active_period = connection.execute(
+                    select(self.snapshots.c.period).order_by(self.snapshots.c.period.desc()).limit(1)
+                ).scalar_one_or_none()
+            else:
+                active_period = period.isoformat()
+            if active_period is None:
+                return None
+            row = connection.execute(
+                select(self.details.c.payload).where(and_(
+                    self.details.c.period == active_period,
+                    self.details.c.cik == cik,
+                ))
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            symbols = dict(connection.execute(
+                select(self.symbols.c.cusip, self.symbols.c.ticker)
+            ).all())
+        if limit is None:
+            detail = InstitutionDetail.model_validate_json(row)
+            return detail.model_copy(update={
+                "holdings": [
+                    item.model_copy(update={"ticker": symbols.get(item.cusip) or item.ticker})
+                    for item in detail.holdings
+                ]
+            })
+
+        # Decode the persisted, import-validated JSON once. Validating only the
+        # requested page avoids thousands of Pydantic objects and a multi-MB
+        # response for every click while retaining the legacy full-detail API.
+        payload = from_json(row)
+        if not isinstance(payload, dict) or not isinstance(payload.get("holdings"), list):
+            raise ValueError("Invalid stored institution detail")
+        holdings = payload["holdings"]
+        for item in holdings:
+            item["ticker"] = symbols.get(item["cusip"]) or item.get("ticker")
+        needle = query.strip().casefold()
+        if status != "all":
+            holdings = [item for item in holdings if item["status"] == status]
+        if needle:
+            holdings = [
+                item for item in holdings
+                if needle in item["issuer"].casefold()
+                or needle in item["cusip"].casefold()
+                or needle in (item.get("ticker") or "").casefold()
+            ]
+        if sort == "shares":
+            holdings.sort(key=lambda item: abs(item["share_change"]), reverse=True)
+        elif sort == "percent":
+            holdings.sort(key=lambda item: abs(item.get("share_change_percent") or 0), reverse=True)
+        elif sort == "value":
+            holdings.sort(key=lambda item: item["value"], reverse=True)
+        else:
+            holdings.sort(key=lambda item: item["portfolio_weight_percent"], reverse=True)
+        payload["holdings_total"] = len(holdings)
+        payload["holdings_limit"] = limit
+        payload["holdings_offset"] = offset
+        payload["holdings"] = holdings[offset:offset + limit]
+        return InstitutionDetail.model_validate(payload)
 
     def activity(self, query: str, period: date) -> InstitutionFlow | None:
         needle = query.strip().upper()

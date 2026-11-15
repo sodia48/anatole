@@ -1125,6 +1125,11 @@ class InstitutionService:
         *,
         force_refresh: bool = False,
         period: date | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        query: str = "",
+        status: str = "all",
+        sort: str = "weight",
     ) -> InstitutionDetail:
         normalized = str(cik).strip().zfill(10)
         if not re.fullmatch(r"\d{10}", normalized):
@@ -1135,7 +1140,10 @@ class InstitutionService:
             try:
                 if period and await asyncio.to_thread(self._store.snapshot_for_period, period) is None:
                     raise ValueError("Période 13F non publiée")
-                detail = await asyncio.to_thread(self._store.detail, normalized, period)
+                detail = await asyncio.to_thread(
+                    self._store.detail, normalized, period,
+                    limit=limit, offset=offset, query=query, status=status, sort=sort,
+                )
             except ValueError:
                 raise
             except Exception as exc:

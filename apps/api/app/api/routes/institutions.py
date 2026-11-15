@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -116,12 +117,18 @@ async def institution_detail(
     cik: str,
     refresh: bool = Query(default=False),
     period: date | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=80),
+    status: Literal["all", "new", "increased", "reduced", "closed", "unchanged"] = Query(default="all"),
+    sort: Literal["weight", "value", "shares", "percent"] = Query(default="weight"),
 ) -> InstitutionDetail:
     try:
         return await institution_service.institution_detail(
             cik,
             force_refresh=refresh,
             period=period,
+            limit=limit, offset=offset, query=q, status=status, sort=sort,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
