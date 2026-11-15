@@ -715,7 +715,8 @@
 }
 
 .detailMetrics strong {
-  font-size: clamp(16px, 1.7vw, 23px);
+  font-size: clamp(14px, 1.15vw, 18px);
+  white-space: nowrap;
 }
 
 .holdingsPanel .sectionHeading > strong {
