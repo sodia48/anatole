@@ -88,7 +88,7 @@ export default defineConfig({
             // startup initialization disabled by default.
             INSTITUTIONS_STARTUP_INITIALIZATION_ENABLED: "true",
             ACCOUNT_ADMIN_EMAILS:
-              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com",
+              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com,admin-institutions-e2e-desktop-chromium@example.com,admin-institutions-e2e-mobile-pixel-7@example.com,admin-institutions-e2e-mobile-iphone-14@example.com",
           },
         },
         {

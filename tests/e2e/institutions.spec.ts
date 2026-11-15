@@ -335,3 +335,45 @@ test("la page Institutions conserve un contraste lisible avec Anatole Blanc", as
   await expect(metric).toHaveCSS("color", "rgb(8, 32, 51)");
   await expect(ranking).toHaveCSS("color", "rgb(8, 32, 51)");
 });
+
+test("le tableau de qualité distingue visiteur, utilisateur et administrateur", async ({ context, page }, testInfo) => {
+  const api = context.request;
+  const password = "InstitutionsE2E-2026!";
+  const path = "/api/admin/institutions/quality";
+  const notice = page.getByText("Connexion administrateur requise ou suivi temporairement indisponible.");
+
+  await page.goto("/admin/institutions");
+  await expect(notice).toBeVisible();
+  expect((await api.get(path)).status()).toBe(401);
+
+  const regularEmail = `regular-institutions-${testInfo.project.name}-${Date.now()}@example.com`;
+  expect((await api.post("/api/account/register", { data: {
+    email: regularEmail, password, accepted_terms: true, accepted_privacy: true,
+  } })).status()).toBe(201);
+  expect((await api.get(path)).status()).toBe(403);
+  await page.reload();
+  await expect(notice).toBeVisible();
+  expect((await api.delete("/api/account/delete", { data: {
+    password, confirmation: "SUPPRIMER",
+  } })).status()).toBe(204);
+
+  const adminEmail = `admin-institutions-e2e-${testInfo.project.name}@example.com`;
+  expect((await api.post("/api/account/register", { data: {
+    email: adminEmail, password, accepted_terms: true, accepted_privacy: true,
+  } })).status()).toBe(201);
+  const qualityResponse = await api.get(path);
+  expect(qualityResponse.status()).toBe(200);
+  const quality = await qualityResponse.json();
+  expect(quality.latest_period).toBeNull();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Qualité des données institutionnelles" })).toBeVisible();
+  await expect(page.getByText("Collecte et période")).toBeVisible();
+  await expect(page.getByText("Couverture et cohérence")).toBeVisible();
+  await expect(page.getByText("Sources et erreurs")).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("institutions-admin-empty.png"), fullPage: true });
+
+  expect((await api.delete("/api/account/delete", { data: {
+    password, confirmation: "SUPPRIMER",
+  } })).status()).toBe(204);
+});

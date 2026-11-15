@@ -61,6 +61,16 @@ def _cgroup_metrics() -> dict[str, Any]:
     return output
 
 
+def _cgroup_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, int]:
+    previous = before.get("cpu.stat", {})
+    current = after.get("cpu.stat", {})
+    return {
+        key: int(value) - int(previous[key])
+        for key, value in current.items()
+        if key in previous and value.isdigit() and previous[key].isdigit()
+    }
+
+
 def _timed(operation: Callable[[], Any], *, repetitions: int = 12) -> tuple[dict[str, float], Any]:
     samples: list[float] = []
     result = None
@@ -175,6 +185,8 @@ def main() -> None:
 
     event.listen(engine, "before_cursor_execute", before_cursor_execute)
     event.listen(engine, "after_cursor_execute", after_cursor_execute)
+    container_before = _cgroup_metrics()
+    profile_started = perf_counter()
     try:
         for label, limit in (("legacy_full", None), ("page_100", 100)):
             timing, detail = _timed(lambda: store.detail(args.cik, limit=limit))
@@ -189,6 +201,7 @@ def main() -> None:
     finally:
         event.remove(engine, "before_cursor_execute", before_cursor_execute)
         event.remove(engine, "after_cursor_execute", after_cursor_execute)
+    container_after = _cgroup_metrics()
     report["sql_calls_for_28_detail_reads"] = {
         label: {
             "count": sum(1 for name, _ in sql_events if name == label),
@@ -196,7 +209,13 @@ def main() -> None:
         }
         for label in sorted({name for name, _ in sql_events})
     }
-    report["container"] = _cgroup_metrics()
+    report["container"] = {
+        "before": container_before,
+        "after": container_after,
+        "cpu_stat_delta": _cgroup_delta(container_before, container_after),
+        "profile_elapsed_seconds": round(perf_counter() - profile_started, 2),
+    }
+    report["pool_after"] = engine.pool.status()
     print(json.dumps(report, ensure_ascii=False, indent=2, default=str))
 
 
