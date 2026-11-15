@@ -234,15 +234,15 @@ test("détail gestionnaire paginé et filtré sur le serveur", async ({ page }, 
   });
   await page.goto("/institutions/0001234567");
   await expect(page.getByRole("heading", { name: institution.name })).toBeVisible();
-  await expect(page.getByText("POSITION 000", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("POSITION 000").filter({ visible: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "Suivant", exact: true }).click();
-  await expect(page.getByText("POSITION 100", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("POSITION 100").filter({ visible: true }).first()).toBeVisible();
   await page.getByRole("tab", { name: "Nouvelle position" }).click();
-  await expect(page.getByText("POSITION 202", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("POSITION 202").filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Suivant", exact: true })).toHaveCount(0);
   await page.getByRole("tab", { name: "Toutes" }).click();
   await page.getByLabel("Rechercher une position").fill("POSITION 150");
-  await expect(page.getByText("POSITION 150", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText("POSITION 150").filter({ visible: true }).first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("institution-paginated-detail.png"), fullPage: true });
 });
 

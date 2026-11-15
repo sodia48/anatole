@@ -21,6 +21,16 @@ Sur SQLite locale en mémoire, 25 lectures chaudes du même détail ont donné :
 
 Le mode paginé est optionnel dans l'API pour préserver les clients historiques. L'interface Institutions demande désormais des pages de 100 et applique recherche, statut et tri à **l'ensemble** des positions avant de découper la page. Le JSON persisté complet est encore lu et décodé par l'API ; le transfert PostgreSQL → API reste donc un coût possible. Le gain local ne doit pas être présenté comme un gain PostgreSQL ou HTTP confirmé.
 
+Avant le déploiement du nouveau commit, le 15 novembre, une série HTTP comparable a ciblé **le même CIK BlackRock**, avec deux requêtes de chauffe puis 20 requêtes par niveau de concurrence. Toutes ont renvoyé 200 et 2 034 073 octets ; les temps incluent le réseau entre le client de mesure et Render :
+
+| Version non paginée de préproduction | p50 | p95 | Maximum |
+| --- | ---: | ---: | ---: |
+| 1 travailleur | 362,18 ms | 582,13 ms | 647,58 ms |
+| 5 travailleurs | 1 306,57 ms | 1 795,86 ms | 1 983,62 ms |
+| 10 travailleurs | 2 537,58 ms | 4 046,14 ms | 4 050,47 ms |
+
+Cette nouvelle série diffère de la campagne précédente (25 requêtes à cinq travailleurs) par sa taille et son instant ; seule une répétition **à méthode identique** après déploiement permettra d'attribuer un gain au code.
+
 Le script `scripts/profile_institutions_staging.py` est limité à `APP_ENV=staging`, exige le nom attendu de la base et place ses diagnostics SQL dans une transaction en lecture seule. Il mesure les plans `EXPLAIN (ANALYZE, BUFFERS)`, les index, le transfert du payload, le nombre de requêtes, les temps de détail/JSON, les statistiques PostgreSQL accessibles et les compteurs cgroup sans afficher URL, secrets, comptes ou payloads. Commande depuis le Shell de l'API de préproduction, après son déploiement sur le nouveau commit :
 
 ```sh
@@ -29,7 +39,7 @@ PYTHONPATH=. python ../../scripts/profile_institutions_staging.py \
   --expected-database anatole_institutions_staging --cik 0002012383
 ```
 
-**À compléter après accès Shell :** plans et buffers réels, index utilisés, statistiques CPU/RAM PostgreSQL si accessibles, connexions, compte SQL de ce chemin, et comparatif HTTP p50/p95 pour 1, 5 et 10 travailleurs avant/après. Aucune extension ni configuration PostgreSQL permanente n'est autorisée par ce script.
+**À compléter après accès Shell :** plans et buffers réels, index utilisés, statistiques CPU/RAM PostgreSQL si accessibles, connexions, compte SQL de ce chemin, et répétition HTTP p50/p95 après optimisation à 1, 5 et 10 travailleurs. Aucune extension ni configuration PostgreSQL permanente n'est autorisée par ce script.
 
 ## Capacité de stockage
 
