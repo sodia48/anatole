@@ -207,6 +207,45 @@ test("activité par titre et détail des positions", async ({ page }) => {
   expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
 });
 
+test("détail gestionnaire paginé et filtré sur le serveur", async ({ page }, testInfo) => {
+  const allHoldings = Array.from({ length: 205 }, (_, index) => ({
+    ...detail.holdings[0],
+    cusip: String(index).padStart(9, "0"),
+    ticker: null,
+    issuer: `POSITION ${String(index).padStart(3, "0")}`,
+    value: 205 - index,
+    portfolio_weight_percent: (205 - index) / 205,
+    status: index === 202 ? "new" : "increased",
+  }));
+  await page.route(/\/api\/anatole\/api\/v1\/discovery\/institutions\/0001234567(?:\?|$)/, async (route) => {
+    const url = new URL(route.request().url());
+    const limit = Number(url.searchParams.get("limit") ?? 100);
+    const offset = Number(url.searchParams.get("offset") ?? 0);
+    const status = url.searchParams.get("status") ?? "all";
+    const query = (url.searchParams.get("q") ?? "").toLowerCase();
+    const filtered = allHoldings.filter((holding) =>
+      (status === "all" || holding.status === status)
+      && (!query || holding.issuer.toLowerCase().includes(query)),
+    );
+    await route.fulfill({ json: {
+      ...detail, holdings: filtered.slice(offset, offset + limit),
+      holdings_total: filtered.length, holdings_limit: limit, holdings_offset: offset,
+    } });
+  });
+  await page.goto("/institutions/0001234567");
+  await expect(page.getByRole("heading", { name: institution.name })).toBeVisible();
+  await expect(page.getByText("POSITION 000").filter({ visible: true }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Suivant", exact: true }).click();
+  await expect(page.getByText("POSITION 100").filter({ visible: true }).first()).toBeVisible();
+  await page.getByRole("tab", { name: "Nouvelle position" }).click();
+  await expect(page.getByText("POSITION 202").filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Suivant", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Toutes" }).click();
+  await page.getByLabel("Rechercher une position").fill("POSITION 150");
+  await expect(page.getByText("POSITION 150").filter({ visible: true }).first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("institution-paginated-detail.png"), fullPage: true });
+});
+
 test("classement complet paginé sur mobile et ordinateur", async ({ page }) => {
   const managers = Array.from({ length: 25 }, (_, index) => ({
     ...institution,
@@ -242,7 +281,33 @@ test("la section Institutions suit la préférence anglaise", async ({ page }) =
   await page.goto("/institutions");
   await expect(page.locator("html")).toHaveAttribute("lang", "en-CA");
   await expect(page.getByRole("heading", { name: "Institutional intelligence" })).toBeVisible();
-  await expect(page.getByText(/Share changes compare two quarterly 13F filings/)).toBeVisible();
+  await expect(page.getByText(/Share changes compare two 13F filings/)).toBeVisible();
+});
+
+test("historique accessible sur ordinateur et mobile sans inventer de périodes", async ({ page }, testInfo) => {
+  await page.goto("/institutions/0001234567");
+  await page.getByRole("link", { name: "Historique trimestriel" }).click();
+  await expect(page).toHaveURL(/\/institutions\/0001234567\/history$/);
+  await expect(page.getByRole("heading", { name: /Historique trimestriel/ })).toBeVisible();
+  await expect(page.getByText("Aucun trimestre publié pour ce gestionnaire.")).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("institutions-history.png"), fullPage: true });
+  const width = await page.evaluate(() => ({ client: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.client + 1);
+
+  await page.goto("/institutions");
+  await page.getByRole("button", { name: "Titres", exact: true }).click();
+  await page.getByLabel("Ticker ou CUSIP").fill("AAPL");
+  await page.getByRole("button", { name: "Rechercher", exact: true }).click();
+  await page.getByRole("link", { name: "Historique de la position" }).click();
+  await expect(page).toHaveURL(/\/institutions\/security\/history\?q=AAPL$/);
+  await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
+  const emptyPosition = page.getByText("Aucune période publiée pour ce titre.");
+  await expect(emptyPosition).toBeVisible();
+  await emptyPosition.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-position-history.png"), fullPage: true });
+  await page.goto("/institutions/security/history?q=AAPL&q=MSFT");
+  await expect(page.getByRole("heading", { name: /Historique d’une position/ })).toBeVisible();
+  await expect(page.getByLabel("Ticker vérifié ou CUSIP")).toHaveValue("");
 });
 
 test("la page Institutions conserve un contraste lisible avec Anatole Blanc", async ({ page }) => {
@@ -269,4 +334,46 @@ test("la page Institutions conserve un contraste lisible avec Anatole Blanc", as
   await expect(heading).toHaveCSS("color", "rgb(8, 32, 51)");
   await expect(metric).toHaveCSS("color", "rgb(8, 32, 51)");
   await expect(ranking).toHaveCSS("color", "rgb(8, 32, 51)");
+});
+
+test("le tableau de qualité distingue visiteur, utilisateur et administrateur", async ({ context, page }, testInfo) => {
+  const api = context.request;
+  const password = "InstitutionsE2E-2026!";
+  const path = "/api/admin/institutions/quality";
+  const notice = page.getByText("Connexion administrateur requise ou suivi temporairement indisponible.");
+
+  await page.goto("/admin/institutions");
+  await expect(notice).toBeVisible();
+  expect((await api.get(path)).status()).toBe(401);
+
+  const regularEmail = `regular-institutions-${testInfo.project.name}-${Date.now()}@example.com`;
+  expect((await api.post("/api/account/register", { data: {
+    email: regularEmail, password, accepted_terms: true, accepted_privacy: true,
+  } })).status()).toBe(201);
+  expect((await api.get(path)).status()).toBe(403);
+  await page.reload();
+  await expect(notice).toBeVisible();
+  expect((await api.delete("/api/account/delete", { data: {
+    password, confirmation: "SUPPRIMER",
+  } })).status()).toBe(204);
+
+  const adminEmail = `admin-institutions-e2e-${testInfo.project.name}@example.com`;
+  expect((await api.post("/api/account/register", { data: {
+    email: adminEmail, password, accepted_terms: true, accepted_privacy: true,
+  } })).status()).toBe(201);
+  const qualityResponse = await api.get(path);
+  expect(qualityResponse.status()).toBe(200);
+  const quality = await qualityResponse.json();
+  expect(quality.latest_period).toBeNull();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Qualité des données institutionnelles" })).toBeVisible();
+  await expect(page.getByText("Collecte et période")).toBeVisible();
+  await expect(page.getByText("Couverture et cohérence")).toBeVisible();
+  await expect(page.getByText("Sources et erreurs")).toBeVisible();
+  await expect(notice).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath("institutions-admin-empty.png"), fullPage: true });
+
+  expect((await api.delete("/api/account/delete", { data: {
+    password, confirmation: "SUPPRIMER",
+  } })).status()).toBe(204);
 });

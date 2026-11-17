@@ -28,10 +28,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
+from pydantic_core import from_json
 
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
+    InstitutionHistory,
+    InstitutionHistoryPoint,
+    InstitutionPositionHistory,
+    InstitutionPositionHistoryPoint,
     InstitutionSourceStatus,
     InstitutionsSnapshot,
 )
@@ -362,6 +367,8 @@ class InstitutionStore:
             raise ValueError("Duplicate institution CIK")
         if any(item.institution.cik not in known or item.institution.report_period != period for item in details):
             raise ValueError("Detail outside the validated period")
+        if {item.institution.cik for item in details} != known or len(details) != len(known):
+            raise ValueError("Incomplete or duplicate manager detail coverage")
         period_text = period.isoformat()
         amount_types = amount_types or {}
         self.create_schema()
@@ -414,6 +421,150 @@ class InstitutionStore:
             ).scalar_one_or_none()
         return InstitutionsSnapshot.model_validate_json(row) if row else None
 
+    def published_periods(self) -> list[date]:
+        """Only periods with an atomically published snapshot are visible."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                select(self.snapshots.c.period).order_by(self.snapshots.c.period.desc())
+            ).scalars().all()
+        return [date.fromisoformat(row) for row in rows]
+
+    def snapshot_for_period(self, period: date) -> InstitutionsSnapshot | None:
+        with self.engine.connect() as connection:
+            payload = connection.execute(
+                select(self.snapshots.c.payload).where(self.snapshots.c.period == period.isoformat())
+            ).scalar_one_or_none()
+        return InstitutionsSnapshot.model_validate_json(payload) if payload else None
+
+    def manager_history(self, cik: str) -> InstitutionHistory:
+        with self.engine.connect() as connection:
+            payloads = connection.execute(
+                select(self.snapshots.c.payload).order_by(self.snapshots.c.period)
+            ).scalars().all()
+        points: list[InstitutionHistoryPoint] = []
+        name = cik
+        for payload in payloads:
+            snapshot = InstitutionsSnapshot.model_validate_json(payload)
+            summary = next((item for item in snapshot.institutions if item.cik == cik), None)
+            if summary is None:
+                continue
+            name = summary.name
+            points.append(InstitutionHistoryPoint(
+                report_period=summary.report_period, filed_at=summary.filed_at,
+                filing_url=summary.filing_url,
+                total_13f_value=summary.total_13f_value,
+                top10_concentration_percent=summary.top10_concentration_percent,
+                holdings_count=summary.holdings_count,
+                new_positions_count=summary.new_positions_count,
+                closed_positions_count=summary.closed_positions_count,
+                comparison_available=summary.comparison_available,
+            ))
+        return InstitutionHistory(cik=cik, name=name, periods=points)
+
+    def position_history(self, query: str) -> InstitutionPositionHistory:
+        """Aggregate stored 13F values by actual published period, never interpolating."""
+        periods = self.published_periods()
+        if not periods:
+            return InstitutionPositionHistory(query=query, periods=[])
+        with self.engine.connect() as connection:
+            cusip = self._cusip_for_query(connection, query, periods[0])
+            if not cusip:
+                return InstitutionPositionHistory(query=query, periods=[])
+            rows = connection.execute(
+                select(self.holdings).where(self.holdings.c.cusip == cusip)
+                .order_by(self.holdings.c.period)
+            ).mappings().all()
+            snapshot_rows = connection.execute(
+                select(self.snapshots.c.period, self.snapshots.c.payload)
+            ).all()
+        published = {period.isoformat() for period in periods}
+        urls = {
+            period: {item.cik: item.filing_url for item in InstitutionsSnapshot.model_validate_json(payload).institutions}
+            for period, payload in snapshot_rows
+        }
+        grouped: dict[str, list[Any]] = {}
+        for row in rows:
+            if row["period"] in published:
+                grouped.setdefault(row["period"], []).append(row)
+        points = []
+        for period in sorted(grouped):
+            group = grouped[period]
+            active = [row for row in group if row["status"] != "closed"]
+            points.append(InstitutionPositionHistoryPoint(
+                report_period=date.fromisoformat(period), cusip=cusip,
+                ticker=next((row["ticker"] for row in group if row["ticker"]), None),
+                issuer=group[0]["issuer"],
+                shares=(sum(row["shares"] for row in active)
+                        if all(row["put_call"] == "" and row["amount_type"] == "SH" for row in active)
+                        else None),
+                value=sum(row["value"] for row in active),
+                managers_holding=len({row["cik"] for row in active}),
+                filing_urls=list(dict.fromkeys(
+                    url for row in active if (url := urls.get(period, {}).get(row["cik"]))
+                ))[:10],
+            ))
+        return InstitutionPositionHistory(query=query, periods=points)
+
+    def quality(self) -> dict[str, Any]:
+        """Operational facts for an authenticated administrator only."""
+        self.create_schema()
+        with self.engine.connect() as connection:
+            latest = connection.execute(
+                select(self.snapshots).order_by(self.snapshots.c.period.desc()).limit(1)
+            ).mappings().first()
+            run = connection.execute(
+                select(self.runs).order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
+            success = connection.execute(
+                select(self.runs).where(self.runs.c.status == "succeeded")
+                .order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
+            last_failure = connection.execute(
+                select(self.runs).where(self.runs.c.status == "failed")
+                .order_by(self.runs.c.started_at.desc()).limit(1)
+            ).mappings().first()
+            if latest:
+                period = latest["period"]
+                details_count = connection.execute(select(func.count()).select_from(self.details).where(
+                    self.details.c.period == period
+                )).scalar_one()
+                filings_count = connection.execute(select(func.count()).select_from(self.filings).where(
+                    self.filings.c.period == period
+                )).scalar_one()
+                partial_period = connection.execute(select(func.max(self.filings.c.period)).where(
+                    self.filings.c.period > period
+                )).scalar_one_or_none()
+                partial_ciks = set(connection.execute(select(self.filings.c.cik).where(
+                    self.filings.c.period == partial_period
+                )).scalars()) if partial_period else set()
+            else:
+                details_count = filings_count = 0
+                partial_period = None
+                partial_ciks = set()
+        snapshot = InstitutionsSnapshot.model_validate_json(latest["payload"]) if latest else None
+        expected = len(snapshot.institutions) if snapshot else 0
+        covered = min(details_count, expected)
+        duration = None
+        if run and run["finished_at"]:
+            duration = (datetime.fromisoformat(run["finished_at"]) - datetime.fromisoformat(run["started_at"])).total_seconds()
+        return {
+            "latest_period": latest["period"] if latest else None,
+            "published_at": latest["published_at"] if latest else None,
+            "last_success_at": success["finished_at"] if success else None,
+            "last_run_status": run["status"] if run else None,
+            "last_error_category": last_failure["error_category"] if last_failure else None,
+            "last_error_at": last_failure["finished_at"] if last_failure else None,
+            "last_run_duration_seconds": duration,
+            "managers_expected": expected,
+            "managers_updated": covered,
+            "managers_lagging": len({item.cik for item in snapshot.institutions} - partial_ciks) if snapshot and partial_period else 0,
+            "partial_period": partial_period,
+            "coverage_percent": round(covered / expected * 100, 1) if expected else 0.0,
+            "filings_count": filings_count,
+            "sources_unavailable": [source.source for source in snapshot.sources if source.status == "unavailable"] if snapshot else [],
+            "consistency_ok": expected == details_count if snapshot else False,
+        }
+
     def verified_ticker_exists(self, ticker: str) -> bool:
         with self.engine.connect() as connection:
             return connection.execute(
@@ -438,28 +589,74 @@ class InstitutionStore:
             raise ValueError("Symbole ambigu : recherchez par CUSIP")
         return cusips[0] if cusips else None
 
-    def detail(self, cik: str, period: date | None = None) -> InstitutionDetail | None:
-        if period is None:
-            active = self.latest_snapshot()
-            period = active.report_period if active else None
-        if period is None:
-            return None
+    def detail(
+        self, cik: str, period: date | None = None, *,
+        limit: int | None = None, offset: int = 0, query: str = "",
+        status: str = "all", sort: str = "weight",
+    ) -> InstitutionDetail | None:
+        if limit is None and (offset or query or status != "all" or sort != "weight"):
+            raise ValueError("La pagination est requise pour filtrer les positions")
         with self.engine.connect() as connection:
-            statement = select(self.details.c.payload).where(self.details.c.cik == cik)
-            statement = statement.where(self.details.c.period == period.isoformat())
-            row = connection.execute(statement.order_by(self.details.c.period.desc()).limit(1)).scalar_one_or_none()
-            detail = InstitutionDetail.model_validate_json(row) if row else None
-            if detail:
-                symbols = dict(connection.execute(
-                    select(self.symbols.c.cusip, self.symbols.c.ticker)
-                ).all())
-                detail = detail.model_copy(update={
-                    "holdings": [
-                        item.model_copy(update={"ticker": symbols.get(item.cusip) or item.ticker})
-                        for item in detail.holdings
-                    ]
-                })
-        return detail
+            if period is None:
+                active_period = connection.execute(
+                    select(self.snapshots.c.period).order_by(self.snapshots.c.period.desc()).limit(1)
+                ).scalar_one_or_none()
+            else:
+                active_period = period.isoformat()
+            if active_period is None:
+                return None
+            row = connection.execute(
+                select(self.details.c.payload).where(and_(
+                    self.details.c.period == active_period,
+                    self.details.c.cik == cik,
+                ))
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            symbols = dict(connection.execute(
+                select(self.symbols.c.cusip, self.symbols.c.ticker)
+            ).all())
+        if limit is None:
+            detail = InstitutionDetail.model_validate_json(row)
+            return detail.model_copy(update={
+                "holdings": [
+                    item.model_copy(update={"ticker": symbols.get(item.cusip) or item.ticker})
+                    for item in detail.holdings
+                ]
+            })
+
+        # Decode the persisted, import-validated JSON once. Validating only the
+        # requested page avoids thousands of Pydantic objects and a multi-MB
+        # response for every click while retaining the legacy full-detail API.
+        payload = from_json(row)
+        if not isinstance(payload, dict) or not isinstance(payload.get("holdings"), list):
+            raise ValueError("Invalid stored institution detail")
+        holdings = payload["holdings"]
+        for item in holdings:
+            item["ticker"] = symbols.get(item["cusip"]) or item.get("ticker")
+        needle = query.strip().casefold()
+        if status != "all":
+            holdings = [item for item in holdings if item["status"] == status]
+        if needle:
+            holdings = [
+                item for item in holdings
+                if needle in item["issuer"].casefold()
+                or needle in item["cusip"].casefold()
+                or needle in (item.get("ticker") or "").casefold()
+            ]
+        if sort == "shares":
+            holdings.sort(key=lambda item: abs(item["share_change"]), reverse=True)
+        elif sort == "percent":
+            holdings.sort(key=lambda item: abs(item.get("share_change_percent") or 0), reverse=True)
+        elif sort == "value":
+            holdings.sort(key=lambda item: item["value"], reverse=True)
+        else:
+            holdings.sort(key=lambda item: item["portfolio_weight_percent"], reverse=True)
+        payload["holdings_total"] = len(holdings)
+        payload["holdings_limit"] = limit
+        payload["holdings_offset"] = offset
+        payload["holdings"] = holdings[offset:offset + limit]
+        return InstitutionDetail.model_validate(payload)
 
     def activity(self, query: str, period: date) -> InstitutionFlow | None:
         needle = query.strip().upper()

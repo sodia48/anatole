@@ -733,10 +733,18 @@ export function getInstitutionDetail(
   cik: string,
   refresh = false,
   signal?: AbortSignal,
+  page?: { limit: number; offset: number; query: string; status: string; sort: string },
 ): Promise<InstitutionDetail> {
   const params = new URLSearchParams({
     refresh: String(refresh),
   });
+  if (page) {
+    params.set("limit", String(page.limit));
+    params.set("offset", String(page.offset));
+    if (page.query) params.set("q", page.query);
+    params.set("status", page.status);
+    params.set("sort", page.sort);
+  }
 
   return apiRequest<InstitutionDetail>(
     `/api/v1/discovery/institutions/${encodeURIComponent(cik)}?${params.toString()}`,

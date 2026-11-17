@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from datetime import date
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
+    InstitutionHistory,
+    InstitutionPositionHistory,
     InstitutionSecuritySearch,
     InstitutionsSnapshot,
 )
@@ -25,12 +30,46 @@ router = APIRouter()
 async def institutions_directory(
     limit: int = Query(default=50, ge=1, le=100),
     refresh: bool = Query(default=False),
+    period: date | None = Query(default=None),
 ) -> InstitutionsSnapshot:
     try:
         return await institution_service.institutions_snapshot(
             limit=limit,
             force_refresh=refresh,
+            period=period,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InstitutionsUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/institutions/periods", response_model=list[date])
+async def institution_periods() -> list[date]:
+    try:
+        return await institution_service.published_periods()
+    except InstitutionsUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/institutions/security/history", response_model=InstitutionPositionHistory)
+async def institution_security_history(
+    q: str = Query(min_length=1, max_length=80),
+) -> InstitutionPositionHistory:
+    try:
+        return await institution_service.position_history(q)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except InstitutionsUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get("/institutions/history/{cik}", response_model=InstitutionHistory)
+async def institution_manager_history(cik: str) -> InstitutionHistory:
+    try:
+        return await institution_service.manager_history(cik)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except InstitutionsUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -77,11 +116,19 @@ async def institution_security_activity(
 async def institution_detail(
     cik: str,
     refresh: bool = Query(default=False),
+    period: date | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=80),
+    status: Literal["all", "new", "increased", "reduced", "closed", "unchanged"] = Query(default="all"),
+    sort: Literal["weight", "value", "shares", "percent"] = Query(default="weight"),
 ) -> InstitutionDetail:
     try:
         return await institution_service.institution_detail(
             cik,
             force_refresh=refresh,
+            period=period,
+            limit=limit, offset=offset, query=q, status=status, sort=sort,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

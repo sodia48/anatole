@@ -83,8 +83,12 @@ export default defineConfig({
             ACCOUNT_DATABASE_URL: accountDatabaseURL,
             ACCOUNT_REGISTRATION_ENABLED: "true",
             ACCOUNT_INVITE_CODES: "",
+            // The isolated in-memory E2E database needs empty Institutions
+            // tables for server-rendered history routes. Production keeps
+            // startup initialization disabled by default.
+            INSTITUTIONS_STARTUP_INITIALIZATION_ENABLED: "true",
             ACCOUNT_ADMIN_EMAILS:
-              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com",
+              "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com,admin-institutions-e2e-desktop-chromium@example.com,admin-institutions-e2e-mobile-pixel-7@example.com,admin-institutions-e2e-mobile-iphone-14@example.com",
           },
         },
         {

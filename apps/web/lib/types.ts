@@ -595,11 +595,44 @@ export type InstitutionHolding = {
 export type InstitutionDetail = {
   institution: InstitutionSummary;
   holdings: InstitutionHolding[];
+  holdings_total?: number | null;
+  holdings_limit?: number | null;
+  holdings_offset?: number | null;
   previous_report_period: string | null;
   source_statuses: InstitutionSourceStatus[];
   generated_at: string;
   stale: boolean;
   message: string | null;
+};
+
+export type InstitutionHistory = {
+  cik: string;
+  name: string;
+  periods: Array<{
+    report_period: string;
+    filed_at: string;
+    filing_url: string;
+    total_13f_value: number;
+    top10_concentration_percent: number;
+    holdings_count: number;
+    new_positions_count: number;
+    closed_positions_count: number;
+    comparison_available: boolean;
+  }>;
+};
+
+export type InstitutionPositionHistory = {
+  query: string;
+  periods: Array<{
+    report_period: string;
+    cusip: string;
+    ticker: string | null;
+    issuer: string;
+    shares: number | null;
+    value: number;
+    managers_holding: number;
+    filing_urls: string[];
+  }>;
 };
 
 export type InstitutionFlow = {

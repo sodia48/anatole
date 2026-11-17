@@ -78,7 +78,9 @@ jobs:
         run: pnpm test:mobile
 
   e2e:
-    runs-on: ubuntu-latest
+    # Playwright's WebKit dependencies target a supported LTS image. Keep this
+    # fixed so ubuntu-latest cannot switch the E2E job to a new OS mid-rollout.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs: [api-tests, web-build, mobile-quality]
     steps:

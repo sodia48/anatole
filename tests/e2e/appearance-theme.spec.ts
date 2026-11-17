@@ -128,6 +128,9 @@ for (const route of [
       localStorage.setItem("anatole.appearance-choice.v1", "1");
     }, preferences("blue"));
     await page.goto(route);
+    if (route === "/compte") {
+      await expect(page).toHaveURL(/\/parametres\?section=account$/);
+    }
     await expect(page.getByRole("button", { name: "Signaler un problème" })).toHaveAttribute("data-client-ready", "true");
     await expect(page.locator("body")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     await expect(page.locator(".discovery-loading, .cockpit-loading")).toHaveCount(0);

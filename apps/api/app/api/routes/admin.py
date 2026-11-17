@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -19,6 +20,8 @@ from app.schemas.admin import (
 )
 from app.services.accounts import account_service
 from app.services.canada_360_assistant import check_provider_health
+from app.services.institutions import institution_service, latest_due_13f_period
+from app.services.institution_metrics import institution_runtime_metrics
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -53,6 +56,31 @@ async def overview(_: AccountUser = Depends(current_admin)) -> AdminOverview:
         reliability=reliability_monitor.snapshot(),
         upstream_metrics=shared_http_client.metrics.as_dict(),
     )
+
+
+@router.get("/institutions/quality")
+async def institutions_quality(_: AccountUser = Depends(current_admin)) -> dict[str, object]:
+    store = institution_service._store
+    if store is None:
+        raise HTTPException(status_code=503, detail="Stockage institutionnel indisponible.")
+    try:
+        quality = await asyncio.to_thread(store.quality)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Suivi institutionnel indisponible.") from exc
+    due = latest_due_13f_period(datetime.now(UTC).date())
+    alerts = []
+    if quality["last_run_status"] == "failed":
+        alerts.append("pipeline_failed")
+    if due and (quality["latest_period"] is None or quality["latest_period"] < due.isoformat()):
+        alerts.append("period_overdue")
+        if quality["partial_period"] != due.isoformat():
+            quality["managers_lagging"] = quality["managers_expected"]
+    if not quality["consistency_ok"]:
+        alerts.append("coverage_inconsistent")
+    return {
+        **quality, "due_period": due.isoformat() if due else None, "alerts": alerts,
+        "runtime": institution_runtime_metrics.snapshot(),
+    }
 
 
 @router.get("/users", response_model=AdminUserList)

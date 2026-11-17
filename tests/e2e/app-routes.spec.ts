@@ -1263,7 +1263,7 @@ test("Anatole Institutional construit un readiness pack enterprise", async ({ pa
 
   const pack = page.getByTestId(
     "institutional-enterprise-readiness-pack",
-  );
+  ).filter({ visible: true });
 
   await expect(pack).toBeVisible();
   await expect(pack).toContainText("INSTITUTION-A");
