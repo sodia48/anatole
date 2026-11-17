@@ -15,10 +15,14 @@ import httpx
 
 from app.core.config import settings
 from app.core.resilience import shared_http_client
+from app.services.accounts import account_service
+from app.services.institution_store import InstitutionStore
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
     InstitutionHolding,
+    InstitutionSecurityPosition,
+    InstitutionSecuritySearch,
     InstitutionSourceStatus,
     InstitutionSummary,
     InstitutionsSnapshot,
@@ -43,7 +47,7 @@ DETAIL_TTL_SECONDS = 6 * 60 * 60
 SNAPSHOT_TTL_SECONDS = 6 * 60 * 60
 TICKER_TTL_SECONDS = 30 * 24 * 60 * 60
 STALE_TTL_SECONDS = 30 * 24 * 60 * 60
-SEC_REQUEST_INTERVAL_SECONDS = 0.11
+SEC_REQUEST_INTERVAL_SECONDS = 0.2
 SEC_MAX_CONCURRENCY = 5
 TICKER_RESOLVE_LIMIT = 25
 LEGACY_VALUE_CHANGE_DATE = date(2023, 1, 3)
@@ -406,10 +410,12 @@ class InstitutionService:
         sec_transport: httpx.AsyncBaseTransport | None = None,
         finnhub_transport: httpx.AsyncBaseTransport | None = None,
         universe_path: Path = UNIVERSE_PATH,
+        store: InstitutionStore | None = None,
     ) -> None:
         self._sec_transport = sec_transport
         self._finnhub_transport = finnhub_transport
         self._universe_path = universe_path
+        self._store = store
         self._sec_semaphore = asyncio.Semaphore(SEC_MAX_CONCURRENCY)
         self._finnhub_semaphore = asyncio.Semaphore(5)
         self._rate_lock = asyncio.Lock()
@@ -996,6 +1002,43 @@ class InstitutionService:
         force_refresh: bool = False,
     ) -> InstitutionsSnapshot:
         bounded_limit = max(1, min(limit, 50))
+        if self._store is not None:
+            try:
+                prepared = await asyncio.to_thread(self._store.latest_snapshot)
+            except Exception:
+                prepared = None
+            snapshot = prepared or self._seed_snapshot(50)
+            if prepared is not None and prepared.report_period is not None:
+                try:
+                    partial_period, partial_count, amendment = await asyncio.to_thread(
+                        self._store.partial_coverage,
+                        prepared.report_period,
+                        (prepared.validated_at or prepared.generated_at).date(),
+                    )
+                    snapshot = snapshot.model_copy(update={
+                        "partial_report_period": partial_period,
+                        "partial_institutions_reporting": partial_count,
+                        "stale": snapshot.stale or amendment,
+                        "message": (
+                            "Un amendement plus récent requiert une nouvelle validation du classement."
+                            if amendment else snapshot.message
+                        ),
+                    })
+                except Exception:
+                    snapshot = snapshot.model_copy(update={
+                        "stale": True,
+                        "message": "Le statut des dépôts récents est temporairement indisponible.",
+                    })
+            expected_period = latest_due_13f_period(datetime.now(UTC).date())
+            if expected_period is not None and (
+                snapshot.report_period is None or snapshot.report_period < expected_period
+            ):
+                snapshot = snapshot.model_copy(update={
+                    "stale": True,
+                    "message": "Le dernier trimestre 13F exigible n'est pas encore validé dans cet instantané.",
+                    "sources": [source.model_copy(update={"status": "stale"}) for source in snapshot.sources],
+                })
+            return snapshot.model_copy(update={"institutions": snapshot.institutions[:bounded_limit]})
         if (
             self._snapshot_cache is not None
             and not force_refresh
@@ -1066,6 +1109,16 @@ class InstitutionService:
         normalized = str(cik).strip().zfill(10)
         if not re.fullmatch(r"\d{10}", normalized):
             raise ValueError("CIK invalide")
+        if self._store is not None:
+            try:
+                detail = await asyncio.to_thread(self._store.detail, normalized)
+            except Exception as exc:
+                raise InstitutionsUnavailable("Le stockage institutionnel est indisponible.") from exc
+            if detail is None:
+                raise InstitutionsUnavailable(
+                    "Les positions de ce gestionnaire ne sont pas encore préparées."
+                )
+            return detail
         cached = self._detail_cache.get(normalized)
         if (
             cached is not None
@@ -1195,6 +1248,37 @@ class InstitutionService:
         needle = query.strip().upper()
         if not needle:
             raise ValueError("Titre ou CUSIP requis")
+        if self._store is not None:
+            try:
+                prepared = await asyncio.to_thread(self._store.latest_snapshot)
+            except Exception as exc:
+                raise InstitutionsUnavailable("L'index institutionnel est indisponible.") from exc
+            if prepared is None or prepared.report_period is None:
+                raise InstitutionsUnavailable("L'index institutionnel n'est pas encore préparé.")
+            if not re.fullmatch(r"[A-Z0-9]{9}", needle):
+                try:
+                    verified = await asyncio.to_thread(self._store.verified_ticker_exists, needle)
+                except Exception as exc:
+                    raise InstitutionsUnavailable("L'index institutionnel est indisponible.") from exc
+                if not verified:
+                    raise ValueError("Symbole non vérifié dans l'index 13F ; recherchez par CUSIP.")
+            try:
+                activity = await asyncio.to_thread(
+                    self._store.activity, needle, prepared.report_period
+                )
+            except ValueError:
+                raise
+            except Exception as exc:
+                raise InstitutionsUnavailable("L'index des titres institutionnels est indisponible.") from exc
+            if activity is None:
+                return InstitutionFlow(
+                    ticker=None, cusip=needle if re.fullmatch(r"[A-Z0-9]{9}", needle) else "",
+                    issuer="", institutions_holding=0, institutions_increased=0,
+                    institutions_reduced=0, institutions_new=0, institutions_closed=0,
+                    aggregate_share_change=0, current_reported_value=0,
+                    institution_names=[],
+                )
+            return activity
         snapshot = await self.institutions_snapshot(limit=50)
         tasks = [
             self.institution_detail(institution.cik)
@@ -1276,5 +1360,48 @@ class InstitutionService:
             ))[:10],
         )
 
+    async def search_holdings(
+        self, query: str, *, limit: int = 20, offset: int = 0,
+    ) -> InstitutionSecuritySearch:
+        if self._store is None:
+            raise InstitutionsUnavailable("L'index institutionnel n'est pas configuré.")
+        needle = query.strip().upper()
+        if not needle:
+            raise ValueError("Titre ou CUSIP requis")
+        try:
+            snapshot = await asyncio.to_thread(self._store.latest_snapshot)
+        except Exception as exc:
+            raise InstitutionsUnavailable("L'index institutionnel est indisponible.") from exc
+        if snapshot is None or snapshot.report_period is None:
+            raise InstitutionsUnavailable("Aucune période institutionnelle validée.")
+        if not re.fullmatch(r"[A-Z0-9]{9}", needle):
+            try:
+                verified = await asyncio.to_thread(self._store.verified_ticker_exists, needle)
+            except Exception as exc:
+                raise InstitutionsUnavailable("L'index institutionnel est indisponible.") from exc
+            if not verified:
+                raise ValueError("Symbole non vérifié dans l'index 13F ; recherchez par CUSIP.")
+        try:
+            rows, total = await asyncio.to_thread(
+                self._store.holdings_page, needle, snapshot.report_period,
+                limit=limit, offset=offset,
+            )
+        except Exception as exc:
+            raise InstitutionsUnavailable("L'index des titres institutionnels est indisponible.") from exc
+        names = {item.cik: item for item in snapshot.institutions}
+        return InstitutionSecuritySearch(
+            query=needle, report_period=snapshot.report_period,
+            total=total, limit=limit, offset=offset,
+            results=[InstitutionSecurityPosition(
+                cik=row["cik"],
+                institution_name=names[row["cik"]].name if row["cik"] in names else row["cik"],
+                filing_url=names[row["cik"]].filing_url if row["cik"] in names else "",
+                cusip=row["cusip"], ticker=row["ticker"], issuer=row["issuer"],
+                security_class=row["security_class"], put_call=row["put_call"] or None,
+                shares=row["shares"], previous_shares=row["previous_shares"],
+                share_change=row["share_change"], value=row["value"], status=row["status"],
+            ) for row in rows],
+        )
 
-institution_service = InstitutionService()
+
+institution_service = InstitutionService(store=InstitutionStore(account_service.engine))

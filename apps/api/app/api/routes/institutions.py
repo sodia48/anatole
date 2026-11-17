@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas.institutions import (
     InstitutionDetail,
     InstitutionFlow,
+    InstitutionSecuritySearch,
     InstitutionsSnapshot,
 )
 from app.services.institutions import (
@@ -30,6 +31,24 @@ async def institutions_directory(
             limit=limit,
             force_refresh=refresh,
         )
+    except InstitutionsUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.get(
+    "/institutions/security/holdings",
+    response_model=InstitutionSecuritySearch,
+    summary="Positions 13F indexées par CUSIP ou symbole vérifié",
+)
+async def institution_security_holdings(
+    q: str = Query(min_length=1, max_length=80),
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+) -> InstitutionSecuritySearch:
+    try:
+        return await institution_service.search_holdings(q, limit=limit, offset=offset)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except InstitutionsUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

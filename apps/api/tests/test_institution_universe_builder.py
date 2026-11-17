@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 from app.services.institutions import UNIVERSE_PATH, latest_due_13f_period
+from app.schemas.institutions import InstitutionDetail
+from app.services.institution_store import snapshot_from_payload
 from scripts.update_institution_universe import build_payload, previous_quarter_end
 
 
@@ -77,6 +79,32 @@ def test_snapshot_uses_one_explicit_quarter_and_only_comparable_filings(tmp_path
     assert by_cik["0000000001"]["increased_positions_count"] == 1
     assert by_cik["0000000002"]["comparison_available"] is False
     assert by_cik["0000000002"]["new_positions_count"] == 0
+    snapshot = snapshot_from_payload(payload)
+    assert len(snapshot.sources) == 2
+    assert snapshot.sources[0].url == "https://www.sec.gov/current.zip"
+    assert snapshot.sources[1].url == "https://www.sec.gov/previous.zip"
+
+
+def test_offline_builder_prepares_details_and_filing_provenance(tmp_path: Path) -> None:
+    current = tmp_path / "current.zip"
+    previous = tmp_path / "previous.zip"
+    _archive(current, [("0000000001-26-000002", "1", "30-Jun-2026", "10-Aug-2026", 15)])
+    _archive(previous, [("0000000001-26-000001", "1", "31-Mar-2026", "10-May-2026", 10)])
+    details: dict[str, dict[str, object]] = {}
+    filings: list[dict[str, str]] = []
+    amount_types: dict[tuple[str, str, str, str], str] = {}
+    build_payload(
+        current, previous, current_url="https://www.sec.gov/current.zip",
+        previous_url="https://www.sec.gov/previous.zip", universe_size=50,
+        report_period=date(2026, 6, 30), details_out=details,
+        filings_out=filings, amount_types_out=amount_types,
+    )
+    detail = InstitutionDetail.model_validate(details["0000000001"])
+    assert detail.holdings[0].status == "increased"
+    assert detail.holdings[0].share_change == 5
+    assert detail.holdings[0].previous_value == 100
+    assert filings[0]["period"] == "2026-06-30"
+    assert amount_types[("0000000001", "67066G104", "COM", "")] == "SH"
 
 
 def test_invalid_or_absent_quarter_is_rejected(tmp_path: Path) -> None:

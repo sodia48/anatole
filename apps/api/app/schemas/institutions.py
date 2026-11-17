@@ -87,6 +87,31 @@ class InstitutionFlow(BaseModel):
     institution_names: list[str] = Field(default_factory=list)
 
 
+class InstitutionSecurityPosition(BaseModel):
+    cik: str
+    institution_name: str
+    filing_url: str
+    cusip: str
+    ticker: str | None = None
+    issuer: str
+    security_class: str
+    put_call: str | None = None
+    shares: float
+    previous_shares: float
+    share_change: float
+    value: float
+    status: InstitutionHoldingStatus
+
+
+class InstitutionSecuritySearch(BaseModel):
+    query: str
+    report_period: date
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
+    results: list[InstitutionSecurityPosition] = Field(default_factory=list)
+
+
 class InstitutionsSnapshot(BaseModel):
     institutions: list[InstitutionSummary] = Field(default_factory=list)
     top_increased: list[InstitutionFlow] = Field(default_factory=list)

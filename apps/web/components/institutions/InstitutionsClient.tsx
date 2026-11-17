@@ -384,7 +384,7 @@ function ActivitySearch({ language, locale }: { language: "fr" | "en"; locale: s
         <label htmlFor="institution-security-search">{pick(language, "Ticker ou CUSIP", "Ticker or CUSIP")}</label>
         <div>
           <Search aria-hidden="true" size={17} />
-          <input id="institution-security-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="NVDA, AAPL, RY…" />
+          <input id="institution-security-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="NVDA, AAPL, 67066G104…" />
           <button type="submit" disabled={loading || !query.trim()}>{loading ? pick(language, "Analyse…", "Analyzing…") : pick(language, "Rechercher", "Search")}</button>
         </div>
       </form>
