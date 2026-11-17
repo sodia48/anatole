@@ -134,6 +134,7 @@ test("English sky theme keeps the bank simulator readable without DCF inputs", a
 });
 
 test("a failed recalculation keeps the last reliable result and accepts a retry", async ({ page }) => {
+  test.setTimeout(90_000);
   let failure = 0;
   await page.route("**/stocks/RY/fundamental-intelligence/scenarios", route => {
     const body = route.request().postDataJSON() as Request;
@@ -149,7 +150,10 @@ test("a failed recalculation keeps the last reliable result and accepts a retry"
   for (const status of [400, 422, 500, -1]) {
     failure = status;
     await panel.getByRole("button", { name: "Calculer les scénarios" }).click();
-    await expect(panel.getByText("Ancien calcul — mise à jour échouée")).toBeVisible();
+    // The simulated WebKit timeout may settle at the API's 45-second deadline.
+    await expect(panel.getByText("Ancien calcul — mise à jour échouée"), `failure mode ${status}`).toBeVisible({
+      timeout: status === -1 ? 50_000 : 15_000,
+    });
     await expect(panel.getByText("Central · 100 CAD")).toBeVisible();
     await expect(panel.getByRole("alert")).toBeVisible();
   }

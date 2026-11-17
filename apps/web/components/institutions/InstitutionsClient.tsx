@@ -23,6 +23,7 @@ import { usePreferences } from "@/components/providers/PreferencesProvider";
 import {
   getInstitutionDetail,
   getInstitutionSecurityActivity,
+  getInstitutionSecurityHoldings,
   getInstitutionsSnapshot,
 } from "@/lib/api";
 import { localeFor, pick } from "@/lib/i18n";
@@ -31,6 +32,7 @@ import type {
   InstitutionFlow,
   InstitutionHolding,
   InstitutionHoldingStatus,
+  InstitutionSecuritySearch,
   InstitutionSourceStatus,
   InstitutionSummary,
   InstitutionsSnapshot,
@@ -41,6 +43,8 @@ import styles from "./InstitutionsClient.module.css";
 type CountryFilter = "all" | "canada" | "usa" | "other";
 type InstitutionSort = "value" | "new" | "increased" | "reduced";
 type RadarTab = "increased" | "new" | "reduced" | "closed";
+type InstitutionView = "overview" | "managers" | "securities" | "radar";
+const MANAGERS_PER_PAGE = 20;
 type HoldingSort = "weight" | "value" | "shares" | "percent";
 type HoldingFilter = "all" | InstitutionHoldingStatus;
 
@@ -156,22 +160,22 @@ function Disclosure({ language }: { language: "fr" | "en" }) {
       <Info aria-hidden="true" size={17} />
       <div>
         <strong>
-          {pick(language, "Comment lire ces variations", "How to read these changes")}
+          {pick(language, "Lire les variations", "Reading changes")}
         </strong>
         <p>
           {pick(
             language,
-            "Les variations sont déduites de la comparaison de deux déclarations 13F trimestrielles. Elles ne représentent pas un journal de transactions et peuvent être publiées jusqu’à 45 jours après la fin du trimestre.",
-            "Changes are inferred by comparing quarterly 13F filings. They are not a transaction ledger and filings may be published up to 45 days after quarter-end.",
+            "Variations de quantités entre deux 13F trimestriels, pas des transactions. Un dépôt peut paraître 45 jours après la fin du trimestre.",
+            "Share changes compare two quarterly 13F filings, not trades. Filings may arrive 45 days after quarter-end.",
           )}
         </p>
         <details>
-          <summary>{pick(language, "Qu’est-ce qu’un 13F ?", "What is a 13F?")}</summary>
+          <summary>{pick(language, "Formulaire 13F", "13F filing")}</summary>
           <p>
             {pick(
               language,
-              "Déclaration trimestrielle déposée auprès de la SEC par certains grands gestionnaires institutionnels. Elle présente leurs positions sur les titres visés par la réglementation 13F à la fin du trimestre. Elle ne constitue pas un journal de transactions ni nécessairement le portefeuille complet.",
-              "A quarterly filing submitted to the SEC by certain large institutional investment managers. It reports their positions in securities covered by 13F rules at quarter-end. It is not a transaction ledger and does not necessarily represent the manager’s complete portfolio.",
+              "Le 13F décrit certains titres de grands gestionnaires à la fin du trimestre, sans couvrir nécessairement tout leur portefeuille.",
+              "A 13F reports certain securities held by large managers at quarter-end; it need not cover their whole portfolio.",
             )}
           </p>
         </details>
@@ -200,10 +204,10 @@ function SourcePanel({
         <span className={styles.eyebrow}>{pick(language, "SOURCES OFFICIELLES", "OFFICIAL SOURCES")}</span>
         <h2>SEC EDGAR — Form 13F-HR</h2>
         <p>
-          {pick(language, "Instantané généré le", "Snapshot generated on")} {formatDate(generatedAt, locale)}
+          {pick(language, "Généré le", "Generated on")} {formatDate(generatedAt, locale)}
         </p>
         {extractedAt && <p>{pick(language, "Données extraites le", "Data extracted on")} {formatDate(extractedAt, locale)}</p>}
-        {validatedAt && <p>{pick(language, "Dernière validation le", "Last validated on")} {formatDate(validatedAt, locale)}</p>}
+        {validatedAt && <p>{pick(language, "Validé le", "Validated on")} {formatDate(validatedAt, locale)}</p>}
       </div>
       <div className={styles.sourceList}>
         {sources.map((source) => (
@@ -237,12 +241,14 @@ function InstitutionRows({
             <tr>
               <th>{pick(language, "Institution", "Institution")}</th>
               <th>{pick(language, "Valeur 13F", "13F value")}</th>
+              <th>{pick(language, "Variation valeur", "Value change")}</th>
               <th>{pick(language, "Positions", "Holdings")}</th>
               <th>{pick(language, "Nouvelles", "New")}</th>
               <th>{pick(language, "Augmentées", "Increased")}</th>
               <th>{pick(language, "Réduites", "Reduced")}</th>
               <th>{pick(language, "Fermées", "Closed")}</th>
-              <th>{pick(language, "Dernier rapport", "Latest report")}</th>
+              <th>{pick(language, "Période", "Period")}</th>
+              <th>{pick(language, "Déposé le", "Filed on")}</th>
             </tr>
           </thead>
           <tbody>
@@ -258,12 +264,14 @@ function InstitutionRows({
                   </Link>
                 </td>
                 <td><strong>{formatMoney(institution.total_13f_value, locale)}</strong></td>
+                <td>{institution.comparison_available && institution.previous_total_13f_value != null ? formatPercent(institution.previous_total_13f_value === 0 ? null : (institution.total_13f_value / institution.previous_total_13f_value - 1) * 100, locale) : "—"}</td>
                 <td>{formatNumber(institution.holdings_count, locale)}</td>
                 <td className={styles.positive}>{formatNumber(institution.new_positions_count, locale)}</td>
                 <td className={styles.positive}>{formatNumber(institution.increased_positions_count, locale)}</td>
                 <td className={styles.negative}>{formatNumber(institution.reduced_positions_count, locale)}</td>
                 <td className={styles.negative}>{formatNumber(institution.closed_positions_count, locale)}</td>
                 <td>{formatDate(institution.report_period, locale)}</td>
+                <td>{formatDate(institution.filed_at, locale)}</td>
               </tr>
             ))}
           </tbody>
@@ -280,9 +288,10 @@ function InstitutionRows({
               <ArrowUpRight aria-hidden="true" size={18} />
             </div>
             <div className={styles.cardValue}>
-              <span>{pick(language, "Valeur des positions 13F", "13F holdings value")}</span>
+              <span>{pick(language, "Valeur 13F", "13F value")}</span>
               <strong>{formatMoney(institution.total_13f_value, locale)}</strong>
             </div>
+            <span>{pick(language, "Déposé le", "Filed on")} {formatDate(institution.filed_at, locale)} · {quarterLabel(institution.report_period, language)}</span>
             <dl className={styles.cardStats}>
               <div><dt>{pick(language, "Positions", "Holdings")}</dt><dd>{formatNumber(institution.holdings_count, locale)}</dd></div>
               <div><dt>{pick(language, "Nouvelles", "New")}</dt><dd>{formatNumber(institution.new_positions_count, locale)}</dd></div>
@@ -300,10 +309,12 @@ function Radar({
   snapshot,
   language,
   locale,
+  onInspect,
 }: {
   snapshot: InstitutionsSnapshot;
   language: "fr" | "en";
   locale: string;
+  onInspect: (flow: InstitutionFlow) => void;
 }) {
   const [tab, setTab] = useState<RadarTab>("increased");
   const flows: Record<RadarTab, InstitutionFlow[]> = {
@@ -322,7 +333,8 @@ function Radar({
   return (
     <aside className={styles.radar}>
       <span className={styles.eyebrow}>{pick(language, "RADAR GLOBAL", "GLOBAL RADAR")}</span>
-      <h2>{pick(language, "Titres les plus accumulés", "Most accumulated securities")}</h2>
+      <h2>{pick(language, "Mouvements déclarés", "Reported changes")}</h2>
+      <p className={styles.radarContext}>{quarterLabel(snapshot.report_period, language)} · {pick(language, "comparé à", "compared with")} {quarterLabel(snapshot.previous_report_period, language)} · {snapshot.institutions_comparable ?? 0}/{snapshot.institutions_reporting ?? snapshot.institutions.length} {pick(language, "gestionnaires comparables", "comparable managers")}</p>
       <div className={styles.tabList} role="tablist" aria-label={pick(language, "Catégorie du radar", "Radar category")}>
         {(Object.keys(tabLabels) as RadarTab[]).map((key) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)}>
@@ -344,6 +356,8 @@ function Radar({
               {flow.aggregate_share_change !== null && (
                 <small>{formatSigned(flow.aggregate_share_change, locale)} {pick(language, "actions déclarées", "reported shares")}</small>
               )}
+              <small>{formatMoney(flow.current_reported_value, locale)} · {flow.institutions_holding} {pick(language, "détiennent", "hold")}</small>
+              <button type="button" onClick={() => onInspect(flow)}>{pick(language, "Voir les déclarants", "View filers")}</button>
             </div>
           </li>
         ))}
@@ -352,33 +366,62 @@ function Radar({
   );
 }
 
-function ActivitySearch({ language, locale }: { language: "fr" | "en"; locale: string }) {
-  const [query, setQuery] = useState("");
+function ActivitySearch({ language, locale, initialQuery = "" }: { language: "fr" | "en"; locale: string; initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery);
   const [result, setResult] = useState<InstitutionFlow | null>(null);
+  const [searchedQuery, setSearchedQuery] = useState("");
+  const [positions, setPositions] = useState<InstitutionSecuritySearch | null>(null);
+  const [positionsLoading, setPositionsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!query.trim() || loading) return;
+  const search = useCallback(async (value: string, signal?: AbortSignal) => {
+    if (!value.trim()) return;
     setLoading(true);
     setError(null);
+    setPositions(null);
     try {
-      setResult(await getInstitutionSecurityActivity(query));
+      setResult(await getInstitutionSecurityActivity(value, signal));
+      setSearchedQuery(value.trim());
     } catch (caught) {
+      if (signal?.aborted) return;
       setError(caught instanceof Error ? caught.message : pick(language, "Recherche indisponible.", "Search unavailable."));
       setResult(null);
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
+    }
+  }, [language]);
+
+  useEffect(() => {
+    if (!initialQuery) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => void search(initialQuery, controller.signal), 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [initialQuery, search]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!loading) void search(query);
+  }
+
+  async function loadPositions(offset = 0) {
+    if (!searchedQuery || positionsLoading) return;
+    setPositionsLoading(true);
+    try {
+      setPositions(await getInstitutionSecurityHoldings(searchedQuery, 20, offset));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : pick(language, "Positions indisponibles.", "Holdings unavailable."));
+    } finally {
+      setPositionsLoading(false);
     }
   }
 
   return (
     <section className={styles.activity}>
       <div>
-        <span className={styles.eyebrow}>{pick(language, "RECHERCHE PAR TITRE", "SECURITY LOOKUP")}</span>
-        <h2>{pick(language, "Voir qui détient un titre", "See who holds a security")}</h2>
-        <p>{pick(language, "Recherche fiable par ticker résolu ou CUSIP officiel.", "Reliable search by resolved ticker or official CUSIP.")}</p>
+        <span className={styles.eyebrow}>{pick(language, "RECHERCHE 13F", "13F SEARCH")}</span>
+        <h2>{pick(language, "Déclarants d’un titre", "Security filers")}</h2>
+        <p>{pick(language, "Ticker vérifié ou CUSIP officiel.", "Verified ticker or official CUSIP.")}</p>
       </div>
       <form onSubmit={submit}>
         <label htmlFor="institution-security-search">{pick(language, "Ticker ou CUSIP", "Ticker or CUSIP")}</label>
@@ -391,7 +434,7 @@ function ActivitySearch({ language, locale }: { language: "fr" | "en"; locale: s
       {error && <p className={styles.inlineError}>{error}</p>}
       {result && (
         result.institution_names.length === 0 ? (
-          <p className={styles.emptyInline}>{pick(language, "Aucune position correspondante dans l’univers institutionnel suivi.", "No matching holding in the tracked institutional universe.")}</p>
+          <p className={styles.emptyInline}>{pick(language, "Aucune position dans l’univers suivi.", "No holding in the tracked universe.")}</p>
         ) : (
           <div className={styles.activityResult}>
             <div className={styles.activityTitle}>
@@ -399,7 +442,7 @@ function ActivitySearch({ language, locale }: { language: "fr" | "en"; locale: s
               {result.ticker && <Link href={`/focus/${encodeURIComponent(result.ticker)}`}>{pick(language, "Ouvrir Focus", "Open Focus")} <ArrowUpRight aria-hidden="true" size={14} /></Link>}
             </div>
             <dl>
-              <div><dt>{pick(language, "Institutions détenant", "Institutions holding")}</dt><dd>{result.institutions_holding}</dd></div>
+              <div><dt>{pick(language, "Détenteurs", "Holders")}</dt><dd>{result.institutions_holding}</dd></div>
               <div><dt>{pick(language, "Ayant augmenté", "Increased")}</dt><dd>{result.institutions_increased}</dd></div>
               <div><dt>{pick(language, "Ayant réduit", "Reduced")}</dt><dd>{result.institutions_reduced}</dd></div>
               <div><dt>{pick(language, "Nouvelles positions", "New positions")}</dt><dd>{result.institutions_new}</dd></div>
@@ -407,6 +450,22 @@ function ActivitySearch({ language, locale }: { language: "fr" | "en"; locale: s
               <div><dt>{pick(language, "Valeur déclarée", "Reported value")}</dt><dd>{formatMoney(result.current_reported_value, locale)}</dd></div>
             </dl>
             <p><strong>{pick(language, "Principaux déclarants :", "Top filers:")}</strong> {result.institution_names.join(" · ")}</p>
+            <button type="button" onClick={() => void loadPositions()} disabled={positionsLoading}>
+              {pick(language, "Consulter les déclarants", "View reporting managers")}
+            </button>
+            {positions && <div className={styles.positionResults}>
+              <p>{pick(language, "Positions déclarées", "Reported holdings")} · {positions.total} · {quarterLabel(positions.report_period, language)}</p>
+              <ul>{positions.results.map((position) => <li key={`${position.cik}-${position.cusip}-${position.security_class}-${position.put_call ?? ""}`}>
+                <Link href={`/institutions/${position.cik}`}>{position.institution_name}</Link>
+                <span>{statusLabel(position.status, language)} · {formatNumber(position.shares, locale)} · {formatMoney(position.value, locale)}</span>
+                <a href={position.filing_url} target="_blank" rel="noreferrer">SEC <ExternalLink aria-hidden="true" size={12} /></a>
+              </li>)}</ul>
+              <div className={styles.pager}>
+                <button type="button" onClick={() => void loadPositions(Math.max(0, positions.offset - positions.limit))} disabled={positionsLoading || positions.offset === 0}>{pick(language, "Précédent", "Previous")}</button>
+                <span>{positions.offset + 1}–{Math.min(positions.offset + positions.results.length, positions.total)} / {positions.total}</span>
+                <button type="button" onClick={() => void loadPositions(positions.offset + positions.limit)} disabled={positionsLoading || positions.offset + positions.limit >= positions.total}>{pick(language, "Suivant", "Next")}</button>
+              </div>
+            </div>}
           </div>
         )
       )}
@@ -425,12 +484,15 @@ export function InstitutionsClient() {
   const [query, setQuery] = useState("");
   const [country, setCountry] = useState<CountryFilter>("all");
   const [sort, setSort] = useState<InstitutionSort>("value");
+  const [view, setView] = useState<InstitutionView>("overview");
+  const [page, setPage] = useState(0);
+  const [selectedSecurity, setSelectedSecurity] = useState("");
 
   const load = useCallback(async (refresh = false, signal?: AbortSignal) => {
     if (refresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const next = await getInstitutionsSnapshot(50, refresh, signal);
+      const next = await getInstitutionsSnapshot(100, refresh, signal);
       setSnapshot(next);
       setError(null);
     } catch (caught) {
@@ -466,10 +528,15 @@ export function InstitutionsClient() {
       .sort((left, right) => Number(right[sortValue[sort]]) - Number(left[sortValue[sort]]));
   }, [country, query, snapshot?.institutions, sort]);
 
+  const pageCount = Math.max(1, Math.ceil(institutions.length / MANAGERS_PER_PAGE));
+  const visibleInstitutions = institutions.slice(page * MANAGERS_PER_PAGE, (page + 1) * MANAGERS_PER_PAGE);
+  const latestFilings = [...(snapshot?.institutions ?? [])]
+    .filter((institution) => institution.filed_at)
+    .sort((left, right) => (right.filed_at ?? "").localeCompare(left.filed_at ?? ""))
+    .slice(0, 5);
+
   const totalValue = snapshot?.institutions.reduce((sum, institution) => sum + institution.total_13f_value, 0) ?? 0;
   const totalNew = snapshot?.institutions.reduce((sum, institution) => sum + institution.new_positions_count, 0) ?? 0;
-  const totalIncreased = snapshot?.institutions.reduce((sum, institution) => sum + institution.increased_positions_count, 0) ?? 0;
-  const totalReduced = snapshot?.institutions.reduce((sum, institution) => sum + institution.reduced_positions_count, 0) ?? 0;
 
   if (loading && snapshot === null) {
     return <main className={styles.page}><section className={styles.loading}><span className={styles.spinner} /><div><h1>{pick(language, "Chargement des institutions…", "Loading institutions…")}</h1><p>SEC EDGAR — Form 13F</p></div></section></main>;
@@ -482,33 +549,46 @@ export function InstitutionsClient() {
   return (
     <main className={styles.page}>
       {(snapshot.stale || error) && <div className={styles.staleBanner}><strong>STALE</strong><span>{snapshot.message ?? error ?? pick(language, "Dernier instantané fiable affiché.", "Last reliable snapshot shown.")}</span></div>}
-      <section className={styles.hero}>
-        <div><span className={styles.eyebrow}>INSTITUTIONS</span><h1>{pick(language, "Suivre les grands gestionnaires à travers leurs déclarations 13F.", "Track major institutional managers through their 13F filings.")}</h1><p>{pick(language, "Données officielles SEC, comparées entre deux trimestres.", "Official SEC data compared across two quarters.")}</p><p>{pick(language, "Période de référence", "Reference period")} : {quarterLabel(snapshot.report_period, language)} · {snapshot.period_status === "published_dataset" ? pick(language, "jeu trimestriel SEC publié", "published SEC quarterly dataset") : pick(language, "couverture à vérifier", "coverage to verify")}</p>{snapshot.institutions_reporting != null && <p>{pick(language, "Gestionnaires présents dans l’échantillon", "Managers in the sample")} : {snapshot.institutions_reporting} · {pick(language, "comparables au trimestre précédent", "comparable with the previous quarter")} : {snapshot.institutions_comparable ?? 0}</p>}{snapshot.partial_report_period && <p>{pick(language, "Trimestre suivant partiel", "Partial following quarter")} : {quarterLabel(snapshot.partial_report_period, language)} ({snapshot.partial_institutions_reporting ?? 0})</p>}</div>
-        <div className={styles.heroAside}><strong>{snapshot.institutions.length}</strong><span>{pick(language, "institutions affichées", "institutions shown")}</span><small>{pick(language, "Période", "Period")} · {quarterLabel(snapshot.report_period, language)}</small></div>
+      <section className={`${styles.hero} ${styles.overviewHero}`}>
+        <div>
+          <span className={styles.eyebrow}>INSTITUTIONS · SEC EDGAR</span>
+          <h1>{pick(language, "Intelligence institutionnelle", "Institutional intelligence")}</h1>
+          <p>{pick(language, "Dernier trimestre complet", "Latest complete quarter")} : <strong>{quarterLabel(snapshot.report_period, language)}</strong> · {snapshot.period_status === "published_dataset" ? pick(language, "jeu trimestriel SEC publié", "published SEC quarterly dataset") : pick(language, "couverture à vérifier", "coverage to verify")}</p>
+          {snapshot.partial_report_period && <p>{pick(language, "Trimestre suivant partiel", "Partial following quarter")} : {quarterLabel(snapshot.partial_report_period, language)} ({snapshot.partial_institutions_reporting ?? 0})</p>}
+        </div>
+        <button className={styles.refreshButton} type="button" onClick={() => void load(true)} disabled={refreshing}><RefreshCw aria-hidden="true" size={15} className={refreshing ? styles.spinning : undefined} />{pick(language, "Actualiser", "Refresh")}</button>
       </section>
       <section className={styles.metrics} aria-label={pick(language, "Indicateurs", "Metrics")}>
-        <div><span>{pick(language, "Valeur 13F suivie", "Tracked 13F value")}</span><strong>{formatMoney(totalValue, locale)}</strong></div>
+        <div><span>{pick(language, "Institutions suivies", "Tracked institutions")}</span><strong>{snapshot.institutions_reporting ?? snapshot.institutions.length}</strong><small>{snapshot.institutions_comparable ?? 0} {pick(language, "comparables", "comparable")}</small></div>
+        <div><span>{pick(language, "Valeur 13F déclarée", "Reported 13F value")}</span><strong>{formatMoney(totalValue, locale)}</strong><small>{pick(language, "Somme non dédoublonnée", "Sum includes overlaps")}</small></div>
         <div><span>{pick(language, "Nouvelles positions", "New positions")}</span><strong>{formatNumber(totalNew, locale)}</strong></div>
-        <div><span>{pick(language, "Positions augmentées", "Increased positions")}</span><strong>{formatNumber(totalIncreased, locale)}</strong></div>
-        <div><span>{pick(language, "Positions réduites", "Reduced positions")}</span><strong>{formatNumber(totalReduced, locale)}</strong></div>
+        <div><span>{pick(language, "Dernières déclarations", "Latest filings")}</span><strong>{latestFilings.length}</strong></div>
       </section>
-      <Disclosure language={language} />
-      <ActivitySearch language={language} locale={locale} />
-      <section className={styles.directoryGrid}>
-        <div className={styles.directory}>
-          <div className={styles.sectionHeading}>
-            <div><span className={styles.eyebrow}>{pick(language, "CLASSEMENT", "RANKING")}</span><h2>{pick(language, "Principaux gestionnaires 13F", "Leading 13F managers")}</h2></div>
-            <button className={styles.refreshButton} type="button" onClick={() => void load(true)} disabled={refreshing}><RefreshCw aria-hidden="true" size={15} className={refreshing ? styles.spinning : undefined} />{pick(language, "Actualiser", "Refresh")}</button>
-          </div>
+      <nav className={styles.viewTabs} aria-label={pick(language, "Vues Institutions", "Institution views")}>
+        {([
+          ["overview", "Vue d’ensemble", "Overview"],
+          ["managers", "Gestionnaires", "Managers"],
+          ["securities", "Titres", "Securities"],
+          ["radar", "Radar", "Radar"],
+        ] as const).map(([key, fr, en]) => <button key={key} type="button" aria-current={view === key ? "page" : undefined} onClick={() => setView(key)}>{pick(language, fr, en)}</button>)}
+      </nav>
+      {view === "overview" && <section className={styles.directory}>
+          <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>{pick(language, "DERNIERS DÉPÔTS", "LATEST FILINGS")}</span><h2>{pick(language, "Déclarations vérifiées", "Verified filings")}</h2></div><button className={styles.textButton} type="button" onClick={() => setView("managers")}>{pick(language, "Tous les gestionnaires", "All managers")} <ArrowUpRight aria-hidden="true" size={14} /></button></div>
+          <ul className={styles.latestList}>{latestFilings.map((institution) => <li key={institution.cik}><Link href={`/institutions/${institution.cik}`}><strong>{institution.name}</strong><span>{quarterLabel(institution.report_period, language)} · {formatMoney(institution.total_13f_value, locale)}</span></Link><time dateTime={institution.filed_at ?? undefined}>{formatDate(institution.filed_at, locale)}</time></li>)}</ul>
+      </section>}
+      {view === "managers" && <section className={styles.directory}>
+          <div className={styles.sectionHeading}><div><span className={styles.eyebrow}>{pick(language, "CLASSEMENT", "RANKING")}</span><h2>{pick(language, "Gestionnaires 13F", "13F managers")}</h2><p>{institutions.length} {pick(language, "résultats", "results")} · {quarterLabel(snapshot.report_period, language)}</p></div></div>
           <div className={styles.filters}>
-            <label className={styles.searchBox}><Search aria-hidden="true" size={17} /><span className={styles.srOnly}>{pick(language, "Rechercher une institution", "Search an institution")}</span><input aria-label={pick(language, "Rechercher une institution", "Search an institution")} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pick(language, "Nom ou CIK", "Name or CIK")} /></label>
-            <label><span>{pick(language, "Pays", "Country")}</span><select value={country} onChange={(event) => setCountry(event.target.value as CountryFilter)}><option value="all">{pick(language, "Toutes", "All")}</option><option value="canada">Canada</option><option value="usa">{pick(language, "États-Unis", "United States")}</option><option value="other">{pick(language, "Autres", "Other")}</option></select></label>
-            <label><span>{pick(language, "Trier par", "Sort by")}</span><select aria-label={pick(language, "Trier les institutions", "Sort institutions")} value={sort} onChange={(event) => setSort(event.target.value as InstitutionSort)}><option value="value">{pick(language, "Valeur", "Value")}</option><option value="new">{pick(language, "Nouvelles", "New")}</option><option value="increased">{pick(language, "Augmentées", "Increased")}</option><option value="reduced">{pick(language, "Réduites", "Reduced")}</option></select></label>
+            <label className={styles.searchBox}><Search aria-hidden="true" size={17} /><span className={styles.srOnly}>{pick(language, "Rechercher une institution", "Search an institution")}</span><input aria-label={pick(language, "Rechercher une institution", "Search an institution")} value={query} onChange={(event) => { setQuery(event.target.value); setPage(0); }} placeholder={pick(language, "Nom ou CIK", "Name or CIK")} /></label>
+            <label><span>{pick(language, "Pays", "Country")}</span><select value={country} onChange={(event) => { setCountry(event.target.value as CountryFilter); setPage(0); }}><option value="all">{pick(language, "Toutes", "All")}</option><option value="canada">Canada</option><option value="usa">{pick(language, "États-Unis", "United States")}</option><option value="other">{pick(language, "Autres", "Other")}</option></select></label>
+            <label><span>{pick(language, "Trier par", "Sort by")}</span><select aria-label={pick(language, "Trier les institutions", "Sort institutions")} value={sort} onChange={(event) => { setSort(event.target.value as InstitutionSort); setPage(0); }}><option value="value">{pick(language, "Valeur", "Value")}</option><option value="new">{pick(language, "Nouvelles", "New")}</option><option value="increased">{pick(language, "Augmentées", "Increased")}</option><option value="reduced">{pick(language, "Réduites", "Reduced")}</option></select></label>
           </div>
-          {institutions.length > 0 ? <InstitutionRows institutions={institutions} locale={locale} language={language} /> : <p className={styles.emptyInline}>{pick(language, "Aucune institution ne correspond à ces filtres.", "No institution matches these filters.")}</p>}
-        </div>
-        <Radar snapshot={snapshot} language={language} locale={locale} />
-      </section>
+          {institutions.length > 0 ? <InstitutionRows institutions={visibleInstitutions} locale={locale} language={language} /> : <p className={styles.emptyInline}>{pick(language, "Aucune institution ne correspond à ces filtres.", "No institution matches these filters.")}</p>}
+          {institutions.length > MANAGERS_PER_PAGE && <div className={styles.pager}><button type="button" disabled={page === 0} onClick={() => setPage((current) => current - 1)}>{pick(language, "Précédent", "Previous")}</button><span>{page + 1} / {pageCount}</span><button type="button" disabled={page + 1 >= pageCount} onClick={() => setPage((current) => current + 1)}>{pick(language, "Suivant", "Next")}</button></div>}
+      </section>}
+      {view === "securities" && <ActivitySearch key={selectedSecurity} language={language} locale={locale} initialQuery={selectedSecurity} />}
+      {view === "radar" && <Radar snapshot={snapshot} language={language} locale={locale} onInspect={(flow) => { setSelectedSecurity(flow.cusip); setView("securities"); }} />}
+      <Disclosure language={language} />
       <SourcePanel sources={snapshot.sources} generatedAt={snapshot.generated_at} extractedAt={snapshot.extracted_at} validatedAt={snapshot.validated_at} language={language} />
     </main>
   );

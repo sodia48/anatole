@@ -616,6 +616,31 @@ export type InstitutionFlow = {
   institution_names: string[];
 };
 
+export type InstitutionSecurityPosition = {
+  cik: string;
+  institution_name: string;
+  filing_url: string;
+  cusip: string;
+  ticker: string | null;
+  issuer: string;
+  security_class: string;
+  put_call: string | null;
+  shares: number;
+  previous_shares: number;
+  share_change: number;
+  value: number;
+  status: InstitutionHoldingStatus;
+};
+
+export type InstitutionSecuritySearch = {
+  query: string;
+  report_period: string;
+  total: number;
+  limit: number;
+  offset: number;
+  results: InstitutionSecurityPosition[];
+};
+
 export type InstitutionsSnapshot = {
   institutions: InstitutionSummary[];
   top_increased: InstitutionFlow[];

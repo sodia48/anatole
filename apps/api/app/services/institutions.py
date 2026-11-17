@@ -1001,13 +1001,13 @@ class InstitutionService:
         limit: int = 50,
         force_refresh: bool = False,
     ) -> InstitutionsSnapshot:
-        bounded_limit = max(1, min(limit, 50))
+        bounded_limit = max(1, min(limit, 100))
         if self._store is not None:
             try:
                 prepared = await asyncio.to_thread(self._store.latest_snapshot)
             except Exception:
                 prepared = None
-            snapshot = prepared or self._seed_snapshot(50)
+            snapshot = prepared or self._seed_snapshot(100)
             if prepared is not None and prepared.report_period is not None:
                 try:
                     partial_period, partial_count, amendment = await asyncio.to_thread(
@@ -1051,7 +1051,7 @@ class InstitutionService:
                 ]
             })
         try:
-            snapshot = self._seed_snapshot(50)
+            snapshot = self._seed_snapshot(100)
         except Exception:
             if self._snapshot_cache is not None:
                 stale = self._snapshot_cache.value.model_copy(update={
