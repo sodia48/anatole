@@ -954,14 +954,14 @@ test("Le choix Institutionnel ouvre les 70 capacites d'Anatole Institutional", a
     page.getByTestId("institutional-morning-brief"),
   ).toBeVisible();
 
-  const workspaces = page.getByTestId("institutional-workspace-grid");
+  const workspaces = page.getByRole("main").getByTestId("institutional-workspace-grid");
   await expect(workspaces).toBeVisible();
   await expect(workspaces.locator("a")).toHaveCount(8);
 
-  const library = page.getByTestId("institutional-capability-library");
+  const library = page.getByRole("main").getByTestId("institutional-capability-library");
   await expect(library).not.toHaveAttribute("open", "");
 
-  const grid = page.getByTestId("institutional-capability-grid");
+  const grid = page.getByRole("main").getByTestId("institutional-capability-grid");
   await expect(grid.locator("[data-capability-id]")).toHaveCount(70);
   await expect(grid).toBeHidden();
 
@@ -1516,7 +1516,7 @@ test("Anatole Institutional regroupe les capacites dans huit desks operationnels
     waitUntil: "domcontentloaded",
   });
 
-  const workspaces = page.getByTestId(
+  const workspaces = page.getByRole("main").getByTestId(
     "institutional-workspace-grid",
   );
 
@@ -1538,7 +1538,7 @@ test("Anatole Institutional regroupe les capacites dans huit desks operationnels
     ).toBeVisible();
   }
 
-  const library = page.getByTestId(
+  const library = page.getByRole("main").getByTestId(
     "institutional-capability-library",
   );
 
