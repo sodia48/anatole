@@ -1,0 +1,21 @@
+services:
+  - type: cron
+    name: anatole-institutions-delivery-check
+    runtime: python
+    branch: codex/institutions-final-delivery-ops
+    region: oregon
+    plan: 0.5c-512mb
+    schedule: "0 0 1 1 *"
+    autoDeployTrigger: off
+    buildCommand: pip install -e apps/api
+    startCommand: python scripts/diagnose_institutions_restore_isolation.py
+    envVars:
+      - key: STAGING_DATABASE_URL
+        fromDatabase:
+          name: anatole-institutions-staging-pg
+          property: connectionString
+      - key: STAGING_APP_DATABASE_URL
+        fromService:
+          name: anatole-api-institutions-staging
+          type: web
+          envVarKey: ACCOUNT_DATABASE_URL
