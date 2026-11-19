@@ -264,7 +264,7 @@ test.describe("Company ecosystem", () => {
     let initialReadyAt = 0;
     let initialCompleted = false;
     let refreshReadyAt = 0;
-    let depthTwoReadyAt = 0;
+    let depthTwoRequests = 0;
 
     await page.route("**/api/anatole/api/v1/discovery/company-network/**", async (route) => {
       const url = new URL(route.request().url());
@@ -283,8 +283,8 @@ test.describe("Company ecosystem", () => {
           value = snapshots.get("MDA")!;
         }
       } else if (requestedDepth === 2) {
-        if (depthTwoReadyAt === 0) depthTwoReadyAt = Date.now() + 1_500;
-        value = Date.now() < depthTwoReadyAt
+        depthTwoRequests += 1;
+        value = depthTwoRequests === 1
           ? buildingSnapshot(snapshots.get("MDA")!, 2, true)
           : {
             ...snapshots.get("MDA")!,

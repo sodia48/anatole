@@ -81,6 +81,12 @@ jobs:
     # Playwright's WebKit dependencies target a supported LTS image. Keep this
     # fixed so ubuntu-latest cannot switch the E2E job to a new OS mid-rollout.
     runs-on: ubuntu-24.04
+    # Match the pinned @playwright/test version. The official image includes
+    # the browsers and OS libraries, avoiding slow apt mirror downloads.
+    # Run the test process as a non-root user, as in Playwright's CI example.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.0-noble
+      options: --user 1001
     timeout-minutes: 45
     needs: [api-tests, web-build, mobile-quality]
     steps:
@@ -98,8 +104,6 @@ jobs:
         run: |
           python -m pip install -e "apps/api[dev]"
           pnpm install --frozen-lockfile
-      - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps chromium webkit
       - name: Run critical journeys
         env:
           MARKET_DATA_PROVIDER: demo

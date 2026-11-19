@@ -2,6 +2,7 @@ import "server-only";
 
 import Link from "next/link";
 import { cookies } from "next/headers";
+import { notFound } from "next/navigation";
 import { SESSION_COOKIE_NAME } from "@/lib/session-cookie";
 import styles from "../../institutions/history.module.css";
 
@@ -81,6 +82,7 @@ const runStatusLabels: Record<string, string> = {
 };
 
 export default async function InstitutionalQualityPage() {
+  if (process.env.INSTITUTIONS_ADMIN_ENABLED !== "true") notFound();
   const quality = await readQuality();
   return <main className={styles.page}>
     <Link className={styles.back} href="/admin">← Retour à l’administration</Link>
