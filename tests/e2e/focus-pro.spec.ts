@@ -222,6 +222,13 @@ test.describe("Focus Pro workstation", () => {
 
   test("alerts, fundamental markers and backtest", async ({ page }) => {
     const visibleEarningsDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1_000).toISOString();
+    // Keep the real API response while avoiding intermittent WebKit failures
+    // when its browser process reads the local HTTPS test proxy under load.
+    await page.route("**/api/anatole/api/v1/backtest", async (route) => {
+      const response = await route.fetch();
+      expect(response.ok()).toBeTruthy();
+      await route.fulfill({ response });
+    });
     await page.route("**/api/anatole/api/v1/stocks/RY/fundamentals", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
