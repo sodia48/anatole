@@ -156,6 +156,24 @@ test.beforeEach(async ({ page }) => {
   await mockInstitutionApi(page);
 });
 
+test("le trimestre partiel garde le classement validé et indique la collecte", async ({ page }) => {
+  await page.route("**/api/anatole/api/v1/discovery/institutions?**", async (route) => {
+    await route.fulfill({ json: {
+      ...snapshot,
+      partial_report_period: "2026-09-30",
+      partial_institutions_reporting: 1,
+      last_sync_at: "2026-11-23T09:17:00Z",
+      next_check_at: "2026-11-24T09:17:00Z",
+    } });
+  });
+  await page.goto("/institutions");
+  await expect(page.getByText(/Dernier trimestre complet : T2 2026/)).toBeVisible();
+  await expect(page.getByText(/Trimestre en cours de collecte : T3 2026/)).toBeVisible();
+  await expect(page.getByText(/1 gestionnaire a publié, autres en attente/)).toBeVisible();
+  await expect(page.getByText(/Dernière synchronisation réussie/)).toBeVisible();
+  await expect(page.getByText(/Prochain contrôle/)).toBeVisible();
+});
+
 test("classement, recherche, tri et radar Institutions", async ({ page }, testInfo) => {
   await page.goto("/institutions");
   await expect(page.getByRole("heading", { name: "Intelligence institutionnelle" })).toBeVisible();

@@ -1034,10 +1034,12 @@ class InstitutionService:
                         prepared.report_period,
                         (prepared.validated_at or prepared.generated_at).date(),
                     )
+                    collection = await asyncio.to_thread(self._store.public_collection_status)
                     snapshot = snapshot.model_copy(update={
                         "partial_report_period": partial_period,
                         "partial_institutions_reporting": partial_count,
                         "stale": snapshot.stale or amendment,
+                        **collection,
                         "message": (
                             "Un amendement plus récent requiert une nouvelle validation du classement."
                             if amendment else snapshot.message
@@ -1140,6 +1142,45 @@ class InstitutionService:
             try:
                 if period and await asyncio.to_thread(self._store.snapshot_for_period, period) is None:
                     raise ValueError("Période 13F non publiée")
+                if period is None:
+                    published = await asyncio.to_thread(self._store.latest_snapshot)
+                    if published and published.report_period:
+                        pending = await asyncio.to_thread(
+                            self._store.latest_pending_manager, normalized, published.report_period,
+                        )
+                        if pending:
+                            if limit is None and (offset or query or status != "all" or sort != "weight"):
+                                raise ValueError("La pagination est requise pour filtrer les positions")
+                            from app.services.institution_collector import _direct_detail
+
+                            detail = await asyncio.to_thread(
+                                _direct_detail, self._store, pending[0], normalized, pending[1],
+                            )
+                            holdings = detail.holdings
+                            needle = query.strip().casefold()
+                            if status != "all":
+                                holdings = [item for item in holdings if item.status == status]
+                            if needle:
+                                holdings = [item for item in holdings if (
+                                    needle in item.issuer.casefold()
+                                    or needle in item.cusip.casefold()
+                                    or needle in (item.ticker or "").casefold()
+                                )]
+                            key = {
+                                "shares": lambda item: abs(item.share_change),
+                                "percent": lambda item: abs(item.share_change_percent or 0),
+                                "value": lambda item: item.value,
+                                "weight": lambda item: item.portfolio_weight_percent,
+                            }[sort]
+                            holdings = sorted(holdings, key=key, reverse=True)
+                            total = len(holdings)
+                            return detail.model_copy(update={
+                                "holdings": holdings[offset:offset + limit] if limit else holdings,
+                                "holdings_total": total if limit else None,
+                                "holdings_limit": limit,
+                                "holdings_offset": offset if limit else None,
+                                "message": "Trimestre en cours de collecte : déclaration vérifiée, hors classement consolidé.",
+                            })
                 detail = await asyncio.to_thread(
                     self._store.detail, normalized, period,
                     limit=limit, offset=offset, query=query, status=status, sort=sort,

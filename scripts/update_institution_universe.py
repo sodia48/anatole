@@ -79,7 +79,7 @@ def request(url: str, user_agent: str) -> urllib.request.Request:
 
 
 def discover_dataset_urls(user_agent: str) -> tuple[str, str]:
-    with urllib.request.urlopen(request(DATASET_PAGE, user_agent)) as response:
+    with urllib.request.urlopen(request(DATASET_PAGE, user_agent), timeout=30) as response:
         html = response.read().decode("utf-8", errors="replace")
     links = re.findall(
         r'href=["\']([^"\']+_form13f\.zip)["\']',
@@ -95,10 +95,19 @@ def discover_dataset_urls(user_agent: str) -> tuple[str, str]:
 
 
 def download(url: str, target: Path, user_agent: str) -> None:
-    with urllib.request.urlopen(request(url, user_agent)) as response:
+    with urllib.request.urlopen(request(url, user_agent), timeout=60) as response:
         with target.open("wb") as output:
             while chunk := response.read(1024 * 1024):
                 output.write(chunk)
+
+
+def dataset_signature(url: str, user_agent: str) -> str:
+    """Cheap official validators; an empty result triggers periodic hash checks."""
+    head = urllib.request.Request(url, headers=request(url, user_agent).headers,
+                                  method="HEAD")
+    with urllib.request.urlopen(head, timeout=30) as response:
+        return "|".join(str(response.headers.get(name) or "") for name in
+                        ("ETag", "Last-Modified", "Content-Length"))
 
 
 def parse_sec_date(value: str) -> date:

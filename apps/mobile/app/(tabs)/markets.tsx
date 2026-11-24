@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FlatList, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CalendarIntelligenceScreen } from "@/src/components/calendar/CalendarIntelligenceScreen";
+import { InstitutionsMobileScreen } from "@/src/components/institutions/InstitutionsMobileScreen";
 import { GlobalSearchButton } from "@/src/components/search/GlobalSearchButton";
 import { MarketHeatmap } from "@/src/components/cockpit/MarketHeatmap";
 import { StockRow } from "@/src/components/market";
@@ -104,6 +105,7 @@ export default function MarketsScreen() {
   const navigation = <MarketsNavigation hub={hub} onHub={setHub} />;
   if (hub === "news") return <NewsIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialRegion={requestedRegion} preferredRegions={workspace.data.preferences?.preferred_regions ?? []} />;
   if (hub === "calendar") return <CalendarIntelligenceScreen header={navigation} initialCategory={requestedCategory} initialDateRange={requestedDateRange} initialDayOffset={requestedDayOffset} initialKind={requestedKind} initialRegion={requestedRegion} initialTicker={requestedTicker} />;
+  if (hub === "institutions") return <InstitutionsMobileScreen header={navigation} />;
 
   async function addWatchlist(ticker: string) {
     if (workspace.data.watchlist.includes(ticker)) return;

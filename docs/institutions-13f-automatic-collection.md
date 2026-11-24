@@ -1,0 +1,17 @@
+# Institutions 3.0 — collecte 13F automatique
+
+La commande existante du Cron Render reste `python scripts/sync_institution_store.py --if-new`, une fois par jour à 09:17 UTC. Elle utilise la connexion PostgreSQL interne déjà configurée. Aucun accès à la base n'est nécessaire depuis GitHub Actions : son workflow devient une vérification manuelle, sans écriture ni secret PostgreSQL.
+
+À chaque passage, le collecteur consulte les soumissions EDGAR des gestionnaires suivis, en respectant un intervalle minimal de 200 ms entre requêtes SEC. Il classe chaque 13F-HR par période de rapport, distingue les amendements de remplacement des ajouts et télécharge les tables XML seulement pour les ensembles d'accessions inconnus. Les tables vérifiées d'un trimestre en cours restent dans `institution_pending_filings`. Un gestionnaire déjà déposé peut être consulté dans sa fiche avec la mention « en cours de collecte » ; le classement public garde une seule période et les autres restent en attente.
+
+Une publication atomique a lieu lorsque 95 % des gestionnaires de référence ont une table vérifiée. Le nombre exact de gestionnaires inclus et les absents restent affichés. Une nouvelle déclaration ou un amendement republie le même trimestre ; les périodes antérieures restent consultables. Après publication, les tables temporaires sont supprimées et les accessions vérifiées restent dans `institution_manager_versions` pour éviter les téléchargements répétés. Une interruption SEC conserve le dernier trimestre valide et un nouveau passage reprend les données déjà vérifiées.
+
+Le ZIP officiel SEC est contrôlé séparément par URL, métadonnées HTTP et empreinte SHA-256. Même si les métadonnées ne changent pas, une vérification par empreinte est faite au moins tous les sept jours. Un ZIP plus ancien, ou du même trimestre qu'un état EDGAR déjà publié, ne peut pas remplacer ses déclarations directes potentiellement plus récentes.
+
+Le 23 novembre 2026, [la page des ZIP SEC](https://www.sec.gov/data-research/sec-markets-data/form-13f-data-sets) s'arrêtait aux dépôts d'août 2026, tandis que les 13F-HR du T3 2026 de [BlackRock](https://www.sec.gov/Archives/edgar/data/2012383/000201238326003985/xslForm13F_X02/primary_doc.xml), [FMR](https://www.sec.gov/Archives/edgar/data/315066/000031506626002964/0000315066-26-002964-index.htm) et [State Street](https://www.sec.gov/Archives/edgar/data/93751/000009375126000747/primary_doc.xml) étaient déjà accessibles dans EDGAR. La collecte directe permet de les traiter sans attendre le ZIP.
+
+## Activation contrôlée
+
+Cette PR ne modifie aucune ressource Render ni la base de production. Avant la fusion et le déploiement du nouveau code, vérifier le Cron actuel, sa fenêtre d'exécution, la capacité PostgreSQL et le plan de sauvegarde. La première exécution créera uniquement les tables additives `institution_pending_filings`, `institution_manager_versions` et `institution_dataset_versions` sur la base existante. Le Cron doit rester l'unique écrivain programmé ; le workflow GitHub ne doit pas être réactivé comme importateur. Suivre le premier passage et vérifier les counts, la période, les erreurs SEC, les durées et la conservation des trimestres antérieurs avant d'annoncer T3 comme publié.
+
+La vue mobile native Institutions lit le même endpoint que le web et distingue la période validée du trimestre en collecte. Le tableau administrateur reste soumis à sa configuration d'accès existante.
