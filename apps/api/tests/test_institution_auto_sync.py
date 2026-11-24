@@ -118,6 +118,15 @@ def prepared_store(tmp_path: Path) -> InstitutionStore:
 
 
 @pytest.mark.asyncio
+async def test_api_keeps_published_detail_before_cron_adds_new_table(tmp_path: Path) -> None:
+    store = prepared_store(tmp_path)
+    store.pending.drop(store.engine)
+    detail = await InstitutionService(store=store).institution_detail("0000000001", limit=25)
+    assert detail.institution.report_period == date(2026, 6, 30)
+    assert detail.holdings
+
+
+@pytest.mark.asyncio
 async def test_partial_quarter_publish_amendment_and_idempotence(tmp_path: Path) -> None:
     store = prepared_store(tmp_path)
     worker = SECWorker()

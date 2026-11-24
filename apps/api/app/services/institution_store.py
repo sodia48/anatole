@@ -27,7 +27,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from pydantic_core import from_json
 
 from app.schemas.institutions import (
@@ -379,11 +379,21 @@ class InstitutionStore:
         return {cik: json.loads(payload) for cik, payload in rows}
 
     def latest_pending_manager(self, cik: str, complete_period: date) -> tuple[date, dict[str, Any]] | None:
-        with self.engine.connect() as connection:
-            row = connection.execute(select(self.pending.c.period, self.pending.c.payload).where(and_(
-                self.pending.c.cik == cik,
-                self.pending.c.period >= complete_period.isoformat(),
-            )).order_by(self.pending.c.period.desc()).limit(1)).first()
+        try:
+            with self.engine.connect() as connection:
+                row = connection.execute(select(self.pending.c.period, self.pending.c.payload).where(and_(
+                    self.pending.c.cik == cik,
+                    self.pending.c.period >= complete_period.isoformat(),
+                )).order_by(self.pending.c.period.desc()).limit(1)).first()
+        except DBAPIError as error:
+            # API and Cron deploy independently; preserve published details until
+            # the Cron creates this additive table on its first new-code run.
+            missing_postgres = getattr(error.orig, "sqlstate", None) == "42P01"
+            missing_sqlite = (self.engine.dialect.name == "sqlite"
+                              and "no such table: institution_pending_filings" in str(error.orig))
+            if missing_postgres or missing_sqlite:
+                return None
+            raise
         return (date.fromisoformat(row.period), json.loads(row.payload)) if row else None
 
     def pending_accessions(self, period: date, cik: str) -> list[str]:
