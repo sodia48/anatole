@@ -93,6 +93,8 @@ def test_institution_quality_is_admin_only(admin_client: TestClient, tmp_path: P
     path = "/api/v1/admin/institutions/quality"
     assert admin_client.get(path).status_code == 401
     assert admin_client.get(path, headers=auth(regular["token"])).status_code == 403
+    assert admin_client.get(path, headers=auth(admin["token"])).status_code == 404
+    monkeypatch.setenv("INSTITUTIONS_ADMIN_ENABLED", "true")
     response = admin_client.get(path, headers=auth(admin["token"]))
     assert response.status_code == 200, response.text
     body = response.json()

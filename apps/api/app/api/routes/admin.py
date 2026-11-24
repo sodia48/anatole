@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -60,6 +61,8 @@ async def overview(_: AccountUser = Depends(current_admin)) -> AdminOverview:
 
 @router.get("/institutions/quality")
 async def institutions_quality(_: AccountUser = Depends(current_admin)) -> dict[str, object]:
+    if os.environ.get("INSTITUTIONS_ADMIN_ENABLED", "").strip().lower() != "true":
+        raise HTTPException(status_code=404, detail="Not Found")
     store = institution_service._store
     if store is None:
         raise HTTPException(status_code=503, detail="Stockage institutionnel indisponible.")

@@ -87,6 +87,7 @@ export default defineConfig({
             // tables for server-rendered history routes. Production keeps
             // startup initialization disabled by default.
             INSTITUTIONS_STARTUP_INITIALIZATION_ENABLED: "true",
+            INSTITUTIONS_ADMIN_ENABLED: "true",
             ACCOUNT_ADMIN_EMAILS:
               "admin-e2e-desktop-chromium@example.com,admin-e2e-mobile-pixel-7@example.com,admin-e2e-mobile-iphone-14@example.com,admin-institutions-e2e-desktop-chromium@example.com,admin-institutions-e2e-mobile-pixel-7@example.com,admin-institutions-e2e-mobile-iphone-14@example.com",
           },
@@ -103,6 +104,7 @@ export default defineConfig({
           timeout: 180_000,
           env: {
             ANATOLE_API_URL: apiURL,
+            INSTITUTIONS_ADMIN_ENABLED: "true",
             NEXT_PUBLIC_API_URL: apiURL,
             NEXT_PUBLIC_WS_URL: process.env.CI ? "wss://localhost:3000" : "ws://127.0.0.1:8000",
           },
