@@ -32,6 +32,19 @@ import type {
 
 type CockpitUniverse = "tsx60" | "composite" | "tsxv";
 
+type MobileInstitutionsSnapshot = {
+  report_period: string | null;
+  institutions: { cik: string; name: string; report_period: string }[];
+  institutions_reporting?: number | null;
+  institutions_expected?: number | null;
+  partial_report_period?: string | null;
+  partial_institutions_reporting?: number;
+  last_sync_at?: string | null;
+  next_check_at?: string | null;
+  collection_error?: string | null;
+  sources: { status: string }[];
+};
+
 function cockpitSnapshotMatchesUniverse(
   snapshot: CockpitSnapshot,
   universe: CockpitUniverse,
@@ -65,6 +78,9 @@ async function getCockpitSnapshot(
 }
 
 export const marketApi = {
+  institutions: (signal?: AbortSignal) => apiRequest<MobileInstitutionsSnapshot>(
+    "/api/v1/discovery/institutions?limit=100", { timeoutMs: 15_000, signal },
+  ),
   cockpit: (universe: CockpitUniverse = "tsx60", signal?: AbortSignal) =>
     getCockpitSnapshot(universe, signal),
   screener: (universe: ScreenerUniverse = "composite", signal?: AbortSignal) => apiRequest<ScreenerSnapshot>(`/api/v1/discovery/screener?universe=${universe}`, { timeoutMs: universe === "tsx60" ? 10_000 : 35_000, signal }),

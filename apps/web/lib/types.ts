@@ -685,11 +685,15 @@ export type InstitutionsSnapshot = {
   generated_at: string;
   extracted_at?: string | null;
   validated_at?: string | null;
-  period_status?: "published_dataset" | "partial" | "legacy";
+  period_status?: "published_dataset" | "published_edgar" | "partial" | "legacy";
   institutions_reporting?: number | null;
+  institutions_expected?: number | null;
   institutions_comparable?: number | null;
   partial_report_period?: string | null;
   partial_institutions_reporting?: number;
+  last_sync_at?: string | null;
+  next_check_at?: string | null;
+  collection_error?: string | null;
   sources: InstitutionSourceStatus[];
   stale: boolean;
   message: string | null;

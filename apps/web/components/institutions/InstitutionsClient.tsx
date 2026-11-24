@@ -555,8 +555,12 @@ export function InstitutionsClient() {
         <div>
           <span className={styles.eyebrow}>INSTITUTIONS · SEC EDGAR</span>
           <h1>{pick(language, "Intelligence institutionnelle", "Institutional intelligence")}</h1>
-          <p>{pick(language, "Dernier trimestre complet", "Latest complete quarter")} : <strong>{quarterLabel(snapshot.report_period, language)}</strong> · {snapshot.period_status === "published_dataset" ? pick(language, "jeu trimestriel SEC publié", "published SEC quarterly dataset") : pick(language, "couverture à vérifier", "coverage to verify")}</p>
-          {snapshot.partial_report_period && <p>{pick(language, "Trimestre suivant partiel", "Partial following quarter")} : {quarterLabel(snapshot.partial_report_period, language)} ({snapshot.partial_institutions_reporting ?? 0})</p>}
+          <p>{snapshot.period_status === "published_edgar" ? pick(language, "Dernier trimestre validé", "Latest validated quarter") : pick(language, "Dernier trimestre complet", "Latest complete quarter")} : <strong>{quarterLabel(snapshot.report_period, language)}</strong> · {snapshot.period_status === "published_dataset" ? pick(language, "jeu trimestriel SEC publié", "published SEC quarterly dataset") : snapshot.period_status === "published_edgar" ? pick(language, "dépôts EDGAR vérifiés", "verified EDGAR filings") : pick(language, "couverture à vérifier", "coverage to verify")}</p>
+          {snapshot.period_status === "published_edgar" && snapshot.institutions_expected && <p>{snapshot.institutions_reporting ?? snapshot.institutions.length}/{snapshot.institutions_expected} {pick(language, "gestionnaires vérifiés", "verified managers")} · {Math.max(0, snapshot.institutions_expected - (snapshot.institutions_reporting ?? snapshot.institutions.length))} {pick(language, "en attente", "pending")}</p>}
+          {snapshot.partial_report_period && <p>{pick(language, "Trimestre en cours de collecte", "Quarter being collected")} : {quarterLabel(snapshot.partial_report_period, language)} · {snapshot.partial_institutions_reporting ?? 0} {snapshot.partial_institutions_reporting === 1 ? pick(language, "gestionnaire a publié, autres en attente", "manager reported, others pending") : pick(language, "gestionnaires ont publié, autres en attente", "managers reported, others pending")}</p>}
+          {snapshot.last_sync_at && <p>{pick(language, "Dernière synchronisation réussie", "Last successful sync")} : {formatDate(snapshot.last_sync_at, locale)}</p>}
+          {snapshot.next_check_at && <p>{pick(language, "Prochain contrôle", "Next check")} : {formatDate(snapshot.next_check_at, locale)}</p>}
+          {snapshot.collection_error && <p role="status">{snapshot.collection_error}</p>}
         </div>
         <button className={styles.refreshButton} type="button" onClick={() => void load(true)} disabled={refreshing}><RefreshCw aria-hidden="true" size={15} className={refreshing ? styles.spinning : undefined} />{pick(language, "Actualiser", "Refresh")}</button>
       </section>
@@ -678,7 +682,7 @@ export function InstitutionDetailClient() {
 
   return (
     <main className={styles.page}>
-      {(detail.stale || error) && <div className={styles.staleBanner}><strong>STALE</strong><span>{detail.message ?? error ?? pick(language, "Dernier instantané fiable affiché.", "Last reliable snapshot shown.")}</span></div>}
+      {(detail.stale || detail.message || error) && <div className={styles.staleBanner}><strong>{detail.stale ? "STALE" : pick(language, "COLLECTE", "COLLECTING")}</strong><span>{detail.message ?? error ?? pick(language, "Dernier instantané fiable affiché.", "Last reliable snapshot shown.")}</span></div>}
       <Link className={styles.backLink} href="/institutions"><ArrowLeft aria-hidden="true" size={16} />{pick(language, "Toutes les institutions", "All institutions")}</Link>
       <section className={`${styles.hero} ${styles.detailHero}`}>
         <div><span className={styles.eyebrow}>{countryLabel(institution.country, language)} · FORM 13F</span><h1>{institution.name}</h1><p>CIK {institution.cik} · {pick(language, "Rapport", "Report")}: {formatDate(institution.report_period, locale)} · {pick(language, "Déposé", "Filed")}: {formatDate(institution.filed_at, locale)}</p><a className={styles.secLink} href={institution.filing_url} target="_blank" rel="noreferrer">SEC EDGAR — Form 13F-HR <ExternalLink aria-hidden="true" size={14} /></a></div>

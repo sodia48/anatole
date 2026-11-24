@@ -27,7 +27,7 @@ from sqlalchemy import (
     update,
 )
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from pydantic_core import from_json
 
 from app.schemas.institutions import (
@@ -124,6 +124,29 @@ class InstitutionStore:
             Column("source_url", Text, nullable=False),
         )
         Index("ix_institution_filings_cik_period", self.filings.c.cik, self.filings.c.period)
+        self.pending = Table(
+            "institution_pending_filings", self.metadata,
+            Column("period", String(10), nullable=False),
+            Column("cik", String(10), nullable=False),
+            Column("accessions", Text, nullable=False),
+            Column("payload", Text, nullable=False),
+            Column("updated_at", String(40), nullable=False),
+            PrimaryKeyConstraint("period", "cik"),
+        )
+        self.manager_versions = Table(
+            "institution_manager_versions", self.metadata,
+            Column("period", String(10), nullable=False),
+            Column("cik", String(10), nullable=False),
+            Column("accessions", Text, nullable=False),
+            PrimaryKeyConstraint("period", "cik"),
+        )
+        self.dataset_versions = Table(
+            "institution_dataset_versions", self.metadata,
+            Column("url", Text, primary_key=True),
+            Column("signature", Text, nullable=False),
+            Column("sha256", String(64), nullable=False),
+            Column("checked_at", String(40), nullable=False),
+        )
         self.runs = Table(
             "institution_ingestion_runs", self.metadata,
             Column("run_id", String(36), primary_key=True),
@@ -326,6 +349,109 @@ class InstitutionStore:
                 inserted += 1
         return inserted
 
+    def stage_manager(self, period: date, cik: str, accessions: list[str], payload: dict[str, Any]) -> bool:
+        """Persist a verified EDGAR table without changing the published ranking."""
+        if not accessions or not payload.get("holdings"):
+            raise ValueError("A staged manager needs verified filings and holdings")
+        period_text = period.isoformat()
+        accession_text = json.dumps(accessions, separators=(",", ":"))
+        with self.engine.begin() as connection:
+            existing = connection.execute(select(self.pending.c.accessions).where(and_(
+                self.pending.c.period == period_text, self.pending.c.cik == cik,
+            ))).scalar_one_or_none()
+            if existing == accession_text:
+                return False
+            values = dict(accessions=accession_text, payload=json.dumps(payload),
+                          updated_at=datetime.now(UTC).isoformat())
+            if existing is None:
+                connection.execute(insert(self.pending).values(period=period_text, cik=cik, **values))
+            else:
+                connection.execute(update(self.pending).where(and_(
+                    self.pending.c.period == period_text, self.pending.c.cik == cik,
+                )).values(**values))
+        return True
+
+    def pending_managers(self, period: date) -> dict[str, dict[str, Any]]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(select(self.pending.c.cik, self.pending.c.payload).where(
+                self.pending.c.period == period.isoformat()
+            )).all()
+        return {cik: json.loads(payload) for cik, payload in rows}
+
+    def latest_pending_manager(self, cik: str, complete_period: date) -> tuple[date, dict[str, Any]] | None:
+        try:
+            with self.engine.connect() as connection:
+                row = connection.execute(select(self.pending.c.period, self.pending.c.payload).where(and_(
+                    self.pending.c.cik == cik,
+                    self.pending.c.period >= complete_period.isoformat(),
+                )).order_by(self.pending.c.period.desc()).limit(1)).first()
+        except DBAPIError as error:
+            # API and Cron deploy independently; preserve published details until
+            # the Cron creates this additive table on its first new-code run.
+            missing_postgres = getattr(error.orig, "sqlstate", None) == "42P01"
+            missing_sqlite = (self.engine.dialect.name == "sqlite"
+                              and "no such table: institution_pending_filings" in str(error.orig))
+            if missing_postgres or missing_sqlite:
+                return None
+            raise
+        return (date.fromisoformat(row.period), json.loads(row.payload)) if row else None
+
+    def pending_accessions(self, period: date, cik: str) -> list[str]:
+        with self.engine.connect() as connection:
+            value = connection.execute(select(self.pending.c.accessions).where(and_(
+                self.pending.c.period == period.isoformat(), self.pending.c.cik == cik,
+            ))).scalar_one_or_none()
+        return json.loads(value) if value else []
+
+    def published_manager_accessions(self, period: date, cik: str) -> list[str]:
+        with self.engine.connect() as connection:
+            value = connection.execute(select(self.manager_versions.c.accessions).where(and_(
+                self.manager_versions.c.period == period.isoformat(),
+                self.manager_versions.c.cik == cik,
+            ))).scalar_one_or_none()
+        return json.loads(value) if value else []
+
+    def pending_publication_periods(self, complete_period: date, validated_at: datetime) -> list[date]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(select(self.pending.c.period).where(
+                (self.pending.c.period > complete_period.isoformat())
+                | ((self.pending.c.period == complete_period.isoformat())
+                   & (self.pending.c.updated_at > validated_at.isoformat()))
+            ).distinct().order_by(self.pending.c.period)).scalars().all()
+        return [date.fromisoformat(row) for row in rows]
+
+    def published_filings(self, period: date) -> list[dict[str, str]]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(select(self.filings).where(
+                self.filings.c.period == period.isoformat()
+            )).mappings().all()
+        return [dict(row) for row in rows]
+
+    def published_accessions(self, period: date) -> set[str]:
+        with self.engine.connect() as connection:
+            return set(connection.execute(select(self.filings.c.accession).where(
+                self.filings.c.period == period.isoformat()
+            )).scalars())
+
+    def dataset_version(self, url: str) -> dict[str, str] | None:
+        with self.engine.connect() as connection:
+            row = connection.execute(select(self.dataset_versions).where(
+                self.dataset_versions.c.url == url
+            )).mappings().first()
+        return dict(row) if row else None
+
+    def save_dataset_version(self, url: str, signature: str, sha256: str) -> None:
+        with self.engine.begin() as connection:
+            values = dict(signature=signature, sha256=sha256, checked_at=datetime.now(UTC).isoformat())
+            if connection.execute(select(self.dataset_versions.c.url).where(
+                self.dataset_versions.c.url == url
+            )).scalar_one_or_none() is None:
+                connection.execute(insert(self.dataset_versions).values(url=url, **values))
+            else:
+                connection.execute(update(self.dataset_versions).where(
+                    self.dataset_versions.c.url == url
+                ).values(**values))
+
     def partial_coverage(self, complete_period: date, validated_at: date) -> tuple[date | None, int, bool]:
         """Count later filings separately and flag amendments to the complete period."""
         period = complete_period.isoformat()
@@ -349,6 +475,28 @@ class InstitutionStore:
             ).scalar_one_or_none() is not None
         return (date.fromisoformat(latest) if latest else None, count, amendment)
 
+    def public_collection_status(self) -> dict[str, Any]:
+        """Bounded operational metadata; no connection details or raw SEC responses."""
+        with self.engine.connect() as connection:
+            latest = connection.execute(select(self.runs).order_by(
+                self.runs.c.started_at.desc()
+            ).limit(1)).mappings().first()
+            success = connection.execute(select(self.runs.c.finished_at).where(
+                self.runs.c.status == "succeeded"
+            ).order_by(self.runs.c.started_at.desc()).limit(1)).scalar_one_or_none()
+        now = datetime.now(UTC)
+        next_check = now.replace(hour=9, minute=17, second=0, microsecond=0)
+        if next_check <= now:
+            next_check += timedelta(days=1)
+        return {
+            "last_sync_at": datetime.fromisoformat(success) if success else None,
+            "next_check_at": next_check,
+            "collection_error": (
+                "La vérification SEC a échoué; le dernier trimestre validé reste disponible."
+                if latest and latest["status"] == "failed" else None
+            ),
+        }
+
     def publish(
         self,
         snapshot: InstitutionsSnapshot,
@@ -356,6 +504,7 @@ class InstitutionStore:
         *,
         amount_types: dict[tuple[str, str, str, str], str] | None = None,
         filings: list[dict[str, str]] | None = None,
+        manager_accessions: dict[str, list[str]] | None = None,
     ) -> None:
         period = snapshot.report_period
         if period is None or not snapshot.institutions:
@@ -379,6 +528,7 @@ class InstitutionStore:
             connection.execute(delete(self.holdings).where(self.holdings.c.period == period_text))
             connection.execute(delete(self.details).where(self.details.c.period == period_text))
             connection.execute(delete(self.filings).where(self.filings.c.period == period_text))
+            connection.execute(delete(self.manager_versions).where(self.manager_versions.c.period == period_text))
             connection.execute(delete(self.snapshots).where(self.snapshots.c.period == period_text))
             for detail in details:
                 connection.execute(insert(self.details).values(
@@ -408,11 +558,23 @@ class InstitutionStore:
                     connection.execute(insert(self.holdings), rows)
             if filings:
                 connection.execute(insert(self.filings), filings)
+                by_cik: dict[str, list[str]] = {}
+                for filing in filings:
+                    by_cik.setdefault(filing["cik"], []).append(filing["accession"])
+                by_cik.update(manager_accessions or {})
+                if by_cik:
+                    connection.execute(insert(self.manager_versions), [
+                        {"period": period_text, "cik": cik,
+                         "accessions": json.dumps(sorted(accessions))}
+                        for cik, accessions in by_cik.items()
+                    ])
             connection.execute(insert(self.snapshots).values(
                 period=period_text,
                 payload=snapshot.model_dump_json(),
                 published_at=datetime.now(UTC).isoformat(),
             ))
+            # Published details and accession fingerprints are durable; raw staging is not.
+            connection.execute(delete(self.pending).where(self.pending.c.period <= period_text))
 
     def latest_snapshot(self) -> InstitutionsSnapshot | None:
         with self.engine.connect() as connection:
@@ -428,6 +590,19 @@ class InstitutionStore:
                 select(self.snapshots.c.period).order_by(self.snapshots.c.period.desc())
             ).scalars().all()
         return [date.fromisoformat(row) for row in rows]
+
+    def reference_manager_ciks(self, limit: int = 100) -> set[str]:
+        """Keep tracking managers missing from a later partially covered quarter."""
+        with self.engine.connect() as connection:
+            period = connection.execute(select(self.details.c.period).group_by(
+                self.details.c.period
+            ).order_by(func.count().desc(), self.details.c.period.desc()).limit(1)).scalar_one_or_none()
+            if period is None:
+                return set()
+            rows = connection.execute(select(self.details.c.cik).where(
+                self.details.c.period == period
+            ).limit(limit)).scalars().all()
+        return set(rows)
 
     def snapshot_for_period(self, period: date) -> InstitutionsSnapshot | None:
         with self.engine.connect() as connection:

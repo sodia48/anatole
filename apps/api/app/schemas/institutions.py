@@ -126,11 +126,15 @@ class InstitutionsSnapshot(BaseModel):
     generated_at: datetime
     extracted_at: datetime | None = None
     validated_at: datetime | None = None
-    period_status: Literal["published_dataset", "partial", "legacy"] = "legacy"
+    period_status: Literal["published_dataset", "published_edgar", "partial", "legacy"] = "legacy"
     institutions_reporting: int | None = Field(default=None, ge=0)
+    institutions_expected: int | None = Field(default=None, ge=0)
     institutions_comparable: int | None = Field(default=None, ge=0)
     partial_report_period: date | None = None
     partial_institutions_reporting: int = Field(default=0, ge=0)
+    last_sync_at: datetime | None = None
+    next_check_at: datetime | None = None
+    collection_error: str | None = None
     sources: list[InstitutionSourceStatus] = Field(default_factory=list)
     stale: bool = False
     message: str | None = None
