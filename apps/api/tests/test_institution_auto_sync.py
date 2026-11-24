@@ -55,6 +55,7 @@ class SECWorker:
         self.amended = False
         self.amendment_type = "RESTATEMENT"
         self.fail_cik: str | None = None
+        self.include_q4 = False
         self.table_requests: list[str] = []
 
     async def get_submissions(self, cik: str, *, force_refresh: bool):
@@ -72,6 +73,12 @@ class SECWorker:
             dates.append("2026-11-20")
             periods.append("2026-09-30")
             documents.append("amendment.xml")
+        if cik in self.reporting and self.include_q4:
+            forms.append("13F-HR")
+            accessions.append(f"{cik}-27-000001")
+            dates.append("2027-02-10")
+            periods.append("2026-12-31")
+            documents.append("q4.xml")
         return ({
             "cik": int(cik), "name": f"Manager {int(cik)}",
             "filings": {"recent": {
@@ -225,3 +232,21 @@ async def test_network_failure_keeps_last_valid_quarter_and_recovers(tmp_path: P
     assert recovered.published_period == date(2026, 9, 30)
     assert store.public_collection_status()["collection_error"] is None
     assert store.published_periods() == [date(2026, 9, 30), date(2026, 6, 30)]
+
+
+@pytest.mark.asyncio
+async def test_catch_up_two_quarters_links_each_to_its_predecessor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    store = prepared_store(tmp_path)
+    worker = SECWorker()
+    worker.reporting.add("0000000002")
+    worker.include_q4 = True
+    monkeypatch.setattr("app.services.institution_collector._latest_closed_quarter",
+                        lambda _: date(2026, 12, 31))
+    result = await collect_recent_13f(store, worker=worker, min_coverage=1)
+    assert result.published_period == date(2026, 12, 31)
+    assert store.published_periods() == [
+        date(2026, 12, 31), date(2026, 9, 30), date(2026, 6, 30),
+    ]
+    assert store.latest_snapshot().previous_report_period == date(2026, 9, 30)

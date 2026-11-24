@@ -292,6 +292,7 @@ async def collect_recent_13f(store: InstitutionStore, *, worker: object | None =
             )
             if count:
                 published, reporting = period, count
+                complete = await asyncio.to_thread(store.latest_snapshot)
         await asyncio.to_thread(store.finish_run, run_id, period=published,
                                 institutions_count=reporting or staged,
                                 error_category="PartialSEC" if failed and not published else None)
