@@ -170,6 +170,19 @@ def test_store_rejects_incomplete_manager_detail_coverage(tmp_path: Path) -> Non
     assert store.latest_snapshot() is None
 
 
+def test_streamed_publish_rolls_back_incomplete_revision(tmp_path: Path) -> None:
+    store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))
+    snapshot, details = fixture_data()
+    store.publish(snapshot, iter(details))
+    original = store.detail("0000000002").model_dump_json()
+
+    with pytest.raises(ValueError, match="Incomplete"):
+        store.publish(snapshot, (detail for detail in details[:1]))
+
+    assert store.detail("0000000002").model_dump_json() == original
+    assert store.latest_snapshot().institutions == snapshot.institutions
+
+
 @pytest.mark.asyncio
 async def test_reads_never_call_sec_even_when_refresh_requested(tmp_path: Path) -> None:
     store = InstitutionStore(create_engine(f"sqlite:///{tmp_path / 'institutions.db'}"))

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from time import monotonic
-from typing import Any, Awaitable, Callable, Generic, TypeVar
+from typing import Any, Awaitable, Callable, Generic, Iterable, TypeVar
 from xml.etree import ElementTree
 
 import httpx
@@ -834,6 +834,13 @@ class InstitutionService:
         details: list[tuple[InstitutionSummary, list[InstitutionHolding], bool]],
         status: str,
     ) -> list[InstitutionFlow]:
+        return InstitutionService._live_flows_grouped(details)[status]
+
+    @staticmethod
+    def _live_flows_grouped(
+        details: Iterable[tuple[InstitutionSummary, list[InstitutionHolding], bool]],
+    ) -> dict[str, list[InstitutionFlow]]:
+        """Aggregate one manager at a time and materialize only the top flows."""
         aggregated: dict[str, dict[str, Any]] = {}
         for institution, holdings, _ in details:
             for holding in holdings:
@@ -861,40 +868,33 @@ class InstitutionService:
                 if institution.name not in item["names"]:
                     item["names"].append(institution.name)
 
-        flows = [
-            InstitutionFlow(
-                ticker=None,
-                cusip=cusip,
-                issuer=str(item["issuer"]),
+        counters = {
+            "increased": "institutions_increased",
+            "new": "institutions_new",
+            "reduced": "institutions_reduced",
+            "closed": "institutions_closed",
+        }
+        result: dict[str, list[InstitutionFlow]] = {}
+        for status, counter in counters.items():
+            key = counter.removeprefix("institutions_")
+            ranked = sorted(
+                aggregated.items(),
+                key=lambda row: (len(row[1][key]), row[1]["value"]),
+                reverse=True,
+            )[:20]
+            result[status] = [InstitutionFlow(
+                ticker=None, cusip=cusip, issuer=str(item["issuer"]),
                 institutions_holding=len(item["holding"]),
                 institutions_increased=len(item["increased"]),
                 institutions_reduced=len(item["reduced"]),
                 institutions_new=len(item["new"]),
                 institutions_closed=len(item["closed"]),
-                aggregate_share_change=(
-                    float(item["share_change"])
-                    if item["share_change_reliable"]
-                    else None
-                ),
+                aggregate_share_change=(float(item["share_change"])
+                                        if item["share_change_reliable"] else None),
                 current_reported_value=float(item["value"]),
                 institution_names=item["names"][:10],
-            )
-            for cusip, item in aggregated.items()
-        ]
-        counter = {
-            "increased": "institutions_increased",
-            "new": "institutions_new",
-            "reduced": "institutions_reduced",
-            "closed": "institutions_closed",
-        }[status]
-        flows.sort(
-            key=lambda flow: (
-                getattr(flow, counter),
-                flow.current_reported_value,
-            ),
-            reverse=True,
-        )
-        return flows[:20]
+            ) for cusip, item in ranked]
+        return result
 
     async def _refresh_live_snapshot(
         self,
