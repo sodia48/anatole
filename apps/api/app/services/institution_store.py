@@ -7,7 +7,7 @@ import json
 import re
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from sqlalchemy import (
     Column,
@@ -378,6 +378,19 @@ class InstitutionStore:
             )).all()
         return {cik: json.loads(payload) for cik, payload in rows}
 
+    def pending_manager_ciks(self, period: date) -> set[str]:
+        with self.engine.connect() as connection:
+            return set(connection.execute(select(self.pending.c.cik).where(
+                self.pending.c.period == period.isoformat()
+            )).scalars())
+
+    def pending_manager(self, period: date, cik: str) -> dict[str, Any] | None:
+        with self.engine.connect() as connection:
+            payload = connection.execute(select(self.pending.c.payload).where(and_(
+                self.pending.c.period == period.isoformat(), self.pending.c.cik == cik,
+            ))).scalar_one_or_none()
+        return json.loads(payload) if payload else None
+
     def latest_pending_manager(self, cik: str, complete_period: date) -> tuple[date, dict[str, Any]] | None:
         try:
             with self.engine.connect() as connection:
@@ -500,7 +513,7 @@ class InstitutionStore:
     def publish(
         self,
         snapshot: InstitutionsSnapshot,
-        details: list[InstitutionDetail],
+        details: Iterable[InstitutionDetail],
         *,
         amount_types: dict[tuple[str, str, str, str], str] | None = None,
         filings: list[dict[str, str]] | None = None,
@@ -514,10 +527,6 @@ class InstitutionStore:
         known = {item.cik for item in snapshot.institutions}
         if len(known) != len(snapshot.institutions):
             raise ValueError("Duplicate institution CIK")
-        if any(item.institution.cik not in known or item.institution.report_period != period for item in details):
-            raise ValueError("Detail outside the validated period")
-        if {item.institution.cik for item in details} != known or len(details) != len(known):
-            raise ValueError("Incomplete or duplicate manager detail coverage")
         period_text = period.isoformat()
         amount_types = amount_types or {}
         self.create_schema()
@@ -525,12 +534,23 @@ class InstitutionStore:
             symbols = dict(connection.execute(
                 select(self.symbols.c.cusip, self.symbols.c.ticker)
             ).all())
-            connection.execute(delete(self.holdings).where(self.holdings.c.period == period_text))
-            connection.execute(delete(self.details).where(self.details.c.period == period_text))
             connection.execute(delete(self.filings).where(self.filings.c.period == period_text))
             connection.execute(delete(self.manager_versions).where(self.manager_versions.c.period == period_text))
             connection.execute(delete(self.snapshots).where(self.snapshots.c.period == period_text))
+            seen: set[str] = set()
             for detail in details:
+                cik = detail.institution.cik
+                if cik not in known or detail.institution.report_period != period:
+                    raise ValueError("Detail outside the validated period")
+                if cik in seen:
+                    raise ValueError("Incomplete or duplicate manager detail coverage")
+                seen.add(cik)
+                connection.execute(delete(self.holdings).where(and_(
+                    self.holdings.c.period == period_text, self.holdings.c.cik == cik,
+                )))
+                connection.execute(delete(self.details).where(and_(
+                    self.details.c.period == period_text, self.details.c.cik == cik,
+                )))
                 connection.execute(insert(self.details).values(
                     period=period_text,
                     cik=detail.institution.cik,
@@ -556,6 +576,17 @@ class InstitutionStore:
                     })
                 if rows:
                     connection.execute(insert(self.holdings), rows)
+            if seen != known:
+                raise ValueError("Incomplete or duplicate manager detail coverage")
+            # Remove managers omitted from a revised snapshot within this transaction.
+            connection.execute(delete(self.holdings).where(and_(
+                self.holdings.c.period == period_text,
+                self.holdings.c.cik.not_in(seen),
+            )))
+            connection.execute(delete(self.details).where(and_(
+                self.details.c.period == period_text,
+                self.details.c.cik.not_in(seen),
+            )))
             if filings:
                 connection.execute(insert(self.filings), filings)
                 by_cik: dict[str, list[str]] = {}

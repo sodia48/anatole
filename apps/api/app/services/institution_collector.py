@@ -122,25 +122,38 @@ def _publish_pending(store: InstitutionStore, period: date,
                      *, min_coverage: float, source_partial: bool = False) -> int:
     from app.services.institutions import InstitutionService
 
-    pending = store.pending_managers(period)
-    eligible = {cik: row for cik, row in pending.items() if cik in tracked}
+    eligible = store.pending_manager_ciks(period) & tracked
     if period > complete.report_period and len(eligible) < math.ceil(len(tracked) * min_coverage):
         return 0
-    existing = {}
+    existing: set[str] = set()
     if period == complete.report_period:
         for item in complete.institutions:
-            detail = store.detail(item.cik, period)
-            if detail is not None:
-                existing[item.cik] = detail
-    details = {**existing, **{
-        cik: _direct_detail(store, period, cik, row) for cik, row in eligible.items()
-    }}
-    if not details:
+            if item.cik not in eligible and store.detail(item.cik, period) is not None:
+                existing.add(item.cik)
+    ciks = existing | eligible
+    if not ciks:
         return 0
-    ordered = sorted(details.values(), key=lambda item: item.institution.total_13f_value,
-                     reverse=True)
-    summaries = [item.institution for item in ordered]
-    flows = [(item.institution, item.holdings, False) for item in ordered[:50]]
+
+    def detail_for(cik: str) -> InstitutionDetail:
+        if cik in eligible:
+            row = store.pending_manager(period, cik)
+            if row is None:
+                raise ValueError("Missing staged 13F manager")
+            return _direct_detail(store, period, cik, row)
+        detail = store.detail(cik, period)
+        if detail is None:
+            raise ValueError("Missing published 13F manager")
+        return detail
+
+    # Three bounded passes trade database reads for a low peak memory footprint.
+    # A complete quarter may contain millions of positions; never retain all
+    # staged JSON payloads and Pydantic details in one Python process.
+    summaries = [detail_for(cik).institution for cik in sorted(ciks)]
+    summaries.sort(key=lambda item: item.total_13f_value, reverse=True)
+    flows = InstitutionService._live_flows_grouped(
+        (detail.institution, detail.holdings, False)
+        for detail in (detail_for(item.cik) for item in summaries[:50])
+    )
     previous_period = (complete.previous_report_period if period == complete.report_period
                        else complete.report_period)
     now = datetime.now(UTC)
@@ -150,10 +163,8 @@ def _publish_pending(store: InstitutionStore, period: date,
         period_status="published_edgar", institutions_reporting=len(summaries),
         institutions_expected=len(tracked),
         institutions_comparable=sum(item.comparison_available for item in summaries),
-        top_increased=InstitutionService._live_flows(flows, "increased"),
-        top_new=InstitutionService._live_flows(flows, "new"),
-        top_reduced=InstitutionService._live_flows(flows, "reduced"),
-        top_closed=InstitutionService._live_flows(flows, "closed"),
+        top_increased=flows["increased"], top_new=flows["new"],
+        top_reduced=flows["reduced"], top_closed=flows["closed"],
         sources=[InstitutionSourceStatus(
             source="SEC EDGAR — Form 13F-HR",
             status="partial" if source_partial or len(summaries) < len(tracked) else "available",
@@ -163,19 +174,23 @@ def _publish_pending(store: InstitutionStore, period: date,
     )
     published_accessions = {
         cik: set(store.published_manager_accessions(period, cik))
-        for cik in existing if cik not in eligible
+        for cik in existing
     }
     old_filings = {row["accession"]: row for row in store.published_filings(period)
                    if row["accession"] in published_accessions.get(row["cik"], set())}
-    for row in eligible.values():
+    for cik in eligible:
+        row = store.pending_manager(period, cik)
+        if row is None:
+            raise ValueError("Missing staged 13F manager")
         for filing in row["filings"]:
             old_filings[filing["accession"]] = filing
     manager_accessions = {
         cik: (store.pending_accessions(period, cik) if cik in eligible
               else store.published_manager_accessions(period, cik))
-        for cik in details
+        for cik in ciks
     }
-    store.publish(snapshot, ordered, filings=list(old_filings.values()),
+    store.publish(snapshot, (detail_for(item.cik) for item in summaries),
+                  filings=list(old_filings.values()),
                   manager_accessions=manager_accessions)
     return len(summaries)
 
