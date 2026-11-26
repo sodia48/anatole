@@ -40,6 +40,7 @@ async function openAssistantComposer(page: Page): Promise<void> {
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(plan) }),
   );
   await page.goto("/assistant");
+  await page.getByTestId("conseil-space-dossier").click();
   await page.getByRole("button", { name: /Ton plan/ }).click();
   await page.getByRole("button", { name: /Calculer mon plan/ }).click();
   await expect(page.getByRole("heading", { name: /Tes 3 prochaines étapes/ })).toBeVisible();
