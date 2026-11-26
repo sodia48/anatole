@@ -4,6 +4,33 @@
   padding-bottom: 30px;
 }
 
+.anatole-shopping_embedded__ {
+  min-width: 0;
+  padding-bottom: 0;
+}
+
+.anatole-shopping_embedded__ .anatole-shopping_hero__ {
+  min-height: 190px;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.anatole-shopping_embedded__ .anatole-shopping_hero__ h2 {
+  max-width: 790px;
+  margin: 8px 0 12px;
+  font-size: clamp(27px, 3vw, 43px);
+  line-height: 1.08;
+  letter-spacing: -.04em;
+}
+
+.anatole-shopping_embedded__ .anatole-shopping_heroSeal__ {
+  min-height: 135px;
+}
+
+.anatole-shopping_embedded__ .anatole-shopping_quizShell__,
+.anatole-shopping_embedded__ .anatole-shopping_resultsStage__ {
+  min-width: 0;
+}
+
 .anatole-shopping_hero__,
 .anatole-shopping_categoryStage__,
 .anatole-shopping_quizShell__,

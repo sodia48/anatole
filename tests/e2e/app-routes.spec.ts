@@ -239,6 +239,7 @@ test("Anatole Conseil expose le plan vivant, le laboratoire et le lien Magasiner
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("conseil-space-projects").click();
   const command = page.getByTestId("advisor-command-center");
   await expect(command).toBeVisible();
   await expect(command).toContainText(/Voici où en est ton plan|Here is where your plan stands/i);
@@ -290,7 +291,8 @@ test("Anatole Conseil V3 bascule vers le cockpit, manipule la trajectoire et enr
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
-  await expect(page.getByText(/Ton plan, en un coup d’œil|Your plan at a glance/i)).toBeVisible();
+  await expect(page.getByTestId("conseil-priority-metrics")).toBeVisible();
+  await page.getByTestId("conseil-space-projects").click();
   await expect(page.getByTestId("advisor-primary-plan")).toContainText(/26.*000|26,000/i);
 
   await page.getByTestId("advisor-tab-scenarios").click();
@@ -313,6 +315,7 @@ test("Anatole Conseil V3 bascule vers le cockpit, manipule la trajectoire et enr
 
 test("Anatole Conseil V3 garde le questionnaire pour un nouveau profil", async ({ page }) => {
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-dossier").click();
   await expect(page.getByText(/Qu’est-ce que tu veux accomplir|What do you want to achieve/i)).toBeVisible();
   await expect(page.getByRole("navigation", { name: /Étapes du plan|Plan steps/i })).toBeVisible();
 });
@@ -342,6 +345,8 @@ test("Anatole Conseil V4 ajoute Decision Lab et bilan synchronisable", async ({ 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-projects").click();
+  await page.getByTestId("advisor-v4-advanced").locator("summary").click();
   const v4 = page.getByTestId("advisor-v4-layer");
   await expect(v4).toBeVisible();
   await expect(v4).toContainText(/V4/);
@@ -384,6 +389,8 @@ test("Anatole Conseil V5 expose les dix modules financiers", async ({ page }) =>
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("conseil-space-projects").click();
+  await page.getByTestId("advisor-v4-advanced").locator("summary").click();
   const suite = page.getByTestId("advisor-v4-layer");
   await expect(suite).toBeVisible();
   await expect(suite).toHaveAttribute("data-version", "5");
@@ -435,6 +442,7 @@ test("Anatole Conseil adapte l'échelle de trajectoire quand la cible est très 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-projects").click();
   await page.getByTestId("advisor-tab-scenarios").click();
 
   await expect(page.getByTestId("advisor-target-offscale")).toBeVisible();
@@ -469,6 +477,7 @@ test("Anatole Conseil ne trace plus une cible hors échelle comme un faux plafon
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-projects").click();
   await page.getByTestId("advisor-tab-scenarios").click();
 
   await expect(page.getByTestId("advisor-target-offscale")).toBeVisible();
@@ -508,6 +517,7 @@ test("Anatole Conseil V7 transforme la trajectoire en Trajectory Lab", async ({ 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-projects").click();
   await page.getByTestId("advisor-tab-scenarios").click();
 
   const chart = page.getByTestId("advisor-trajectory-chart");
@@ -555,6 +565,7 @@ test("Anatole Conseil V7 sépare le scénario quand les hypothèses changent", a
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-projects").click();
   await page.getByTestId("advisor-tab-scenarios").click();
 
   await expect(page.getByTestId("advisor-scenario-path")).toHaveCount(0);
@@ -633,6 +644,7 @@ test("Anatole Conseil V8 relie les 20 modules du Financial Command Deck", async 
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("conseil-space-dossier").click();
   await page.getByTestId("advisor-v8-legacy").locator("summary").click();
 
   const v8 = page.getByTestId("advisor-v8-layer");
@@ -686,6 +698,7 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-dossier").click();
   await page.getByTestId("advisor-v8-legacy").locator("summary").click();
   await page.getByTestId("advisor-v8-tab-scenarios").click();
 
@@ -702,6 +715,7 @@ test("Anatole Conseil V8 persiste les hypothèses de simulation", async ({ page 
   await expect(volatilityInput).toHaveValue("12.5");
 
   await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByTestId("conseil-space-dossier").click();
   await page.getByTestId("advisor-v8-legacy").locator("summary").click();
   await page.getByTestId("advisor-v8-tab-scenarios").click();
 
@@ -794,6 +808,7 @@ test("Anatole Conseil V10 regroupe les 35 capacités dans cinq espaces", async (
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
 
+  await page.getByTestId("advisor-v9-advanced").locator("summary").click();
   const v10 = page.getByTestId("advisor-v10-layer");
   await expect(v10).toBeVisible();
   await expect(v10).toHaveAttribute("data-feature-count", "35");
@@ -812,9 +827,10 @@ test("Anatole Conseil V10 regroupe les 35 capacités dans cinq espaces", async (
     await expect(v10.locator("[data-module]:visible")).toHaveCount(expectedModules);
   }
 
+  await page.getByTestId("conseil-space-dossier").click();
   const legacy = page.getByTestId("advisor-v8-legacy");
   await expect(legacy).not.toHaveAttribute("open", "");
-  await expect(page.getByTestId("advisor-v8-layer")).toBeHidden();
+  await expect(page.getByTestId("advisor-v8-layer")).toHaveCount(0);
 });
 
 test("Anatole Conseil V9 importe un CSV bancaire local et détecte les récurrences", async ({ page }) => {
@@ -841,6 +857,7 @@ test("Anatole Conseil V9 importe un CSV bancaire local et détecte les récurren
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v9-advanced").locator("summary").click();
 
   const csv = [
     "date,description,amount",
@@ -900,6 +917,7 @@ test("Anatole Conseil V9 persiste le mode urgence localement", async ({ page }) 
   });
 
   await page.goto("/assistant", { waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v9-advanced").locator("summary").click();
   await page.getByTestId("advisor-v10-tab-file").click();
 
   const toggle = page.getByTestId("advisor-v9-emergency-toggle");
@@ -907,6 +925,7 @@ test("Anatole Conseil V9 persiste le mode urgence localement", async ({ page }) 
   await expect(toggle).toBeChecked();
 
   await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByTestId("advisor-v9-advanced").locator("summary").click();
   await page.getByTestId("advisor-v10-tab-file").click();
   await expect(page.getByTestId("advisor-v9-emergency-toggle")).toBeChecked();
   await expect(page.getByTestId("advisor-v10-layer")).toContainText(
