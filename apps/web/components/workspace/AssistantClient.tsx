@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -13,15 +14,17 @@ import {
   LockKeyhole,
   RefreshCw,
   Send,
-  ShieldCheck,
   Sparkles,
   Target,
   WalletCards,
 } from "@/components/layout/AppIcons";
 import {
+  Component,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -38,17 +41,70 @@ import type {
 } from "@/lib/types";
 
 import { WORKSPACE_SYNC_EVENT } from "@/lib/workspace-sync";
-import { AdvisorCommandCenter } from "@/components/workspace/AdvisorCommandCenter";
-import { AdvisorV4Layer } from "@/components/workspace/AdvisorV4Layer";
-import { AdvisorV8Layer } from "@/components/workspace/AdvisorV8Layer";
-import { AdvisorV9Layer } from "@/components/workspace/AdvisorV9Layer";
 import { usePreferences } from "@/components/providers/PreferencesProvider";
 import { localeFor, pick, type AnatoleLanguage } from "@/lib/i18n";
 
 import "./Workspace.css";
+import "./Conseil.css";
 
 const PORTFOLIO_KEY = "anatole:portfolio:v1";
 const ADVISOR_PROFILE_KEY = "anatole:advisor-profile:v1";
+const ADVICE_SPACE_KEY = "anatole:conseil-space:v1";
+
+type AdviceSpace = "today" | "projects" | "shop" | "dossier";
+
+const ADVICE_SPACES: Array<{ id: AdviceSpace; fr: string; en: string }> = [
+  { id: "today", fr: "Aujourd’hui", en: "Today" },
+  { id: "projects", fr: "Mes projets", en: "My projects" },
+  { id: "shop", fr: "Magasiner", en: "Shop" },
+  { id: "dossier", fr: "Mon dossier", en: "My file" },
+];
+
+function ConseilModuleLoading() {
+  const { preferences } = usePreferences();
+  const language = preferences.language;
+  return <div className="anatole-conseil-loading" role="status">{pick(language, "Chargement de cet espace…", "Loading this space…")}</div>;
+}
+
+class ConseilModuleBoundary extends Component<
+  { children: ReactNode; language: AnatoleLanguage },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return <div className="anatole-conseil-moduleError" role="alert">
+      <strong>{pick(this.props.language, "Cet espace ne s’est pas chargé.", "This space did not load.")}</strong>
+      <button type="button" onClick={() => window.location.reload()}>{pick(this.props.language, "Réessayer", "Retry")}</button>
+    </div>;
+  }
+}
+
+const AdvisorCommandCenter = dynamic(
+  () => import("@/components/workspace/AdvisorCommandCenter").then((module) => module.AdvisorCommandCenter),
+  { ssr: false, loading: () => <ConseilModuleLoading /> },
+);
+const AdvisorV4Layer = dynamic(
+  () => import("@/components/workspace/AdvisorV4Layer").then((module) => module.AdvisorV4Layer),
+  { ssr: false, loading: () => <ConseilModuleLoading /> },
+);
+const AdvisorV8Layer = dynamic(
+  () => import("@/components/workspace/AdvisorV8Layer").then((module) => module.AdvisorV8Layer),
+  { ssr: false, loading: () => <ConseilModuleLoading /> },
+);
+const AdvisorV9Layer = dynamic(
+  () => import("@/components/workspace/AdvisorV9Layer").then((module) => module.AdvisorV9Layer),
+  { ssr: false, loading: () => <ConseilModuleLoading /> },
+);
+const ShoppingClient = dynamic(
+  () => import("@/components/workspace/ShoppingClient").then((module) => module.ShoppingClient),
+  { ssr: false, loading: () => <ConseilModuleLoading /> },
+);
 
 const EMPTY_PROFILE: AdvisorProfile = {
   currency: "CAD",
@@ -292,7 +348,11 @@ export function AssistantClient() {
   const [hydrated, setHydrated] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [journeyMode, setJourneyMode] = useState(true);
+  const [space, setSpace] = useState<AdviceSpace>("today");
+  const [visitedSpaces, setVisitedSpaces] = useState<Set<AdviceSpace>>(() => new Set(["today"]));
+  const [advancedOpen, setAdvancedOpen] = useState({ v9: false, v4: false, v8: false });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const spaceScroll = useRef<Record<AdviceSpace, number>>({ today: 0, projects: 0, shop: 0, dossier: 0 });
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -305,6 +365,12 @@ export function AssistantClient() {
         loadedProfile.horizon_years !== null &&
         loadedProfile.current_savings !== null;
       setJourneyMode(!established);
+      const savedSpace = window.sessionStorage.getItem(ADVICE_SPACE_KEY);
+      if (ADVICE_SPACES.some((item) => item.id === savedSpace)) {
+        const restored = savedSpace as AdviceSpace;
+        setSpace(restored);
+        setVisitedSpaces((current) => new Set([...current, restored]));
+      }
       setHydrated(true);
     }, 0);
     return () => window.clearTimeout(timer);
@@ -323,6 +389,14 @@ export function AssistantClient() {
     if (!hydrated || typeof window === "undefined") return;
     window.localStorage.setItem(ADVISOR_PROFILE_KEY, JSON.stringify(profile));
   }, [hydrated, profile]);
+
+  useLayoutEffect(() => {
+    if (!hydrated) return;
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: spaceScroll.current[space], behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [hydrated, space]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -359,6 +433,33 @@ export function AssistantClient() {
     () => advisorText(GOALS.find((item) => item.value === profile.goal_type)?.label ?? "Objectif non défini", language),
     [language, profile.goal_type],
   );
+
+  const selectSpace = (nextSpace: AdviceSpace) => {
+    if (nextSpace === space) return;
+    spaceScroll.current[space] = window.scrollY;
+    window.sessionStorage.setItem(ADVICE_SPACE_KEY, nextSpace);
+    setVisitedSpaces((current) => new Set([...current, nextSpace]));
+    setSpace(nextSpace);
+  };
+
+  const savedAmount = profile.current_savings;
+  const targetAmount = profile.target_amount;
+  const remainingAmount = targetAmount !== null && savedAmount !== null
+    ? Math.max(0, targetAmount - savedAmount)
+    : null;
+  const reserveMonths = profile.liquid_reserve !== null && (profile.essential_monthly_expenses ?? 0) > 0
+    ? profile.liquid_reserve / (profile.essential_monthly_expenses ?? 1)
+    : null;
+  const priorityAlert = profile.high_interest_debt
+    ? { fr: "Dette à taux élevé déclarée dans votre profil.", en: "High-interest debt recorded in your profile." }
+    : reserveMonths !== null && reserveMonths < 3
+      ? { fr: "Votre réserve couvre moins de trois mois de dépenses essentielles.", en: "Your reserve covers less than three months of essential expenses." }
+      : null;
+  const nextAction = !profile.goal_type || targetAmount === null || savedAmount === null
+    ? { space: "dossier" as const, fr: "Compléter mon projet", en: "Complete my project" }
+    : reserveMonths === null
+      ? { space: "dossier" as const, fr: "Préciser ma réserve", en: "Add my reserve" }
+      : { space: "projects" as const, fr: "Tester un scénario", en: "Try a scenario" };
 
   const updateProfile = <K extends keyof AdvisorProfile>(
     key: K,
@@ -455,176 +556,120 @@ export function AssistantClient() {
   );
 
   return (
-    <main className={"anatole-ws_page__"}>
-      <section className={`panel ${"anatole-ws_guideHero__"}`}>
-        <div>
-          <span className="eyebrow">
-            ANATOLE{" "}
-            {journeyMode
-              ? pick(language, "CONSEIL · PLAN VIVANT", "ADVICE · LIVING PLAN")
-              : pick(language, "CONSEIL · COCKPIT PERSONNEL", "ADVICE · PERSONAL COCKPIT")}
-          </span>
-          <h1>
-            {journeyMode
-              ? pick(language, "Ton plan financier, vivant.", "Your living financial plan.")
-              : pick(language, "Ton plan, en un coup d’œil.", "Your plan at a glance.")}
-          </h1>
-          <p>
-            {journeyMode
-              ? pick(
-                  language,
-                  "Un diagnostic adaptatif, des scénarios manipulables et une timeline qui évoluent pendant que tu précises ta situation.",
-                  "An adaptive diagnostic, interactive scenarios and a timeline that evolve as you clarify your situation.",
-                )
-              : pick(
-                  language,
-                  "Ta progression, tes scénarios, tes jalons et les informations qui comptent le plus sont réunis ici.",
-                  "Your progress, scenarios, milestones and most important inputs are brought together here.",
-                )}
-          </p>
-          <div className={"anatole-ws_guideHeroActions__"}>
-            <Link href="/assistant/magasiner" className={"anatole-ws_primaryButton__"}>
-              <WalletCards size={16} />
-              {pick(language, "Magasiner des produits financiers", "Shop financial products")}
-            </Link>
-            <span className={"anatole-ws_guideHeroHint__"}>
-              {pick(language, "Comparer frais, taux et protections avec des sources officielles.", "Compare fees, rates and coverage with official sources.")}
-            </span>
-          </div>
-        </div>
-        <div className={"anatole-ws_guideHeroStatus__"}>
-          <strong>{profileProgress}%</strong>
-          <span>{pick(language, "profil utile", "useful profile")}</span>
-          <small>{advisorText(STEPS[step - 1].label, language)}</small>
-        </div>
-      </section>
+    <main className="anatole-ws_page__ anatole-conseil-page">
+      <header className="anatole-conseil-hero">
+        <span className="eyebrow">ANATOLE CONSEIL</span>
+        <h1>{pick(language, "Vos finances, plus claires.", "Your finances, made clearer.")}</h1>
+        <p>{pick(language, "L’essentiel aujourd’hui. Vos projets, vos comparaisons et votre dossier quand vous en avez besoin.", "What matters today. Your projects, comparisons and file when you need them.")}</p>
+      </header>
 
-      <section className={"anatole-ws_simpleBoundary__"}>
-        <ShieldCheck size={19} />
-        <div>
-          <strong>{pick(language, "Tu gardes le contrôle", "You remain in control")}</strong>
-          <span>
-            {pick(language, "Anatole explique, calcule et met les risques en évidence. Il ne choisit aucun placement à ta place.", "Anatole explains, calculates, and highlights risks. It does not choose investments for you.")}
-          </span>
-        </div>
-        <div className={"anatole-ws_saveStatus__"}>
-          <LockKeyhole size={14} /> {pick(language, "Enregistré sur cet appareil", "Saved on this device")}
-        </div>
-      </section>
-
-      {journeyMode ? (
-      <nav className={`panel ${"anatole-ws_guideStepper__"}`} aria-label={pick(language, "Étapes du plan", "Plan steps")}>
-        {STEPS.map((item) => {
-          const active = item.number === step;
-          const completed = item.number < step;
-          return (
-            <button
-              type="button"
-              key={item.number}
-              className={`${"anatole-ws_guideStep__"} ${active ? "anatole-ws_guideStepActive__" : ""} ${completed ? "anatole-ws_guideStepDone__" : ""}`}
-              aria-current={active ? "step" : undefined}
-              onClick={() => setStep(item.number)}
-            >
-              <span>{completed ? <Check size={14} /> : item.number}</span>
-              <div>
-                <strong>{advisorText(item.label, language)}</strong>
-                <small>{advisorText(item.description, language)}</small>
-              </div>
-            </button>
-          );
-        })}
+      <nav className="anatole-conseil-nav" aria-label={pick(language, "Espaces Conseil", "Advice spaces")} data-testid="conseil-spaces">
+        {ADVICE_SPACES.map((item) => (
+          <button key={item.id} type="button" data-testid={`conseil-space-${item.id}`}
+            aria-current={space === item.id ? "page" : undefined}
+            onClick={() => selectSpace(item.id)}>
+            {pick(language, item.fr, item.en)}
+          </button>
+        ))}
       </nav>
-      ) : null}
 
-      {hydrated && !journeyMode ? (
-        <>
-          <AdvisorV9Layer
-            profile={profile}
-            goalLabel={goalLabel}
-            language={language}
-            portfolioCount={portfolio.length}
-          />
+      <section id="conseil-today" className={`anatole-conseil-space${journeyMode ? "" : " anatole-conseil-established"}`} data-testid="conseil-today"
+        hidden={space !== "today"} style={space !== "today" ? { display: "none" } : undefined}>
+        {!hydrated ? <div className="anatole-conseil-loading" role="status">{pick(language, "Chargement de votre espace…", "Loading your space…")}</div> : (
+          <>
+            {journeyMode ? (
+              <div className="anatole-conseil-welcome">
+                <span className="eyebrow">{pick(language, "BIENVENUE", "WELCOME")}</span>
+                <h2>{pick(language, "Commençons par ce qui compte pour vous.", "Let's start with what matters to you.")}</h2>
+                <p>{pick(language, "Définissez un premier projet à votre rythme. Vos réponses restent modifiables.", "Set your first project at your pace. You can change your answers later.")}</p>
+              </div>
+            ) : (
+              <div className="anatole-conseil-metrics" data-testid="conseil-priority-metrics">
+                <article><span>{pick(language, "Déjà mis de côté", "Already saved")}</span><strong>{formatMoney(savedAmount, profile.currency, language)}</strong><small>{goalLabel}</small></article>
+                <article><span>{pick(language, "Reste à atteindre", "Remaining to goal")}</span><strong>{formatMoney(remainingAmount, profile.currency, language)}</strong><small>{pick(language, "Selon les montants saisis", "From your entered amounts")}</small></article>
+                <article><span>{pick(language, "Réserve disponible", "Available reserve")}</span><strong>{reserveMonths === null ? pick(language, "À préciser", "To add") : `${reserveMonths.toFixed(1)} ${pick(language, "mois", "months")}`}</strong><small>{pick(language, "Dépenses essentielles couvertes", "Essential expenses covered")}</small></article>
+              </div>
+            )}
+            {!journeyMode ? <div className="anatole-conseil-attention" data-testid="conseil-priority-alert">
+              <span className="eyebrow">{pick(language, "POINT D’ATTENTION", "POINT TO WATCH")}</span>
+              <p>{priorityAlert ? pick(language, priorityAlert.fr, priorityAlert.en) : pick(language, "Aucune alerte prioritaire selon les informations fournies.", "No priority alert based on the information provided.")}</p>
+            </div> : null}
+            <div className="anatole-conseil-next" data-testid="conseil-next-action">
+              <div><span className="eyebrow">{pick(language, "PROCHAINE ACTION", "NEXT STEP")}</span><h2>{pick(language, nextAction.fr, nextAction.en)}</h2>
+                <p>{journeyMode ? pick(language, "Quelques réponses suffisent pour commencer.", "A few answers are enough to begin.") : pick(language, "Votre plan reste accessible sans recommencer le questionnaire.", "Your plan stays available without repeating the questionnaire.")}</p></div>
+              <button type="button" className="anatole-ws_primaryButton__" onClick={() => selectSpace(nextAction.space)}>{pick(language, "Continuer", "Continue")} <ArrowRight size={16} /></button>
+            </div>
+            {profileProgress < 100 ? <p className="anatole-conseil-completion">{pick(language, "À compléter : les informations manquantes sont visibles dans Mon dossier.", "To complete: missing information is shown in My file.")}</p> : null}
+          </>
+        )}
+        <details className="anatole-conseil-advanced" data-testid="advisor-v9-advanced"
+          onToggle={(event) => { if (event.currentTarget.open) setAdvancedOpen((current) => ({ ...current, v9: true })); }}>
+          <summary>{pick(language, "Analyses avancées : signaux, événements et décisions", "Advanced analysis: signals, events and decisions")}</summary>
+          {hydrated && advancedOpen.v9 ? <ConseilModuleBoundary language={language}><AdvisorV9Layer profile={profile} goalLabel={goalLabel} language={language} portfolioCount={portfolio.length} /></ConseilModuleBoundary> : null}
+        </details>
+      </section>
 
-          <details
-            className={"anatole-ws_legacyAdvice__"}
-            data-testid="advisor-v8-legacy"
-          >
-            <summary>
-              <span>
-                <strong>
-                  {pick(
-                    language,
-                    "Outils V8 avancés",
-                    "Advanced V8 tools",
-                  )}
-                </strong>
-                <small>
-                  {pick(
-                    language,
-                    "Compatibilité temporaire pendant la migration V10",
-                    "Temporary compatibility during the V10 migration",
-                  )}
-                </small>
-              </span>
-              <span>{pick(language, "Afficher", "Show")}</span>
-            </summary>
+      <section id="conseil-projects" className="anatole-conseil-space" data-testid="conseil-projects"
+        hidden={space !== "projects"} style={space !== "projects" ? { display: "none" } : undefined}>
+        {hydrated && visitedSpaces.has("projects") ? <ConseilModuleBoundary language={language}><AdvisorCommandCenter
+          profile={profile} plan={plan} profileProgress={profileProgress} goalLabel={goalLabel}
+          language={language} step={step} portfolioCount={portfolio.length} dashboardMode={!journeyMode}
+          onEditProfile={() => { setStep(1); setJourneyMode(true); selectSpace("dossier"); }}
+          onNewGoal={() => { setProfile(EMPTY_PROFILE); setPlan(null); setStep(1); setJourneyMode(true); selectSpace("dossier"); }}
+          onApplyProfile={(nextProfile) => { setProfile(nextProfile); setPlan(null); setStep(1); setJourneyMode(false); }}
+          onOpenAnalysis={() => { setStep(4); setJourneyMode(true); selectSpace("dossier"); }}
+        /></ConseilModuleBoundary> : null}
+        <details className="anatole-conseil-advanced" data-testid="advisor-v4-advanced"
+          onToggle={(event) => { if (event.currentTarget.open) setAdvancedOpen((current) => ({ ...current, v4: true })); }}>
+          <summary>{pick(language, "Atelier avancé : objectifs, dettes, fiscalité et décisions", "Advanced workbench: goals, debt, tax and decisions")}</summary>
+          {hydrated && advancedOpen.v4 ? <ConseilModuleBoundary language={language}><AdvisorV4Layer profile={profile} goalLabel={goalLabel} language={language}
+            portfolioCount={portfolio.length} dashboardMode={!journeyMode}
+            onApplyProfile={(nextProfile) => { setProfile(nextProfile); setPlan(null); setStep(1); setJourneyMode(false); }} /></ConseilModuleBoundary> : null}
+        </details>
+      </section>
 
-            <AdvisorV8Layer
-              profile={profile}
-              goalLabel={goalLabel}
-              language={language}
-              portfolioCount={portfolio.length}
-            />
-          </details>
-        </>
-      ) : null}
+      <section id="conseil-shop" className="anatole-conseil-space" data-testid="conseil-shop"
+        hidden={space !== "shop"} style={space !== "shop" ? { display: "none" } : undefined}>
+        {hydrated && visitedSpaces.has("shop") ? <ConseilModuleBoundary language={language}><ShoppingClient embedded /></ConseilModuleBoundary> : null}
+      </section>
 
-      {hydrated ? (
-        <AdvisorV4Layer
-          profile={profile}
-          goalLabel={goalLabel}
-          language={language}
-          portfolioCount={portfolio.length}
-          dashboardMode={!journeyMode}
-          onApplyProfile={(nextProfile) => {
-            setProfile(nextProfile);
-            setPlan(null);
-            setStep(1);
-            setJourneyMode(false);
-          }}
-        />
-      ) : null}
+      <section id="conseil-dossier" className="anatole-conseil-space" data-testid="conseil-dossier"
+        hidden={space !== "dossier"} style={space !== "dossier" ? { display: "none" } : undefined}>
+        <div className="anatole-conseil-dossierIntro">
+          <div><span className="eyebrow">{pick(language, "MON DOSSIER", "MY FILE")}</span>
+            <h2>{pick(language, "Vos informations, à votre rythme.", "Your information, at your pace.")}</h2>
+            <p>{pick(language, "Le profil et les données des anciennes versions restent disponibles sur cet appareil.", "Your profile and data from earlier versions remain available on this device.")}</p></div>
+          <span><LockKeyhole size={15} /> {pick(language, "Enregistré sur cet appareil", "Saved on this device")}</span>
+        </div>
+        {journeyMode && profile.goal_type ? <button type="button" className="anatole-conseil-closeForm"
+          onClick={() => { setJourneyMode(false); selectSpace("today"); }}>
+          {pick(language, "Revenir à Aujourd’hui", "Back to Today")}
+        </button> : null}
+        {!journeyMode ? <div className="anatole-conseil-profileSummary">
+          <div><span>{pick(language, "Projet actuel", "Current project")}</span><strong>{profile.goal_name || goalLabel}</strong></div>
+          <div><span>{pick(language, "Horizon", "Horizon")}</span><strong>{profile.horizon_years ?? "—"}</strong></div>
+          <div><span>{pick(language, "Profil", "Profile")}</span><strong>{profileProgress}%</strong></div>
+          <button type="button" className="anatole-ws_secondaryButton__" onClick={() => { setStep(1); setJourneyMode(true); }}>{pick(language, "Modifier mon profil", "Edit my profile")}</button>
+        </div> : null}
 
-      <AdvisorCommandCenter
-        profile={profile}
-        plan={plan}
-        profileProgress={profileProgress}
-        goalLabel={goalLabel}
-        language={language}
-        step={step}
-        portfolioCount={portfolio.length}
-        dashboardMode={!journeyMode}
-        onEditProfile={() => {
-          setStep(1);
-          setJourneyMode(true);
-        }}
-        onNewGoal={() => {
-          setProfile(EMPTY_PROFILE);
-          setPlan(null);
-          setStep(1);
-          setJourneyMode(true);
-        }}
-        onApplyProfile={(nextProfile) => {
-          setProfile(nextProfile);
-          setPlan(null);
-          setStep(1);
-          setJourneyMode(false);
-        }}
-        onOpenAnalysis={() => {
-          setStep(4);
-          setJourneyMode(true);
-        }}
-      />
+        {journeyMode ? <nav className={`panel ${"anatole-ws_guideStepper__"}`} aria-label={pick(language, "Étapes du plan", "Plan steps")}>
+          {STEPS.map((item) => {
+            const active = item.number === step;
+            const completed = item.number < step;
+            return <button type="button" key={item.number}
+              className={`${"anatole-ws_guideStep__"} ${active ? "anatole-ws_guideStepActive__" : ""} ${completed ? "anatole-ws_guideStepDone__" : ""}`}
+              aria-current={active ? "step" : undefined} onClick={() => setStep(item.number)}>
+              <span>{completed ? <Check size={14} /> : item.number}</span>
+              <div><strong>{advisorText(item.label, language)}</strong><small>{advisorText(item.description, language)}</small></div>
+            </button>;
+          })}
+        </nav> : null}
+
+        <details className="anatole-conseil-advanced" data-testid="advisor-v8-legacy"
+          onToggle={(event) => { if (event.currentTarget.open) setAdvancedOpen((current) => ({ ...current, v8: true })); }}>
+          <summary>{pick(language, "Outils avancés : historique, scénarios et dossier exportable", "Advanced tools: history, scenarios and exportable file")}</summary>
+          {hydrated && advancedOpen.v8 ? <ConseilModuleBoundary language={language}><AdvisorV8Layer profile={profile} goalLabel={goalLabel} language={language} portfolioCount={portfolio.length} /></ConseilModuleBoundary> : null}
+        </details>
 
       {journeyMode ? (
       <div className={"anatole-ws_guideShell__"}>
@@ -1206,6 +1251,7 @@ export function AssistantClient() {
         </aside>
       </div>
       ) : null}
+      </section>
     </main>
   );
 }

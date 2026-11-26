@@ -196,7 +196,7 @@ function QuestionView({
   );
 }
 
-export function ShoppingClient() {
+export function ShoppingClient({ embedded = false }: { embedded?: boolean }) {
   const { preferences } = usePreferences();
   const language = preferences.language;
   const searchParams = useSearchParams();
@@ -214,6 +214,7 @@ export function ShoppingClient() {
     useState<ShoppingCategoryId | null>(deepLinkedCategory);
   const [answers, setAnswers] = useState<ShoppingAnswers>({});
   const [questionIndex, setQuestionIndex] = useState(0);
+  const Container = embedded ? "section" : "main";
 
   const questions = useMemo(
     () =>
@@ -314,23 +315,25 @@ export function ShoppingClient() {
   }
 
   return (
-    <main className={"anatole-shopping_page__"}>
+    <Container className={`anatole-shopping_page__${embedded ? " anatole-shopping_embedded__" : ""}`}>
       <header className={"anatole-shopping_hero__"}>
         <div>
-          <Link href="/assistant" className={"anatole-shopping_backLink__"}>
+          {!embedded ? <Link href="/assistant" className={"anatole-shopping_backLink__"}>
             <ArrowLeft size={15} />
             {pick(language, "Anatole Conseil", "Anatole Advice")}
-          </Link>
+          </Link> : null}
           <span className={"anatole-shopping_eyebrow__"}>
             ANATOLE {pick(language, "MAGASINER", "SHOP")}
           </span>
-          <h1>
+          {embedded ? <h2>
+            {pick(language, "Trouvons le produit qui répond à votre besoin.", "Find the product that fits your need.")}
+          </h2> : <h1>
             {pick(
               language,
               "Dis-moi ce dont tu as besoin. Anatole fait le tri.",
               "Tell me what you need. Anatole sorts it out.",
             )}
-          </h1>
+          </h1>}
           <p>
             {pick(
               language,
@@ -833,6 +836,6 @@ export function ShoppingClient() {
           )}
         </section>
       ) : null}
-    </main>
+    </Container>
   );
 }
